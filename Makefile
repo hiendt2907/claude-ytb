@@ -1,9 +1,12 @@
-.PHONY: setup test run lint clean listen listen-install listen-uninstall listen-logs dashboard tunnel
+.PHONY: setup setup-f5 test run lint clean listen listen-install listen-uninstall listen-logs dashboard tunnel
 
+# Cài đặt đầy đủ trên máy mới: ffmpeg, .venv, requirements, .env, thư mục runtime.
 setup:
-	python3 -m venv .venv
-	.venv/bin/pip install -r requirements.txt
-	@echo "Cần ffmpeg: brew install ffmpeg"
+	bash scripts/setup.sh
+
+# Như setup, cộng thêm F5-TTS giọng nhân bản local (tải model ~5.4GB).
+setup-f5:
+	bash scripts/setup.sh --with-f5-voice
 
 test:
 	.venv/bin/pytest
