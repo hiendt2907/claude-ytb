@@ -3,46 +3,14 @@
 from pathlib import Path
 
 from pydantic import Field
-from pydantic_settings import (
-    BaseSettings,
-    JsonConfigSettingsSource,
-    PydanticBaseSettingsSource,
-    SettingsConfigDict,
-)
-
-# File config động: dashboard ghi vào đây. Ưu tiên CAO hơn .env (xem
-# settings_customise_sources) nên giá trị sửa trên web đè giá trị .env mặc định.
-# .env chỉ còn là nơi seed secrets gốc; mọi tiến trình (web, listener subprocess,
-# pipeline) đều đọc lại file này khi khởi tạo Settings.
-DYNAMIC_CONFIG_FILE = Path("data/config.json")
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
-        json_file=DYNAMIC_CONFIG_FILE,
-        json_file_encoding="utf-8",
         extra="ignore",
     )
-
-    @classmethod
-    def settings_customise_sources(
-        cls,
-        settings_cls: type[BaseSettings],
-        init_settings: PydanticBaseSettingsSource,
-        env_settings: PydanticBaseSettingsSource,
-        dotenv_settings: PydanticBaseSettingsSource,
-        file_secret_settings: PydanticBaseSettingsSource,
-    ) -> tuple[PydanticBaseSettingsSource, ...]:
-        # Thứ tự ưu tiên (cao → thấp): init > env shell > data/config.json (dashboard)
-        # > .env > secrets. Dashboard đè .env, nhưng env shell tường minh vẫn thắng.
-        return (
-            init_settings,
-            env_settings,
-            JsonConfigSettingsSource(settings_cls),
-            dotenv_settings,
-            file_secret_settings,
-        )
 
     # TTS
     tts_provider: str = "edge"  # edge | elevenlabs | f5
@@ -101,14 +69,6 @@ class Settings(BaseSettings):
     listener_skill: str = "/youtube-auto"
     # Cho phép lệnh /sh chạy shell tùy ý trên máy (mạnh + nguy hiểm). Bật có chủ đích.
     listener_allow_shell: bool = True
-
-    # Dashboard web — điều khiển + cấu hình qua trình duyệt (sau Cloudflare Tunnel).
-    dashboard_host: str = "127.0.0.1"   # 127.0.0.1 = chỉ local + tunnel; 0.0.0.0 = LAN
-    dashboard_port: int = 8765
-    # Mật khẩu đăng nhập dashboard. RỖNG = chặn truy cập (fail-safe khi expose ra ngoài).
-    dashboard_password: str = ""
-    # Khoá ký cookie session. Tự sinh nếu rỗng (mất khi restart = phải đăng nhập lại).
-    dashboard_secret_key: str = ""
 
 
 settings = Settings()

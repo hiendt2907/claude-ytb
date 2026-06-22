@@ -56,19 +56,9 @@ expose singleton `settings`. Mọi key (API keys, paths, provider, `dry_run`) đ
 không hardcode rải rác. `DRY_RUN=true` (mặc định) = render local, không upload thật —
 giữ nguyên hành vi này khi triển khai khâu publish.
 
-**Config động (dashboard):** ưu tiên nguồn là env shell > `data/config.json`
-(dashboard ghi, gitignored) > `.env` > secrets — xem `settings_customise_sources`.
-Thêm key sửa-được-trên-web: khai báo field trong `Settings` + thêm vào
-`web/config_store.py::FIELDS`. `config_store.save()` ghi atomic rồi reload singleton
-tại chỗ (`settings.__dict__.update`) để mọi module đã import thấy ngay.
-
-### Dashboard web (`web/`)
-
-FastAPI + Jinja2/HTMX, gọi thẳng module pipeline. `make dashboard` (uvicorn); đăng
-nhập bằng `DASHBOARD_PASSWORD` (session cookie). Cổng duyệt kịch bản chạy song song
-web + Telegram: `web/approvals.py` đăng ký qua `ideation.approval.set_approval_provider`.
-Job nền single-flight trong `web/jobs.py`. Từ xa qua Cloudflare Tunnel `ytb.nginxwaf.xyz`
-(README). KHÔNG commit `data/config.json` (chứa secrets).
+Không có UI web — điều khiển pipeline qua CLI (`make run`) và Telegram (listener
+daemon, `make listen-install`). Cổng duyệt kịch bản chỉ qua Telegram
+(`ideation/approval.py`).
 
 ## Ngách & series (định hướng nội dung)
 

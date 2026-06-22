@@ -11,21 +11,9 @@ trong code batch). Vì vậy cổng này chỉ DUYỆT / TỪ CHỐI:
 
 from __future__ import annotations
 
-from typing import Callable
-
 from ..config.settings import settings
-from ..notify.telegram import Decision, Verdict, request_approval, send_message
+from ..notify.telegram import Decision, request_approval, send_message
 from ..pkg.models import Script
-
-# Cho phép thay cổng duyệt (vd dashboard web đăng ký provider riêng). Mặc định
-# None = dùng Telegram. Provider nhận (title, body) trả về Verdict như Telegram.
-_approval_provider: Callable[[str, str], Verdict] | None = None
-
-
-def set_approval_provider(provider: Callable[[str, str], Verdict] | None) -> None:
-    """Đăng ký cổng duyệt thay thế Telegram cho tiến trình hiện tại."""
-    global _approval_provider
-    _approval_provider = provider
 
 
 class ScriptRevisionRequested(Exception):
@@ -43,13 +31,6 @@ def gate(script: Script) -> Script:
     """
     if not settings.telegram_approval:
         return script
-
-    # Cổng web (dashboard) thay Telegram nếu đã đăng ký provider.
-    if _approval_provider is not None:
-        verdict = _approval_provider(script.title, _format_full(script))
-        if verdict.decision is Decision.APPROVED:
-            return script
-        raise ScriptRevisionRequested(verdict.instruction)
 
     if not settings.telegram_bot_token or not settings.telegram_chat_id:
         print(

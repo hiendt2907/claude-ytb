@@ -1,4 +1,4 @@
-.PHONY: setup setup-f5 test run lint clean listen listen-install listen-uninstall listen-logs dashboard tunnel
+.PHONY: setup setup-f5 test run lint clean listen listen-install listen-uninstall listen-logs
 
 # Cài đặt đầy đủ trên máy mới: ffmpeg, .venv, requirements, .env, thư mục runtime.
 setup:
@@ -31,14 +31,3 @@ listen-uninstall:
 
 listen-logs:
 	tail -f assets/listener.out.log assets/listener.err.log
-
-# Dashboard web — điều khiển + cấu hình toàn pipeline trên 1 trang.
-# Host/port lấy từ settings (DASHBOARD_HOST/PORT). Cần DASHBOARD_PASSWORD đã đặt.
-dashboard:
-	.venv/bin/uvicorn ytb_pipeline.web.app:app \
-		--host $${DASHBOARD_HOST:-127.0.0.1} --port $${DASHBOARD_PORT:-8765} \
-		--app-dir src
-
-# Mở Cloudflare Tunnel tới dashboard (config riêng, không đụng tunnel khác).
-tunnel:
-	cloudflared tunnel --config $(HOME)/.cloudflared/ytb-dashboard.yml run ytb-dashboard
