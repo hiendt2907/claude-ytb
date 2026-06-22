@@ -1,0 +1,7 @@
+[1/4] Ideation  ✓  3 Thói Quen Buổi Sáng Thay Đổi Cả Cuộc Đời Bạn (5 đoạn)
+[2/4] Voiceover ✓  assets/audio/3-thoi-quen-buoi-sang-thay-oi-ca-cuoc-oi-ban.mp3  (32.4s)
+[3/4] Render    ✓  (ai) assets/output/3-thoi-quen-buoi-sang-thay-oi-ca-cuoc-oi-ban.mp4
+  ✓ Đã upload: https://youtu.be/tGjjuq2QK-Y
+  ⚠ Không đặt được thumbnail (kênh cần verify?): <HttpError 403 when requesting https://youtube.googleapis.com/upload/youtube/v3/thumbnails/set?videoId=tGjjuq2QK-Y&alt=json&uploadType=media returned "The authenticated user doesn't have permissions to upload and set custom video thumbnails.". Details: "[{'message': "The authenticated user doesn't have permissions to upload and set custom video thumbnails.", 'domain': 'youtube.thumbnail', 'reason': 'forbidden', 'location': 'Authorization', 'locationType': 'header'}]">
+[4/4] Publish   ✓  uploaded=True
+Xong: uploaded=True url=https://youtu.be/tGjjuq2QK-Y

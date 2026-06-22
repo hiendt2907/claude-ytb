@@ -1,0 +1,164 @@
+{
+  "topic": "nghich-ly-lua-chon",
+  "title": "Nghịch Lý Lựa Chọn: Vì Sao Càng Nhiều Phương Án Càng Tê Liệt",
+  "target_minutes": 10,
+  "voice": "vi-VN-NamMinhNeural",
+  "description": "Nhiều lựa chọn lẽ ra phải khiến ta tự do và hạnh phúc hơn. Vậy vì sao đứng trước một thực đơn dài, một kệ hàng đầy ắp, hay hàng trăm phương án, ta lại tê liệt, chọn đại, rồi tiếc nuối? Tập này giải thích Nghịch lý lựa chọn — cơ chế vì sao quá nhiều phương án lại bào mòn quyết định của bạn — và ba cách thiết kế lại lựa chọn để hành động dứt khoát hơn.\n\nChương:\n00:00 Nghịch lý: tự do chọn lựa lại khiến ta tê liệt\n01:10 Vấn đề: tê liệt, kiệt sức, và tiếc nuối\n03:00 Cơ chế: thí nghiệm gian hàng mứt năm 2000\n06:00 Khung áp dụng: 3 cách thiết kế lại lựa chọn\n08:40 Mặt tối, chốt và cầu nối tập sau\n\nNguồn tham khảo: Iyengar S. & Lepper M. (2000), 'When Choice is Demotivating', Journal of Personality and Social Psychology; Barry Schwartz, 'The Paradox of Choice: Why More Is Less' (2004); nghiên cứu quỹ hưu trí 401(k) của Sheena Iyengar, Đại học Columbia.",
+  "tags": ["tâm lý học", "phát triển bản thân", "nghịch lý lựa chọn", "ra quyết định", "khoa học hành vi", "mental models", "choice overload", "năng suất"],
+  "compliance": {
+    "passed": true,
+    "community": "Nội dung giáo dục về tâm lý học ra quyết định, không vi phạm tiêu chuẩn cộng đồng; không nội dung nguy hiểm/thù ghét/người lớn.",
+    "copyright": "Kịch bản gốc tự viết; B-roll lấy từ Pexels (giấy phép free-to-use); không dùng nhạc/clip có bản quyền.",
+    "accuracy": "Các nghiên cứu dẫn ra đều truy được: Iyengar & Lepper 2000 đăng Journal of Personality and Social Psychology (thí nghiệm gian hàng mứt ở chợ Draeger's, California); Barry Schwartz 'The Paradox of Choice' 2004; nghiên cứu 401(k) của Iyengar tại Columbia.",
+    "advertiser": "Chủ đề trung tính, advertiser-friendly; không cờ bạc/thuốc/vũ khí/nội dung nhạy cảm.",
+    "coppa": "Không nhắm trẻ em; nội dung cho khán giả trưởng thành quan tâm phát triển bản thân.",
+    "notes": "Đã rà 3 gate ngách (mục 0c): không self-help hô khẩu hiệu, mật độ ý cao, mọi số liệu/tên riêng có nguồn truy được (đặc biệt các con số thí nghiệm mứt)."
+  },
+  "sections": [
+    {
+      "narration": "Mến chào các bạn, đây là Nghịch Lý Lựa Chọn: vì sao càng nhiều phương án bạn lại càng tê liệt. Hãy nhớ lại lần gần nhất bạn mở một ứng dụng xem phim. Hàng nghìn bộ phim trong tầm tay. Bạn lướt mười phút, hai mươi phút, thêm vào danh sách rồi lại bỏ ra, và cuối cùng tắt máy đi ngủ mà chưa xem nổi một phút nào. Lẽ ra càng nhiều lựa chọn càng tốt chứ? Vậy mà bạn lại thấy mệt và bực hơn là sung sướng. Đây không phải vì bạn khó tính. Đây là một cơ chế tâm lý đã được đo đạc rất rõ.",
+      "caption": "Tự do chọn lựa lại khiến ta tê liệt",
+      "broll": "person scrolling endless streaming menu indecisive",
+      "hook": true
+    },
+    {
+      "narration": "Ta lớn lên với một niềm tin gần như hiển nhiên: càng nhiều lựa chọn thì càng tự do, mà càng tự do thì càng hạnh phúc. Đó là lý do cửa hàng nào cũng tự hào vì có hàng trăm mẫu mã, thực đơn nào cũng dài mấy trang. Nhưng có một ngưỡng mà ở đó mọi thứ đảo chiều. Quá ngưỡng đó, thêm một lựa chọn không còn cho bạn thêm tự do, mà cộng thêm một gánh nặng. Và bộ não con người chạm ngưỡng đó sớm hơn ta tưởng rất nhiều.",
+      "caption": "Có một ngưỡng mà ở đó mọi thứ đảo chiều",
+      "broll": "overwhelming supermarket shelf many products",
+      "emphasis": ["MỘT NGƯỠNG ĐẢO CHIỀU"]
+    },
+    {
+      "narration": "Cái giá đầu tiên của quá nhiều lựa chọn là sự tê liệt. Khi đứng trước hai phương án, bạn so sánh và chọn trong vài giây. Khi đứng trước ba mươi phương án, việc so sánh tất cả với nhau trở nên bất khả thi, nên bộ não làm điều dễ nhất: trì hoãn, để đó, không quyết. Càng nhiều phương án, xác suất bạn không chọn gì cả lại càng cao. Đây nghe có vẻ vô lý, nhưng nó lặp lại trong hết thí nghiệm này đến thí nghiệm khác.",
+      "caption": "Càng nhiều phương án, xác suất không chọn gì càng cao",
+      "broll": "person frozen in front of large menu board"
+    },
+    {
+      "narration": "Cái giá thứ hai là sự kiệt sức. Mỗi lần cân nhắc một lựa chọn, dù nhỏ, bộ não tiêu tốn một chút năng lượng ra quyết định. Sáng ra bạn chọn mặc gì, ăn gì, đi đường nào, trả lời tin nào trước. Đến trưa, cái cơ bắp ra quyết định đã mỏi, và chất lượng lựa chọn của bạn tụt xuống. Một danh sách phương án dài không chỉ làm bạn chọn lâu hơn, nó còn rút cạn cái năng lượng mà lẽ ra bạn để dành cho những quyết định thật sự quan trọng trong ngày.",
+      "caption": "Mỗi lựa chọn rút một chút năng lượng ra quyết định",
+      "broll": "tired person rubbing eyes at desk afternoon"
+    },
+    {
+      "narration": "Hiện tượng này có một cái tên và một bằng chứng gây sốc. Năm 2011, một nhóm nghiên cứu công bố trên kỷ yếu Viện Hàn lâm Khoa học Quốc gia Hoa Kỳ một phân tích các phiên xử ân xá của thẩm phán ở Israel. Họ phát hiện ngay đầu buổi sáng, hoặc ngay sau giờ nghỉ ăn, tỉ lệ thẩm phán chấp thuận ân xá lên tới khoảng sáu mươi lăm phần trăm. Nhưng càng về cuối mỗi phiên, khi đã ra hàng loạt quyết định liên tiếp, tỉ lệ chấp thuận tụt dần về gần như bằng không. Cùng một hồ sơ, số phận một con người có thể khác nhau chỉ vì nó được xét lúc bộ não thẩm phán còn tươi hay đã cạn.",
+      "caption": "2011, nghiên cứu thẩm phán Israel: cạn năng lượng thì quyết tệ đi",
+      "broll": "judge gavel courtroom serious",
+      "emphasis": ["65% xuống GẦN 0%"]
+    },
+    {
+      "narration": "Và cái giá thứ ba, âm thầm nhưng dai dẳng nhất, là sự tiếc nuối. Khi bạn chọn một trong ba thứ, bạn bỏ lại hai. Khi bạn chọn một trong ba mươi thứ, bạn bỏ lại hai mươi chín. Càng nhiều phương án bị bỏ lại, bạn càng dễ tưởng tượng rằng đâu đó trong số đó có một lựa chọn tốt hơn cái bạn vừa chọn. Thế là ngay cả khi đã quyết, bạn vẫn không thấy hài lòng, vì cái bóng của những phương án không chọn cứ ám lấy bạn.",
+      "caption": "Càng nhiều phương án bỏ lại, càng dễ tiếc nuối",
+      "broll": "person looking back doubtful many doors",
+      "transition": true
+    },
+    {
+      "narration": "Vậy bằng chứng ở đâu? Năm 2000, hai nhà tâm lý học Sheena Iyengar và Mark Lepper công bố một thí nghiệm trở thành kinh điển, đăng trên Journal of Personality and Social Psychology. Họ dựng một gian hàng nếm thử mứt trong một chợ thực phẩm cao cấp tên Draeger's ở California. Vào những giờ khác nhau, họ đổi số loại mứt bày ra. Có lúc bày sáu loại. Có lúc bày tới hai mươi bốn loại. Rồi họ lặng lẽ đếm hai con số: bao nhiêu người dừng lại nếm, và bao nhiêu người thật sự mua.",
+      "caption": "2000, chợ Draeger's — gian hàng nếm thử mứt",
+      "broll": "jam jars display tasting booth grocery store",
+      "emphasis": ["6 LOẠI hay 24 LOẠI"]
+    },
+    {
+      "narration": "Kết quả phần đầu đúng như trực giác. Gian hàng bày hai mươi bốn loại mứt thu hút nhiều người dừng lại hơn: khoảng sáu mươi phần trăm khách đi ngang ghé vào nếm, so với chỉ bốn mươi phần trăm ở gian hàng sáu loại. Nhiều lựa chọn rõ ràng hấp dẫn hơn, kéo được nhiều sự chú ý hơn. Nếu câu chuyện dừng ở đây, ta sẽ kết luận càng nhiều càng tốt. Nhưng con số thứ hai mới là cú lật.",
+      "caption": "24 loại hút khách hơn: 60% ghé nếm so với 40%",
+      "broll": "crowd gathering around busy stall"
+    },
+    {
+      "narration": "Trong số những người dừng lại ở gian hàng hai mươi bốn loại, chỉ khoảng ba phần trăm rốt cuộc mua một hũ mứt. Còn ở gian hàng chỉ sáu loại, con số đó là khoảng ba mươi phần trăm. Hãy dừng lại ở đây một giây. Gian hàng ít lựa chọn hơn bán được nhiều gấp khoảng mười lần tính theo tỉ lệ người mua. Nhiều lựa chọn kéo người ta tới, nhưng chính nó lại khiến người ta không thể quyết, và bỏ đi tay không. Đó là nghịch lý lựa chọn được bắt tận tay.",
+      "caption": "Nhưng chỉ 3% mua ở quầy 24 loại, so với 30% ở quầy 6 loại",
+      "broll": "empty handed shopper walking away",
+      "emphasis": ["ÍT LỰA CHỌN BÁN GẤP ~10 LẦN"]
+    },
+    {
+      "narration": "Để hiểu vì sao chuyện này xảy ra, ta cần nhìn vào cái bộ não phải làm khi so sánh các phương án. Mỗi lựa chọn không phải là một điểm đơn giản; nó là một bó các thuộc tính: giá, chất lượng, hương vị, thương hiệu, cảm giác. Khi có sáu phương án, số cặp cần so sánh còn ít, bộ não kham được. Khi có hai mươi bốn phương án, số cặp so sánh tăng lên theo cấp số nhân, vượt xa khả năng của trí nhớ làm việc vốn chỉ giữ được vài cụm thông tin cùng lúc. Bộ não bị quá tải, và phản ứng tự nhiên khi quá tải là rút lui.",
+      "caption": "Số phép so sánh tăng theo cấp số nhân, não quá tải",
+      "broll": "complex network connections overload illustration",
+      "emphasis": ["QUÁ TẢI thì RÚT LUI"]
+    },
+    {
+      "narration": "Có một lớp cơ chế thứ hai sâu hơn, gọi là chi phí cơ hội. Mỗi phương án hấp dẫn mà bạn không chọn trở thành một mất mát tưởng tượng. Với sáu loại mứt, bạn bỏ lại năm. Với hai mươi bốn loại, bạn bỏ lại hai mươi ba mất mát tiềm tàng. Trước khi kịp tận hưởng thứ mình chọn, bạn đã phải gánh cảm giác đánh đổi nặng nề. Càng nhiều phương án tốt, cái cảm giác mình đang bỏ lỡ thứ gì đó càng lớn, và niềm vui của lựa chọn cuối cùng càng bị bào mòn.",
+      "caption": "Mỗi phương án không chọn là một mất mát tưởng tượng",
+      "broll": "person imagining alternative paths fading"
+    },
+    {
+      "narration": "Nhà tâm lý học Barry Schwartz gói toàn bộ hiện tượng này vào một cuốn sách năm 2004 mang tên Nghịch lý của sự lựa chọn. Ông phân biệt hai kiểu người ra quyết định. Người tối đa hoá luôn cố tìm cho ra phương án tốt nhất tuyệt đối, nên phải xét hết mọi lựa chọn. Người đủ tốt thì đặt ra tiêu chuẩn vừa đủ, gặp phương án đạt tiêu chuẩn là chọn và đi tiếp. Điều đáng nói là Schwartz dẫn các nghiên cứu cho thấy người tối đa hoá thường ra quyết định khách quan tốt hơn một chút, nhưng lại kém hài lòng và dễ trầm uất hơn hẳn.",
+      "caption": "Barry Schwartz, 2004 — người tối đa hoá và người đủ tốt",
+      "broll": "two contrasting shoppers careful versus quick",
+      "transition": true
+    },
+    {
+      "narration": "Hãy ngẫm kỹ chỗ này, vì nó là trái tim của vấn đề. Người tối đa hoá chọn được thứ tốt hơn một chút, nhưng phải trả giá bằng nhiều giờ cân nhắc, nhiều căng thẳng, và một nỗi tiếc nuối triền miên rằng biết đâu vẫn còn thứ tốt hơn. Người đủ tốt chấp nhận một thứ vừa đủ tốt, nhanh chóng, rồi dành năng lượng còn lại cho việc sống. Tính trên tổng thể hạnh phúc và thời gian, người đủ tốt thường thắng. Cái tốt nhất, hoá ra, lại là kẻ thù của cái đủ tốt.",
+      "caption": "Cái 'tốt nhất' là kẻ thù của cái 'đủ tốt'",
+      "broll": "calm satisfied person making quick choice",
+      "emphasis": ["ĐỦ TỐT thường THẮNG"]
+    },
+    {
+      "narration": "Và đây không chỉ là chuyện mứt hay phim ảnh. Sheena Iyengar còn nghiên cứu các quỹ hưu trí tại Đại học Columbia. Bà phát hiện rằng khi công ty đưa ra càng nhiều phương án quỹ đầu tư cho nhân viên chọn, thì tỉ lệ nhân viên thật sự tham gia đóng góp lại càng giảm. Cứ thêm một nhóm phương án nữa, lại có thêm người, vì rối quá, chọn cách không làm gì cả, và bỏ lỡ cả khoản tiền công ty hỗ trợ. Quá nhiều lựa chọn ở đây không chỉ gây khó chịu, nó khiến người ta mất tiền thật.",
+      "caption": "Nghiên cứu quỹ hưu trí: nhiều phương án hơn, ít người tham gia hơn",
+      "broll": "confused employee looking at investment options form"
+    },
+    {
+      "narration": "Thời đại số đẩy cơ chế này lên cực điểm, vì giờ đây số lựa chọn gần như vô hạn. Hãy nghĩ tới các ứng dụng hẹn hò. Khi chỉ có vài người để gặp trong một ngôi làng nhỏ, người ta tìm hiểu kỹ và gắn bó. Khi có hàng nghìn hồ sơ chỉ cách một cái vuốt tay, mỗi người đối diện lại bị âm thầm so sánh với cả một biển người tiềm năng chưa gặp. Kết quả là nhiều người vuốt mãi không dừng, không ai đủ tốt, vì cái tốt nhất giả định luôn nằm ở cú vuốt tiếp theo. Vô hạn lựa chọn không tạo ra vô hạn hài lòng; nó tạo ra một sự bồn chồn không bao giờ ngơi.",
+      "caption": "Thời đại số: lựa chọn vô hạn tạo ra bồn chồn vô hạn",
+      "broll": "person endlessly swiping dating app phone",
+      "emphasis": ["CÁI TỐT NHẤT luôn ở CÚ VUỐT SAU"]
+    },
+    {
+      "narration": "Có một chi tiết tinh tế giải thích vì sao vô hạn lựa chọn lại độc hại đến vậy: nó phá huỷ cảm giác cam kết. Khi bạn biết đây là lựa chọn cuối cùng, bạn dồn toàn bộ tâm trí để làm cho nó tốt đẹp. Nhưng khi bạn biết luôn còn phương án khác, một phần trong bạn giữ lại, không dám đầu tư trọn vẹn, phòng khi cần đổi. Trớ trêu thay, chính cái sự giữ lại đó khiến lựa chọn hiện tại khó mà tốt lên được, và bạn lại càng có cớ để tin rằng đáng lẽ mình nên chọn cái khác.",
+      "caption": "Vô hạn lựa chọn phá huỷ cảm giác cam kết trọn vẹn",
+      "broll": "person hesitating half committed looking away"
+    },
+    {
+      "narration": "Giờ ta sang phần áp dụng, vì hiểu cơ chế chỉ có ích khi đổi được cách làm. Cách thứ nhất: đặt tiêu chuẩn trước khi nhìn vào các phương án, đừng đặt sau. Trước khi mở trang mua hàng, hãy quyết trước: tôi cần một chiếc tai nghe dưới một mức giá, pin trên một số giờ, có chống ồn. Khi đã có bộ tiêu chuẩn, bạn không còn so sánh ba mươi món với nhau nữa; bạn chỉ lọc ra vài món đạt chuẩn rồi chọn cái đầu tiên trong số đó. Bạn vừa biến mình từ người tối đa hoá thành người đủ tốt một cách có chủ đích.",
+      "caption": "Cách 1: Đặt tiêu chuẩn TRƯỚC khi nhìn phương án",
+      "broll": "person writing criteria checklist before shopping",
+      "emphasis": ["CHUẨN TRƯỚC, CHỌN SAU"]
+    },
+    {
+      "narration": "Cách thứ hai: chủ động cắt bớt phương án thay vì cố xét hết. Đây nghe ngược đời, vì ta được dạy phải cân nhắc mọi khả năng. Nhưng nếu một danh sách dài làm bạn tê liệt, hãy đặt ra một luật đơn giản: chỉ xét tối đa ba lựa chọn cùng lúc. Lướt thực đơn, chọn ra ba món tiềm năng đầu tiên, gập thực đơn lại, rồi chỉ quyết giữa ba món đó. Việc tự giới hạn không làm bạn nghèo lựa chọn đi; nó trả lại cho bạn khả năng thật sự quyết được, thay vì chết chìm trong khả năng.",
+      "caption": "Cách 2: Tự giới hạn xuống còn vài lựa chọn",
+      "broll": "hand narrowing down options to three cards"
+    },
+    {
+      "narration": "Lấy một ví dụ rất đời thường. Bạn cần mua một cái nồi chiên không dầu. Có hàng trăm mẫu. Người tối đa hoá sẽ mở hai mươi tab, đọc trăm bài đánh giá, ba ngày sau vẫn chưa mua, và đầu thì căng như dây đàn. Người áp dụng hai cách trên sẽ làm thế này: định trước ngân sách và hai tính năng bắt buộc, lọc ra đúng ba mẫu đạt chuẩn có đánh giá tốt, chọn mẫu rẻ nhất trong ba, đặt hàng, đóng máy. Cả hai có thể mua được cái nồi gần như nhau, nhưng một người mất ba ngày và một tâm trạng tệ, người kia mất hai mươi phút.",
+      "caption": "Ví dụ: mua nồi chiên — 3 ngày căng thẳng hay 20 phút",
+      "broll": "person comparing kitchen appliances online quickly"
+    },
+    {
+      "narration": "Cách thứ ba, và đây là cách giải toả nhất: với những quyết định nhỏ, hãy cố tình làm cho chúng không thể đảo ngược, hoặc tự động hoá chúng đi. Nghiên cứu cho thấy khi một lựa chọn đã chốt và không rút lại được, người ta lại hài lòng với nó hơn so với khi vẫn còn cửa đổi ý. Vì sao? Vì khi không thể đổi, bộ não thôi so sánh với các phương án khác và bắt đầu tìm lý do để yêu cái mình đang có. Còn khi cửa đổi ý vẫn mở, nó cứ canh cánh nhìn ra ngoài.",
+      "caption": "Cách 3: Quyết định nhỏ — chốt cứng, đừng để cửa đổi ý",
+      "broll": "closing door firmly decision made",
+      "emphasis": ["CHỐT CỨNG = HÀI LÒNG HƠN"],
+      "transition": true
+    },
+    {
+      "narration": "Cụ thể hơn, hãy gom những lựa chọn lặp đi lặp lại hàng ngày thành thói quen cố định để khỏi phải quyết lại mỗi lần. Ăn sáng cùng một vài món xoay vòng. Mặc một kiểu trang phục công sở gần như đồng phục. Nhiều người làm việc cường độ cao cố tình thu hẹp những lựa chọn vặt vãnh này, không phải vì họ nghèo nàn, mà để dành nguyên cái năng lượng ra quyết định cho công việc đáng giá. Bạn chỉ có một bình năng lượng quyết định mỗi ngày; đừng tiêu nó vào việc chọn tất.",
+      "caption": "Gom lựa chọn vặt thành thói quen, để dành năng lượng",
+      "broll": "minimalist wardrobe identical outfits row"
+    },
+    {
+      "narration": "Nhưng phải nói thẳng một mặt còn lại, nếu không bạn sẽ hiểu lệch. Nghịch lý lựa chọn không có nghĩa là ít lựa chọn luôn tốt hơn nhiều lựa chọn. Với những quyết định lớn và hiếm, như chọn nơi sống hay nghề nghiệp, việc xem xét kỹ nhiều phương án là xứng đáng. Vấn đề chỉ nảy sinh khi ta đổ cùng một mức công sức cân nhắc vào cả những chuyện cỏn con. Chìa khoá không phải là luôn ít đi, mà là biết phân loại: đâu là quyết định đáng cân não, đâu là quyết định chỉ cần đủ tốt.",
+      "caption": "Mặt còn lại: phân loại quyết định lớn và quyết định vặt",
+      "broll": "scale weighing big versus small decisions"
+    },
+    {
+      "narration": "Một mẹo phân loại đơn giản mà rất hiệu quả là tự hỏi: quyết định này tốn của tôi bao nhiêu nếu chọn sai, và tôi có sửa lại được không? Nếu sai chỉ mất vài chục nghìn và sửa được trong một phút, thì cân nhắc quá ba mươi giây là đang lãng phí đời mình. Hãy chọn nhanh và đi tiếp. Còn nếu sai sẽ ảnh hưởng nhiều năm và khó đảo ngược, đó mới là lúc xứng đáng mở nhiều phương án ra, ngồi xuống, và cân nhắc cho thật kỹ. Dồn sự kỹ lưỡng vào đúng chỗ chính là bản chất của ra quyết định thông minh.",
+      "caption": "Mẹo phân loại: sai thì mất gì, và có sửa được không?",
+      "broll": "person thinking decision matrix reversible cost",
+      "emphasis": ["DỒN KỸ LƯỠNG VÀO ĐÚNG CHỖ"]
+    },
+    {
+      "narration": "Và đây là mặt tối cần cảnh giác. Cũng như nhiều cơ chế tâm lý khác, nghịch lý lựa chọn bị khai thác để chống lại bạn. Các trang bán hàng cố tình bày ra vô số phiên bản, rồi đặt cạnh đó một gói được tô đậm là lựa chọn phổ biến nhất, để khi bạn quá tải và mệt mỏi, bạn bám luôn vào cái họ muốn bạn chọn. Sự tê liệt của bạn chính là điểm tựa để họ lái quyết định. Biết được cơ chế, bạn mới nhận ra lúc nào sự rối rắm là vô tình, và lúc nào nó được dựng lên có chủ đích.",
+      "caption": "Mặt tối: người bán dùng sự quá tải để lái bạn",
+      "broll": "highlighted recommended pricing plan among many",
+      "emphasis": ["TÊ LIỆT thành ĐIỂM TỰA để LÁI BẠN"]
+    },
+    {
+      "narration": "Nếu hôm nay bạn chỉ giữ lại một điều, hãy để nó là điều này: tự do không nằm ở chỗ có thật nhiều lựa chọn, mà ở chỗ có khả năng quyết được rồi sống trọn với quyết định đó. Thêm phương án quá một ngưỡng không cho bạn thêm tự do, nó chỉ cộng thêm gánh nặng so sánh và tiếc nuối. Người làm chủ được lựa chọn không phải người xét nhiều nhất, mà là người biết khi nào nên dừng xét và bắt đầu chọn.",
+      "caption": "Tự do là quyết được rồi sống trọn với quyết định",
+      "broll": "confident person walking forward decision made calm"
+    },
+    {
+      "narration": "Câu hỏi tôi muốn để lại cho bạn là: quyết định nào trong cuộc sống đang khiến bạn tê liệt nhất vì có quá nhiều phương án? Hãy viết nó xuống phần bình luận, kèm bộ tiêu chuẩn vừa đủ mà bạn sẽ dùng để cắt danh sách đó xuống còn ba lựa chọn. Chỉ riêng việc viết ra tiêu chuẩn thôi đã đẩy bạn ra khỏi vùng tê liệt rồi. Và ở tập sau, ta sẽ đi vào một cơ chế họ hàng: vì sao một khi đã lỡ chọn và đổ công sức vào rồi, ta lại cố bám lấy lựa chọn đó dù trong lòng đã biết nó sai. Nếu tập này giúp bạn nhìn rõ hơn cái mệt khi phải chọn, hãy để lại một lượt thích và đăng ký kênh để không bỏ lỡ những cơ chế tiếp theo. Hẹn gặp lại các bạn ở tập tiếp theo.",
+      "caption": "Quyết định nào đang khiến bạn tê liệt nhất?",
+      "broll": "comment section engagement social media"
+    }
+  ]
+}

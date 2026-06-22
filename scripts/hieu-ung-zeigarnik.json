@@ -1,0 +1,163 @@
+{
+  "topic": "hieu-ung-zeigarnik",
+  "title": "Hiệu Ứng Zeigarnik: Vì Sao Việc Bạn Chưa Làm Xong Cứ Ám Ảnh Trong Đầu",
+  "target_minutes": 10,
+  "voice": "vi-VN-NamMinhNeural",
+  "description": "Vì sao một việc còn dang dở lại chiếm lấy tâm trí bạn nhiều hơn cả chục việc đã hoàn thành? Tập này giải thích Hiệu ứng Zeigarnik — cơ chế tâm lý đằng sau cảm giác 'đầu óc lúc nào cũng bận' — và cách biến nó thành công cụ thay vì để nó bào mòn bạn.\n\nChương:\n00:00 Nghịch lý: việc đã xong thì quên, việc dở dang thì nhớ\n01:10 Vấn đề: vì sao đầu bạn không bao giờ thật sự nghỉ\n03:00 Cơ chế: thí nghiệm người bồi bàn năm 1927\n05:30 Khung áp dụng: 3 cách dùng Zeigarnik có chủ đích\n08:30 Chốt và cầu nối tập sau\n\nNguồn tham khảo: Zeigarnik B. (1927); Masicampo & Baumeister (2011), Đại học Florida State; hiệu ứng Ovsiankina (Maria Ovsiankina, 1928).",
+  "tags": ["tâm lý học", "phát triển bản thân", "hiệu ứng zeigarnik", "tập trung", "năng suất", "khoa học hành vi", "mental models", "trì hoãn"],
+  "compliance": {
+    "passed": true,
+    "community": "Nội dung giáo dục về tâm lý học hành vi, không vi phạm tiêu chuẩn cộng đồng; không nội dung nguy hiểm/thù ghét/người lớn.",
+    "copyright": "Kịch bản gốc tự viết; B-roll lấy từ Pexels (giấy phép free-to-use); không dùng nhạc/clip có bản quyền.",
+    "accuracy": "Các nghiên cứu dẫn ra đều truy được: Zeigarnik 1927 (luận án dưới hướng dẫn Kurt Lewin), Masicampo & Baumeister 2011 đăng Journal of Personality and Social Psychology, hiệu ứng Ovsiankina 1928.",
+    "advertiser": "Chủ đề trung tính, advertiser-friendly; không cờ bạc/thuốc/vũ khí/nội dung nhạy cảm.",
+    "coppa": "Không nhắm trẻ em; nội dung cho khán giả trưởng thành quan tâm phát triển bản thân.",
+    "notes": "Đã rà 3 gate ngách (mục 0c): không self-help hô khẩu hiệu, mật độ ý cao, mọi số liệu/tên riêng có nguồn truy được."
+  },
+  "sections": [
+    {
+      "narration": "Mến chào các bạn, đây là Hiệu Ứng Zeigarnik: vì sao việc bạn chưa làm xong cứ ám ảnh trong đầu. Hãy thử nhớ lại: tối qua bạn ăn món gì, bạn còn nhớ không? Có thể đã quên. Nhưng cái email bạn chưa trả lời, cái tin nhắn còn dang dở, cái dự án bỏ giữa chừng tuần trước, thì sao? Chúng vẫn ở đó, lởn vởn trong đầu, đôi khi nhảy ra giữa lúc bạn đang cố ngủ. Đây không phải vì bạn vô kỷ luật. Đây là một cơ chế của bộ não đã được đặt tên từ gần một trăm năm trước.",
+      "caption": "Việc đã xong thì quên, việc dở dang thì nhớ",
+      "broll": "person lying awake at night thinking",
+      "hook": true
+    },
+    {
+      "narration": "Điều kỳ lạ là thế này: bộ não của bạn đối xử với việc đã hoàn thành và việc còn dang dở theo hai cách hoàn toàn khác nhau. Một việc bạn làm xong, bộ não gần như lập tức buông nó ra, xoá khỏi bộ nhớ tạm. Nhưng một việc còn treo lơ lửng, nó lại được giữ lại, được nhắc đi nhắc lại, như một tab trình duyệt mở mãi không tắt. Mười việc đã đóng không làm bạn mệt bằng một việc còn mở.",
+      "caption": "Não giữ lại việc dang dở như một tab không tắt",
+      "broll": "many browser tabs open on screen",
+      "emphasis": ["MỘT VIỆC CÒN MỞ"]
+    },
+    {
+      "narration": "Và đây là cái giá thật sự. Cảm giác đầu óc lúc nào cũng bận, lúc nào cũng có gì đó nhấp nháy ở rìa suy nghĩ, thường không đến từ việc bạn đang làm. Nó đến từ tất cả những việc bạn chưa làm xong nhưng vẫn đang mở trong nền. Mỗi việc dang dở chiếm một phần nhỏ sự chú ý của bạn. Bạn có thể chỉ đang làm một việc, nhưng bộ não đang gồng để giữ cho cả chục việc khác không bị quên.",
+      "caption": "Vì sao đầu bạn không bao giờ thật sự nghỉ",
+      "broll": "stressed person at messy desk many sticky notes"
+    },
+    {
+      "narration": "Để tôi đưa ra một con số dễ hình dung. Hãy tưởng tượng sự chú ý của bạn là một thanh pin một trăm phần trăm mỗi sáng. Mỗi việc dang dở mà bạn ôm trong đầu, chứ không phải ghi ra đâu đó, rút đi vài phần trăm pin chỉ để nhắc bạn rằng nó còn tồn tại. Mười việc treo lơ lửng, bạn khởi động ngày mới với cái đầu đã hao một phần lớn năng lượng, trước cả khi bắt tay vào việc đầu tiên. Đó là lý do nhiều người thấy mệt dù chưa làm được gì.",
+      "caption": "Mỗi việc treo lơ lửng rút một phần pin chú ý",
+      "broll": "low battery icon draining animation",
+      "transition": true
+    },
+    {
+      "narration": "Vậy cơ chế đằng sau là gì? Câu chuyện bắt đầu ở Berlin, năm 1927. Một nhà tâm lý học trẻ tên Bluma Zeigarnik ngồi trong quán cà phê cùng người thầy của mình là Kurt Lewin. Họ để ý một điều ở những người bồi bàn: người bồi bàn nhớ chính xác đến từng chi tiết những món mà bàn chưa thanh toán. Nhưng ngay khi khách trả tiền xong, họ gần như quên sạch món đó. Đơn hàng còn mở thì nhớ như in; đơn hàng đã đóng thì bay khỏi đầu.",
+      "caption": "Berlin, 1927 — người bồi bàn và đơn hàng chưa thanh toán",
+      "broll": "vintage cafe waiter serving tables black and white",
+      "emphasis": ["1927"]
+    },
+    {
+      "narration": "Zeigarnik không dừng ở quan sát. Bà mang nó vào phòng thí nghiệm. Bà cho các nghiệm viên làm một loạt nhiệm vụ nhỏ: xâu hạt, giải câu đố, nặn đất sét. Với một nửa số nhiệm vụ, bà để họ làm xong. Với nửa còn lại, bà cố tình ngắt giữa chừng, bảo họ dừng lại để chuyển sang việc khác. Sau đó bà hỏi: bạn nhớ được những nhiệm vụ nào? Kết quả lặp đi lặp lại một cách đáng kinh ngạc.",
+      "caption": "Thí nghiệm: làm xong một nửa, ngắt giữa chừng một nửa",
+      "broll": "hands solving puzzle close up"
+    },
+    {
+      "narration": "Những nhiệm vụ bị ngắt giữa chừng được nhớ tốt hơn khoảng chín mươi phần trăm so với những nhiệm vụ đã hoàn thành. Nói cách khác, chính việc chưa-xong làm cho ký ức về nó sống động và dai dẳng hơn hẳn. Từ đó hiện tượng này mang tên bà: Hiệu ứng Zeigarnik. Một việc dang dở tạo ra một loại căng thẳng tinh thần, và căng thẳng đó giữ cho việc ấy luôn hiện diện trong tâm trí, cho đến khi nó được giải toả.",
+      "caption": "Việc dang dở được nhớ tốt hơn ~90%",
+      "broll": "brain neurons firing illustration",
+      "emphasis": ["DANG DỞ = NHỚ DAI HƠN"]
+    },
+    {
+      "narration": "Hãy để ý mặt còn lại của phát hiện này, vì nó cũng quan trọng không kém. Một khi nhiệm vụ được hoàn thành, ký ức về nó phai đi rất nhanh. Bộ não coi mục tiêu đã đạt là việc có thể buông, nên nó chủ động giải phóng chỗ chứa. Đây là một thiết kế thông minh: nếu ta nhớ dai mọi việc đã làm xong y như việc còn dang dở, tâm trí sẽ tắc nghẽn ngay. Vấn đề chỉ nảy sinh khi ta liên tục mở việc mới mà hiếm khi thật sự khép lại việc cũ, khiến cán cân nghiêng hẳn về phía những vòng lặp chưa đóng.",
+      "caption": "Mặt còn lại: việc đã xong phai rất nhanh, và đó là thiết kế tốt",
+      "broll": "memory fading away particles dissolve"
+    },
+    {
+      "narration": "Để hiểu vì sao điều này xảy ra, ta cần nói tới trí nhớ làm việc. Trí nhớ làm việc là cái bảng nháp trong đầu, nơi bộ não giữ tạm những gì đang cần xử lý. Vấn đề là cái bảng này rất nhỏ; các nghiên cứu kinh điển trong tâm lý học nhận thức ước lượng nó chỉ giữ được chừng bốn cụm thông tin cùng lúc. Mỗi việc dang dở mà bạn để bộ não tự canh giữ sẽ chiếm một ô trên cái bảng nháp tí hon đó. Đó là lý do vật lý vì sao ôm nhiều việc mở trong đầu khiến bạn khó suy nghĩ rành mạch về bất cứ việc nào.",
+      "caption": "Trí nhớ làm việc chỉ giữ được vài cụm cùng lúc",
+      "broll": "small whiteboard limited space concept",
+      "emphasis": ["BẢNG NHÁP RẤT NHỎ"]
+    },
+    {
+      "narration": "Hãy hiểu cho đúng cơ chế, vì đây là phần quan trọng nhất. Khi bạn bắt đầu một việc, bộ não tạo ra một mục tiêu chưa hoàn thành. Để đảm bảo bạn quay lại làm nốt, nó giữ mục tiêu đó ở trạng thái hoạt động, liên tục đẩy nó lên bề mặt ý thức như một lời nhắc. Cơ chế này cực kỳ hữu ích thời nguyên thuỷ: nó ngăn tổ tiên ta bỏ dở việc săn bắt hay dựng chỗ trú. Nhưng trong thế giới hiện đại, nơi bạn mở ba mươi việc cùng lúc và không đóng cái nào, chính cơ chế ấy quay lại bào mòn bạn.",
+      "caption": "Não giữ mục tiêu chưa xong ở trạng thái hoạt động",
+      "broll": "ancient hunters chasing prey illustration"
+    },
+    {
+      "narration": "Và có một chi tiết thường bị bỏ qua, nhưng nó thay đổi tất cả. Năm 2011, hai nhà nghiên cứu Masicampo và Baumeister ở Đại học Florida State đặt một câu hỏi sắc bén: phải làm xong việc thì cái đầu mới yên, hay chỉ cần có một kế hoạch cụ thể là đủ? Họ làm thí nghiệm: cho người ta nghĩ về một việc dang dở quan trọng. Một nhóm chỉ nghĩ về nó. Nhóm kia được yêu cầu viết ra một kế hoạch cụ thể: khi nào, ở đâu, làm như thế nào.",
+      "caption": "2011, Florida State — làm xong, hay chỉ cần kế hoạch?",
+      "broll": "researcher writing on whiteboard study",
+      "transition": true
+    },
+    {
+      "narration": "Kết quả đảo ngược trực giác thông thường. Nhóm chỉ viết ra kế hoạch, dù chưa làm gì cả, đã thôi bị việc dang dở ám ảnh, và làm bài kiểm tra ngay sau đó tốt hơn hẳn nhóm còn lại. Bộ não không thật sự đòi bạn phải hoàn thành. Nó đòi được bảo đảm rằng việc đó sẽ được xử lý. Một kế hoạch cụ thể chính là lời bảo đảm đó. Viết nó ra, và bộ não chịu buông. Đây là chìa khoá để biến Zeigarnik từ kẻ thù thành công cụ.",
+      "caption": "Kế hoạch cụ thể đủ để não chịu buông",
+      "broll": "person writing checklist in notebook calm",
+      "emphasis": ["KẾ HOẠCH = LỜI BẢO ĐẢM"]
+    },
+    {
+      "narration": "Giờ ta sang phần áp dụng. Cách thứ nhất: đóng vòng lặp bằng giấy, đừng đóng nó bằng đầu. Mỗi khi một việc chưa-làm nảy ra trong đầu, đừng cố ghi nhớ nó, hãy viết nó ra ngay, càng cụ thể càng tốt: làm gì, bước đầu tiên là gì, khi nào làm. Hành động viết ra chính là tín hiệu bảo đảm mà nghiên cứu năm 2011 chỉ ra. Bạn không cần làm xong việc đó lúc này; bạn chỉ cần cho bộ não bằng chứng rằng nó đã được ghi nhận và sẽ được xử lý.",
+      "caption": "Cách 1: Đóng vòng lặp bằng giấy, không bằng đầu",
+      "broll": "hand writing todo list on paper"
+    },
+    {
+      "narration": "Ý tưởng này không chỉ nằm trong phòng thí nghiệm. Chuyên gia về năng suất David Allen, trong phương pháp nổi tiếng của ông, gọi chính những việc dang dở này là các vòng lặp mở. Toàn bộ hệ thống của ông xoay quanh một nguyên tắc: lấy mọi vòng lặp mở ra khỏi đầu và đưa vào một nơi đáng tin cậy bên ngoài, để tâm trí không phải làm cái việc mệt mỏi là vừa ghi nhớ vừa suy nghĩ. Ông gọi trạng thái đạt được là tâm trí tĩnh như mặt nước. Điều thú vị là một phương pháp thực hành phổ biến hàng triệu người dùng lại trùng khít với cái mà Zeigarnik phát hiện trong phòng thí nghiệm gần một thế kỷ trước.",
+      "caption": "David Allen gọi việc dang dở là 'vòng lặp mở'",
+      "broll": "organized desk notebook system calm"
+    },
+    {
+      "narration": "Lấy một ví dụ rất đời thường. Bạn là sinh viên đang ôn thi. Giữa lúc học, bạn chợt nhớ mình chưa đăng ký môn cho kỳ sau, chưa trả lời tin nhắn của mẹ, chưa đặt lịch cắt tóc. Nếu bạn để mặc, ba ý nghĩ đó sẽ cứ chen vào trang sách mỗi vài phút, và bạn học một tiếng nhưng chữ vào đầu chỉ bằng nửa. Nhưng nếu bạn dừng ba mươi giây, viết cả ba việc cùng bước đầu tiên ra một mẩu giấy để cạnh bàn, ba vòng lặp đó được đóng tạm. Bộ não nhận tín hiệu rằng chúng đã an toàn, và trả lại cho bạn trọn vẹn sự chú ý để học.",
+      "caption": "Ví dụ: ba việc vặt chen vào trang sách khi ôn thi",
+      "broll": "student studying interrupted by thoughts"
+    },
+    {
+      "narration": "Đây là lý do vì sao một danh sách việc cần làm tử tế khiến người ta thấy nhẹ đầu ngay lập tức, dù chưa hoàn thành thêm việc nào. Nó không phải phép màu năng suất; nó là cách bạn tắt bớt những tab đang chạy ngầm. Mẹo nhỏ nhưng quan trọng: viết bước hành động cụ thể, không phải viết chủ đề mơ hồ. Gọi cho nha sĩ đặt lịch sáng mai có sức giải toả lớn hơn nhiều so với chỉ viết hai chữ sức khoẻ.",
+      "caption": "Viết bước hành động cụ thể, không viết chủ đề mơ hồ",
+      "broll": "satisfied person crossing off list"
+    },
+    {
+      "narration": "Và đây là một hệ quả ít người để ý, nhưng nó giải thích vì sao bị ngắt ngang lại tai hại đến vậy. Khi bạn đang tập trung làm một việc rồi bị gián đoạn, dù chỉ để liếc một thông báo, bạn vừa tạo thêm một vòng lặp mở mới. Bộ não bây giờ phải gánh đồng thời cái việc cũ còn dang dở lẫn cái việc vừa chen ngang. Các nghiên cứu về sự gián đoạn trong công việc cho thấy phải mất nhiều phút người ta mới quay lại được độ tập trung như trước khi bị ngắt. Cái mất không chỉ là vài giây liếc điện thoại, mà là cả cái đuôi căng thẳng mà vòng lặp dở dang để lại phía sau.",
+      "caption": "Mỗi lần bị ngắt là một vòng lặp mở mới chồng lên",
+      "broll": "developer interrupted by notification at work"
+    },
+    {
+      "narration": "Cách thứ hai: dùng chính sự dang dở để đánh bại trì hoãn. Đây là mặt lật ngược của hiệu ứng. Nếu việc chưa-xong tạo ra căng thẳng kéo bạn quay lại, thì bí quyết để bắt đầu một việc bạn ngại không phải là ép mình làm hết, mà chỉ là bắt đầu một mẩu thật nhỏ. Viết đúng một câu của bản báo cáo. Mở tài liệu ra và gõ tiêu đề. Một khi đã mở vòng lặp, bộ não sẽ tự sinh ra áp lực nhẹ thúc bạn hoàn tất nó.",
+      "caption": "Cách 2: Mở một mẩu nhỏ để não tự kéo bạn làm tiếp",
+      "broll": "person starting to write first line laptop",
+      "emphasis": ["CHỈ CẦN BẮT ĐẦU"],
+      "transition": true
+    },
+    {
+      "narration": "Hiện tượng này thậm chí có tên riêng. Maria Ovsiankina, một đồng nghiệp của Zeigarnik, phát hiện năm 1928 rằng khi người ta bị ngắt giữa chừng một nhiệm vụ, họ có xu hướng tự động quay lại làm nốt nó ngay cả khi không ai yêu cầu. Sức kéo quay lại của việc dang dở mạnh đến mức đó. Vậy nên thay vì nhìn vào cả ngọn núi công việc rồi tê liệt, hãy cố tình tạo ra một vết dang dở nhỏ. Bắt đầu, rồi cho phép mình dừng. Bạn sẽ ngạc nhiên vì mình muốn quay lại.",
+      "caption": "Hiệu ứng Ovsiankina, 1928 — sức kéo quay lại việc dở",
+      "broll": "person drawn back to unfinished work"
+    },
+    {
+      "narration": "Cách thứ ba, và đây là cách tinh tế nhất: cố tình để dở đúng chỗ. Nhà văn Ernest Hemingway có một thói quen nổi tiếng: ông luôn dừng viết khi đang ở giữa một câu mà ông biết sẽ viết tiếp ra sao. Nghe có vẻ ngược đời, nhưng đó chính là Zeigarnik được dùng có chủ đích. Bằng cách để câu văn dang dở, ông giữ cho dự án luôn ở trạng thái mở trong đầu suốt đêm, để sáng hôm sau ngồi vào bàn là mạch viết đã sẵn sàng tuôn ra, không phải khởi động lại từ con số không.",
+      "caption": "Cách 3: Dừng giữa chừng có chủ đích, kiểu Hemingway",
+      "broll": "vintage typewriter unfinished page",
+      "emphasis": ["DỪNG KHI ĐANG DỞ"]
+    },
+    {
+      "narration": "Bạn có thể mượn đúng thủ thuật đó cho công việc của mình. Cuối buổi làm việc, đừng cố ép mình hoàn tất gọn ghẽ một phần rồi mới nghỉ. Hãy dừng lại khi bạn vẫn biết rõ bước tiếp theo là gì, và ghi nhanh bước đó ra. Ngày hôm sau bạn sẽ không phải đối mặt với một trang trắng và cảm giác ì ạch của việc bắt đầu lại; bạn bước thẳng vào một vòng lặp đang mở sẵn. Đây là cách những người làm việc sáng tạo lâu năm giữ cho động lực không bị nguội giữa các phiên.",
+      "caption": "Dừng khi còn biết rõ bước tiếp theo",
+      "broll": "person leaving desk with note for tomorrow"
+    },
+    {
+      "narration": "Có một cái bẫy ở đây cần nói rõ, nếu không bạn sẽ làm hỏng cả ba cách trên. Viết việc ra giấy chỉ giải toả được bộ não nếu bạn thật sự tin vào danh sách đó. Nếu bạn viết ra rồi không bao giờ xem lại, chỉ sau vài lần bộ não sẽ học được rằng cái danh sách kia là nơi việc đi vào để bị lãng quên, và nó sẽ lại giành quyền tự canh giữ mọi thứ, kéo căng thẳng quay về. Vì vậy nguyên tắc đi kèm là: phải có một thời điểm cố định bạn xem lại danh sách, dù chỉ mỗi sáng một lần. Lòng tin vào hệ thống mới là thứ khiến bộ não chịu buông, chứ không phải bản thân tờ giấy.",
+      "caption": "Cái bẫy: não chỉ buông nếu nó TIN vào danh sách",
+      "broll": "abandoned notes pile ignored",
+      "emphasis": ["PHẢI XEM LẠI ĐỀU"]
+    },
+    {
+      "narration": "Nhưng phải nói thẳng một mặt tối, nếu không bạn sẽ dùng sai. Hiệu ứng Zeigarnik cũng chính là thứ các nền tảng giải trí và mạng xã hội khai thác để giữ bạn dán mắt vào màn hình. Một tập phim kết thúc ngay giữa cao trào. Một thanh tiến trình hiện bạn mới hoàn thành bảy mươi phần trăm hồ sơ. Một thông báo nói còn một bước nữa thôi. Tất cả đều cố tình mở một vòng lặp trong đầu bạn và không cho đóng, để bạn phải quay lại. Biết cơ chế, bạn mới nhận ra khi nào mình đang bị nó điều khiển.",
+      "caption": "Mặt tối: nền tảng dùng Zeigarnik để giữ bạn",
+      "broll": "person scrolling phone late night glow",
+      "transition": true
+    },
+    {
+      "narration": "Vậy nên nguyên tắc gọn lại thế này. Việc dang dở tạo ra căng thẳng tinh thần, và căng thẳng đó là con dao hai lưỡi. Khi nó là vòng lặp của người khác cố mở trong đầu bạn, hãy chủ động đóng nó: đặt giới hạn, tắt thông báo, đừng để thanh tiến trình của ai đó chỉ huy buổi tối của bạn. Khi nó là vòng lặp của chính bạn, hãy dùng nó: mở một mẩu nhỏ để khởi động, hoặc viết kế hoạch ra giấy để giải toả. Cùng một cơ chế, hai cách dùng ngược nhau.",
+      "caption": "Con dao hai lưỡi: đóng vòng lặp của người khác, dùng vòng lặp của bạn",
+      "broll": "balance scale concept illustration",
+      "emphasis": ["CÙNG MỘT CƠ CHẾ, HAI CÁCH DÙNG"]
+    },
+    {
+      "narration": "Nếu hôm nay bạn chỉ giữ lại một điều, hãy để nó là điều này: cái mệt mỏi mơ hồ trong đầu bạn thường không phải vì bạn lười hay yếu đuối. Nó là tiếng vọng của những vòng lặp chưa đóng. Và bạn không cần làm xong tất cả để được yên; bạn chỉ cần đưa chúng ra khỏi đầu, đặt lên giấy thành những kế hoạch cụ thể. Bộ não chỉ đòi một lời bảo đảm, không đòi sự hoàn hảo. Tối nay, trước khi ngủ, hãy thử viết ra mọi việc đang treo lơ lửng. Bạn có thể sẽ ngủ ngon hơn bạn nghĩ.",
+      "caption": "Não đòi một lời bảo đảm, không đòi sự hoàn hảo",
+      "broll": "person sleeping peacefully calm bedroom"
+    },
+    {
+      "narration": "Câu hỏi tôi muốn để lại cho bạn là: ngay lúc này, vòng lặp dang dở nào đang ngốn nhiều năng lượng nhất trong đầu bạn? Hãy viết nó xuống phần bình luận, kèm bước đầu tiên nhỏ nhất để khép nó lại. Đôi khi chỉ cần gọi tên nó ra thôi cũng đã nhẹ đi một phần, vì bạn vừa chuyển nó từ một nỗi lo mơ hồ thành một bước hành động rõ ràng mà bộ não có thể yên tâm giao lại cho giấy bút. Và ở tập sau, chúng ta sẽ đi vào một cơ chế họ hàng gần với Zeigarnik, thứ giải thích vì sao càng cố gắng quên một điều thì nó lại càng quay lại mạnh hơn. Nếu tập này giúp bạn nhìn cái mệt trong đầu mình rõ hơn một chút, hãy để lại một lượt thích và đăng ký kênh để không bỏ lỡ những cơ chế tiếp theo. Hẹn gặp lại các bạn ở tập tiếp theo.",
+      "caption": "Vòng lặp nào đang ngốn năng lượng của bạn nhất?",
+      "broll": "comment section engagement social media"
+    }
+  ]
+}

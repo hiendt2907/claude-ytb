@@ -1,0 +1,59 @@
+{
+  "topic": "thien-kien-tieu-cuc",
+  "title": "Vì Sao 1 Lời Chê Ám Ảnh Hơn 10 Lời Khen — Thiên Kiến Tiêu Cực",
+  "voice": "vi-VN-NamMinhNeural",
+  "description": "Vì sao một bình luận tiêu cực duy nhất có thể ám ảnh bạn cả tuần, dù mười người khác vừa khen bạn? Short này giải thích Thiên kiến tiêu cực — cơ chế khiến não bộ cân điều xấu nặng hơn điều tốt — và 1 cách phòng thủ cụ thể.",
+  "tags": ["tâm lý học", "thiên kiến tiêu cực", "negativity bias", "khoa học hành vi", "mental models", "phát triển bản thân"],
+  "compliance": {
+    "passed": true,
+    "community": "Nội dung giáo dục tâm lý học, không vi phạm tiêu chuẩn cộng đồng; không nội dung nguy hiểm/thù ghét/người lớn.",
+    "copyright": "Kịch bản gốc tự viết; B-roll AI-generated/Pexels free-to-use; không dùng nhạc/clip có bản quyền.",
+    "accuracy": "Dẫn nghiên cứu Baumeister, Bratslavsky, Finkenauer & Vohs (2001), 'Bad Is Stronger Than Good', Review of General Psychology — đều truy được.",
+    "advertiser": "Chủ đề trung tính, advertiser-friendly; không cờ bạc/thuốc/vũ khí/nội dung nhạy cảm.",
+    "coppa": "Không nhắm trẻ em; nội dung cho khán giả trưởng thành quan tâm phát triển bản thân.",
+    "notes": "Đã rà 3 gate ngách (mục 0c): giải thích cơ chế không hô khẩu hiệu self-help; mật độ ý cao, không filler; số liệu/tên nghiên cứu (Baumeister 2001) truy được, không bịa. Khác biệt với các video cũ trong ledger: chưa video nào khai thác riêng thiên kiến tiêu cực (negativity bias) như một cơ chế độc lập."
+  },
+  "sections": [
+    {
+      "narration": "Mười người khen bạn xong việc tốt. Một người buông một câu chê. Tối đó, bạn nằm thao thức nhớ lại đúng câu chê đó, còn mười lời khen đã bay biến khỏi đầu từ lâu. Đây không phải vì bạn yếu đuối hay quá nhạy cảm. Não bạn được lập trình để làm chính xác điều đó.",
+      "caption": "1 lời chê thắng 10 lời khen — vì sao?",
+      "broll": "person lying awake at night replaying criticism",
+      "hook": true
+    },
+    {
+      "narration": "Cơ chế này gọi là thiên kiến tiêu cực: với cùng cường độ, một trải nghiệm xấu luôn tác động mạnh hơn một trải nghiệm tốt tương đương. Mất một trăm nghìn đồng đau hơn nhặt được một trăm nghìn đồng vui. Một lời chê nặng hơn một lời khen, dù xét về mặt logic chúng cân bằng nhau.",
+      "caption": "Xấu luôn nặng hơn tốt, dù cường độ ngang nhau",
+      "broll": "scale tipping unevenly bad outweighs good",
+      "emphasis": ["XẤU LUÔN NẶNG HƠN TỐT"]
+    },
+    {
+      "narration": "Năm 2001, ba nhà tâm lý học Roy Baumeister, Ellen Bratslavsky và Catrin Finkenauer cùng Kathleen Vohs công bố một bài tổng hợp chấn động trên tạp chí Review of General Psychology, tên gọi thẳng luôn: 'Cái xấu mạnh hơn cái tốt'. Họ rà soát hàng loạt nghiên cứu về cảm xúc, trí nhớ, quan hệ xã hội, và tìm thấy một mẫu hình lặp lại nhất quán: trên mọi lĩnh vực đời sống, sự kiện tiêu cực luôn để lại dấu ấn tâm lý sâu và lâu hơn sự kiện tích cực tương đương.",
+      "caption": "2001, Review of General Psychology: 'Bad Is Stronger Than Good'",
+      "broll": "research paper journal pages turning",
+      "emphasis": ["BAD IS STRONGER THAN GOOD"]
+    },
+    {
+      "narration": "Họ chỉ ra một con số rất hay nhắc tới trong nghiên cứu quan hệ hôn nhân: để một cuộc hôn nhân duy trì hạnh phúc, mỗi một tương tác tiêu cực cần được bù lại bằng khoảng năm tương tác tích cực. Không phải một đổi một. Một việc xấu cần năm việc tốt mới kéo lại được thế cân bằng cảm xúc.",
+      "caption": "1 tương tác xấu cần ~5 tương tác tốt để bù lại",
+      "broll": "couple balancing positive negative interactions chart",
+      "emphasis": ["1 XẤU CẦN 5 TỐT"]
+    },
+    {
+      "narration": "Vì sao tiến hoá gắn cho ta một bộ não thiên vị vậy? Với tổ tiên ta, bỏ lỡ một dấu hiệu nguy hiểm trả giá bằng mạng sống, còn bỏ lỡ một cơ hội tốt chỉ là lỡ một bữa ăn ngon. Bộ não ưu tiên sống sót hơn niềm vui, nên nó bám chặt điều xấu, còn điều tốt trôi qua nhẹ nhàng. Cơ chế từng cứu mạng tổ tiên giờ khiến một bình luận mạng xã hội ám ảnh ta cả tuần.",
+      "caption": "Né nguy hiểm quan trọng hơn tận hưởng niềm vui — với tổ tiên ta",
+      "broll": "ancient human alert to danger in nature",
+      "transition": true
+    },
+    {
+      "narration": "Một khi biết cơ chế này, bạn có một cách phòng thủ cụ thể: chủ động đếm tỉ lệ. Sau một ngày làm việc, đừng để đầu tự động neo vào câu chê duy nhất. Hãy ép mình liệt kê ra ít nhất năm điều diễn ra ổn, dù nhỏ, để cân lại đúng cái tỉ lệ một-chọi-năm mà não bạn đang phớt lờ. Không phải để giả vờ lạc quan, mà để sửa lại một phép tính mà bộ não bạn đang tính sai có chủ đích.",
+      "caption": "Phòng thủ: ép mình đếm ra 5 điều ổn để cân lại 1 điều xấu",
+      "broll": "person writing list of good things notebook",
+      "emphasis": ["ĐẾM RA 5 ĐIỀU ỔN"]
+    },
+    {
+      "narration": "Lần tới một câu chê cứ lặp lại trong đầu, nhớ rằng đó không phải vì nó đúng hay quan trọng hơn. Đó chỉ là thiên kiến tiêu cực làm đúng việc nó được lập trình. Tập sau, một cơ chế khác cũng đánh lừa trí nhớ: hiệu ứng Baader-Meinhof, vì sao một thứ vừa học xong tự nhiên xuất hiện khắp mọi nơi.",
+      "caption": "Tập sau: Hiệu ứng Baader-Meinhof",
+      "broll": "person realizing pattern repeating everywhere"
+    }
+  ]
+}

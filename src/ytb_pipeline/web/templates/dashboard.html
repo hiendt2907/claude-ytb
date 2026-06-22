@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — claude-ytb{% endblock %}
+{% block body %}
+<div class="shell">
+  <header class="topbar">
+    <h1>claude<span class="dot">·</span>ytb</h1>
+    <nav class="nav">
+      {% if dry_run %}<span class="badge dry">DRY_RUN</span>{% else %}<span class="badge live">LIVE</span>{% endif %}
+      <a href="/">Bảng điều khiển</a>
+      <a href="/config">Cấu hình</a>
+      <a href="/logout">Đăng xuất</a>
+    </nav>
+  </header>
+
+  <div class="grid">
+    <div>
+      <div class="card">
+        <h2>Chạy pipeline từ kịch bản</h2>
+        <form class="row" method="post" action="/run">
+          <div>
+            <label for="script">Kịch bản (scripts/*.json)</label>
+            <select id="script" name="script" required>
+              {% for s in scripts %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+            </select>
+          </div>
+          <button type="submit">▶ Chạy</button>
+        </form>
+        {% if not scripts %}<p class="muted">Chưa có file kịch bản nào trong <code>scripts/</code>.</p>{% endif %}
+      </div>
+
+      <div class="card">
+        <h2>Hoặc giao việc cho /youtube-auto</h2>
+        <form class="row" method="post" action="/auto">
+          <div>
+            <label for="instruction">Lệnh tự do</label>
+            <input type="text" id="instruction" name="instruction" placeholder="vd: làm 1 short ngách giao tiếp, hẹn 20h">
+          </div>
+          <button type="submit" class="ghost">⚡ Auto</button>
+        </form>
+      </div>
+
+      <div class="card" id="job" hx-get="/partials/status" hx-trigger="every 3s" hx-swap="innerHTML">
+        {% include "_status.html" %}
+      </div>
+    </div>
+
+    <div>
+      <div class="card">
+        <h2>Sổ cái sản xuất (mới nhất)</h2>
+        <pre class="log">{% for line in ledger %}{{ line }}
+{% endfor %}{% if not ledger %}(trống){% endif %}</pre>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

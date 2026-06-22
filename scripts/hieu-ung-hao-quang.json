@@ -1,0 +1,65 @@
+{
+  "topic": "hieu-ung-hao-quang",
+  "title": "Một Điểm Tốt Khiến Bạn Tin Cả Con Người Họ Tốt — Hiệu Ứng Hào Quang",
+  "voice": "vi-VN-NamMinhNeural",
+  "description": "Vì sao một người đẹp, ăn nói khéo hay chỉ đơn giản là quen mặt lại tự động được ta tin là thông minh, tử tế, đáng tin hơn — dù chưa hề có bằng chứng nào? Short này giải thích Hiệu ứng hào quang qua nghiên cứu kinh điển của Edward Thorndike (1920) và thí nghiệm giáo viên chấm bài của Nisbett & Wilson (1977).",
+  "tags": ["tâm lý học", "hiệu ứng hào quang", "halo effect", "thiên kiến nhận thức", "khoa học hành vi", "mental models"],
+  "compliance": {
+    "passed": true,
+    "community": "Nội dung giáo dục tâm lý học, không vi phạm tiêu chuẩn cộng đồng; không nội dung nguy hiểm/thù ghét/người lớn.",
+    "copyright": "Kịch bản gốc tự viết; B-roll AI-generated/Pexels free-to-use; không dùng nhạc/clip có bản quyền.",
+    "accuracy": "Dẫn nghiên cứu của Edward Thorndike (1920), 'A Constant Error in Psychological Ratings', Journal of Applied Psychology — sĩ quan quân đội được cấp trên đánh giá; và Nisbett & Wilson (1977), 'The Halo Effect: Evidence for Unconscious Alteration of Judgments', Journal of Personality and Social Psychology — đều truy được.",
+    "advertiser": "Chủ đề trung tính, advertiser-friendly; không cờ bạc/thuốc/vũ khí/nội dung nhạy cảm.",
+    "coppa": "Không nhắm trẻ em; nội dung cho khán giả trưởng thành quan tâm phát triển bản thân.",
+    "notes": "Đã rà 3 gate ngách (mục 0c): giải thích cơ chế lan toả đánh giá cụ thể (Thorndike 1920, Nisbett & Wilson 1977), không hô khẩu hiệu self-help; mật độ ý cao; nguồn truy được, không bịa số liệu. Khác biệt với video cũ: chưa video nào khai thác hiệu ứng hào quang/halo effect — phân biệt rõ với Forer (đoán tính cách mơ hồ) và optimism bias (lạc quan về tương lai bản thân)."
+  },
+  "sections": [
+    {
+      "narration": "Một người đồng nghiệp ăn nói lưu loát, ngoại hình ưa nhìn, và gần như ngay lập tức bạn tin rằng họ cũng làm việc giỏi, đáng tin cậy, thậm chí tốt bụng — dù bạn chưa hề thấy họ làm một việc cụ thể nào chứng minh điều đó. Đây không phải trực giác chính xác. Đây là một lỗi nhận thức có tên gọi hẳn hoi.",
+      "caption": "Một điểm tốt — và bạn tin cả con người họ tốt?",
+      "broll": "charismatic person speaking confidently in meeting",
+      "hook": true
+    },
+    {
+      "narration": "Cơ chế này gọi là hiệu ứng hào quang: một ấn tượng tích cực ở một khía cạnh — ngoại hình, giọng nói, một thành tích nổi bật — lan toả và tô màu tích cực lên toàn bộ đánh giá của ta về người đó, kể cả những khía cạnh ta hoàn toàn chưa kiểm chứng.",
+      "caption": "Một điểm sáng lan toả thành ấn tượng tốt toàn diện",
+      "broll": "glowing light spreading metaphor halo",
+      "emphasis": ["MỘT ĐIỂM TỐT LAN TOẢ TOÀN DIỆN"]
+    },
+    {
+      "narration": "Năm một nghìn chín trăm hai mươi, nhà tâm lý học Edward Thorndike công bố trên Journal of Applied Psychology một phát hiện từ dữ liệu quân đội: các sĩ quan chỉ huy được yêu cầu đánh giá binh sĩ trên nhiều tiêu chí riêng biệt — thể lực, trí tuệ, kỷ luật, khả năng lãnh đạo.",
+      "caption": "1920, Edward Thorndike — Journal of Applied Psychology",
+      "broll": "military officer reviewing rating sheets documents",
+      "emphasis": ["1920 — THORNDIKE PHÁT HIỆN HÀO QUANG"]
+    },
+    {
+      "narration": "Thorndike phát hiện các điểm số này tương quan với nhau bất thường cao — cao hơn nhiều mức một người thực sự xuất sắc đều ở mọi mặt nên có. Một binh sĩ được đánh giá thể lực tốt gần như chắc chắn cũng được cho điểm trí tuệ và kỷ luật cao, dù các tiêu chí này về lý thuyết độc lập với nhau. Người đánh giá đang để một điểm sáng nhuộm màu cả bảng chấm.",
+      "caption": "Điểm thể lực cao → điểm trí tuệ, kỷ luật cũng tự động cao theo",
+      "broll": "rating scale chart correlated scores",
+      "emphasis": ["TƯƠNG QUAN BẤT THƯỜNG GIỮA CÁC TIÊU CHÍ"]
+    },
+    {
+      "narration": "Năm một nghìn chín trăm bảy mươi bảy, Richard Nisbett và Timothy Wilson tái hiện hiệu ứng này trong phòng thí nghiệm, công bố trên Journal of Personality and Social Psychology: sinh viên xem video một giảng viên, một nhóm thấy bản ấm áp thân thiện, nhóm khác thấy bản lạnh lùng xa cách — cùng một giảng viên, cùng nội dung giảng.",
+      "caption": "1977, Nisbett & Wilson — Journal of Personality and Social Psychology",
+      "broll": "students watching lecturer video in lab study",
+      "emphasis": ["1977 — NISBETT & WILSON TÁI HIỆN TRONG PHÒNG THÍ NGHIỆM"]
+    },
+    {
+      "narration": "Nhóm xem bản ấm áp đánh giá luôn cả ngoại hình, giọng nói, thậm chí cách dùng từ của giảng viên là hấp dẫn hơn — những thứ giống hệt nhau ở cả hai bản video. Đáng chú ý hơn: khi được hỏi liệu sự ấm áp có ảnh hưởng đến các đánh giá khác không, hầu hết người tham gia khẳng định không, dù dữ liệu cho thấy ngược lại hoàn toàn. Hiệu ứng hào quang hoạt động vô thức, ngay cả khi ta tin mình đang khách quan.",
+      "caption": "Người tham gia phủ nhận bị ảnh hưởng — nhưng dữ liệu nói ngược lại",
+      "broll": "person confidently denying bias unaware",
+      "transition": true
+    },
+    {
+      "narration": "Cách phòng vệ cụ thể: khi đánh giá một người ở một việc cụ thể — năng lực chuyên môn, độ tin cậy trong một quyết định — hãy tự hỏi liệu mình đang chấm dựa trên bằng chứng trực tiếp của chính việc đó, hay đang vô thức mượn điểm sáng từ một khía cạnh hoàn toàn khác của họ.",
+      "caption": "Tách riêng bằng chứng thật khỏi ấn tượng lan toả",
+      "broll": "person separating evidence from impression analytical",
+      "emphasis": ["TÁCH BẰNG CHỨNG KHỎI ẤN TƯỢNG LAN TOẢ"]
+    },
+    {
+      "narration": "Lần tới khi bạn thấy mình tin tưởng ai đó ngay từ một chi tiết nhỏ, hỏi thật: tôi đang đánh giá đúng việc họ làm, hay đang bị một hào quang nào đó chiếu sáng cả nhận định của mình?",
+      "caption": "Bạn đang đánh giá đúng việc — hay bị hào quang chiếu sáng?",
+      "broll": "person reconsidering judgment thoughtfully"
+    }
+  ]
+}

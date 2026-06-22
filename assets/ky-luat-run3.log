@@ -1,0 +1,11 @@
+[1/4] Ideation  ✓  Kỷ Luật Bản Thân: Cách Rèn Dù Bạn Không Có Một Chút Động Lực Nào (15 đoạn)
+[2/4] Voiceover ✓  assets/audio/ky-luat-ban-than-cach-ren-du-ban-khong-co-mot-chut-ong-luc-nao.mp3  (334.0s)
+[3/4] Render    ✓  (ai/landscape) assets/output/ky-luat-ban-than-cach-ren-du-ban-khong-co-mot-chut-ong-luc-nao.mp4
+  Loại: Clip thường
+  Lên lịch công khai lúc: 2026-06-17T06:00:00+0700
+  ✓ Đã upload: https://youtu.be/LNYxk7MGDQY
+  ⚠ Không đặt được thumbnail (kênh cần verify?): <HttpError 403 when requesting https://youtube.googleapis.com/upload/youtube/v3/thumbnails/set?videoId=LNYxk7MGDQY&alt=json&uploadType=media returned "The authenticated user doesn't have permissions to upload and set custom video thumbnails.". Details: "[{'message': "The authenticated user doesn't have permissions to upload and set custom video thumbnails.", 'domain': 'youtube.thumbnail', 'reason': 'forbidden', 'location': 'Authorization', 'locationType': 'header'}]">
+[4/4] Publish   ✓  uploaded=True
+  ✓ Đã đưa lên Drive (Claude-YTB): https://drive.google.com/file/d/1RuVOj2-jDwPEb-hDyI7CEy0UwQfQ15te/view?usp=drivesdk
+  ✓ Đã xoá bản local: assets/output/ky-luat-ban-than-cach-ren-du-ban-khong-co-mot-chut-ong-luc-nao.mp4
+Xong: uploaded=True url=https://youtu.be/LNYxk7MGDQY

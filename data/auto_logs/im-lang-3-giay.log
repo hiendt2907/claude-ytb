@@ -1,0 +1,11 @@
+[1/4] Ideation  ✓  Im Lặng 3 Giây: Mẹo Giao Tiếp Khiến Người Khác Nể Bạn (8 đoạn)
+[2/4] Voiceover ✓  assets/audio/im-lang-3-giay-meo-giao-tiep-khien-nguoi-khac-ne-ban.mp3  (83.2s)
+[3/4] Render    ✓  (ai/portrait) assets/output/im-lang-3-giay-meo-giao-tiep-khien-nguoi-khac-ne-ban.mp4
+  Loại: YouTube Short (dọc, ≤3p)
+  Lên lịch công khai lúc: 2026-06-17T12:00:00+0700
+  ✓ Đã upload: https://youtu.be/YKBdy0Ehc3Q
+  ⚠ Không đặt được thumbnail (kênh cần verify?): <HttpError 403 when requesting https://youtube.googleapis.com/upload/youtube/v3/thumbnails/set?videoId=YKBdy0Ehc3Q&alt=json&uploadType=media returned "The authenticated user doesn't have permissions to upload and set custom video thumbnails.". Details: "[{'message': "The authenticated user doesn't have permissions to upload and set custom video thumbnails.", 'domain': 'youtube.thumbnail', 'reason': 'forbidden', 'location': 'Authorization', 'locationType': 'header'}]">
+[4/4] Publish   ✓  uploaded=True
+  ✓ Đã đưa lên Drive (Claude-YTB): https://drive.google.com/file/d/1UseVFljO9Jfab95FOw_rgDfuwfObA3mH/view?usp=drivesdk
+  ✓ Đã xoá bản local: assets/output/im-lang-3-giay-meo-giao-tiep-khien-nguoi-khac-ne-ban.mp4
+Xong: uploaded=True url=https://youtu.be/YKBdy0Ehc3Q

@@ -1,0 +1,65 @@
+{
+  "topic": "hieu-ung-hawthorne",
+  "title": "Hiệu Ứng Hawthorne: Bị Quan Sát Thôi Cũng Khiến Bạn Làm Việc Tốt Hơn",
+  "voice": "vi-VN-NamMinhNeural",
+  "description": "Vì sao công nhân làm việc năng suất hơn chỉ vì biết mình đang bị theo dõi — dù điều kiện làm việc thực tế chẳng đổi gì? Short này giải thích Hiệu ứng Hawthorne qua loạt nghiên cứu nổi tiếng tại nhà máy Western Electric Hawthorne Works (1924-1932).",
+  "tags": ["tâm lý học", "hiệu ứng hawthorne", "hawthorne effect", "tâm lý hành vi", "khoa học hành vi", "mental models"],
+  "compliance": {
+    "passed": true,
+    "community": "Nội dung giáo dục tâm lý học/lịch sử quản trị, trung tính, không bạo lực/nhạy cảm; tuân thủ tiêu chuẩn cộng đồng.",
+    "copyright": "Kịch bản gốc tự viết; B-roll AI-generated/Pexels free-to-use; không dùng nhạc/clip có bản quyền.",
+    "accuracy": "Dẫn loạt nghiên cứu tại nhà máy Western Electric Hawthorne Works, Cicero, Illinois (1924-1932), đặc biệt thí nghiệm 'Relay Assembly Test Room' với nhóm nữ công nhân do đội nghiên cứu Harvard (Elton Mayo và đồng nghiệp) phân tích; thuật ngữ 'Hawthorne effect' do Henry A. Landsberger đặt năm 1958 khi xem lại dữ liệu — truy được.",
+    "advertiser": "Chủ đề tâm lý/quản trị lao động trung tính, advertiser-friendly, không tranh cãi.",
+    "coppa": "Không nhắm trẻ em; nội dung cho khán giả trưởng thành quan tâm phát triển bản thân.",
+    "notes": "Đã rà 3 gate ngách (mục 0c): giải thích cơ chế 'cảm giác bị quan sát/được chú ý' thay đổi hành vi độc lập với điều kiện thực tế, không hô khẩu hiệu; mật độ ý cao, không câu đệm; nguồn truy được (Western Electric Hawthorne Works 1924-1932, Landsberger 1958). Khác mọi video cũ trong kênh: chưa video nào khai thác Hawthorne effect — cơ chế quan sát/đo lường tác động hành vi, khác các hiệu ứng nhận thức cá nhân (Dunning-Kruger, Zeigarnik...) đã làm trước. Không thuộc 2 series 30 ngày đang chạy — video rời theo yêu cầu lô 3-short."
+  },
+  "sections": [
+    {
+      "narration": "Nhà máy Hawthorne Works tăng độ sáng đèn lên, năng suất công nhân tăng vọt. Các nhà nghiên cứu mừng rỡ, thử giảm độ sáng xuống thấp hơn cả ban đầu — năng suất vẫn tiếp tục tăng. Vấn đề chưa từng nằm ở ánh sáng.",
+      "caption": "Giảm ánh sáng xuống — năng suất vẫn tăng. Vì sao?",
+      "broll": "factory workers under bright lights working fast",
+      "hook": true
+    },
+    {
+      "narration": "Cơ chế này gọi là Hiệu ứng Hawthorne: khi con người biết mình đang bị quan sát hoặc đo lường, họ tự điều chỉnh hành vi để khớp với điều họ NGHĨ người quan sát mong đợi — bất kể điều kiện thực tế như ánh sáng, lương hay giờ nghỉ có thay đổi gì hay không.",
+      "caption": "Bị quan sát thôi cũng đủ thay đổi hành vi, bất kể điều kiện thật",
+      "broll": "researcher with clipboard observing worker closely",
+      "emphasis": ["BỊ QUAN SÁT THÔI CŨNG ĐỦ ĐỔI HÀNH VI"]
+    },
+    {
+      "narration": "Từ một nghìn chín trăm hai mươi bốn đến một nghìn chín trăm ba mươi hai, tại nhà máy Western Electric Hawthorne Works ở Cicero, Illinois, đội nghiên cứu Harvard do Elton Mayo dẫn đầu phân tích thí nghiệm 'Relay Assembly Test Room' trên một nhóm nữ công nhân lắp linh kiện.",
+      "caption": "1924-1932, Western Electric Hawthorne Works — đội Harvard, Elton Mayo",
+      "broll": "vintage 1920s factory researchers clipboard observing workers",
+      "emphasis": ["1924-1932 — HAWTHORNE WORKS"]
+    },
+    {
+      "narration": "Mỗi lần đổi điều kiện — thêm giờ nghỉ, rút ngắn giờ nghỉ, đổi ca làm — sản lượng của nhóm đều tăng. Kỳ lạ nhất: khi nhà nghiên cứu đưa mọi điều kiện trở lại đúng như lúc ban đầu, sản lượng vẫn cao hơn hẳn so với trước khi thí nghiệm bắt đầu.",
+      "caption": "Trở lại điều kiện ban đầu — sản lượng vẫn cao hơn lúc trước",
+      "broll": "chart showing productivity rising despite condition changes",
+      "emphasis": ["TĂNG DÙ TRỞ LẠI ĐIỀU KIỆN BAN ĐẦU"]
+    },
+    {
+      "narration": "Năm một nghìn chín trăm năm mươi tám, nhà xã hội học Henry Landsberger xem lại toàn bộ dữ liệu và chỉ ra: thứ thực sự thay đổi hành vi không phải ánh sáng hay giờ nghỉ, mà chính cảm giác được chú ý — nhóm công nhân biết mình đang là đối tượng nghiên cứu quan trọng, nên làm việc khác đi.",
+      "caption": "Không phải ánh sáng — chính cảm giác 'được chú ý' làm thay đổi hành vi",
+      "broll": "workers noticing they are being watched and changing posture",
+      "transition": true
+    },
+    {
+      "narration": "Hiệu ứng này lặp lại khắp nơi ngày nay: nhân viên biết sếp đang xem camera làm việc chăm hơn hẳn lúc không ai nhìn; người mới đeo vòng đo bước chân tự nhiên đi bộ nhiều hơn vào những ngày đầu, dù chẳng ai ép.",
+      "caption": "Vòng đo bước chân — đi bộ nhiều hơn ngay từ ngày đầu đeo",
+      "broll": "person checking fitness tracker walking energetically",
+      "emphasis": ["VÒNG ĐO BƯỚC CHÂN — NGÀY ĐẦU ĐEO"]
+    },
+    {
+      "narration": "Muốn lợi dụng cơ chế này cho chính mình, hãy tự tạo cảm giác bị quan sát có chủ đích: báo cáo tiến trình công việc cho một người cụ thể mỗi ngày, hoặc quay lại video buổi tập của mình dù không định đăng. Chỉ việc biết có ai đó sẽ xem lại cũng đủ kéo bạn làm nghiêm túc hơn ngay từ lần đầu.",
+      "caption": "Tự báo cáo tiến trình cho 1 người cụ thể mỗi ngày — kéo mình làm nghiêm túc hơn",
+      "broll": "person logging daily progress reporting to someone",
+      "emphasis": ["TỰ BÁO CÁO TIẾN TRÌNH MỖI NGÀY"]
+    },
+    {
+      "narration": "Bạn có để ý mình làm việc khác đi rõ rệt khi biết có người đang xem không? Kể lại tình huống đó ở phần bình luận, và theo dõi kênh để xem cơ chế tâm lý tiếp theo.",
+      "caption": "Bạn từng làm khác đi khi biết có người đang xem chưa? Comment kể lại nhé!",
+      "broll": "person looking directly at camera confidently"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+[1/4] Ideation  ✓  5 Lệnh Git Cứu Bạn Khi Lỡ Tay Mất Code! (7 đoạn)
+[2/4] Voiceover ✓  assets/audio/5-lenh-git-cuu-ban-khi-lo-tay-mat-code.mp3  (31.8s)
+[3/4] Render    ✓  (ai) assets/output/5-lenh-git-cuu-ban-khi-lo-tay-mat-code.mp4
+── DRY RUN — không upload thật ──
+  Title : 5 Lệnh Git Cứu Bạn Khi Lỡ Tay Mất Code!
+  Tags  : git, devops, lập trình, lệnh git, coding, developer, terminal, github
+  Video : assets/output/5-lenh-git-cuu-ban-khi-lo-tay-mat-code.mp4
+  Thumb : assets/output/5-lenh-git-cuu-ban-khi-lo-tay-mat-code_thumb.jpg
+  Privacy: private  |  Thời lượng: 31.8s
+[4/4] Publish   ✓  uploaded=False
+Xong: uploaded=False url=None

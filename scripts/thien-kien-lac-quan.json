@@ -1,0 +1,59 @@
+{
+  "topic": "thien-kien-lac-quan",
+  "title": "Vì Sao Ai Cũng Tin Điều Xấu Sẽ Rơi Vào Người Khác — Thiên Kiến Lạc Quan",
+  "voice": "vi-VN-NamMinhNeural",
+  "description": "Vì sao gần như ai cũng tự tin mình ít khả năng gặp tai nạn, bệnh tật hay thất bại hơn người trung bình — dù về mặt thống kê điều đó là bất khả? Short này giải thích Thiên kiến lạc quan, nghiên cứu não bộ của Tali Sharot, và một câu hỏi cụ thể để cân bằng lại phán đoán rủi ro.",
+  "tags": ["tâm lý học", "thiên kiến lạc quan", "optimism bias", "khoa học hành vi", "mental models", "phát triển bản thân"],
+  "compliance": {
+    "passed": true,
+    "community": "Nội dung giáo dục tâm lý học, không vi phạm tiêu chuẩn cộng đồng; không nội dung nguy hiểm/thù ghét/người lớn.",
+    "copyright": "Kịch bản gốc tự viết; B-roll AI-generated/Pexels free-to-use; không dùng nhạc/clip có bản quyền.",
+    "accuracy": "Dẫn nghiên cứu của nhà thần kinh học nhận thức Tali Sharot (University College London), công bố trên Current Biology năm 2011, dùng fMRI quan sát vùng vỏ não trán khi cập nhật thông tin xấu/tốt về tương lai — đều truy được.",
+    "advertiser": "Chủ đề trung tính, advertiser-friendly; không cờ bạc/thuốc/vũ khí/nội dung nhạy cảm.",
+    "coppa": "Không nhắm trẻ em; nội dung cho khán giả trưởng thành quan tâm phát triển bản thân.",
+    "notes": "Đã rà 3 gate ngách (mục 0c): giải thích cơ chế não bộ cụ thể (Sharot 2011, fMRI), không hô khẩu hiệu self-help; mật độ ý cao; nguồn (Current Biology, UCL) truy được, không bịa số liệu. Khác biệt với video cũ: chưa video nào khai thác thiên kiến lạc quan (optimism bias) như cơ chế riêng."
+  },
+  "sections": [
+    {
+      "narration": "Hỏi một trăm người hút thuốc rằng nguy cơ họ bị ung thư phổi cao hay thấp hơn người hút thuốc trung bình khác, gần như tất cả đều trả lời: thấp hơn. Về mặt thống kê, điều đó là bất khả — không thể ai cũng thấp hơn trung bình cùng lúc. Nhưng não bạn không quan tâm logic đó. Nó đã quyết định từ trước: chuyện xấu là của người khác.",
+      "caption": "Ai cũng tin rủi ro CỦA MÌNH thấp hơn trung bình?",
+      "broll": "person confident feeling immune to risk statistics",
+      "hook": true
+    },
+    {
+      "narration": "Cơ chế này gọi là thiên kiến lạc quan: xu hướng đánh giá thấp khả năng những điều xấu sẽ xảy đến với chính mình, đồng thời đánh giá cao khả năng những điều tốt sẽ đến. Ly hôn, tai nạn xe, mất việc, bệnh nặng — phần lớn chúng ta đều ngầm tin bản thân ít khả năng gặp phải hơn người khác, dù chẳng có cơ sở thực tế nào cho niềm tin đó.",
+      "caption": "Đánh giá thấp rủi ro của MÌNH, cao cơ hội của MÌNH",
+      "broll": "person imagining only good future outcomes",
+      "emphasis": ["RỦI RO LÀ CỦA NGƯỜI KHÁC"]
+    },
+    {
+      "narration": "Năm hai nghìn mười một, nhà thần kinh học nhận thức Tali Sharot tại đại học University College London công bố một nghiên cứu trên tạp chí Current Biology, dùng máy chụp cộng hưởng từ chức năng để nhìn thẳng vào não khi con người tiếp nhận tin xấu về tương lai của chính họ.",
+      "caption": "2011, Tali Sharot, UCL — quét não bằng fMRI",
+      "broll": "fMRI brain scan research laboratory",
+      "emphasis": ["TALI SHAROT — UCL 2011"]
+    },
+    {
+      "narration": "Bà cho người tham gia ước tính trước nguy cơ bản thân gặp những biến cố xấu như trộm cắp hay bệnh tật, rồi cho họ biết con số thống kê thật. Khi tin tốt hơn dự đoán, não cập nhật ngay, ghi nhớ kỹ. Nhưng khi tin xấu hơn dự đoán, vùng vỏ não trán phụ trách cập nhật thông tin gần như tắt tiếng — não lặng lẽ phớt lờ tin xấu, từ chối cập nhật lại mức độ lạc quan ban đầu.",
+      "caption": "Tin xấu hơn dự đoán → vùng não cập nhật gần như tắt",
+      "broll": "brain region activity comparison good bad news",
+      "emphasis": ["NÃO TỪ CHỐI CẬP NHẬT TIN XẤU"]
+    },
+    {
+      "narration": "Cơ chế này từng có lợi: nó giúp ta đủ can đảm thử việc mới, yêu, sinh con, khởi nghiệp, mà không bị nỗi sợ thống kê làm tê liệt. Nhưng cái giá là phán đoán rủi ro thực tế bị bóp méo có hệ thống: người ta không mua bảo hiểm, không khám sức khoẻ định kỳ, không thắt dây an toàn, vì tin chắc 'chuyện đó không rơi vào mình'.",
+      "caption": "Cái giá: không bảo hiểm, không khám định kỳ vì 'sẽ không phải mình'",
+      "broll": "person skipping safety precaution overconfident",
+      "transition": true
+    },
+    {
+      "narration": "Cách cân bằng lại: trước một quyết định có rủi ro, đừng hỏi 'khả năng nó xảy ra với TÔI là bao nhiêu', vì câu đó luôn bị bóp méo theo hướng lạc quan. Hỏi thay vào đó: 'trong một nhóm người giống tôi, bao nhiêu phần trăm đã gặp chuyện này?'. Đưa bản thân về đúng vị trí một điểm dữ liệu trong nhóm, thay vì một ngoại lệ được miễn trừ.",
+      "caption": "Hỏi: nhóm người giống tôi, bao % đã gặp chuyện này?",
+      "broll": "person looking at group statistics objectively",
+      "emphasis": ["TÔI LÀ 1 ĐIỂM DỮ LIỆU, KHÔNG PHẢI NGOẠI LỆ"]
+    },
+    {
+      "narration": "Lạc quan không xấu, nó từng giúp tổ tiên ta tiến lên. Nhưng khi cần đánh giá rủi ro thật, hãy mượn con số của nhóm, đừng mượn cảm giác của riêng mình. Tập sau, một cơ chế phòng thủ tâm lý cực đoan hơn: hiệu ứng chim đà điểu, vì sao biết tin xấu sắp tới mà người ta vẫn chọn không nhìn vào nó.",
+      "caption": "Tập sau: Hiệu ứng chim đà điểu",
+      "broll": "person avoiding looking at bad news ignoring"
+    }
+  ]
+}

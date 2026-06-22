@@ -1,0 +1,2467 @@
+{
+  "config": {
+    "length": "long",
+    "visual": "ai",
+    "publish": "real",
+    "count": 2,
+    "strategy": "2 clip ngang ~12 phut (target_minutes=12) cho 2 khung gio: toi nay 20:00 16/6 + sang mai 06:00 17/6; chu de moi chong trung",
+    "asked_at": "2026-06-16"
+  },
+  "items": [
+    {
+      "slug": "hieu-ung-dunning-kruger",
+      "topic": "Hiệu Ứng Dunning-Kruger: Vì Sao Người Kém Nhất Lại Tự Tin Nhất",
+      "orientation": "landscape",
+      "render_provider": "ai",
+      "dry_run": false,
+      "publish_at": "2026-06-17T20:00:00+0700",
+      "stage": "ideation",
+      "status": "ok",
+      "updated": "2026-06-17",
+      "series_day": 1
+    },
+    {
+      "slug": "hieu-ung-hawthorne",
+      "topic": "Hiệu Ứng Hawthorne: Bị Quan Sát Thôi Cũng Khiến Bạn Làm Việc Tốt Hơn",
+      "orientation": "portrait",
+      "render_provider": "ai",
+      "dry_run": false,
+      "publish_at": "2026-06-20T07:00:00+0700",
+      "stage": "done",
+      "status": "ok",
+      "updated": "2026-06-19",
+      "batch": "lo-3-short-sang-2026-06-20",
+      "batch_index": "1/3",
+      "url": "https://youtu.be/Fk0eSTTZQ8E",
+      "drive_url": "https://drive.google.com/file/d/1yBHvIPCe0Fqraf2S7lo9OQOzWo5s-7VD/view?usp=drivesdk"
+    },
+    {
+      "slug": "thien-kien-nhan-thuc-muon",
+      "topic": "Tao Biết Trước Rồi! — Thiên Kiến Nhận Thức Muộn (Hindsight Bias)",
+      "orientation": "portrait",
+      "render_provider": "ai",
+      "dry_run": false,
+      "publish_at": "2026-06-20T09:30:00+0700",
+      "stage": "done",
+      "status": "ok",
+      "updated": "2026-06-19",
+      "batch": "lo-3-short-sang-2026-06-20",
+      "batch_index": "2/3",
+      "url": "https://youtu.be/SRa-2YXKJC8",
+      "drive_url": "https://drive.google.com/file/d/1aHWO3RCfKYShKtyu-Fc7x9rh3rNl2VCS/view?usp=drivesdk"
+    },
+    {
+      "slug": "nghich-ly-abilene",
+      "topic": "Cả Nhóm Đồng Ý Dù Không Ai Muốn — Nghịch Lý Abilene",
+      "orientation": "portrait",
+      "render_provider": "ai",
+      "dry_run": false,
+      "publish_at": "2026-06-20T12:00:00+0700",
+      "stage": "done",
+      "status": "ok",
+      "updated": "2026-06-19",
+      "batch": "lo-3-short-sang-2026-06-20",
+      "batch_index": "3/3",
+      "url": "https://youtu.be/7iAQDJ5htkM",
+      "drive_url": "https://drive.google.com/file/d/1xYkW006w616uz5GJAem64F6UphSrUKV6/view?usp=drivesdk"
+    }
+  ],
+  "series": {
+    "status": "active",
+    "niche": "Cơ chế tâm lý & hành vi học ứng dụng (mental models)",
+    "reason": "Ngách 'Cơ chế tâm lý & hành vi học ứng dụng' thắng (18đ): search 4 (evergreen, cầu tra ổn định), competition 4 (ít kênh VN faceless chuyên cơ chế), ypp 5 (advertiser-safe tuyệt đối), brand 5 (đúng lõi '1 Cốc Café 6h' = phát triển bản thân THẬT, giải cơ chế chứ không self-help). Trending VN hiện do nhạc/game chiếm sóng, không evergreen → chọn domain bền thay vì đu hot.",
+    "research": [
+      {
+        "topic": "SON TUNG M-TP x TYGA | COME MY WAY | OFFICIAL MUSIC VIDEO",
+        "views": 34095966,
+        "trend": "up",
+        "source": "youtube",
+        "category": "10",
+        "hashtags": [
+          {
+            "tag": "sontungmtp",
+            "count": 2
+          },
+          {
+            "tag": "tyga",
+            "count": 2
+          },
+          {
+            "tag": "antiantiart",
+            "count": 1
+          },
+          {
+            "tag": "cmw",
+            "count": 1
+          },
+          {
+            "tag": "cmw son tung mtp",
+            "count": 1
+          },
+          {
+            "tag": "cmw son tung mtp tyga",
+            "count": 1
+          },
+          {
+            "tag": "come my way",
+            "count": 1
+          },
+          {
+            "tag": "come my way son tung mtp",
+            "count": 1
+          },
+          {
+            "tag": "come my way son tung mtp tyga",
+            "count": 1
+          },
+          {
+            "tag": "come my way sơn tùng mtp",
+            "count": 1
+          },
+          {
+            "tag": "comemyway",
+            "count": 1
+          },
+          {
+            "tag": "mtp",
+            "count": 1
+          },
+          {
+            "tag": "mtpentertainment",
+            "count": 1
+          },
+          {
+            "tag": "phuong vu",
+            "count": 1
+          },
+          {
+            "tag": "phuong vu antiantiart",
+            "count": 1
+          },
+          {
+            "tag": "son tung",
+            "count": 1
+          },
+          {
+            "tag": "son tung mtp",
+            "count": 1
+          },
+          {
+            "tag": "son tung mtp come my way",
+            "count": 1
+          },
+          {
+            "tag": "sontung",
+            "count": 1
+          },
+          {
+            "tag": "sơn tùng",
+            "count": 1
+          },
+          {
+            "tag": "sơn tùng mtp",
+            "count": 1
+          },
+          {
+            "tag": "sơn tùng come my way",
+            "count": 1
+          },
+          {
+            "tag": "sơn tùng comeback",
+            "count": 1
+          },
+          {
+            "tag": "sơn tùng mtp come my way",
+            "count": 1
+          },
+          {
+            "tag": "sơn tùng tyga",
+            "count": 1
+          },
+          {
+            "tag": "tyga sơn tùng",
+            "count": 1
+          },
+          {
+            "tag": "tyga sơn tùng come my way",
+            "count": 1
+          }
+        ],
+        "keywords": []
+      },
+      {
+        "topic": "[Trailer] Giới thiệu phim NỢ ĐỜI VAY TRẢ - Tuần 5 | Kẻ ác liệu sẽ cam tâm từ bỏ thế cờ đang nắm giữ?",
+        "views": 356444,
+        "trend": "up",
+        "source": "youtube",
+        "category": "1",
+        "hashtags": [
+          {
+            "tag": "thvl",
+            "count": 2
+          },
+          {
+            "tag": "nợ đời vay trả",
+            "count": 1
+          },
+          {
+            "tag": "nợđờivaytrả",
+            "count": 1
+          },
+          {
+            "tag": "phim nợ đời vay trả",
+            "count": 1
+          },
+          {
+            "tag": "phim truyện hay mới nhất 2026",
+            "count": 1
+          },
+          {
+            "tag": "phim truyện việt nam",
+            "count": 1
+          },
+          {
+            "tag": "phim truyện việt nam 2026",
+            "count": 1
+          },
+          {
+            "tag": "phim truyện việt nam hay mới nhất",
+            "count": 1
+          },
+          {
+            "tag": "phim truyện việt nam hay nhất",
+            "count": 1
+          },
+          {
+            "tag": "phim truyện việt nam mới nhất",
+            "count": 1
+          },
+          {
+            "tag": "phim truyện xưa việt nam",
+            "count": 1
+          },
+          {
+            "tag": "phim viet nam 2026",
+            "count": 1
+          },
+          {
+            "tag": "phim việt nam",
+            "count": 1
+          },
+          {
+            "tag": "phim việt nam 2026",
+            "count": 1
+          },
+          {
+            "tag": "phim xưa việt nam",
+            "count": 1
+          },
+          {
+            "tag": "phim xưa việt nam 2026",
+            "count": 1
+          },
+          {
+            "tag": "phim xưa việt nam hay",
+            "count": 1
+          },
+          {
+            "tag": "phim xưa việt nam hay mới nhất 2026",
+            "count": 1
+          },
+          {
+            "tag": "phim xưa việt nam hay nhất",
+            "count": 1
+          },
+          {
+            "tag": "phim xưa việt nam mới",
+            "count": 1
+          },
+          {
+            "tag": "phimgiờvàng",
+            "count": 1
+          },
+          {
+            "tag": "phimtrênthvl",
+            "count": 1
+          },
+          {
+            "tag": "phimvietnam",
+            "count": 1
+          },
+          {
+            "tag": "phimviệtnam",
+            "count": 1
+          },
+          {
+            "tag": "thvlphim",
+            "count": 1
+          },
+          {
+            "tag": "trailer",
+            "count": 1
+          },
+          {
+            "tag": "truyenhinhvinhlong",
+            "count": 1
+          },
+          {
+            "tag": "vinhlongtv",
+            "count": 1
+          }
+        ],
+        "keywords": []
+      },
+      {
+        "topic": "Bình Luận Tiếng Việt: T1 vs GEN (BO5) | ROAD TO MSI LCK 2026",
+        "views": 3583931,
+        "trend": "up",
+        "source": "youtube",
+        "category": "20",
+        "hashtags": [
+          {
+            "tag": "lck",
+            "count": 2
+          },
+          {
+            "tag": "boxsports",
+            "count": 1
+          },
+          {
+            "tag": "bình luận gen hle",
+            "count": 1
+          },
+          {
+            "tag": "bình luận tiếng việt",
+            "count": 1
+          },
+          {
+            "tag": "chung kết hle gen",
+            "count": 1
+          },
+          {
+            "tag": "ck",
+            "count": 1
+          },
+          {
+            "tag": "faker",
+            "count": 1
+          },
+          {
+            "tag": "final gen vs hle",
+            "count": 1
+          },
+          {
+            "tag": "final hle",
+            "count": 1
+          },
+          {
+            "tag": "gen",
+            "count": 1
+          },
+          {
+            "tag": "gen hle",
+            "count": 1
+          },
+          {
+            "tag": "geng",
+            "count": 1
+          },
+          {
+            "tag": "hle",
+            "count": 1
+          },
+          {
+            "tag": "lck faker",
+            "count": 1
+          },
+          {
+            "tag": "lck global",
+            "count": 1
+          },
+          {
+            "tag": "lck live",
+            "count": 1
+          },
+          {
+            "tag": "lck tieng viet",
+            "count": 1
+          },
+          {
+            "tag": "lck tiếng việt",
+            "count": 1
+          },
+          {
+            "tag": "lck2026",
+            "count": 1
+          },
+          {
+            "tag": "league of legends",
+            "count": 1
+          },
+          {
+            "tag": "leaveyourmark",
+            "count": 1
+          },
+          {
+            "tag": "lien minh",
+            "count": 1
+          },
+          {
+            "tag": "lien minh huyen thoai",
+            "count": 1
+          },
+          {
+            "tag": "liên minh",
+            "count": 1
+          },
+          {
+            "tag": "liên minh huyền thoại",
+            "count": 1
+          },
+          {
+            "tag": "lịch lck",
+            "count": 1
+          },
+          {
+            "tag": "lmht",
+            "count": 1
+          },
+          {
+            "tag": "lol",
+            "count": 1
+          },
+          {
+            "tag": "onliveesports",
+            "count": 1
+          },
+          {
+            "tag": "trực tiếp lck",
+            "count": 1
+          }
+        ],
+        "keywords": [
+          "trực tiếp lck b�nh luận tiếng việt"
+        ]
+      },
+      {
+        "topic": "TÓC TIÊN | người  còn  thương  em  không | OFFICIAL MV",
+        "views": 2777114,
+        "trend": "up",
+        "source": "youtube",
+        "category": "10",
+        "hashtags": [
+          {
+            "tag": "906090 tóc tiên",
+            "count": 1
+          },
+          {
+            "tag": "ca sĩ tóc tiên",
+            "count": 1
+          },
+          {
+            "tag": "catena tóc tiên",
+            "count": 1
+          },
+          {
+            "tag": "có ai thương em như anh tóc tiên",
+            "count": 1
+          },
+          {
+            "tag": "có ai thương em tóc tiên",
+            "count": 1
+          },
+          {
+            "tag": "mv mới tóc tiên",
+            "count": 1
+          },
+          {
+            "tag": "mv tóc tiên",
+            "count": 1
+          },
+          {
+            "tag": "mv tóc tiên mới",
+            "count": 1
+          },
+          {
+            "tag": "nguoiconthuongemkhong",
+            "count": 1
+          },
+          {
+            "tag": "ngày mai tóc tiên",
+            "count": 1
+          },
+          {
+            "tag": "nhạc tóc tiên",
+            "count": 1
+          },
+          {
+            "tag": "toctien",
+            "count": 1
+          },
+          {
+            "tag": "tóc tiên",
+            "count": 1
+          },
+          {
+            "tag": "tóc tiên dance",
+            "count": 1
+          },
+          {
+            "tag": "tóc tiên em không là duy nhất",
+            "count": 1
+          },
+          {
+            "tag": "tóc tiên hay nhất",
+            "count": 1
+          },
+          {
+            "tag": "tóc tiên live",
+            "count": 1
+          },
+          {
+            "tag": "tóc tiên mv",
+            "count": 1
+          },
+          {
+            "tag": "tóc tiên mới nhất",
+            "count": 1
+          },
+          {
+            "tag": "tóc tiên touliver",
+            "count": 1
+          },
+          {
+            "tag": "vũ điệu cồng chiệng tóc tiên",
+            "count": 1
+          }
+        ],
+        "keywords": []
+      },
+      {
+        "topic": "Tô Gà Chơi Trốn Tìm GuguGaga Trong Minecraft",
+        "views": 1595995,
+        "trend": "up",
+        "source": "youtube",
+        "category": "20",
+        "hashtags": [
+          {
+            "tag": "mcpe",
+            "count": 2
+          },
+          {
+            "tag": "minecraft",
+            "count": 2
+          },
+          {
+            "tag": "togatv",
+            "count": 2
+          },
+          {
+            "tag": "biệt đội sinh tố",
+            "count": 1
+          },
+          {
+            "tag": "chơi trốn tìm gugugaga",
+            "count": 1
+          },
+          {
+            "tag": "chơi trốn tìm gugugaga trong minecraft",
+            "count": 1
+          },
+          {
+            "tag": "gia đình",
+            "count": 1
+          },
+          {
+            "tag": "hihachobi",
+            "count": 1
+          },
+          {
+            "tag": "huggy",
+            "count": 1
+          },
+          {
+            "tag": "huggy wuggy",
+            "count": 1
+          },
+          {
+            "tag": "huynoob",
+            "count": 1
+          },
+          {
+            "tag": "jackvn",
+            "count": 1
+          },
+          {
+            "tag": "minecraft pe",
+            "count": 1
+          },
+          {
+            "tag": "nabee",
+            "count": 1
+          },
+          {
+            "tag": "nếu tô gà",
+            "count": 1
+          },
+          {
+            "tag": "puppy playtime",
+            "count": 1
+          },
+          {
+            "tag": "sinh tố team",
+            "count": 1
+          },
+          {
+            "tag": "sinhtoteam",
+            "count": 1
+          },
+          {
+            "tag": "thử thách 24h tô gà",
+            "count": 1
+          },
+          {
+            "tag": "toga",
+            "count": 1
+          },
+          {
+            "tag": "toga tv",
+            "count": 1
+          },
+          {
+            "tag": "togathuthach",
+            "count": 1
+          },
+          {
+            "tag": "togatroll",
+            "count": 1
+          },
+          {
+            "tag": "trốn tìm gugugaga",
+            "count": 1
+          },
+          {
+            "tag": "tô gà",
+            "count": 1
+          },
+          {
+            "tag": "tô gà chơi trốn tìm",
+            "count": 1
+          },
+          {
+            "tag": "tô gà chơi trốn tìm gugugaga",
+            "count": 1
+          },
+          {
+            "tag": "tô gà chơi trốn tìm gugugaga trong minecraft",
+            "count": 1
+          },
+          {
+            "tag": "tô gà sinh tố",
+            "count": 1
+          },
+          {
+            "tag": "tô gà thử thách",
+            "count": 1
+          },
+          {
+            "tag": "tô gà thử thách 24h",
+            "count": 1
+          },
+          {
+            "tag": "tô gà tv",
+            "count": 1
+          },
+          {
+            "tag": "yummie",
+            "count": 1
+          }
+        ],
+        "keywords": [
+          "t� g� chơi trốn t�m",
+          "t� g� thử th�ch chơi trốn t�m"
+        ]
+      },
+      {
+        "topic": "NGÔ LAN HƯƠNG | Có Công Mài \"Sắc\" Afrobeats (DJ Kim Chol Remix)",
+        "views": 869708,
+        "trend": "up",
+        "source": "youtube",
+        "category": "10",
+        "hashtags": [
+          {
+            "tag": "ccms",
+            "count": 2
+          },
+          {
+            "tag": "ngo lan huong",
+            "count": 2
+          },
+          {
+            "tag": "ngolanhuong",
+            "count": 2
+          },
+          {
+            "tag": "ngô lan hương",
+            "count": 2
+          },
+          {
+            "tag": "co cong mai sac",
+            "count": 1
+          },
+          {
+            "tag": "co cong mai sac ngon lan huong",
+            "count": 1
+          },
+          {
+            "tag": "cocongmaisac",
+            "count": 1
+          },
+          {
+            "tag": "có công mài sắc",
+            "count": 1
+          },
+          {
+            "tag": "có công mài sắc mv",
+            "count": 1
+          },
+          {
+            "tag": "có công mài sắc ngô lan hương",
+            "count": 1
+          },
+          {
+            "tag": "em xinh ngo lan huong",
+            "count": 1
+          },
+          {
+            "tag": "em xinh ngô lan hương",
+            "count": 1
+          },
+          {
+            "tag": "em xinh say hi ngô lan hương",
+            "count": 1
+          },
+          {
+            "tag": "lan hương",
+            "count": 1
+          },
+          {
+            "tag": "mv có công mài sắc",
+            "count": 1
+          },
+          {
+            "tag": "ngo lan huong co cong mai sac",
+            "count": 1
+          },
+          {
+            "tag": "ngô lan hương có công mài sắc",
+            "count": 1
+          },
+          {
+            "tag": "ngô lan hương em xinh say hi",
+            "count": 1
+          },
+          {
+            "tag": "ngô lan hương live",
+            "count": 1
+          },
+          {
+            "tag": "ngô lan hương music",
+            "count": 1
+          },
+          {
+            "tag": "ngô lan hương mv",
+            "count": 1
+          },
+          {
+            "tag": "ngô lan hương mv mới",
+            "count": 1
+          }
+        ],
+        "keywords": []
+      },
+      {
+        "topic": "🔴 TRỰC TIẾP: 1V1 CHAMPIONSHIP - APL 2026 (NGÀY 14/06)",
+        "views": 1457903,
+        "trend": "up",
+        "source": "youtube",
+        "category": "20",
+        "hashtags": [
+          {
+            "tag": "1s playoff",
+            "count": 1
+          },
+          {
+            "tag": "1v1",
+            "count": 1
+          },
+          {
+            "tag": "aov",
+            "count": 1
+          },
+          {
+            "tag": "apl2026",
+            "count": 1
+          },
+          {
+            "tag": "arena of valor",
+            "count": 1
+          },
+          {
+            "tag": "bạnmớilàcóquà",
+            "count": 1
+          },
+          {
+            "tag": "cao thu lien quan",
+            "count": 1
+          },
+          {
+            "tag": "cao thủ liên quân",
+            "count": 1
+          },
+          {
+            "tag": "chung kết liên quân",
+            "count": 1
+          },
+          {
+            "tag": "chung kết đấu trường danh vọng",
+            "count": 1
+          },
+          {
+            "tag": "dau truong danh vong",
+            "count": 1
+          },
+          {
+            "tag": "esports",
+            "count": 1
+          },
+          {
+            "tag": "flash",
+            "count": 1
+          },
+          {
+            "tag": "fpl liên quân",
+            "count": 1
+          },
+          {
+            "tag": "fpt sgp",
+            "count": 1
+          },
+          {
+            "tag": "garena liên quân",
+            "count": 1
+          },
+          {
+            "tag": "garena liên quân mobile",
+            "count": 1
+          },
+          {
+            "tag": "giai dau lien quan",
+            "count": 1
+          },
+          {
+            "tag": "giải liên quân",
+            "count": 1
+          },
+          {
+            "tag": "giải đấu",
+            "count": 1
+          },
+          {
+            "tag": "giải đấu 1v1 liên quân",
+            "count": 1
+          },
+          {
+            "tag": "homefront",
+            "count": 1
+          },
+          {
+            "tag": "lcp",
+            "count": 1
+          },
+          {
+            "tag": "liên quân",
+            "count": 1
+          },
+          {
+            "tag": "liên quân esports",
+            "count": 1
+          },
+          {
+            "tag": "liên quân mobile",
+            "count": 1
+          },
+          {
+            "tag": "lướtshopeesănquàkhủng",
+            "count": 1
+          },
+          {
+            "tag": "saigon phantom",
+            "count": 1
+          },
+          {
+            "tag": "sgp",
+            "count": 1
+          },
+          {
+            "tag": "sgp liên quân",
+            "count": 1
+          },
+          {
+            "tag": "solo liên quân",
+            "count": 1
+          },
+          {
+            "tag": "team flash sgp",
+            "count": 1
+          },
+          {
+            "tag": "truc tiep lien quan",
+            "count": 1
+          },
+          {
+            "tag": "valorrisesbattlescollide",
+            "count": 1
+          },
+          {
+            "tag": "vòng loại liên quân",
+            "count": 1
+          }
+        ],
+        "keywords": []
+      },
+      {
+        "topic": "KIỀU ANH - 'LÁ NGỌC CÀNH VÀNG' (Prod. by DUONGK, TUẤN CRY) | Official MV",
+        "views": 379924,
+        "trend": "up",
+        "source": "youtube",
+        "category": "10",
+        "hashtags": [
+          {
+            "tag": "ca nuong kieu anh",
+            "count": 1
+          },
+          {
+            "tag": "ca nuong kieu anh hien tai",
+            "count": 1
+          },
+          {
+            "tag": "ca nuong kieu anh la ai",
+            "count": 1
+          },
+          {
+            "tag": "ca nuong kieu anh live",
+            "count": 1
+          },
+          {
+            "tag": "ca nuong kieu anh official",
+            "count": 1
+          },
+          {
+            "tag": "ca nuong kieu anh va chong",
+            "count": 1
+          },
+          {
+            "tag": "ca nuong kieu anh van quynh",
+            "count": 1
+          },
+          {
+            "tag": "ca nương kiều anh",
+            "count": 1
+          },
+          {
+            "tag": "canuongkieuanh",
+            "count": 1
+          },
+          {
+            "tag": "chi dep dap gio",
+            "count": 1
+          },
+          {
+            "tag": "chi dep kieu anh",
+            "count": 1
+          },
+          {
+            "tag": "duongk",
+            "count": 1
+          },
+          {
+            "tag": "kenh ca nuong kieu anh",
+            "count": 1
+          },
+          {
+            "tag": "kieu anh",
+            "count": 1
+          },
+          {
+            "tag": "kieu anh ca nuong",
+            "count": 1
+          },
+          {
+            "tag": "kieu anh chi dep",
+            "count": 1
+          },
+          {
+            "tag": "kieuanh",
+            "count": 1
+          },
+          {
+            "tag": "kiều anh",
+            "count": 1
+          },
+          {
+            "tag": "kiều anh chị đẹp",
+            "count": 1
+          },
+          {
+            "tag": "kiều anh lá ngọc cành vàng",
+            "count": 1
+          },
+          {
+            "tag": "kiều anh trách trăng tàn",
+            "count": 1
+          },
+          {
+            "tag": "la ngoc canh vang kieu anh",
+            "count": 1
+          },
+          {
+            "tag": "langoccanhvang",
+            "count": 1
+          },
+          {
+            "tag": "lá ngọc cành vàng",
+            "count": 1
+          },
+          {
+            "tag": "officialmusicvideo",
+            "count": 1
+          },
+          {
+            "tag": "trach trang tan ca nuong kieu anh",
+            "count": 1
+          },
+          {
+            "tag": "tuancry",
+            "count": 1
+          }
+        ],
+        "keywords": []
+      },
+      {
+        "topic": "(MECCHA CHAMELEON #1) Thử game trốn tìm mới và khám phá góc trốn siêu hiểm cùng họa sĩ Mixi Moi.",
+        "views": 907796,
+        "trend": "up",
+        "source": "youtube",
+        "category": "24",
+        "hashtags": [
+          {
+            "tag": "1",
+            "count": 2
+          },
+          {
+            "tag": "bộtộcmixi",
+            "count": 1
+          },
+          {
+            "tag": "csgo",
+            "count": 1
+          },
+          {
+            "tag": "funny",
+            "count": 1
+          },
+          {
+            "tag": "funny game",
+            "count": 1
+          },
+          {
+            "tag": "funny stream",
+            "count": 1
+          },
+          {
+            "tag": "gta v",
+            "count": 1
+          },
+          {
+            "tag": "mixi",
+            "count": 1
+          },
+          {
+            "tag": "mixi gaming",
+            "count": 1
+          },
+          {
+            "tag": "mixi live",
+            "count": 1
+          },
+          {
+            "tag": "mixi vlog",
+            "count": 1
+          },
+          {
+            "tag": "mixigaming",
+            "count": 1
+          },
+          {
+            "tag": "mixigaming funny",
+            "count": 1
+          },
+          {
+            "tag": "phùng thanh độ",
+            "count": 1
+          },
+          {
+            "tag": "pubg",
+            "count": 1
+          },
+          {
+            "tag": "refund",
+            "count": 1
+          },
+          {
+            "tag": "refund gaming",
+            "count": 1
+          },
+          {
+            "tag": "streamer việt nam",
+            "count": 1
+          },
+          {
+            "tag": "talkshow",
+            "count": 1
+          },
+          {
+            "tag": "độ mixi",
+            "count": 1
+          },
+          {
+            "tag": "độ phùng",
+            "count": 1
+          },
+          {
+            "tag": "độ tày",
+            "count": 1
+          },
+          {
+            "tag": "độmixi",
+            "count": 1
+          }
+        ],
+        "keywords": []
+      },
+      {
+        "topic": "07. Em - Binz (feat. SOOBIN) | Gặp Lại Album",
+        "views": 14976356,
+        "trend": "up",
+        "source": "youtube",
+        "category": "10",
+        "hashtags": [
+          {
+            "tag": "binz",
+            "count": 2
+          },
+          {
+            "tag": "spacespeakers",
+            "count": 2
+          },
+          {
+            "tag": "spacespeakersgroup",
+            "count": 2
+          },
+          {
+            "tag": "sslabel",
+            "count": 2
+          },
+          {
+            "tag": "binz 2020",
+            "count": 1
+          },
+          {
+            "tag": "binz da poet",
+            "count": 1
+          },
+          {
+            "tag": "binz le",
+            "count": 1
+          },
+          {
+            "tag": "binz official",
+            "count": 1
+          },
+          {
+            "tag": "binzdapoet",
+            "count": 1
+          },
+          {
+            "tag": "dan le",
+            "count": 1
+          },
+          {
+            "tag": "demo binz",
+            "count": 1
+          },
+          {
+            "tag": "gaplaialbum",
+            "count": 1
+          },
+          {
+            "tag": "ssg",
+            "count": 1
+          }
+        ],
+        "keywords": []
+      },
+      {
+        "topic": "Hiha Lên Chức Bố Trong Minecraft",
+        "views": 1281529,
+        "trend": "up",
+        "source": "youtube",
+        "category": "20",
+        "hashtags": [
+          {
+            "tag": "hiha",
+            "count": 2
+          },
+          {
+            "tag": "mcpe",
+            "count": 2
+          },
+          {
+            "tag": "minecraft",
+            "count": 2
+          },
+          {
+            "tag": "h1h4",
+            "count": 1
+          },
+          {
+            "tag": "hahichobi",
+            "count": 1
+          },
+          {
+            "tag": "hiha alpha",
+            "count": 1
+          },
+          {
+            "tag": "hiha aut",
+            "count": 1
+          },
+          {
+            "tag": "hiha aut hiha",
+            "count": 1
+          },
+          {
+            "tag": "hiha bố minecraft",
+            "count": 1
+          },
+          {
+            "tag": "hiha hiha aut",
+            "count": 1
+          },
+          {
+            "tag": "hiha làm bố",
+            "count": 1
+          },
+          {
+            "tag": "hiha làm bố trong minecraft",
+            "count": 1
+          },
+          {
+            "tag": "hiha lên chức bố",
+            "count": 1
+          },
+          {
+            "tag": "hiha minecraft",
+            "count": 1
+          },
+          {
+            "tag": "hiha sinh tố",
+            "count": 1
+          },
+          {
+            "tag": "hiha sinh tố team",
+            "count": 1
+          },
+          {
+            "tag": "hiha và yummie",
+            "count": 1
+          },
+          {
+            "tag": "hiha yummie",
+            "count": 1
+          },
+          {
+            "tag": "hiha yummie minecraft",
+            "count": 1
+          },
+          {
+            "tag": "hihachobi",
+            "count": 1
+          },
+          {
+            "tag": "làng hiha aut",
+            "count": 1
+          },
+          {
+            "tag": "oops club",
+            "count": 1
+          },
+          {
+            "tag": "oops hiha",
+            "count": 1
+          },
+          {
+            "tag": "sinh tố team",
+            "count": 1
+          }
+        ],
+        "keywords": [
+          "hiha c� con trong minecraft",
+          "nếu hiha c� cuộc sống trong minecraft",
+          "anh hiha ở trong minecraft",
+          "nếu yummie c� cuộc sống trong minecraft"
+        ]
+      },
+      {
+        "topic": "toidaidot - GREY D | ‘ÁNH SÁNG • MÀN ĐÊM’ album",
+        "views": 1193949,
+        "trend": "up",
+        "source": "youtube",
+        "category": "10",
+        "hashtags": [
+          {
+            "tag": "greyd",
+            "count": 2
+          },
+          {
+            "tag": "album anh sang man dem",
+            "count": 1
+          },
+          {
+            "tag": "album ánh sáng màn đêm",
+            "count": 1
+          },
+          {
+            "tag": "amee",
+            "count": 1
+          },
+          {
+            "tag": "amee st319",
+            "count": 1
+          },
+          {
+            "tag": "anh sang man dem grey d",
+            "count": 1
+          },
+          {
+            "tag": "anhsangmandem",
+            "count": 1
+          },
+          {
+            "tag": "doan the lan",
+            "count": 1
+          },
+          {
+            "tag": "grey d mv moi",
+            "count": 1
+          },
+          {
+            "tag": "grey d mv mới",
+            "count": 1
+          },
+          {
+            "tag": "greyd toidaidot",
+            "count": 1
+          },
+          {
+            "tag": "key",
+            "count": 1
+          },
+          {
+            "tag": "monstar",
+            "count": 1
+          },
+          {
+            "tag": "monstar j",
+            "count": 1
+          },
+          {
+            "tag": "nicky",
+            "count": 1
+          },
+          {
+            "tag": "saint319",
+            "count": 1
+          },
+          {
+            "tag": "st.319",
+            "count": 1
+          },
+          {
+            "tag": "st319",
+            "count": 1
+          },
+          {
+            "tag": "st319 dance",
+            "count": 1
+          },
+          {
+            "tag": "st319 entertainment",
+            "count": 1
+          },
+          {
+            "tag": "toidaidot",
+            "count": 1
+          },
+          {
+            "tag": "toidaidot greyd",
+            "count": 1
+          },
+          {
+            "tag": "tôidạidột",
+            "count": 1
+          },
+          {
+            "tag": "vpop",
+            "count": 1
+          },
+          {
+            "tag": "zino",
+            "count": 1
+          },
+          {
+            "tag": "ánh sáng màn đêm grey d",
+            "count": 1
+          },
+          {
+            "tag": "đoàn thế lân",
+            "count": 1
+          }
+        ],
+        "keywords": []
+      },
+      {
+        "topic": "BI HUỲNH LẦN ĐẦU CHƠI GROW A GARDEN 2 VÀ ĐẠT KỶ LỤC CÂY DRAGON BREATH RAINBOW ĐẦU TIÊN",
+        "views": 938278,
+        "trend": "up",
+        "source": "youtube",
+        "category": "20",
+        "hashtags": [
+          {
+            "tag": "24h blox fruit",
+            "count": 1
+          },
+          {
+            "tag": "bi huỳnh gaming",
+            "count": 1
+          },
+          {
+            "tag": "bi đại thần",
+            "count": 1
+          },
+          {
+            "tag": "bihuynh",
+            "count": 1
+          },
+          {
+            "tag": "blox fruit",
+            "count": 1
+          },
+          {
+            "tag": "bloxfruits",
+            "count": 1
+          },
+          {
+            "tag": "roblox",
+            "count": 1
+          },
+          {
+            "tag": "thử thách 100 ngày blox fruit",
+            "count": 1
+          },
+          {
+            "tag": "thử thách blox fruit",
+            "count": 1
+          }
+        ],
+        "keywords": []
+      },
+      {
+        "topic": "Cả Biển Người Chết Lặng Với Ca Khúc - Anh Còn Nợ Em | Giọng Hát Quá Hay",
+        "views": 379727,
+        "trend": "up",
+        "source": "youtube",
+        "category": "10",
+        "hashtags": [
+          {
+            "tag": "ballad",
+            "count": 2
+          },
+          {
+            "tag": "anh bằng",
+            "count": 1
+          },
+          {
+            "tag": "anh con no em",
+            "count": 1
+          },
+          {
+            "tag": "anh còn nợ em",
+            "count": 1
+          },
+          {
+            "tag": "anh còn nợ em karaoke",
+            "count": 1
+          },
+          {
+            "tag": "anhbang",
+            "count": 1
+          },
+          {
+            "tag": "anhconnoem",
+            "count": 1
+          },
+          {
+            "tag": "buontamtrang",
+            "count": 1
+          },
+          {
+            "tag": "cover",
+            "count": 1
+          },
+          {
+            "tag": "lam phương",
+            "count": 1
+          },
+          {
+            "tag": "music",
+            "count": 1
+          },
+          {
+            "tag": "nhachaymoingay",
+            "count": 1
+          },
+          {
+            "tag": "nhạc hải ngoại",
+            "count": 1
+          },
+          {
+            "tag": "nhạc trữ tình",
+            "count": 1
+          },
+          {
+            "tag": "nhạc việt",
+            "count": 1
+          },
+          {
+            "tag": "nhạc xưa",
+            "count": 1
+          },
+          {
+            "tag": "rock ballad",
+            "count": 1
+          },
+          {
+            "tag": "trịnh công sơn",
+            "count": 1
+          }
+        ],
+        "keywords": []
+      },
+      {
+        "topic": "Yummie CẶP ĐÔI EM BÉ GUGU GAGA Trong Minecraft ?! 🤩😍",
+        "views": 555390,
+        "trend": "up",
+        "source": "youtube",
+        "category": "24",
+        "hashtags": [
+          {
+            "tag": "mcpe",
+            "count": 2
+          },
+          {
+            "tag": "minecraft",
+            "count": 2
+          },
+          {
+            "tag": "yummie",
+            "count": 2
+          },
+          {
+            "tag": "gugugaga",
+            "count": 1
+          },
+          {
+            "tag": "hiha",
+            "count": 1
+          },
+          {
+            "tag": "hiha giải cứu yummie",
+            "count": 1
+          },
+          {
+            "tag": "hiha và yummie",
+            "count": 1
+          },
+          {
+            "tag": "hiha yêu yummie",
+            "count": 1
+          },
+          {
+            "tag": "sinh tố team",
+            "count": 1
+          },
+          {
+            "tag": "sinh tố yummie",
+            "count": 1
+          },
+          {
+            "tag": "yum mie",
+            "count": 1
+          },
+          {
+            "tag": "yummie minecraft",
+            "count": 1
+          },
+          {
+            "tag": "yummie tv",
+            "count": 1
+          },
+          {
+            "tag": "yummietv",
+            "count": 1
+          },
+          {
+            "tag": "yummy",
+            "count": 1
+          },
+          {
+            "tag": "yummy minecraft",
+            "count": 1
+          },
+          {
+            "tag": "zombie minecraft",
+            "count": 1
+          }
+        ],
+        "keywords": []
+      },
+      {
+        "topic": "CẢM ƠN VỢ CHƯA CƯỚI - CHÂU KHẢI PHONG | COMPOSER: LÊ CHÍ TRUNG | OFFICIAL MV",
+        "views": 304023,
+        "trend": "up",
+        "source": "youtube",
+        "category": "10",
+        "hashtags": [
+          {
+            "tag": "châu khải phong",
+            "count": 3
+          },
+          {
+            "tag": "cảm ơn vợ chưa cưới",
+            "count": 3
+          },
+          {
+            "tag": "lê chí trung",
+            "count": 3
+          },
+          {
+            "tag": "chaukhaiphong",
+            "count": 2
+          },
+          {
+            "tag": "cảm ơn vợ chưa cưới châu khải phong",
+            "count": 2
+          },
+          {
+            "tag": "2026",
+            "count": 1
+          },
+          {
+            "tag": "93newgmedia",
+            "count": 1
+          },
+          {
+            "tag": "cam on vo chua cuoi",
+            "count": 1
+          },
+          {
+            "tag": "cam on vo cua cuoi",
+            "count": 1
+          },
+          {
+            "tag": "camonvochuacuoi",
+            "count": 1
+          },
+          {
+            "tag": "chau khai phong",
+            "count": 1
+          },
+          {
+            "tag": "châu khải phong cảm ơn vợ chưa cưới",
+            "count": 1
+          },
+          {
+            "tag": "cảm ơn em ở lại",
+            "count": 1
+          },
+          {
+            "tag": "hot hit",
+            "count": 1
+          },
+          {
+            "tag": "lechitrung",
+            "count": 1
+          },
+          {
+            "tag": "music",
+            "count": 1
+          },
+          {
+            "tag": "music hit",
+            "count": 1
+          },
+          {
+            "tag": "music video",
+            "count": 1
+          },
+          {
+            "tag": "nhạc trẻ",
+            "count": 1
+          },
+          {
+            "tag": "xin lỗi đã bắt em phải chờ",
+            "count": 1
+          }
+        ],
+        "keywords": []
+      },
+      {
+        "topic": "LK Ca Nhạc Bolero Trữ Tình CỰC HAY & ÊM TAI  - Giọng Ca hay Xuất Sắc - Nhạc Vàng Xưa Toàn Bài Hay",
+        "views": 272735,
+        "trend": "up",
+        "source": "youtube",
+        "category": "10",
+        "hashtags": [
+          {
+            "tag": "bolero",
+            "count": 1
+          },
+          {
+            "tag": "bolero hay nhất",
+            "count": 1
+          },
+          {
+            "tag": "bolero trữ tình hay nhất",
+            "count": 1
+          },
+          {
+            "tag": "ca nhạc",
+            "count": 1
+          },
+          {
+            "tag": "ca nhạc bolero",
+            "count": 1
+          },
+          {
+            "tag": "ca nhạc trữ tình",
+            "count": 1
+          },
+          {
+            "tag": "liên khúc nhạc trữ tình",
+            "count": 1
+          },
+          {
+            "tag": "lk bolero",
+            "count": 1
+          },
+          {
+            "tag": "lk nhạc trữ tình",
+            "count": 1
+          },
+          {
+            "tag": "lk nhạc trữ tình bolero",
+            "count": 1
+          },
+          {
+            "tag": "lk nhạc vàng xưa",
+            "count": 1
+          },
+          {
+            "tag": "nhac bolero hay nhat",
+            "count": 1
+          },
+          {
+            "tag": "nhac bolero tru tinh",
+            "count": 1
+          },
+          {
+            "tag": "nhac tru tinh",
+            "count": 1
+          },
+          {
+            "tag": "nhac tru tinh bolero",
+            "count": 1
+          },
+          {
+            "tag": "nhac vang",
+            "count": 1
+          },
+          {
+            "tag": "nhạc bolero",
+            "count": 1
+          },
+          {
+            "tag": "nhạc bolero hay nhất",
+            "count": 1
+          },
+          {
+            "tag": "nhạc trữ tình",
+            "count": 1
+          },
+          {
+            "tag": "nhạc trữ tình bolero",
+            "count": 1
+          },
+          {
+            "tag": "nhạc trữ tình hay nhất",
+            "count": 1
+          },
+          {
+            "tag": "nhạc vàng",
+            "count": 1
+          },
+          {
+            "tag": "nhạc vàng chọn lọc",
+            "count": 1
+          },
+          {
+            "tag": "nhạc vàng xưa",
+            "count": 1
+          },
+          {
+            "tag": "nhạc xưa",
+            "count": 1
+          },
+          {
+            "tag": "thichnghenhacsong2015",
+            "count": 1
+          }
+        ],
+        "keywords": []
+      },
+      {
+        "topic": "[Free Fire] CULÌ Kết Hợp C4HIHIHI, WAG TQuý Chinh Phục ALTP Của Bác Gấu 50.000N View Và Cái Kết !",
+        "views": 927179,
+        "trend": "up",
+        "source": "youtube",
+        "category": "22",
+        "hashtags": [
+          {
+            "tag": "bacgau",
+            "count": 1
+          },
+          {
+            "tag": "blvvietthang",
+            "count": 1
+          },
+          {
+            "tag": "c4gaming",
+            "count": 1
+          },
+          {
+            "tag": "cenaff",
+            "count": 1
+          },
+          {
+            "tag": "culi",
+            "count": 1
+          },
+          {
+            "tag": "culiff",
+            "count": 1
+          },
+          {
+            "tag": "ff",
+            "count": 1
+          },
+          {
+            "tag": "freefire",
+            "count": 1
+          },
+          {
+            "tag": "freefirehighlight",
+            "count": 1
+          },
+          {
+            "tag": "highlightff",
+            "count": 1
+          },
+          {
+            "tag": "highlightfreefire",
+            "count": 1
+          },
+          {
+            "tag": "hungakira",
+            "count": 1
+          },
+          {
+            "tag": "lbg",
+            "count": 1
+          },
+          {
+            "tag": "lebinhgaming",
+            "count": 1
+          },
+          {
+            "tag": "ligaming",
+            "count": 1
+          },
+          {
+            "tag": "quy11ngon",
+            "count": 1
+          },
+          {
+            "tag": "sangtaofreefire",
+            "count": 1
+          },
+          {
+            "tag": "shorts",
+            "count": 1
+          },
+          {
+            "tag": "sieunhanvitff",
+            "count": 1
+          },
+          {
+            "tag": "tiktok",
+            "count": 1
+          },
+          {
+            "tag": "toantay",
+            "count": 1
+          },
+          {
+            "tag": "trooper",
+            "count": 1
+          },
+          {
+            "tag": "vietthangff",
+            "count": 1
+          }
+        ],
+        "keywords": []
+      },
+      {
+        "topic": "LE SSERAFIM (르세라핌) x ILLIT (아일릿) x KATSEYE (캣츠아이) 'ICONIC BY MISTAKE' Official MV",
+        "views": 26664715,
+        "trend": "up",
+        "source": "youtube",
+        "category": "10",
+        "hashtags": [
+          {
+            "tag": "hybe",
+            "count": 1
+          },
+          {
+            "tag": "hybe labels",
+            "count": 1
+          },
+          {
+            "tag": "iconicbymistake",
+            "count": 1
+          },
+          {
+            "tag": "illit",
+            "count": 1
+          },
+          {
+            "tag": "katseye",
+            "count": 1
+          },
+          {
+            "tag": "le_sserafim",
+            "count": 1
+          },
+          {
+            "tag": "하이브",
+            "count": 1
+          },
+          {
+            "tag": "하이브레이블즈",
+            "count": 1
+          }
+        ],
+        "keywords": []
+      }
+    ],
+    "seo_pool": {
+      "hashtags": [
+        "mcpe",
+        "minecraft",
+        "châu khải phong",
+        "cảm ơn vợ chưa cưới",
+        "hiha",
+        "lê chí trung",
+        "sinh tố team",
+        "yummie",
+        "1",
+        "ballad",
+        "binz",
+        "ccms",
+        "chaukhaiphong",
+        "cảm ơn vợ chưa cưới châu khải phong",
+        "greyd"
+      ],
+      "keywords": [
+        "trực tiếp lck b�nh luận tiếng việt",
+        "t� g� chơi trốn t�m",
+        "t� g� thử th�ch chơi trốn t�m",
+        "hiha c� con trong minecraft",
+        "nếu hiha c� cuộc sống trong minecraft",
+        "anh hiha ở trong minecraft",
+        "nếu yummie c� cuộc sống trong minecraft"
+      ]
+    },
+    "started_at": "2026-06-16",
+    "days_total": 30,
+    "episodes": [
+      {
+        "day": 1,
+        "slug": "hieu-ung-dunning-kruger-vi-sao-nguoi-kem-nhat-lai-tu-tin-nhat",
+        "topic": "Hiệu Ứng Dunning-Kruger: Vì Sao Người Kém Nhất Lại Tự Tin Nhất",
+        "publish_at": "2026-06-17T20:00:00+0700",
+        "status": "done"
+      },
+      {
+        "day": 2,
+        "slug": "hieu-ung-zeigarnik-vi-sao-viec-dang-do-cu-am-anh-tam-tri-ban",
+        "topic": "Hiệu Ứng Zeigarnik: Vì Sao Việc Dang Dở Cứ Ám Ảnh Tâm Trí Bạn",
+        "publish_at": "2026-06-19T06:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 3,
+        "slug": "nghich-ly-lua-chon-vi-sao-cang-nhieu-phuong-an-cang-te-liet",
+        "topic": "Nghịch Lý Lựa Chọn: Vì Sao Càng Nhiều Phương Án Càng Tê Liệt",
+        "publish_at": "2026-06-20T06:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 4,
+        "slug": "bay-chi-phi-chim-vi-sao-ban-co-dam-an-xoi-du-biet-sai",
+        "topic": "Bẫy Chi Phí Chìm: Vì Sao Bạn Cố Đấm Ăn Xôi Dù Biết Sai",
+        "publish_at": "2026-06-21T06:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 5,
+        "slug": "hieu-ung-mo-neo-con-so-dau-tien-thao-tung-moi-quyet-dinh",
+        "topic": "Hiệu Ứng Mỏ Neo: Con Số Đầu Tiên Thao Túng Mọi Quyết Định",
+        "publish_at": "2026-06-22T06:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 6,
+        "slug": "ne-mat-mat-vi-sao-mat-100k-dau-hon-niem-vui-duoc-100k",
+        "topic": "Né Mất Mát: Vì Sao Mất 100k Đau Hơn Niềm Vui Được 100k",
+        "publish_at": "2026-06-23T06:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 7,
+        "slug": "thien-kien-xac-nhan-vi-sao-nao-chi-thay-dieu-ban-muon-thay",
+        "topic": "Thiên Kiến Xác Nhận: Vì Sao Não Chỉ Thấy Điều Bạn Muốn Thấy",
+        "publish_at": "2026-06-24T06:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 8,
+        "slug": "hieu-ung-hao-quang-mot-an-tuong-dau-danh-lua-ca-bo-nao",
+        "topic": "Hiệu Ứng Hào Quang: Một Ấn Tượng Đầu Đánh Lừa Cả Bộ Não",
+        "publish_at": "2026-06-25T06:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 9,
+        "slug": "quy-luat-dinh-ket-vi-sao-nao-nho-sai-moi-trai-nghiem",
+        "topic": "Quy Luật Đỉnh-Kết: Vì Sao Não Nhớ Sai Mọi Trải Nghiệm",
+        "publish_at": "2026-06-26T06:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 10,
+        "slug": "hieu-ung-anh-den-san-khau-khong-ai-de-y-ban-nhu-ban-tuong",
+        "topic": "Hiệu Ứng Ánh Đèn Sân Khấu: Không Ai Để Ý Bạn Như Bạn Tưởng",
+        "publish_at": "2026-06-27T06:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 11,
+        "slug": "hieu-ung-ikea-vi-sao-ta-dinh-gia-qua-cao-thu-minh-tu-lam",
+        "topic": "Hiệu Ứng IKEA: Vì Sao Ta Định Giá Quá Cao Thứ Mình Tự Làm",
+        "publish_at": "2026-06-28T06:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 12,
+        "slug": "hieu-ung-moi-nhu-cach-ban-bi-dat-mui-khi-chon-goi-gia",
+        "topic": "Hiệu Ứng Mồi Nhử: Cách Bạn Bị Dắt Mũi Khi Chọn Gói Giá",
+        "publish_at": "2026-06-29T06:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 13,
+        "slug": "suc-i-hien-trang-co-che-khien-nao-so-moi-thay-doi",
+        "topic": "Sức Ì Hiện Trạng: Cơ Chế Khiến Não Sợ Mọi Thay Đổi",
+        "publish_at": "2026-06-30T06:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 14,
+        "slug": "hieu-ung-dong-khung-cung-su-that-doi-cach-noi-doi-quyet-dinh",
+        "topic": "Hiệu Ứng Đóng Khung: Cùng Sự Thật, Đổi Cách Nói Đổi Quyết Định",
+        "publish_at": "2026-07-01T06:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 15,
+        "slug": "thien-kien-song-sot-vi-sao-bai-hoc-tu-ke-thang-danh-lua-ban",
+        "topic": "Thiên Kiến Sống Sót: Vì Sao Bài Học Từ Kẻ Thắng Đánh Lừa Bạn",
+        "publish_at": "2026-07-02T06:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 16,
+        "slug": "su-bat-luc-hoc-duoc-co-che-khien-con-nguoi-buong-xuoi",
+        "topic": "Sự Bất Lực Học Được: Cơ Chế Khiến Con Người Buông Xuôi",
+        "publish_at": "2026-07-03T06:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 17,
+        "slug": "quy-luat-parkinson-vi-sao-viec-luon-no-ra-lap-day-thoi-gian",
+        "topic": "Quy Luật Parkinson: Vì Sao Việc Luôn Nở Ra Lấp Đầy Thời Gian",
+        "publish_at": "2026-07-04T06:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 18,
+        "slug": "hieu-ung-ben-franklin-nho-va-dung-cach-khien-nguoi-ta-quy-ban",
+        "topic": "Hiệu Ứng Ben Franklin: Nhờ Vả Đúng Cách Khiến Người Ta Quý Bạn",
+        "publish_at": "2026-07-05T06:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 19,
+        "slug": "su-thich-nghi-khoai-lac-vi-sao-mua-sam-khong-lam-ban-vui-lau",
+        "topic": "Sự Thích Nghi Khoái Lạc: Vì Sao Mua Sắm Không Làm Bạn Vui Lâu",
+        "publish_at": "2026-07-06T06:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 20,
+        "slug": "hieu-ung-pygmalion-ky-vong-cua-nguoi-khac-tao-ra-ket-qua-ban",
+        "topic": "Hiệu Ứng Pygmalion: Kỳ Vọng Của Người Khác Tạo Ra Kết Quả Bạn",
+        "publish_at": "2026-07-07T06:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 21,
+        "slug": "qua-tai-nhan-thuc-co-che-vi-sao-nao-ban-can-pin-cuoi-ngay",
+        "topic": "Quá Tải Nhận Thức: Cơ Chế Vì Sao Não Bạn Cạn Pin Cuối Ngày",
+        "publish_at": "2026-07-08T06:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 22,
+        "slug": "tri-nho-tai-dung-vi-sao-nhieu-ky-uc-cua-ban-la-bia",
+        "topic": "Trí Nhớ Tái Dựng: Vì Sao Nhiều Ký Ức Của Bạn Là Bịa",
+        "publish_at": "2026-07-09T06:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 23,
+        "slug": "hieu-ung-mat-phoi-bay-vi-sao-quen-mat-roi-lai-hoa-thich",
+        "topic": "Hiệu Ứng Mặt Phơi Bày: Vì Sao Quen Mặt Rồi Lại Hoá Thích",
+        "publish_at": "2026-07-10T06:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 24,
+        "slug": "phan-khang-tam-ly-vi-sao-bi-cam-lai-cang-muon-lam",
+        "topic": "Phản Kháng Tâm Lý: Vì Sao Bị Cấm Lại Càng Muốn Làm",
+        "publish_at": "2026-07-11T06:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 25,
+        "slug": "hieu-ung-google-vi-sao-ta-quen-sach-thu-co-the-tra-duoc",
+        "topic": "Hiệu Ứng Google: Vì Sao Ta Quên Sạch Thứ Có Thể Tra Được",
+        "publish_at": "2026-07-12T06:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 26,
+        "slug": "ly-thuyet-tu-quyet-co-che-that-cua-dong-luc-ben-vung",
+        "topic": "Lý Thuyết Tự Quyết: Cơ Chế Thật Của Động Lực Bền Vững",
+        "publish_at": "2026-07-13T06:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 27,
+        "slug": "hieu-ung-pratfall-vi-sao-mot-sai-sot-nho-khien-ban-dang-men-hon",
+        "topic": "Hiệu Ứng Pratfall: Vì Sao Một Sai Sót Nhỏ Khiến Bạn Đáng Mến Hơn",
+        "publish_at": "2026-07-14T06:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 28,
+        "slug": "te-liet-phan-tich-co-che-mac-ket-va-cach-thoat-ra",
+        "topic": "Tê Liệt Phân Tích: Cơ Chế Mắc Kẹt Và Cách Thoát Ra",
+        "publish_at": "2026-07-15T06:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 29,
+        "slug": "cua-so-overton-cua-tam-tri-vi-sao-niem-tin-cua-ban-dich-chuyen",
+        "topic": "Cửa Sổ Overton Của Tâm Trí: Vì Sao Niềm Tin Của Bạn Dịch Chuyển",
+        "publish_at": "2026-07-16T06:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 30,
+        "slug": "hieu-ung-mat-trai-cua-phan-thuong-khi-treo-thuong-giet-chet-dam-me",
+        "topic": "Hiệu Ứng Mặt Trái Của Phần Thưởng: Khi Treo Thưởng Giết Chết Đam Mê",
+        "publish_at": "2026-07-17T06:00:00+0700",
+        "status": "queued"
+      }
+    ]
+  },
+  "series_evening": {
+    "status": "active",
+    "slot": "evening",
+    "niche": "Cơ chế tài chính cá nhân (tâm lý tiền bạc & kinh tế học hành vi)",
+    "reason": "Tách slot 20:00 khỏi series sáng. CPM tài chính cao, advertiser-safe, đúng lõi 'giải cơ chế THẬT không self-help'; ngách độc lập với cơ chế tâm lý chung để chống trùng.",
+    "research": [],
+    "seo_pool": {
+      "hashtags": [],
+      "keywords": []
+    },
+    "started_at": "2026-06-18",
+    "days_total": 30,
+    "episodes": [
+      {
+        "day": 1,
+        "slug": "hieu-ung-so-huu-vi-sao-ban-dinh-gia-do-cua-minh-cao-hon-thuc-te",
+        "topic": "Hiệu Ứng Sở Hữu: Vì Sao Bạn Định Giá Đồ Của Mình Cao Hơn Thực Tế",
+        "publish_at": "2026-06-19T20:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 2,
+        "slug": "lam-phat-am-tham-vi-sao-tien-de-yen-moi-nam-mot-teo",
+        "topic": "Lạm Phát Âm Thầm: Vì Sao Tiền Để Yên Mỗi Năm Một Teo",
+        "publish_at": "2026-06-20T20:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 3,
+        "slug": "hieu-ung-mo-neo-gia-vi-sao-cua-hang-luon-co-mot-mon-dat-vo-ly",
+        "topic": "Hiệu Ứng Mỏ Neo Giá: Vì Sao Cửa Hàng Luôn Có Một Món Đắt Vô Lý",
+        "publish_at": "2026-06-21T20:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 4,
+        "slug": "ke-toan-tam-ly-vi-sao-tien-thuong-de-tieu-hon-tien-luong",
+        "topic": "Kế Toán Tâm Lý: Vì Sao Tiền Thưởng Dễ Tiêu Hơn Tiền Lương",
+        "publish_at": "2026-06-22T20:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 5,
+        "slug": "noi-dau-mat-mat-vi-sao-lo-100k-dau-gap-doi-niem-vui-lai-100k",
+        "topic": "Nỗi Đau Mất Mát: Vì Sao Lỗ 100k Đau Gấp Đôi Niềm Vui Lãi 100k",
+        "publish_at": "2026-06-23T20:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 6,
+        "slug": "lam-phat-loi-song-vi-sao-luong-tang-ma-van-khong-du",
+        "topic": "Lạm Phát Lối Sống: Vì Sao Lương Tăng Mà Vẫn Không Dư",
+        "publish_at": "2026-06-24T20:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 7,
+        "slug": "chi-phi-co-hoi-cai-gia-vo-hinh-cua-moi-dong-ban-tieu",
+        "topic": "Chi Phí Cơ Hội: Cái Giá Vô Hình Của Mọi Đồng Bạn Tiêu",
+        "publish_at": "2026-06-25T20:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 8,
+        "slug": "hieu-ung-latte-vi-sao-khoan-nho-hang-ngay-an-mon-ca-gia-tai",
+        "topic": "Hiệu Ứng Latte: Vì Sao Khoản Nhỏ Hằng Ngày Ăn Mòn Cả Gia Tài",
+        "publish_at": "2026-06-26T20:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 9,
+        "slug": "lai-kep-cua-no-vi-sao-the-tin-dung-la-cai-bay-nguoc",
+        "topic": "Lãi Kép Của Nợ: Vì Sao Thẻ Tín Dụng Là Cái Bẫy Ngược",
+        "publish_at": "2026-06-27T20:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 10,
+        "slug": "thien-kien-hien-tai-vi-sao-nao-luon-chon-tieu-nay-hon-de-mai",
+        "topic": "Thiên Kiến Hiện Tại: Vì Sao Não Luôn Chọn Tiêu Nay Hơn Để Mai",
+        "publish_at": "2026-06-28T20:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 11,
+        "slug": "hieu-ung-moi-gia-vi-sao-combo-luon-khien-ban-mua-nhieu-hon",
+        "topic": "Hiệu Ứng Mồi Giá: Vì Sao Combo Luôn Khiến Bạn Mua Nhiều Hơn",
+        "publish_at": "2026-06-29T20:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 12,
+        "slug": "tien-mat-vs-the-vi-sao-quet-the-khien-ban-tieu-manh-tay-hon",
+        "topic": "Tiền Mặt Vs Thẻ: Vì Sao Quẹt Thẻ Khiến Bạn Tiêu Mạnh Tay Hơn",
+        "publish_at": "2026-06-30T20:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 13,
+        "slug": "quy-tac-72-cach-nham-nhanh-bao-lau-tien-cua-ban-nhan-doi",
+        "topic": "Quy Tắc 72: Cách Nhẩm Nhanh Bao Lâu Tiền Của Bạn Nhân Đôi",
+        "publish_at": "2026-07-01T20:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 14,
+        "slug": "da-dang-hoa-vi-sao-bo-het-trung-mot-gio-la-tu-sat-tai-chinh",
+        "topic": "Đa Dạng Hoá: Vì Sao Bỏ Hết Trứng Một Giỏ Là Tự Sát Tài Chính",
+        "publish_at": "2026-07-02T20:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 15,
+        "slug": "thien-kien-song-sot-vi-sao-ban-chi-nghe-chuyen-nguoi-thang-dam",
+        "topic": "Thiên Kiến Sống Sót: Vì Sao Bạn Chỉ Nghe Chuyện Người Thắng Đậm",
+        "publish_at": "2026-07-03T20:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 16,
+        "slug": "hieu-ung-dam-dong-vi-sao-ai-cung-mua-thi-thuong-la-luc-nen-ban",
+        "topic": "Hiệu Ứng Đám Đông: Vì Sao Ai Cũng Mua Thì Thường Là Lúc Nên Bán",
+        "publish_at": "2026-07-04T20:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 17,
+        "slug": "tai-khoan-khan-cap-co-che-tam-ly-dang-sau-quy-du-phong",
+        "topic": "Tài Khoản Khẩn Cấp: Cơ Chế Tâm Lý Đằng Sau Quỹ Dự Phòng",
+        "publish_at": "2026-07-05T20:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 18,
+        "slug": "hieu-ung-khan-hiem-vi-sao-chi-con-2-suat-moc-tui-ban",
+        "topic": "Hiệu Ứng Khan Hiếm: Vì Sao 'Chỉ Còn 2 Suất' Móc Túi Bạn",
+        "publish_at": "2026-07-06T20:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 19,
+        "slug": "dinh-phi-vs-bien-phi-vi-sao-chi-tieu-co-dinh-bop-nghet-ban",
+        "topic": "Định Phí Vs Biến Phí: Vì Sao Chi Tiêu Cố Định Bóp Nghẹt Bạn",
+        "publish_at": "2026-07-07T20:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 20,
+        "slug": "te-liet-vi-qua-nhieu-lua-chon-dau-tu-vi-sao-ban-mai-khong-bat-dau",
+        "topic": "Tê Liệt Vì Quá Nhiều Lựa Chọn Đầu Tư: Vì Sao Bạn Mãi Không Bắt Đầu",
+        "publish_at": "2026-07-08T20:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 21,
+        "slug": "hieu-ung-tam-ly-so-tron-vi-sao-gia-99k-ban-chay-hon-100k",
+        "topic": "Hiệu Ứng Tâm Lý Số Tròn: Vì Sao Giá 99k Bán Chạy Hơn 100k",
+        "publish_at": "2026-07-09T20:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 22,
+        "slug": "tra-gop-0-co-che-vi-sao-mien-lai-van-khien-ban-lo",
+        "topic": "Trả Góp 0%: Cơ Chế Vì Sao 'Miễn Lãi' Vẫn Khiến Bạn Lỗ",
+        "publish_at": "2026-07-10T20:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 23,
+        "slug": "tieu-san-vs-tai-san-vi-sao-chiec-xe-moi-lam-ban-ngheo-di",
+        "topic": "Tiêu Sản Vs Tài Sản: Vì Sao Chiếc Xe Mới Làm Bạn Nghèo Đi",
+        "publish_at": "2026-07-11T20:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 24,
+        "slug": "hieu-ung-neo-thu-nhap-vi-sao-ban-luon-thay-minh-thieu-tien",
+        "topic": "Hiệu Ứng Neo Thu Nhập: Vì Sao Bạn Luôn Thấy Mình Thiếu Tiền",
+        "publish_at": "2026-07-12T20:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 25,
+        "slug": "lai-suat-thuc-vi-sao-gui-tiet-kiem-doi-khi-van-la-lo",
+        "topic": "Lãi Suất Thực: Vì Sao Gửi Tiết Kiệm Đôi Khi Vẫn Là Lỗ",
+        "publish_at": "2026-07-13T20:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 26,
+        "slug": "chi-tieu-theo-cam-xuc-co-che-nao-bo-khi-ban-mua-de-giai-toa",
+        "topic": "Chi Tiêu Theo Cảm Xúc: Cơ Chế Não Bộ Khi Bạn Mua Để Giải Toả",
+        "publish_at": "2026-07-14T20:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 27,
+        "slug": "hieu-ung-sunk-cost-trong-dau-tu-vi-sao-ban-om-co-phieu-lo",
+        "topic": "Hiệu Ứng Sunk Cost Trong Đầu Tư: Vì Sao Bạn Ôm Cổ Phiếu Lỗ",
+        "publish_at": "2026-07-15T20:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 28,
+        "slug": "ngan-sach-phong-bi-vi-sao-chia-tien-theo-tui-lai-hieu-qua",
+        "topic": "Ngân Sách Phong Bì: Vì Sao Chia Tiền Theo Túi Lại Hiệu Quả",
+        "publish_at": "2026-07-16T20:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 29,
+        "slug": "fomo-tai-chinh-co-che-vi-sao-ban-lao-vao-dinh-song",
+        "topic": "FOMO Tài Chính: Cơ Chế Vì Sao Bạn Lao Vào Đỉnh Sóng",
+        "publish_at": "2026-07-17T20:00:00+0700",
+        "status": "queued"
+      },
+      {
+        "day": 30,
+        "slug": "tu-dong-hoa-tiet-kiem-vi-sao-tra-cho-minh-truoc-luon-thang",
+        "topic": "Tự Động Hoá Tiết Kiệm: Vì Sao 'Trả Cho Mình Trước' Luôn Thắng",
+        "publish_at": "2026-07-18T20:00:00+0700",
+        "status": "queued"
+      }
+    ]
+  }
+}

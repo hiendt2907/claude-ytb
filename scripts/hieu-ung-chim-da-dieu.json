@@ -1,0 +1,59 @@
+{
+  "topic": "hieu-ung-chim-da-dieu",
+  "title": "Biết Tin Xấu Sắp Tới Mà Vẫn Không Dám Mở Xem — Hiệu Ứng Chim Đà Điểu",
+  "voice": "vi-VN-NamMinhNeural",
+  "description": "Vì sao biết rõ một tin xấu đang chờ — số dư tài khoản, kết quả xét nghiệm, email công việc — mà bạn vẫn trì hoãn không mở xem? Short này giải thích Hiệu ứng chim đà điểu, nghiên cứu hành vi tài chính của Karlsson, Loewenstein và Seppi, và một cách thoát khỏi vòng né tránh đó.",
+  "tags": ["tâm lý học", "hiệu ứng chim đà điểu", "ostrich effect", "trì hoãn", "khoa học hành vi", "mental models"],
+  "compliance": {
+    "passed": true,
+    "community": "Nội dung giáo dục tâm lý học, không vi phạm tiêu chuẩn cộng đồng; không nội dung nguy hiểm/thù ghét/người lớn.",
+    "copyright": "Kịch bản gốc tự viết; B-roll AI-generated/Pexels free-to-use; không dùng nhạc/clip có bản quyền.",
+    "accuracy": "Dẫn nghiên cứu của Niklas Karlsson, George Loewenstein và Duane Seppi (2009), 'The Ostrich Effect: Selective Attention to Information', công bố trên Journal of Risk and Uncertainty, quan sát hành vi nhà đầu tư né xem tài khoản khi thị trường giảm — đều truy được.",
+    "advertiser": "Chủ đề trung tính, advertiser-friendly; không cờ bạc/thuốc/vũ khí/nội dung nhạy cảm.",
+    "coppa": "Không nhắm trẻ em; nội dung cho khán giả trưởng thành quan tâm phát triển bản thân.",
+    "notes": "Đã rà 3 gate ngách (mục 0c): giải thích cơ chế né tránh thông tin cụ thể (Karlsson, Loewenstein, Seppi 2009), không hô khẩu hiệu self-help; mật độ ý cao; nguồn (Journal of Risk and Uncertainty) truy được, không bịa số liệu. Khác biệt với video cũ: chưa video nào khai thác hiệu ứng chim đà điểu/né tránh thông tin có chủ đích."
+  },
+  "sections": [
+    {
+      "narration": "Một email kết quả xét nghiệm nằm im trong hộp thư ba ngày, chưa mở. Một ứng dụng ngân hàng bị gỡ thông báo vì tháng này chi tiêu quá tay. Bạn không phải không quan tâm — bạn quan tâm đến mức không chịu được việc nhìn thấy nó. Đây là một cơ chế tâm lý có tên hẳn hoi, không phải sự lười biếng của riêng bạn.",
+      "caption": "Biết tin xấu đang chờ — vẫn không dám mở xem?",
+      "broll": "person avoiding opening email notification anxiously",
+      "hook": true
+    },
+    {
+      "narration": "Cơ chế này gọi là hiệu ứng chim đà điểu: xu hướng chủ động né tránh thông tin tiêu cực có thể tiếp cận được, dù việc biết thông tin đó hoàn toàn vô hại về mặt vật lý. Tên gọi xuất phát từ huyền thoại dân gian rằng chim đà điểu vùi đầu vào cát khi gặp nguy hiểm — một huyền thoại sai về loài chim, nhưng lại mô tả chính xác một hành vi rất con người.",
+      "caption": "Né thông tin xấu — dù biết nó không hại gì về vật lý",
+      "broll": "ostrich burying head in sand metaphor",
+      "emphasis": ["NÉ TRÁNH THÔNG TIN CÓ CHỦ ĐÍCH"]
+    },
+    {
+      "narration": "Năm hai nghìn lẻ chín, ba nhà nghiên cứu Niklas Karlsson, George Loewenstein và Duane Seppi công bố trên tạp chí Journal of Risk and Uncertainty một nghiên cứu theo dõi hành vi thật của nhà đầu tư: tần suất họ đăng nhập kiểm tra tài khoản chứng khoán.",
+      "caption": "2009, Karlsson, Loewenstein, Seppi — Journal of Risk and Uncertainty",
+      "broll": "investor checking stock account login screen",
+      "emphasis": ["2009 — NGHIÊN CỨU HIỆU ỨNG ĐÀ ĐIỂU"]
+    },
+    {
+      "narration": "Kết quả: khi thị trường chung đang tăng, nhà đầu tư đăng nhập kiểm tra tài khoản nhiều hơn rõ rệt. Khi thị trường đang giảm, lượt đăng nhập sụt xuống đáng kể. Họ không hề kiểm tra ít hơn vì bận; họ né tránh chính xác vào lúc thông tin có khả năng xấu nhất, dù số tiền thật của họ vẫn đang biến động ngay lúc đó, biết hay không biết.",
+      "caption": "Thị trường giảm → lượt đăng nhập kiểm tra tài khoản sụt mạnh",
+      "broll": "chart market falling fewer logins correlation",
+      "emphasis": ["GIẢM → NÉ KIỂM TRA TÀI KHOẢN"]
+    },
+    {
+      "narration": "Cái giá của né tránh không hề rẻ. Không mở email kết quả xét nghiệm không làm bệnh biến mất, chỉ làm mất thời gian vàng để điều trị. Không kiểm tra tài khoản không ngăn được lỗ, chỉ ngăn bạn hành động kịp lúc để cắt lỗ hay điều chỉnh. Né tránh thông tin tạo cảm giác an toàn giả tạo, trong khi vấn đề thật vẫn tiếp tục diễn ra phía sau cánh cửa bạn không chịu mở.",
+      "caption": "Né tránh không xoá vấn đề — chỉ trì hoãn lúc bạn có thể hành động",
+      "broll": "problem growing silently while ignored",
+      "transition": true
+    },
+    {
+      "narration": "Cách thoát ra rất cụ thể: đặt sẵn một mốc thời gian cố định để buộc mình mở xem, ví dụ tối thứ Hai hàng tuần kiểm tra tài khoản hoặc hộp thư, bất kể trong lòng có ngại tới đâu. Biến việc 'đối diện thông tin' thành một thói quen lên lịch sẵn, để nó không còn là một quyết định đầy sợ hãi mỗi lần phải tự ra.",
+      "caption": "Đặt lịch cố định để buộc mình mở xem, dù ngại",
+      "broll": "person scheduling fixed routine calendar reminder",
+      "emphasis": ["ĐẶT LỊCH CỐ ĐỊNH ĐỂ ĐỐI DIỆN"]
+    },
+    {
+      "narration": "Lần tới khi bạn thấy mình trì hoãn mở một thông báo, hỏi thật: tôi đang bận, hay tôi đang là con chim đà điểu? Đây cũng là tập cuối trong chuỗi năm cơ chế tâm lý ngắn này — nếu muốn xem lại từ đầu thiên kiến tiêu cực, Baader-Meinhof, hiệu ứng Forer hay thiên kiến lạc quan, chúng đang nằm ngay trên kênh.",
+      "caption": "Tôi đang bận, hay đang là chim đà điểu?",
+      "broll": "person finally opening notification facing it"
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "topic": "hieu-ung-bang-quan",
+  "title": "Đông Người Chứng Kiến — Càng Ít Người Ra Tay Giúp",
+  "voice": "vi-VN-NamMinhNeural",
+  "description": "Vì sao một người gặp nạn giữa đám đông lại ít được giúp hơn khi chỉ có một người duy nhất đứng gần? Short này giải thích Hiệu ứng bàng quan tập thể qua nghiên cứu năm 1968 của John Darley và Bibb Latané, ra đời sau vụ Kitty Genovese gây chấn động.",
+  "tags": ["tâm lý học", "hiệu ứng bàng quan", "bystander effect", "tâm lý xã hội", "khoa học hành vi", "mental models"],
+  "compliance": {
+    "passed": true,
+    "community": "Nội dung giáo dục tâm lý học, mô tả sự kiện lịch sử ở mức khái quát không miêu tả chi tiết bạo lực; không vi phạm tiêu chuẩn cộng đồng.",
+    "copyright": "Kịch bản gốc tự viết; B-roll AI-generated/Pexels free-to-use; không dùng nhạc/clip có bản quyền.",
+    "accuracy": "Dẫn nghiên cứu của John M. Darley và Bibb Latané (1968), 'Bystander Intervention in Emergencies: Diffusion of Responsibility', Journal of Personality and Social Psychology — thí nghiệm mô phỏng cấp cứu qua liên lạc nội bộ — truy được.",
+    "advertiser": "Chủ đề tâm lý xã hội trung tính, advertiser-friendly; nhắc sự kiện lịch sử ở mức khái quát, không miêu tả chi tiết bạo lực hay hình ảnh gây sốc.",
+    "coppa": "Không nhắm trẻ em; nội dung cho khán giả trưởng thành quan tâm phát triển bản thân.",
+    "notes": "Đã rà 3 gate ngách (mục 0c): giải thích cơ chế phân tán trách nhiệm cụ thể (Darley & Latané 1968), không hô khẩu hiệu self-help; mật độ ý cao; nguồn truy được. Khác biệt với video cũ: chưa video nào khai thác hiệu ứng bàng quan/bystander effect — cơ chế xã hội-nhóm, khác hẳn các hiệu ứng nhận thức cá nhân đã làm trước."
+  },
+  "sections": [
+    {
+      "narration": "Một người ngã giữa phố đông, hàng chục người đi qua, không ai dừng lại. Cùng người đó ngã trên một con hẻm vắng chỉ có một người duy nhất nhìn thấy, khả năng được giúp lại cao hơn rõ rệt. Nghe ngược đời — càng nhiều người chứng kiến, lại càng ít người ra tay.",
+      "caption": "Đông người chứng kiến — vì sao lại càng ít người giúp?",
+      "broll": "person fallen on busy street crowd passing by",
+      "hook": true
+    },
+    {
+      "narration": "Cơ chế này gọi là hiệu ứng bàng quan tập thể: khi có nhiều người cùng chứng kiến một tình huống cần giúp đỡ, trách nhiệm hành động bị PHÂN TÁN ra cho cả nhóm trong đầu mỗi người, khiến từng cá nhân cảm thấy mình không bắt buộc phải là người ra tay — vì 'chắc sẽ có ai khác làm'.",
+      "caption": "Trách nhiệm bị phân tán cho cả nhóm — 'chắc ai khác sẽ làm'",
+      "broll": "group of people standing watching uncertain",
+      "emphasis": ["TRÁCH NHIỆM BỊ PHÂN TÁN CHO CẢ NHÓM"]
+    },
+    {
+      "narration": "Năm một nghìn chín trăm sáu mươi tám, John Darley và Bibb Latané công bố trên Journal of Personality and Social Psychology một thí nghiệm, ra đời sau vụ việc Kitty Genovese gây chấn động nước Mỹ vì có nhiều người được cho là chứng kiến mà không ai gọi cấp cứu kịp thời.",
+      "caption": "1968, Darley & Latané — Journal of Personality and Social Psychology",
+      "broll": "researchers setting up emergency intercom experiment",
+      "emphasis": ["1968 — DARLEY & LATANÉ SAU VỤ KITTY GENOVESE"]
+    },
+    {
+      "narration": "Họ cho sinh viên ngồi riêng từng phòng, trò chuyện qua hệ thống liên lạc nội bộ, rồi giả lập một người trong nhóm lên cơn cấp cứu rõ rệt qua loa. Khi sinh viên tin chỉ có MỘT mình mình nghe thấy, hơn tám mươi lăm phần trăm chạy đi báo người giúp ngay. Khi tin có NĂM người khác cùng nghe, tỉ lệ này tụt xuống dưới ba mươi mốt phần trăm.",
+      "caption": "Tin chỉ 1 người nghe: 85% đi báo. Tin có 5 người nghe: dưới 31%",
+      "broll": "chart comparing response rate group size",
+      "emphasis": ["85% (1 NGƯỜI) VS DƯỚI 31% (5 NGƯỜI)"]
+    },
+    {
+      "narration": "Không ai trong thí nghiệm này vô tâm hay ác ý — họ thậm chí tỏ ra lo lắng rõ rệt khi được hỏi sau đó. Vấn đề không nằm ở lòng tốt của từng người, mà nằm ở chính cấu trúc tình huống: số người chứng kiến đông lên đã âm thầm làm loãng cảm giác 'tôi phải là người hành động' trong đầu mỗi cá nhân.",
+      "caption": "Không phải vô tâm — chỉ là cấu trúc nhóm làm loãng trách nhiệm",
+      "broll": "person internally conflicted hesitating to act",
+      "transition": true
+    },
+    {
+      "narration": "Hiệu ứng này không chỉ xảy ra trong cấp cứu. Một lỗi sai rõ ràng trong cuộc họp đông người thường không ai lên tiếng sửa, trong khi cùng lỗi đó nếu chỉ có hai người sẽ được chỉ ra ngay — vì mỗi người trong phòng đông đều âm thầm nghĩ người khác chắc sẽ nói.",
+      "caption": "Cuộc họp đông người — lỗi sai rõ ràng vẫn không ai lên tiếng",
+      "broll": "meeting room many people no one speaking up",
+      "emphasis": ["HỌP ĐÔNG — KHÔNG AI LÊN TIẾNG SỬA LỖI"]
+    },
+    {
+      "narration": "Cách phá vỡ hiệu ứng rất cụ thể, đến từ chính nghiên cứu sau này: nếu bạn là người cần giúp, hãy chỉ thẳng vào MỘT người cụ thể và gọi tên hoặc đặc điểm của họ — 'anh áo xanh, gọi cấp cứu giúp tôi' — để phá vỡ sự phân tán trách nhiệm, biến trách nhiệm mơ hồ của cả đám đông thành trách nhiệm rõ ràng của một cá nhân.",
+      "caption": "Chỉ thẳng 1 người cụ thể — phá vỡ sự phân tán trách nhiệm",
+      "broll": "person pointing directly at specific individual for help",
+      "emphasis": ["CHỈ THẲNG 1 NGƯỜI CỤ THỂ"]
+    },
+    {
+      "narration": "Lần tới khi bạn thấy một việc cần làm giữa một nhóm đông và thấy mình chần chừ, hỏi thật: tôi đang chờ ai khác hành động, hay đang là chính 'ai khác' mà cả nhóm đang chờ?",
+      "caption": "Bạn đang chờ ai khác — hay chính là 'ai khác' cả nhóm đang chờ?",
+      "broll": "single person stepping forward to act decisively"
+    }
+  ]
+}

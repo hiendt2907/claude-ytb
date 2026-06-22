@@ -1,0 +1,65 @@
+{
+  "topic": "hieu-ung-dong-khung",
+  "title": "Cùng Một Sự Thật, Đổi Một Câu Chữ — Bạn Quyết Định Khác Hẳn",
+  "voice": "vi-VN-NamMinhNeural",
+  "description": "Vì sao '90% thành công' và '10% thất bại' mô tả đúng cùng một con số, nhưng khiến bạn quyết định hoàn toàn khác nhau? Short này giải thích Hiệu ứng đóng khung qua nghiên cứu kinh điển năm 1981 của Amos Tversky và Daniel Kahneman trên tạp chí Science.",
+  "tags": ["tâm lý học", "hiệu ứng đóng khung", "framing effect", "kinh tế học hành vi", "khoa học hành vi", "mental models"],
+  "compliance": {
+    "passed": true,
+    "community": "Nội dung giáo dục tâm lý học, không vi phạm tiêu chuẩn cộng đồng; không nội dung nguy hiểm/thù ghét/người lớn.",
+    "copyright": "Kịch bản gốc tự viết; B-roll AI-generated/Pexels free-to-use; không dùng nhạc/clip có bản quyền.",
+    "accuracy": "Dẫn nghiên cứu của Amos Tversky và Daniel Kahneman (1981), 'The Framing of Decisions and the Psychology of Choice', Science, vol. 211 — bài toán 'Asian disease problem' về lựa chọn cứu người theo cách diễn đạt sống/chết — truy được.",
+    "advertiser": "Chủ đề trung tính, advertiser-friendly; không cờ bạc/thuốc/vũ khí/nội dung nhạy cảm.",
+    "coppa": "Không nhắm trẻ em; nội dung cho khán giả trưởng thành quan tâm phát triển bản thân.",
+    "notes": "Đã rà 3 gate ngách (mục 0c): giải thích cơ chế cách diễn đạt thay đổi quyết định cụ thể (Tversky & Kahneman 1981, Science), không hô khẩu hiệu self-help; mật độ ý cao; nguồn truy được. Khác biệt với video cũ: chưa video nào khai thác hiệu ứng đóng khung — phân biệt rõ với mỏ neo (con số khởi điểm) vì đây là cách DIỄN ĐẠT cùng một sự thật, không phải con số ban đầu."
+  },
+  "sections": [
+    {
+      "narration": "Một loại thuốc được giới thiệu là 'hiệu quả chín mươi phần trăm'. Một loại khác được giới thiệu là 'thất bại mười phần trăm'. Hai con số nói về đúng một thực tế — chỉ chín mươi và mười phần trăm cộng lại vẫn là một trăm — nhưng phần lớn người nghe sẽ tin tưởng loại đầu hơn hẳn. Vì sao một con số giống nhau lại tạo ra hai cảm giác khác nhau đến vậy?",
+      "caption": "Cùng một con số — hai cách nói, hai cảm giác khác hẳn",
+      "broll": "two medicine labels different wording comparison",
+      "hook": true
+    },
+    {
+      "narration": "Cơ chế này gọi là hiệu ứng đóng khung: cách một thông tin được DIỄN ĐẠT — nhấn vào phần được hay phần mất, phần sống hay phần chết — thay đổi quyết định của ta, dù bản chất con số phía sau hoàn toàn không đổi.",
+      "caption": "Cách diễn đạt thay đổi quyết định — dù số liệu y nguyên",
+      "broll": "frame picture metaphor changing perspective same content",
+      "emphasis": ["DIỄN ĐẠT THAY ĐỔI QUYẾT ĐỊNH, SỐ LIỆU Y NGUYÊN"]
+    },
+    {
+      "narration": "Năm một nghìn chín trăm tám mươi mốt, Amos Tversky và Daniel Kahneman công bố trên tạp chí Science một bài toán nổi tiếng: một dịch bệnh đe dọa sáu trăm người, có hai phương án y tế với hiệu quả thực tế giống nhau, chỉ khác cách diễn đạt.",
+      "caption": "1981, Tversky & Kahneman — tạp chí Science",
+      "broll": "researchers presenting decision experiment scenario",
+      "emphasis": ["1981 — BÀI TOÁN DỊCH BỆNH CỦA TVERSKY & KAHNEMAN"]
+    },
+    {
+      "narration": "Khi phương án được diễn đạt là 'cứu được hai trăm người', đa số người tham gia chọn nó — diễn đạt theo phần ĐƯỢC khiến người ta né rủi ro. Nhưng khi đúng phương án đó được diễn đạt lại là 'bốn trăm người sẽ chết', đa số lại quay sang chọn phương án còn lại — dù hai cách diễn đạt mô tả chính xác cùng một kết quả.",
+      "caption": "'Cứu 200 người' chọn nhiều — '400 người sẽ chết' lại đổi lựa chọn",
+      "broll": "split decision chart same outcome different framing",
+      "emphasis": ["CÙNG KẾT QUẢ — LỰA CHỌN ĐẢO NGƯỢC HOÀN TOÀN"]
+    },
+    {
+      "narration": "Tversky và Kahneman gọi đây là bằng chứng cho lý thuyết viễn vọng: con người không đánh giá lựa chọn dựa trên kết quả cuối cùng một cách khách quan, mà dựa trên việc nó được trình bày là một khoản LỜI hay một khoản LỖ so với một điểm mốc tham chiếu trong đầu.",
+      "caption": "Não đánh giá theo 'lời/lỗ' so với mốc tham chiếu, không theo kết quả cuối",
+      "broll": "reference point gain loss psychology diagram",
+      "transition": true
+    },
+    {
+      "narration": "Hiệu ứng này không chỉ nằm trong phòng thí nghiệm. Một hợp đồng ghi 'phí xử lý không hoàn lại' nghe nhẹ nhàng hơn 'mất tiền nếu hủy' — cùng một điều khoản. Một bác sĩ nói 'chín mươi phần trăm bệnh nhân sống sót sau phẫu thuật này' khiến bệnh nhân an tâm hơn hẳn so với nói 'mười phần trăm bệnh nhân tử vong', dù là một con số.",
+      "caption": "Hợp đồng, quảng cáo, lời khuyên y tế — đều có thể bị đóng khung",
+      "broll": "contract document fine print reading closely",
+      "emphasis": ["HỢP ĐỒNG, QUẢNG CÁO ĐỀU CÓ THỂ BỊ ĐÓNG KHUNG"]
+    },
+    {
+      "narration": "Cách phòng vệ cụ thể: khi nghe một con số quan trọng, thử tự diễn đạt lại nó theo chiều ngược lại — đổi phần trăm thành công sang phần trăm thất bại, đổi 'tiết kiệm được' sang 'mất đi nếu không làm' — rồi xem quyết định của bạn có còn giữ nguyên không. Nếu nó thay đổi, bạn vừa bị đóng khung, không phải vừa cân nhắc kỹ.",
+      "caption": "Tự đổi chiều diễn đạt — quyết định còn giữ nguyên không?",
+      "broll": "person flipping perspective rewriting numbers notebook",
+      "emphasis": ["TỰ ĐỔI CHIỀU DIỄN ĐẠT ĐỂ KIỂM TRA"]
+    },
+    {
+      "narration": "Lần tới khi một con số khiến bạn quyết định ngay lập tức, hỏi thật: tôi đang phản ứng với sự thật, hay với cái khung mà ai đó — hoặc chính tôi — vừa đặt quanh sự thật đó?",
+      "caption": "Bạn đang phản ứng với sự thật — hay với cái khung quanh nó?",
+      "broll": "person pausing before deciding thoughtful moment"
+    }
+  ]
+}

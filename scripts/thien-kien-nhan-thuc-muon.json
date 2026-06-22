@@ -1,0 +1,71 @@
+{
+  "topic": "thien-kien-nhan-thuc-muon",
+  "title": "Tao Biết Trước Rồi! — Thiên Kiến Nhận Thức Muộn (Hindsight Bias)",
+  "voice": "vi-VN-NamMinhNeural",
+  "description": "Vì sao sau khi biết kết quả, ai cũng tin mình đã đoán đúng từ đầu — dù trước đó chính họ đoán khác hẳn? Short này giải thích Thiên kiến nhận thức muộn (hindsight bias) qua nghiên cứu của Baruch Fischhoff (1975) và Arkes và cộng sự (1981) trên bác sĩ chẩn đoán.",
+  "tags": ["tâm lý học", "hindsight bias", "thiên kiến nhận thức muộn", "tâm lý hành vi", "khoa học hành vi", "mental models"],
+  "compliance": {
+    "passed": true,
+    "community": "Nội dung giáo dục tâm lý học, trung tính, không bạo lực/nhạy cảm; tuân thủ tiêu chuẩn cộng đồng.",
+    "copyright": "Kịch bản gốc tự viết; B-roll AI-generated/Pexels free-to-use; không dùng nhạc/clip có bản quyền.",
+    "accuracy": "Dẫn Baruch Fischhoff (1975), 'Hindsight: Biased judgment of past events', Journal of Experimental Psychology: Human Perception and Performance — thí nghiệm dự đoán kết quả chuyến công du Trung Quốc/Liên Xô của Nixon năm 1972; và Arkes, Faust, Guilmette & Hart (1981), 'Hindsight bias among physicians weighing the likelihood of diagnoses', Journal of Applied Psychology — cả hai truy được, không dùng số liệu trang trí.",
+    "advertiser": "Chủ đề tâm lý nhận thức trung tính, advertiser-friendly, không tranh cãi.",
+    "coppa": "Không nhắm trẻ em; nội dung cho khán giả trưởng thành quan tâm phát triển bản thân.",
+    "notes": "Đã rà 3 gate ngách (mục 0c): giải thích cơ chế tái cấu trúc ký ức sau khi biết kết quả, không hô khẩu hiệu; mật độ ý cao; nguồn truy được (Fischhoff 1975, Arkes et al. 1981) — không nêu số liệu % cụ thể chưa xác thực, chỉ mô tả định tính kết quả nghiên cứu để tránh bịa. Khác mọi video cũ trong kênh: chưa video nào khai thác hindsight bias — khác hẳn các hiệu ứng đã làm (Dunning-Kruger, Zeigarnik, sunk cost...). Không thuộc 2 series 30 ngày đang chạy — video rời lô 3-short."
+  },
+  "sections": [
+    {
+      "narration": "Đội bóng yêu thích thua trận, hàng loạt người tự tin tuyên bố 'tao biết trước sẽ thua rồi'. Nhưng chỉ vài giờ trước, chính những người đó còn đặt cược đội này thắng. Trí nhớ của họ vừa tự viết lại quá khứ.",
+      "caption": "'Tao biết trước rồi' — nhưng vài giờ trước họ đoán ngược lại",
+      "broll": "person confidently claiming they knew result after match",
+      "hook": true
+    },
+    {
+      "narration": "Cơ chế này gọi là Thiên kiến nhận thức muộn: sau khi biết kết quả thật, bộ não âm thầm TÁI CẤU TRÚC lại ký ức về phán đoán cũ của chính mình, kéo nó về gần với kết quả đã xảy ra — khiến quá khứ trông hiển nhiên và dễ đoán hơn nó thực sự từng là.",
+      "caption": "Não tái cấu trúc ký ức cũ để khớp với kết quả đã biết",
+      "broll": "brain rewriting memory file folder concept",
+      "emphasis": ["NÃO TÁI CẤU TRÚC KÝ ỨC CỦA CHÍNH MÌNH"]
+    },
+    {
+      "narration": "Năm một nghìn chín trăm bảy mươi lăm, nhà nghiên cứu Baruch Fischhoff công bố trên Journal of Experimental Psychology một thí nghiệm dùng chính chuyến công du Trung Quốc và Liên Xô năm một nghìn chín trăm bảy mươi hai của tổng thống Nixon.",
+      "caption": "1975, Baruch Fischhoff — Journal of Experimental Psychology",
+      "broll": "vintage 1970s diplomatic trip archival footage style",
+      "emphasis": ["1975 — BARUCH FISCHHOFF"]
+    },
+    {
+      "narration": "Trước chuyến đi, người tham gia viết tay dự đoán xác suất cho nhiều khả năng có thể xảy ra. Sau khi biết kết quả thật, họ được yêu cầu nhớ lại đúng dự đoán cũ của mình — và hầu hết nhớ sai, kéo dự đoán cũ về gần khớp với kết quả thật hơn hẳn bản viết tay ban đầu.",
+      "caption": "Nhớ lại dự đoán cũ — nhưng bị kéo lệch về gần kết quả thật",
+      "broll": "person comparing old handwritten notes with memory",
+      "emphasis": ["DỰ ĐOÁN CŨ BỊ KÉO LỆCH VỀ KẾT QUẢ THẬT"]
+    },
+    {
+      "narration": "Hiệu ứng không chỉ bóp méo ký ức của chính mình — nó còn bóp méo cách ta đánh giá người khác. Arkes và cộng sự, năm một nghìn chín trăm tám mươi mốt trên Journal of Applied Psychology, cho hai nhóm bác sĩ cùng xem một hồ sơ bệnh án giống nhau, chỉ khác: một nhóm được biết trước chẩn đoán cuối cùng đúng là gì.",
+      "caption": "1981, Arkes và cộng sự — cùng hồ sơ bệnh án, chỉ khác có biết trước đáp án",
+      "broll": "doctors reviewing medical case file discussing diagnosis",
+      "transition": true
+    },
+    {
+      "narration": "Nhóm bác sĩ biết trước đáp án đánh giá khả năng chẩn đoán đó là 'rõ ràng, dễ thấy' cao hơn hẳn nhóm không biết trước — dù cả hai nhìn đúng một bộ triệu chứng. Biết đáp án khiến con đường dẫn tới nó trông thẳng tắp hơn nó từng là.",
+      "caption": "Biết đáp án — con đường dẫn tới nó trông thẳng tắp hơn thực tế",
+      "broll": "doctor pointing confidently at obvious looking chart",
+      "emphasis": ["BIẾT ĐÁP ÁN LÀM CON ĐƯỜNG TRÔNG 'RÕ RÀNG'"]
+    },
+    {
+      "narration": "Sau mỗi sự cố hay quyết định sai, người ngoài thường buông câu 'ai cũng thấy trước được mà' — đó chính là hindsight bias đang đổ lỗi quá mức cho người trong cuộc, người thực ra đã quyết định giữa một mớ thông tin mơ hồ, không phải bức tranh rõ ràng như khi nhìn lại.",
+      "caption": "'Ai cũng thấy trước' — lời đổ lỗi quá mức từ hindsight bias",
+      "broll": "person blamed unfairly after event with hindsight",
+      "emphasis": ["ĐỔ LỖI QUÁ MỨC SAU KHI BIẾT KẾT QUẢ"]
+    },
+    {
+      "narration": "Để tự bảo vệ mình khỏi cơ chế này, hãy ghi lại lý do và dự đoán của bạn TRƯỚC khi biết kết quả — một dòng nhật ký quyết định ngắn — rồi đối chiếu lại sau. Đừng tin vào ký ức 'tao biết trước rồi', hãy tin vào bản ghi gốc.",
+      "caption": "Ghi lại dự đoán TRƯỚC khi biết kết quả — đừng tin ký ức sau đó",
+      "broll": "person writing decision journal entry notebook",
+      "emphasis": ["GHI LẠI DỰ ĐOÁN TRƯỚC KHI BIẾT KẾT QUẢ"]
+    },
+    {
+      "narration": "Lần gần nhất bạn nói 'tao biết trước rồi' — bạn có chắc đó là ký ức thật, hay chỉ là quá khứ vừa được viết lại? Kể lại bên dưới, và theo dõi kênh để xem cơ chế tâm lý tiếp theo.",
+      "caption": "Lần gần nhất bạn nói 'biết trước rồi' — có chắc là ký ức thật?",
+      "broll": "person looking thoughtfully questioning their own memory"
+    }
+  ]
+}

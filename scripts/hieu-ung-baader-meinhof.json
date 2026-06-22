@@ -1,0 +1,59 @@
+{
+  "topic": "hieu-ung-baader-meinhof",
+  "title": "Vừa Học Xong Một Từ, Nó Xuất Hiện Khắp Nơi — Hiệu Ứng Baader-Meinhof",
+  "voice": "vi-VN-NamMinhNeural",
+  "description": "Vì sao vừa nghe một từ lạ lần đầu, hôm sau bạn lại gặp nó ở khắp mọi nơi, như thể cả thế giới vừa đồng loạt nhắc tới nó? Short này giải thích Hiệu ứng Baader-Meinhof — cơ chế chú ý chọn lọc đánh lừa cảm giác trùng hợp — và cách không bị nó dắt mũi khi suy luận.",
+  "tags": ["tâm lý học", "hiệu ứng baader-meinhof", "thiên kiến nhận thức", "khoa học hành vi", "mental models", "phát triển bản thân"],
+  "compliance": {
+    "passed": true,
+    "community": "Nội dung giáo dục tâm lý học, không vi phạm tiêu chuẩn cộng đồng; không nội dung nguy hiểm/thù ghét/người lớn.",
+    "copyright": "Kịch bản gốc tự viết; B-roll AI-generated/Pexels free-to-use; không dùng nhạc/clip có bản quyền.",
+    "accuracy": "Dẫn cơ chế 'frequency illusion' do nhà ngôn ngữ học Arnold Zwicky đặt tên năm 2005, gắn với nguyên lý chú ý chọn lọc (selective attention) và thiên kiến xác nhận (confirmation bias) đã được nghiên cứu rộng trong tâm lý học nhận thức — đều truy được.",
+    "advertiser": "Chủ đề trung tính, advertiser-friendly; không cờ bạc/thuốc/vũ khí/nội dung nhạy cảm.",
+    "coppa": "Không nhắm trẻ em; nội dung cho khán giả trưởng thành quan tâm phát triển bản thân.",
+    "notes": "Đã rà 3 gate ngách (mục 0c): giải thích cơ chế nhận thức cụ thể, không hô khẩu hiệu self-help; mật độ ý cao; nguồn (Zwicky 2005, selective attention) truy được, không bịa số liệu. Khác biệt với video cũ trong ledger: chưa video nào khai thác hiệu ứng Baader-Meinhof / frequency illusion."
+  },
+  "sections": [
+    {
+      "narration": "Bạn vừa nghe một từ lạ lần đầu trong đời. Hôm sau, nó xuất hiện trên báo. Chiều đó, một người bạn vô tình nhắc tới nó. Tối về, nó lại lướt qua màn hình điện thoại. Cảm giác như cả thế giới vừa đồng loạt chọn đúng ngày này để nói về từ đó. Sự thật phũ hơn nhiều: từ đó vẫn xuất hiện đều như mọi ngày, chỉ là trước đây não bạn lờ nó đi.",
+      "caption": "1 từ vừa học → bỗng thấy nó ở khắp nơi?",
+      "broll": "person noticing same word everywhere suddenly",
+      "hook": true
+    },
+    {
+      "narration": "Hiện tượng này có tên: hiệu ứng Baader-Meinhof, hay còn gọi là ảo giác tần suất. Nó không phải vì thế giới thay đổi, mà vì bộ não bạn thay đổi. Khi vừa được giới thiệu một khái niệm mới, não tự động gắn cho nó một thẻ ưu tiên: đáng chú ý. Từ giây phút đó, mọi lần từ ấy lướt qua mắt bạn, mà trước kia bị bỏ qua không thương tiếc, giờ được giữ lại và đẩy lên ý thức.",
+      "caption": "Không phải thế giới đổi — não bạn vừa gắn thẻ 'đáng chú ý'",
+      "broll": "brain highlighting tagged information among noise",
+      "emphasis": ["NÃO VỪA GẮN THẺ ƯU TIÊN"]
+    },
+    {
+      "narration": "Cơ chế nền của nó gọi là chú ý chọn lọc. Mỗi giây, mắt và tai bạn tiếp nhận một lượng thông tin khổng lồ, gấp hàng trăm lần khả năng xử lý của ý thức. Não buộc phải lọc gắt, chỉ cho qua thứ nó coi là liên quan. Cái tên Baader-Meinhof được nhà ngôn ngữ học Arnold Zwicky đặt năm hai nghìn lẻ năm, theo tên một nhóm khủng bố Đức mà người ta kể từng gặp hiệu ứng này, để mô tả chính cảm giác 'mới biết liền thấy khắp nơi' đó.",
+      "caption": "2005, nhà ngôn ngữ học Arnold Zwicky đặt tên hiện tượng này",
+      "broll": "filtering massive information stream selective attention",
+      "emphasis": ["CHÚ Ý CHỌN LỌC"]
+    },
+    {
+      "narration": "Vế thứ hai khiến nó nguy hiểm hơn chỉ là sự trùng hợp vô hại: thiên kiến xác nhận. Một khi đã tin một thứ đang 'rộ lên', não bạn chủ động săn tìm thêm bằng chứng ủng hộ niềm tin đó, và lờ đi mọi lần nó không xuất hiện. Bạn không đếm số ngày từ đó KHÔNG xuất hiện. Bạn chỉ đếm những lần nó CÓ xuất hiện, rồi kết luận: chắc chắn nó đang bùng nổ thật.",
+      "caption": "Bạn chỉ đếm lần CÓ, quên đếm những lần KHÔNG",
+      "broll": "person collecting only confirming evidence chart",
+      "emphasis": ["CHỈ ĐẾM LẦN CÓ XUẤT HIỆN"]
+    },
+    {
+      "narration": "Hai cơ chế cộng lại tạo ra một cái bẫy suy luận thật sự: bạn tin một xu hướng, một bệnh, một sản phẩm đang 'nổi lên khắp nơi' chỉ vì gần đây bạn mới biết tới nó, chứ không phải vì nó thật sự tăng. Nhà đầu tư mới học một mã cổ phiếu thấy nó được nhắc tới liên tục, tưởng thị trường đang đổ dồn vào, trong khi chỉ là não họ mới bắt đầu để ý.",
+      "caption": "Tưởng đang 'nổi lên' — thật ra chỉ vừa mới để ý",
+      "broll": "investor seeing stock mentioned everywhere illusion",
+      "transition": true
+    },
+    {
+      "narration": "Cách phòng thủ rất cụ thể: mỗi khi thấy một thứ 'bỗng xuất hiện khắp nơi' ngay sau khi bạn mới biết tới nó, hãy tự hỏi một câu duy nhất, nó có thật sự tăng, hay chỉ là tôi mới bắt đầu để ý? Nếu cần kết luận quan trọng, đi tìm số liệu khách quan thay vì tin cảm giác trùng hợp của chính mình.",
+      "caption": "Tự hỏi: nó tăng thật, hay tôi mới để ý?",
+      "broll": "person checking objective data instead of feeling",
+      "emphasis": ["NÓ TĂNG THẬT HAY TÔI MỚI ĐỂ Ý?"]
+    },
+    {
+      "narration": "Lần tới một từ lạ cứ lặp đi lặp lại trước mắt bạn, nhớ rằng đó là não bạn đang lọc khác đi, không phải thế giới đang thay đổi. Tập sau, một cơ chế còn dễ bị lợi dụng hơn: hiệu ứng Forer, vì sao một đoạn mô tả tính cách chung chung lại khiến ai đọc cũng thấy 'đúng y mình'.",
+      "caption": "Tập sau: Hiệu ứng Forer",
+      "broll": "person reading personality description nodding"
+    }
+  ]
+}

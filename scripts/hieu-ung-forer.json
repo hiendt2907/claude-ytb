@@ -1,0 +1,61 @@
+{
+  "topic": "hieu-ung-forer",
+  "title": "Vì Sao Bói Toán Nào Cũng 'Đúng Y Mình' — Hiệu Ứng Forer",
+  "voice": "vi-VN-NamMinhNeural",
+  "description": "Vì sao đọc một đoạn mô tả tính cách chung chung — từ cung hoàng đạo, bói bài đến trắc nghiệm vui — ai cũng thấy nó 'đúng y mình'? Short này giải thích Hiệu ứng Forer (Barnum effect), thí nghiệm gốc năm 1948, và cách nhận diện một mô tả mơ hồ trước khi tin nó.",
+  "tags": ["tâm lý học", "hiệu ứng forer", "barnum effect", "thiên kiến nhận thức", "khoa học hành vi", "mental models"],
+  "compliance": {
+    "passed": true,
+    "community": "Nội dung giáo dục tâm lý học, không vi phạm tiêu chuẩn cộng đồng; không nội dung nguy hiểm/thù ghét/người lớn.",
+    "copyright": "Kịch bản gốc tự viết; B-roll AI-generated/Pexels free-to-use; không dùng nhạc/clip có bản quyền.",
+    "accuracy": "Dẫn thí nghiệm gốc của nhà tâm lý học Bertram Forer năm 1948 (công bố trên Journal of Abnormal Psychology), dùng đoạn mô tả tính cách lấy từ sách chiêm tinh đại trà, sinh viên tự chấm độ chính xác trung bình 4.26/5 — chi tiết truy được.",
+    "advertiser": "Chủ đề trung tính, advertiser-friendly; không cờ bạc/thuốc/vũ khí/nội dung nhạy cảm; không quảng bá bói toán mà giải thích cơ chế tâm lý đằng sau nó.",
+    "coppa": "Không nhắm trẻ em; nội dung cho khán giả trưởng thành quan tâm phát triển bản thân.",
+    "notes": "Đã rà 3 gate ngách (mục 0c): giải thích cơ chế tâm lý cụ thể (Forer 1948), không hô khẩu hiệu self-help, không cổ vũ/bài trừ bói toán mà phân tích cơ chế nhận thức; mật độ ý cao; số liệu (4.26/5, năm 1948, Journal of Abnormal Psychology) truy được, không bịa. Khác biệt với video cũ: chưa video nào khai thác hiệu ứng Forer/Barnum.",
+    "hashtags": [],
+    "keywords": []
+  },
+  "sections": [
+    {
+      "narration": "Một đoạn mô tả tính cách bí ẩn nói: bạn có nhu cầu được người khác yêu thích và ngưỡng mộ, nhưng đôi khi bạn tự phê bình mình quá khắt khe. Bạn cho ba mươi người khác nhau đọc đúng đoạn này, không ai biết người kia cũng nhận được nó. Tất cả đều gật đầu: đúng y mình. Đó không phải phép màu. Đó là một cái bẫy tâm lý được đo đạc từ năm một chín bốn tám.",
+      "caption": "1 đoạn mô tả — 30 người đều thấy 'đúng y mình'?",
+      "broll": "many different people nodding reading same description",
+      "hook": true
+    },
+    {
+      "narration": "Hiệu ứng này gọi là hiệu ứng Forer, đôi khi gọi là hiệu ứng Barnum: xu hướng tin một câu mô tả mơ hồ, chung chung là chính xác và đặc biệt dành riêng cho mình, trong khi câu đó thật ra đúng với hầu hết tất cả mọi người. Bí mật không nằm ở người viết đoán trúng tâm lý bạn. Bí mật nằm ở việc câu chữ được chọn sao cho ai đọc cũng tự gắn ý nghĩa riêng của họ vào đó.",
+      "caption": "Mô tả đúng với gần như AI cũng đều thấy hợp",
+      "broll": "vague description fitting everyone universal statement",
+      "emphasis": ["ĐÚNG VỚI HẦU HẾT MỌI NGƯỜI"]
+    },
+    {
+      "narration": "Năm một chín bốn tám, nhà tâm lý học Bertram Forer làm một thí nghiệm đơn giản mà chấn động. Ông cho sinh viên làm một bài trắc nghiệm tính cách, rồi phát cho mỗi người một bản 'phân tích cá nhân hoá' khác nhau. Sự thật, mọi sinh viên đều nhận đúng một đoạn văn giống nhau, copy thẳng từ một cuốn sách chiêm tinh đại trà ngoài hiệu sách. Ông yêu cầu họ tự chấm điểm mức độ chính xác trên thang năm điểm.",
+      "caption": "1948, nhà tâm lý học Bertram Forer thử nghiệm",
+      "broll": "1948 psychology experiment classroom personality test",
+      "emphasis": ["1948 — THÍ NGHIỆM FORER"]
+    },
+    {
+      "narration": "Điểm trung bình toàn lớp: bốn phẩy hai sáu trên năm. Gần như tuyệt đối tin rằng đoạn văn đó mô tả đúng riêng họ. Kết quả này, công bố trên tạp chí Journal of Abnormal Psychology, trở thành một trong những minh chứng kinh điển nhất cho thấy con người dễ bị một câu mơ hồ đánh lừa thành cảm giác 'được hiểu sâu sắc' đến mức nào.",
+      "caption": "Điểm chính xác trung bình: 4.26/5 — ai cũng tin là đúng riêng mình",
+      "broll": "average score chart 4.26 out of 5",
+      "emphasis": ["4.26/5"]
+    },
+    {
+      "narration": "Vì sao bẫy này hiệu quả đến vậy? Vì câu chữ được chọn cố ý hai mặt: 'đôi khi bạn hướng ngoại, đôi khi bạn cần ở một mình' đúng với hầu hết tất cả mọi người trên đời, nhưng người đọc chỉ nhớ lúc nó khớp với họ, bỏ qua lúc nó mơ hồ chung cho ai cũng được. Đây chính là lý do cung hoàng đạo, bói bài tarot, hay vô số bài trắc nghiệm tính cách trên mạng luôn có vẻ 'đọc đúng tim đen' của bất kỳ ai bấm vào.",
+      "caption": "Câu chữ 2 mặt — khớp với hầu hết ai cũng được",
+      "broll": "horoscope tarot card generic personality quiz",
+      "transition": true
+    },
+    {
+      "narration": "Cách phòng thủ: khi đọc một mô tả khiến bạn thấy 'quá đúng', tự hỏi liệu câu này có đúng với hầu hết người khác không, hay chỉ khớp riêng hoàn cảnh của bạn. Câu nói chung tới mức ai cũng gật đầu được thì không nói lên điều gì đặc biệt về bạn cả.",
+      "caption": "Tự hỏi: câu này đúng riêng tôi, hay đúng với ai cũng được?",
+      "broll": "person questioning generic statement critically",
+      "emphasis": ["ĐÚNG RIÊNG TÔI HAY ĐÚNG VỚI AI CŨNG ĐƯỢC?"]
+    },
+    {
+      "narration": "Lần tới một trắc nghiệm tính cách khiến bạn thấy 'sao mà đúng vậy', nhớ rằng ba mươi người khác đang đọc đúng câu đó và cũng gật đầu y như bạn. Tập sau: thiên kiến lạc quan, vì sao ai cũng tin xác suất xấu sẽ rơi vào người khác, không phải mình.",
+      "caption": "Tập sau: Thiên kiến lạc quan",
+      "broll": "person feeling immune to bad outcomes confidently"
+    }
+  ]
+}

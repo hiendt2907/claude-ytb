@@ -1,0 +1,59 @@
+{
+  "topic": "hieu-ung-spotlight",
+  "title": "Bạn Nghĩ Ai Cũng Nhìn Thấy Vết Bẩn Trên Áo — Sự Thật Là Không Ai Để Ý",
+  "voice": "vi-VN-NamMinhNeural",
+  "description": "Vì sao bạn tin chắc cả phòng đang nhìn vào vết bẩn trên áo hay cái vấp chân của mình, nhưng thực tế gần như chẳng ai nhận ra? Short này giải thích Hiệu ứng Spotlight qua nghiên cứu năm 2000 của Thomas Gilovich, Victoria Medvec và Kenneth Savitsky tại Đại học Cornell.",
+  "tags": ["tâm lý học", "hiệu ứng spotlight", "spotlight effect", "tâm lý xã hội", "khoa học hành vi", "mental models"],
+  "compliance": {
+    "passed": true,
+    "community": "Nội dung giáo dục tâm lý học, không vi phạm tiêu chuẩn cộng đồng; không nội dung nguy hiểm/thù ghét/người lớn.",
+    "copyright": "Kịch bản gốc tự viết; B-roll AI-generated/Pexels free-to-use; không dùng nhạc/clip có bản quyền.",
+    "accuracy": "Dẫn nghiên cứu của Thomas Gilovich, Victoria Husted Medvec và Kenneth Savitsky (2000), 'The Spotlight Effect in Social Judgment', Journal of Personality and Social Psychology — thí nghiệm áo in hình gây xấu hổ tại Cornell University — truy được.",
+    "advertiser": "Chủ đề trung tính, advertiser-friendly; không cờ bạc/thuốc/vũ khí/nội dung nhạy cảm.",
+    "coppa": "Không nhắm trẻ em; nội dung cho khán giả trưởng thành quan tâm phát triển bản thân.",
+    "notes": "Đã rà 3 gate ngách (mục 0c): giải thích cơ chế ước lượng sai mức bị chú ý cụ thể (Gilovich, Medvec, Savitsky 2000), không hô khẩu hiệu self-help; mật độ ý cao; nguồn truy được. Khác biệt với video cũ: chưa video nào khai thác hiệu ứng spotlight — phân biệt rõ với hào quang (đánh giá người khác) vì đây là ước lượng sai về mức người khác chú ý ĐẾN MÌNH."
+  },
+  "sections": [
+    {
+      "narration": "Bạn vừa làm đổ cà phê ra áo trước một buổi họp quan trọng, và suốt cả buổi chỉ tập trung nghĩ ai cũng đang nhìn vào vết bẩn đó. Buổi họp kết thúc, không một ai nhắc tới nó. Không phải vì họ tử tế không nói ra — mà vì gần như chẳng ai để ý từ đầu.",
+      "caption": "Bạn tin ai cũng thấy vết bẩn — sự thật là không ai để ý",
+      "broll": "person self-conscious about stain on shirt meeting",
+      "hook": true
+    },
+    {
+      "narration": "Cơ chế này gọi là hiệu ứng spotlight: ta liên tục đánh giá quá cao mức độ người khác chú ý đến ngoại hình, lời nói và hành động của mình, vì bộ não chỉ trải nghiệm thế giới từ một góc nhìn duy nhất — góc nhìn của chính mình — và nhầm rằng người khác cũng đang soi mình kỹ như mình tự soi.",
+      "caption": "Não chỉ thấy một góc nhìn — của chính mình — rồi tưởng ai cũng soi mình kỹ vậy",
+      "broll": "spotlight shining on single person stage metaphor",
+      "emphasis": ["TƯỞNG AI CŨNG SOI MÌNH NHƯ MÌNH TỰ SOI"]
+    },
+    {
+      "narration": "Năm hai nghìn, Thomas Gilovich, Victoria Medvec và Kenneth Savitsky tại Đại học Cornell công bố trên Journal of Personality and Social Psychology một thí nghiệm: yêu cầu sinh viên mặc một chiếc áo in hình ca sĩ gây cảm giác xấu hổ, rồi bước vào một phòng đầy người khác.",
+      "caption": "2000, Gilovich, Medvec, Savitsky — Cornell University",
+      "broll": "student wearing embarrassing shirt entering room",
+      "emphasis": ["2000 — THÍ NGHIỆM ÁO GÂY XẤU HỔ"]
+    },
+    {
+      "narration": "Người mặc áo được yêu cầu đoán xem bao nhiêu phần trăm người trong phòng đã nhận ra hình in trên áo. Trung bình họ đoán khoảng năm mươi phần trăm. Khi nhóm nghiên cứu hỏi thẳng những người trong phòng, con số thực tế chỉ khoảng hai mươi phần trăm — chưa bằng một nửa mức người mặc áo lo sợ.",
+      "caption": "Đoán 50% người nhận ra — thực tế chỉ khoảng 20%",
+      "broll": "chart comparing estimated versus actual percentage",
+      "emphasis": ["50% ƯỚC ĐOÁN VS 20% THỰC TẾ"]
+    },
+    {
+      "narration": "Khoảng cách này không phải ngẫu nhiên một lần. Gilovich và đồng nghiệp lặp lại thí nghiệm với nhiều tình huống khác — phát biểu sai trong nhóm thảo luận, thắng hay thua trong một trò chơi hợp tác — và luôn thấy cùng một khoảng cách: người trong cuộc luôn tin mình bị soi kỹ hơn thực tế rất nhiều.",
+      "caption": "Lặp lại nhiều tình huống khác — khoảng cách vẫn luôn xuất hiện",
+      "broll": "group discussion person worried about mistake",
+      "transition": true
+    },
+    {
+      "narration": "Cái giá của hiệu ứng này là sự e dè không cần thiết: ta tránh phát biểu, tránh thử cái mới, tránh là chính mình ở nơi đông người, chỉ vì tưởng tượng một ánh đèn spotlight chiếu thẳng vào mình — trong khi hầu hết người xung quanh đang bận để ý đến chính bản thân họ, không phải bạn.",
+      "caption": "Người khác bận để ý chính họ — không phải bạn",
+      "broll": "crowd of people each focused on own phone activity",
+      "emphasis": ["MỖI NGƯỜI BẬN LO CHO CHÍNH MÌNH"]
+    },
+    {
+      "narration": "Lần tới khi bạn lo lắng vì một sai sót nhỏ trước người khác, hãy nhớ con số hai mươi phần trăm của Cornell, và tự hỏi: tôi đang phản ứng với việc người khác thực sự chú ý, hay với một ánh đèn spotlight tôi tự dựng lên trong đầu mình?",
+      "caption": "Ánh đèn đó — có thật, hay do bạn tự dựng lên?",
+      "broll": "person letting go relief walking confidently"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/Users/hiendang/claude-ytb/src/ytb_pipeline/__main__.py", line 23, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "/Users/hiendang/claude-ytb/src/ytb_pipeline/__main__.py", line 14, in main
+    result = run(sys.argv[1])
+  File "/Users/hiendang/claude-ytb/src/ytb_pipeline/pipeline.py", line 19, in run
+    script = load_script(script_source)
+  File "/Users/hiendang/claude-ytb/src/ytb_pipeline/ideation/generator.py", line 44, in load_script
+    raise FileNotFoundError(f"Không tìm thấy kịch bản: {path}")
+FileNotFoundError: Không tìm thấy kịch bản: scripts/deep-work-tap-trung-sau.json

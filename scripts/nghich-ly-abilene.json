@@ -1,0 +1,66 @@
+{
+  "topic": "nghich-ly-abilene",
+  "title": "Cả Nhóm Đồng Ý — Nhưng Chẳng Ai Muốn Đi: Nghịch Lý Abilene",
+  "voice": "vi-VN-NamMinhNeural",
+  "description": "Vì sao một nhóm người cùng đồng ý làm một việc mà thật ra KHÔNG AI trong nhóm muốn làm? Short này giải thích Nghịch lý Abilene (Abilene paradox) do nhà quản trị học Jerry B. Harvey công bố năm 1974.",
+  "tags": ["tâm lý học", "nghịch lý abilene", "abilene paradox", "tâm lý hành vi", "khoa học hành vi", "mental models"],
+  "compliance": {
+    "passed": true,
+    "community": "Nội dung giáo dục tâm lý học/quản trị nhóm, trung tính, không bạo lực/nhạy cảm; tuân thủ tiêu chuẩn cộng đồng.",
+    "copyright": "Kịch bản gốc tự viết; B-roll AI-generated/Pexels free-to-use; không dùng nhạc/clip có bản quyền.",
+    "accuracy": "Dẫn Jerry B. Harvey (1974), 'The Abilene Paradox and other Meditations on Management', Organizational Dynamics — câu chuyện gốc một gia đình ở Texas đồng ý lái xe 53 dặm tới Abilene ăn trưa dù không ai trong họ thật sự muốn đi, chỉ vì tưởng người khác muốn. Không thêm số liệu trang trí ngoài nguồn.",
+    "advertiser": "Chủ đề tâm lý/quản trị nhóm trung tính, advertiser-friendly, không tranh cãi.",
+    "coppa": "Không nhắm trẻ em; nội dung cho khán giả trưởng thành quan tâm phát triển bản thân.",
+    "notes": "Đã rà 3 gate ngách (mục 0c): giải thích cơ chế im lặng giả định đồng thuận để tránh xung đột, không hô khẩu hiệu; mật độ ý cao; nguồn truy được (Harvey 1974). Khác mọi video cũ trong kênh: chưa video nào khai thác Abilene paradox — cơ chế ra quyết định nhóm, khác các hiệu ứng nhận thức cá nhân (Dunning-Kruger, Zeigarnik, hindsight bias...) đã làm trước. Không thuộc 2 series 30 ngày đang chạy — video rời lô 3-short."
+  },
+  "sections": [
+    {
+      "narration": "Một gia đình ở Texas ngồi trong phòng khách nóng bức, ai đó buột miệng 'hay đi Abilene ăn trưa?'. Cả nhà gật đầu, lái năm mươi ba dặm đường nắng tới một quán ăn tầm thường. Trên đường về, từng người lần lượt thú nhận: chẳng ai trong số họ thật sự muốn đi.",
+      "caption": "Cả nhà đồng ý đi — nhưng thật ra không ai muốn đi cả",
+      "broll": "family driving on hot dusty texas highway uncomfortable",
+      "hook": true
+    },
+    {
+      "narration": "Cơ chế này gọi là Nghịch lý Abilene: một nhóm người cùng hành động theo một quyết định mà KHÔNG MỘT CÁ NHÂN nào trong nhóm thật sự ủng hộ, vì mỗi người đều lặng lẽ giả định người khác muốn vậy, và không ai dám là người đầu tiên nói ngược lại.",
+      "caption": "Không ai muốn — nhưng không ai dám là người đầu tiên nói khác",
+      "broll": "group nodding agreement while looking uncertain",
+      "emphasis": ["KHÔNG AI DÁM LÀ NGƯỜI ĐẦU TIÊN NÓI KHÁC"]
+    },
+    {
+      "narration": "Năm một nghìn chín trăm bảy mươi bốn, nhà nghiên cứu quản trị Jerry B. Harvey công bố câu chuyện này trên tạp chí Organizational Dynamics, dùng chính chuyến đi Abilene của gia đình ông làm ví dụ mở đầu cho hiện tượng ông gọi là 'nghịch lý đồng thuận giả'.",
+      "caption": "1974, Jerry B. Harvey — Organizational Dynamics",
+      "broll": "vintage 1970s academic journal paper on desk",
+      "emphasis": ["1974 — JERRY B. HARVEY"]
+    },
+    {
+      "narration": "Harvey chỉ ra nghịch lý nằm ở đây: mỗi người trong xe đều nghĩ mình đang nhượng bộ vì người khác, để giữ hòa khí nhóm — nhưng chính việc ai cũng nhượng bộ lại tạo ra một quyết định mà tổng thể nhóm phải gánh, dù từng cá nhân đều phản đối trong đầu.",
+      "caption": "Mỗi người tưởng đang nhượng bộ vì người khác — không ai thật sự muốn",
+      "broll": "close up faces in car each looking unhappy separately",
+      "emphasis": ["AI CŨNG TƯỞNG ĐANG NHƯỢNG BỘ VÌ NGƯỜI KHÁC"]
+    },
+    {
+      "narration": "Khác với hiệu ứng đồng thuận tập thể thông thường, nơi nhóm thật sự bị thuyết phục theo một ý kiến sai, ở đây không có ai thuyết phục ai — chỉ có sự im lặng tập thể, mỗi người tự kiểm duyệt ý kiến thật của mình vì sợ làm mất lòng nhóm.",
+      "caption": "Không ai thuyết phục ai — chỉ có sự im lặng tập thể",
+      "broll": "person staying silent in group meeting holding back opinion",
+      "transition": true
+    },
+    {
+      "narration": "Hiện tượng này lặp lại trong phòng họp công ty: một dự án tồi vẫn được thông qua vì mỗi người trong phòng đều nghĩ những người khác ủng hộ, nên tự im lặng giữ ý kiến phản đối của riêng mình lại.",
+      "caption": "Dự án tồi vẫn được thông qua — vì ai cũng tưởng người khác ủng hộ",
+      "broll": "office meeting everyone silently agreeing to bad plan",
+      "emphasis": ["DỰ ÁN TỒI VẪN ĐƯỢC THÔNG QUA"]
+    },
+    {
+      "narration": "Để tránh rơi vào chuyến đi Abilene của riêng bạn, hãy chủ động hỏi thẳng từng người trong nhóm 'thật sự bạn nghĩ gì, không cần giữ hòa khí' trước khi chốt quyết định chung — phá vỡ im lặng giả định bằng câu hỏi cụ thể, đừng chờ ai tự nguyện lên tiếng trước.",
+      "caption": "Hỏi thẳng 'bạn nghĩ gì thật' trước khi chốt quyết định chung",
+      "broll": "person directly asking colleague for honest opinion",
+      "emphasis": ["HỎI THẲNG TRƯỚC KHI CHỐT QUYẾT ĐỊNH CHUNG"]
+    },
+    {
+      "narration": "Lần gần nhất nhóm bạn đồng ý làm một việc mà có khi chẳng ai thật sự muốn — bạn có nhận ra mình đang lái xe tới Abilene của ai đó không? Kể lại bên dưới, và theo dõi kênh để xem cơ chế tâm lý tiếp theo.",
+      "caption": "Lần gần nhất nhóm bạn 'lái xe tới Abilene' của ai đó là khi nào?",
+      "broll": "person reflecting thoughtfully after group decision",
+      "transition": true
+    }
+  ]
+}

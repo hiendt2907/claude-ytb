@@ -1,0 +1,11 @@
+[1/4] Ideation  ✓  Trằn Trọc Mãi Không Ngủ? Thử Ngay Kiểu Thở 4-7-8 (9 đoạn)
+[2/4] Voiceover ✓  assets/audio/tran-troc-mai-khong-ngu-thu-ngay-kieu-tho-4-7-8.mp3  (84.3s)
+[3/4] Render    ✓  (ai/portrait) assets/output/tran-troc-mai-khong-ngu-thu-ngay-kieu-tho-4-7-8.mp4
+  Loại: YouTube Short (dọc, ≤3p)
+  Lên lịch công khai lúc: 2026-06-17T20:00:00+0700
+  ✓ Đã upload: https://youtu.be/VcsNmP8Tmyo
+  ⚠ Không đặt được thumbnail (kênh cần verify?): <HttpError 403 when requesting https://youtube.googleapis.com/upload/youtube/v3/thumbnails/set?videoId=VcsNmP8Tmyo&alt=json&uploadType=media returned "The authenticated user doesn't have permissions to upload and set custom video thumbnails.". Details: "[{'message': "The authenticated user doesn't have permissions to upload and set custom video thumbnails.", 'domain': 'youtube.thumbnail', 'reason': 'forbidden', 'location': 'Authorization', 'locationType': 'header'}]">
+[4/4] Publish   ✓  uploaded=True
+  ✓ Đã đưa lên Drive (Claude-YTB): https://drive.google.com/file/d/1wcgP9km7Aw6RaN4J7nymLDYuWhga-5_8/view?usp=drivesdk
+  ✓ Đã xoá bản local: assets/output/tran-troc-mai-khong-ngu-thu-ngay-kieu-tho-4-7-8.mp4
+Xong: uploaded=True url=https://youtu.be/VcsNmP8Tmyo

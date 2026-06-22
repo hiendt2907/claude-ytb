@@ -1,0 +1,158 @@
+{
+  "topic": "hieu-ung-mo-neo",
+  "title": "Hiệu Ứng Mỏ Neo: Con Số Đầu Tiên Thao Túng Mọi Quyết Định",
+  "target_minutes": 10,
+  "voice": "vi-VN-NamMinhNeural",
+  "description": "Vì sao một con số xuất hiện đầu tiên, dù hoàn toàn ngẫu nhiên và vô nghĩa, lại có thể âm thầm uốn cong mọi phán đoán tiếp theo của bạn về giá cả, lương bổng, hay xác suất? Tập này giải thích Hiệu ứng Mỏ neo — cơ chế khiến con số đầu tiên trở thành điểm tựa thao túng — và cách phòng thủ trước nó trong mua bán, đàm phán và cuộc sống.\n\nChương:\n00:00 Nghịch lý: một con số vô nghĩa cũng uốn cong phán đoán\n01:10 Vấn đề: mỏ neo ở khắp nơi quanh bạn\n03:00 Cơ chế: thí nghiệm vòng quay số năm 1974\n06:00 Khung áp dụng: 3 cách phòng thủ trước mỏ neo\n08:40 Mặt tối, chốt và cầu nối tập sau\n\nNguồn tham khảo: Tversky A. & Kahneman D. (1974), 'Judgment under Uncertainty: Heuristics and Biases', tạp chí Science; Ariely D., Loewenstein G. & Prelec D. (2003), thí nghiệm số an sinh xã hội; Northcraft G. & Neale M. (1987), nghiên cứu định giá nhà đất.",
+  "tags": ["tâm lý học", "phát triển bản thân", "hiệu ứng mỏ neo", "ra quyết định", "đàm phán", "khoa học hành vi", "mental models", "anchoring"],
+  "compliance": {
+    "passed": true,
+    "community": "Nội dung giáo dục về tâm lý học ra quyết định, không vi phạm tiêu chuẩn cộng đồng; không nội dung nguy hiểm/thù ghét/người lớn.",
+    "copyright": "Kịch bản gốc tự viết; B-roll lấy từ Pexels (giấy phép free-to-use); không dùng nhạc/clip có bản quyền.",
+    "accuracy": "Các nghiên cứu dẫn ra đều truy được: Tversky & Kahneman 1974 đăng Science (thí nghiệm vòng quay số và số nước châu Phi trong Liên Hợp Quốc); Ariely, Loewenstein & Prelec 2003 (thí nghiệm số an sinh xã hội, 'Coherent Arbitrariness'); Northcraft & Neale 1987 (định giá bất động sản).",
+    "advertiser": "Chủ đề trung tính, advertiser-friendly; không cờ bạc/thuốc/vũ khí/nội dung nhạy cảm.",
+    "coppa": "Không nhắm trẻ em; nội dung cho khán giả trưởng thành quan tâm phát triển bản thân.",
+    "notes": "Đã rà 3 gate ngách (mục 0c): không self-help hô khẩu hiệu, mật độ ý cao, mọi số liệu/tên riêng có nguồn truy được (đặc biệt các con số thí nghiệm vòng quay và số an sinh xã hội)."
+  },
+  "sections": [
+    {
+      "narration": "Mến chào các bạn, đây là Hiệu Ứng Mỏ Neo: con số đầu tiên thao túng mọi quyết định. Hãy thử một điều. Nếu tôi hỏi bạn dân số Thổ Nhĩ Kỳ nhiều hơn hay ít hơn chín mươi triệu người, rồi hỏi bạn đoán con số chính xác, đáp án của bạn sẽ xoay quanh con số chín mươi. Nhưng nếu tôi hỏi nhiều hơn hay ít hơn hai mươi triệu, đáp án của bạn sẽ tụt xuống thấp hơn hẳn. Cùng một câu hỏi, chỉ khác con số tôi thả ra trước, mà phán đoán của bạn đã bị kéo đi. Đây không phải vì bạn dễ tin. Đây là một cơ chế đã được đo đạc chính xác.",
+      "caption": "Một con số thả ra trước đã kéo phán đoán của bạn",
+      "broll": "person guessing number influenced thinking",
+      "hook": true
+    },
+    {
+      "narration": "Hiệu ứng mỏ neo là xu hướng bộ não bám lấy thông tin đầu tiên nhận được, rồi dùng nó làm điểm tựa cho mọi phán đoán về sau. Con số đầu tiên giống như một cái mỏ neo thả xuống đáy biển; mọi suy nghĩ tiếp theo của bạn chỉ dập dềnh quanh nó, không trôi xa được. Điều đáng kinh ngạc là cái mỏ neo này hoạt động ngay cả khi bạn biết rõ nó vô nghĩa, ngay cả khi con số đó hoàn toàn ngẫu nhiên và chẳng liên quan gì tới câu hỏi.",
+      "caption": "Con số đầu tiên thành mỏ neo cho mọi phán đoán sau",
+      "broll": "anchor dropping into ocean depths",
+      "emphasis": ["CON SỐ ĐẦU TIÊN = MỎ NEO"]
+    },
+    {
+      "narration": "Hãy nhìn quanh, mỏ neo ở khắp nơi. Một chiếc áo gắn bảng giá gốc hai triệu, gạch đi, còn tám trăm nghìn. Con số hai triệu kia chính là mỏ neo; nó khiến tám trăm nghìn trông như món hời, dù có thể giá trị thật của chiếc áo chỉ chừng đó hoặc thấp hơn. Bạn không còn đánh giá chiếc áo đáng bao nhiêu nữa; bạn chỉ đang so tám trăm với hai triệu, và thấy mình đang thắng.",
+      "caption": "Giá gốc gạch đi: mỏ neo khiến giá sale trông như hời",
+      "broll": "price tag original crossed out discount sale"
+    },
+    {
+      "narration": "Mỏ neo không chỉ nằm trên bảng giá. Khi đi xin việc, con số lương bạn nói ra đầu tiên thường định khung cho cả cuộc thương lượng. Khi mua nhà, giá người bán hét ban đầu trở thành cái mốc mà mọi lời trả giá xoay quanh. Khi nhà hàng đặt một món cực đắt ở đầu thực đơn, nó không mong bạn gọi món đó; nó muốn món đó làm mỏ neo, để những món còn lại trông hợp lý hơn. Một khi để ý, bạn sẽ thấy người ta thả mỏ neo vào đầu mình cả ngày.",
+      "caption": "Lương, giá nhà, thực đơn — mỏ neo ở mọi nơi",
+      "broll": "restaurant menu expensive item at top",
+      "transition": true
+    },
+    {
+      "narration": "Mỏ neo thậm chí len vào những nơi ta tưởng phải lạnh lùng và công bằng nhất. Có một nghiên cứu cho các thẩm phán hình sự đọc cùng một hồ sơ vụ án, rồi cho họ thấy một mức án mà công tố viên đề nghị. Với một nhóm, con số đề nghị cao; với nhóm kia, con số thấp. Dù đều là thẩm phán giàu kinh nghiệm, mức án họ tuyên cuối cùng vẫn bị kéo theo con số đề nghị mà họ nhìn thấy. Đáng sợ hơn, ngay cả khi con số đó được nói rõ là do một người không hề am hiểu luật đưa ra đại, nó vẫn neo được bản án. Một con số có thể uốn cong cả công lý.",
+      "caption": "Mỏ neo uốn cong cả bản án của thẩm phán",
+      "broll": "judge reviewing case sentencing courtroom",
+      "emphasis": ["UỐN CONG CẢ CÔNG LÝ"]
+    },
+    {
+      "narration": "Vậy bằng chứng khoa học ở đâu? Năm 1974, hai nhà tâm lý học Amos Tversky và Daniel Kahneman công bố trên tạp chí Science một thí nghiệm đặt nền móng cho cả lĩnh vực này. Họ đặt trước mặt người tham gia một vòng quay số, kiểu vòng quay may rủi, nhưng bí mật làm cho nó chỉ dừng ở một trong hai con số: mười, hoặc sáu mươi lăm. Sau khi vòng quay dừng, họ hỏi một câu chẳng liên quan gì tới vòng quay: theo bạn, tỉ lệ phần trăm các quốc gia châu Phi trong Liên Hợp Quốc là bao nhiêu?",
+      "caption": "1974, tạp chí Science — thí nghiệm vòng quay số",
+      "broll": "spinning wheel of fortune numbers",
+      "emphasis": ["DỪNG Ở 10 hay 65"]
+    },
+    {
+      "narration": "Kết quả gây sững sờ. Những người thấy vòng quay dừng ở số mười đưa ra ước đoán trung bình khoảng hai mươi lăm phần trăm. Còn những người thấy nó dừng ở sáu mươi lăm lại đoán trung bình khoảng bốn mươi lăm phần trăm. Hãy nhớ, con số trên vòng quay là hoàn toàn ngẫu nhiên, ai cũng biết nó chỉ là trò may rủi, không hề liên quan tới châu Phi hay Liên Hợp Quốc. Vậy mà nó vẫn kéo lệch câu trả lời gần gấp đôi. Một con số vô nghĩa cũng đủ sức uốn cong phán đoán.",
+      "caption": "Số 10 → đoán ~25%, số 65 → đoán ~45%",
+      "broll": "two groups different answers comparison chart",
+      "emphasis": ["VÔ NGHĨA vẫn UỐN CONG PHÁN ĐOÁN"]
+    },
+    {
+      "narration": "Điều khiến phát hiện này có sức nặng đến vậy là vì nó lật đổ một niềm tin ta luôn ôm chặt: rằng phán đoán của ta là sản phẩm của lý trí cân nhắc, dựa trên thông tin liên quan. Thí nghiệm vòng quay cho thấy chỉ cần một con số ngẫu nhiên lướt qua mắt vài giây trước đó cũng đủ uốn nắn kết luận của ta. Kahneman về sau đoạt giải Nobel kinh tế phần lớn nhờ những công trình kiểu này, vạch ra rằng bộ não con người không phải cỗ máy tính lý trí như ta tưởng, mà đầy những lối tắt có thể bị tác động từ bên ngoài.",
+      "caption": "Phát hiện lật đổ niềm tin rằng ta luôn phán đoán bằng lý trí",
+      "broll": "brain shortcuts illustration nobel concept"
+    },
+    {
+      "narration": "Để hiểu vì sao bộ não dễ bị neo đến vậy, ta cần nhìn vào cách nó ước lượng những điều không chắc chắn. Khi không biết chính xác một đáp án, bộ não không tính từ đầu; nó lười, nên nó tóm lấy con số gần nhất đang có sẵn làm điểm khởi đầu, rồi điều chỉnh dần lên hoặc xuống từ đó. Vấn đề là sự điều chỉnh này gần như luôn dừng lại quá sớm, trước khi tới được con số đúng. Thế là đáp án cuối cùng mắc kẹt ở đâu đó gần cái mỏ neo ban đầu, dù mỏ neo đó từ trên trời rơi xuống.",
+      "caption": "Não bám mỏ neo rồi điều chỉnh, nhưng luôn dừng quá sớm",
+      "broll": "person adjusting estimate slider stopping early"
+    },
+    {
+      "narration": "Có một lớp cơ chế thứ hai tinh vi hơn, gọi là sự dễ tiếp cận chọn lọc. Khi một con số được thả ra, bộ não bạn lập tức đi tìm những lý do vì sao con số đó có thể đúng, chứ không tìm lý do vì sao nó sai. Nếu mỏ neo cao, đầu bạn tự động gợi lên những bằng chứng ủng hộ một đáp án cao. Nếu mỏ neo thấp, nó lại lôi ra những bằng chứng cho đáp án thấp. Bạn không cố ý thiên vị; bộ não chỉ đơn giản chiếu sáng đúng cái góc thông tin hợp với mỏ neo, và để phần còn lại chìm trong bóng tối.",
+      "caption": "Cơ chế thứ hai: não chỉ tìm bằng chứng hợp với mỏ neo",
+      "broll": "spotlight illuminating one side dark room"
+    },
+    {
+      "narration": "Có một thí nghiệm còn cho thấy mỏ neo cắm sâu đến mức nào. Năm 2003, nhà kinh tế học hành vi Dan Ariely cùng các đồng nghiệp yêu cầu sinh viên viết ra hai chữ số cuối của số an sinh xã hội của họ, một con số hoàn toàn ngẫu nhiên. Ngay sau đó, họ cho sinh viên đấu giá những món hàng như rượu vang, bàn phím, sô-cô-la. Lẽ ra hai con số kia chẳng liên quan gì tới giá trị món hàng cả.",
+      "caption": "2003, Ariely — viết 2 chữ số cuối số an sinh xã hội",
+      "broll": "students writing numbers then bidding auction",
+      "transition": true
+    },
+    {
+      "narration": "Nhưng kết quả thì khác. Những sinh viên có hai chữ số cuối cao, ví dụ tám mươi trở lên, sẵn sàng trả cao hơn hẳn cho cùng một món hàng so với những sinh viên có hai chữ số cuối thấp, đôi khi cao gấp hai, gấp ba lần. Chỉ vì vừa viết ra một con số lớn, bộ não họ đã lấy nó làm mỏ neo để định giá chai rượu ngay sau đó. Các nhà nghiên cứu gọi hiện tượng này bằng một cụm từ rất hay: sự tuỳ tiện nhất quán. Giá ta sẵn lòng trả có thể bắt nguồn từ một con số tuỳ tiện, nhưng một khi đã neo, ta lại hành xử nhất quán quanh nó như thể nó có lý.",
+      "caption": "Số cuối cao trả giá cao gấp 2-3 lần cho cùng món hàng",
+      "broll": "wine bottle auction higher bids",
+      "emphasis": ["SỰ TUỲ TIỆN NHẤT QUÁN"]
+    },
+    {
+      "narration": "Và mỏ neo không tha cả những chuyên gia dày dạn nhất. Năm 1987, hai nhà nghiên cứu Northcraft và Neale đưa các nhà môi giới bất động sản chuyên nghiệp đi xem cùng một căn nhà thật, kèm đầy đủ hồ sơ. Khác biệt duy nhất là giá rao trên giấy tờ được in khác nhau cho từng nhóm. Dù là chuyên gia định giá hằng ngày, ước lượng giá trị căn nhà của họ vẫn bị kéo lệch theo cái giá rao in sẵn. Đáng nói hơn, hầu hết đều quả quyết rằng họ không hề bị con số rao kia ảnh hưởng. Đó là điều nguy hiểm nhất ở mỏ neo: nó tác động trong bóng tối.",
+      "caption": "1987, chuyên gia định giá nhà cũng bị mỏ neo kéo lệch",
+      "broll": "real estate agent appraising house documents",
+      "emphasis": ["NÓ TÁC ĐỘNG TRONG BÓNG TỐI"]
+    },
+    {
+      "narration": "Hãy ngẫm kỹ điểm này, vì nó là lý do mỏ neo khó chống. Bạn không cảm thấy mình đang bị neo. Trong đầu bạn, con số bạn đưa ra cảm giác như phán đoán độc lập của riêng mình, hợp lý và có cơ sở. Cái mỏ neo làm việc của nó ở tầng dưới ý thức, lặng lẽ kéo cái neo về phía nó, rồi rút lui để bạn tưởng kết luận là của bạn. Chính vì bạn không nhận ra ảnh hưởng, bạn không thể tự nhắc mình cảnh giác. Đó là vì sao chỉ biết về mỏ neo thôi chưa đủ; bạn cần những công cụ cụ thể để phòng thủ.",
+      "caption": "Mỏ neo nguy hiểm vì bạn không cảm thấy mình bị neo",
+      "broll": "hidden influence puppet strings subtle"
+    },
+    {
+      "narration": "Giờ ta sang phần áp dụng. Cách thứ nhất: trước khi nghe con số của đối phương, hãy tự xác định con số của riêng mình. Trước khi vào cửa hàng, hãy quyết trong đầu món đồ này đáng với bạn bao nhiêu. Trước khi bước vào phỏng vấn lương, hãy nghiên cứu và chốt sẵn khoảng lương bạn nhắm tới. Khi bạn đã có mỏ neo của chính mình, cắm xuống từ trước, con số đối phương thả ra sẽ khó kéo bạn đi hơn nhiều, vì bạn đã có một điểm tựa để so sánh thay vì bám vào cái họ đưa.",
+      "caption": "Cách 1: Tự cắm mỏ neo của mình TRƯỚC khi nghe của họ",
+      "broll": "person deciding budget before shopping notebook",
+      "emphasis": ["CÓ MỎ NEO CỦA RIÊNG MÌNH"]
+    },
+    {
+      "narration": "Cách thứ hai: khi đàm phán, hãy là người thả mỏ neo trước, nếu bạn có đủ thông tin. Có một hiểu lầm phổ biến rằng nên để đối phương ra giá trước. Nhưng nghiên cứu về đàm phán cho thấy bên đưa ra con số đầu tiên thường định khung cho cả cuộc thương lượng, miễn là con số đó có cơ sở hợp lý chứ không lố bịch. Nếu bạn bán hàng, đừng ngại nêu một mức giá khởi điểm tự tin. Nếu bạn đi xin lương, hãy chủ động nói khoảng kỳ vọng dựa trên dữ liệu, thay vì để nhà tuyển dụng thả mỏ neo thấp xuống trước.",
+      "caption": "Cách 2: Chủ động thả mỏ neo trước khi đàm phán",
+      "broll": "two people negotiating across table confident"
+    },
+    {
+      "narration": "Lấy một ví dụ rất đời thường. Bạn rao bán một chiếc xe máy cũ. Nếu bạn rụt rè hỏi người mua trả được bao nhiêu, họ sẽ thả một con số thấp, và cả cuộc mặc cả sẽ leo lên một cách nhọc nhằn từ cái đáy đó. Nhưng nếu bạn mở lời bằng một mức giá khởi điểm có cơ sở, hơi cao hơn mức bạn thật sự mong, thì mọi lời trả giá sau đó sẽ xoay quanh con số của bạn. Bạn không cần thô lỗ hay tham lam; bạn chỉ cần hiểu rằng ai cắm mỏ neo trước thì người đó vẽ ra sân chơi.",
+      "caption": "Ví dụ bán xe: ai cắm mỏ neo trước, người đó vẽ sân chơi",
+      "broll": "person selling motorbike negotiating price",
+      "transition": true
+    },
+    {
+      "narration": "Chuyện đàm phán lương cũng đúng cơ chế ấy, và nó đáng tiền thật. Khi nhà tuyển dụng hỏi mức lương hiện tại hoặc kỳ vọng của bạn, đó chính là họ mời bạn tự thả mỏ neo. Nếu bạn nói một con số thấp vì rụt rè, toàn bộ thương lượng sẽ bị ghìm quanh con số đó, và mức tăng dù có cũng chỉ là vài bước nhỏ từ cái đáy bạn tự đặt. Ngược lại, nếu bạn đã nghiên cứu mặt bằng thị trường và nêu một khoảng có cơ sở ở phía trên kỳ vọng thật, bạn vừa dịch cả cuộc chơi lên cao. Chênh lệch này, cộng dồn qua nhiều năm, có thể là cả một số tiền lớn.",
+      "caption": "Đàm phán lương: con số bạn nêu đầu định khung cả cuộc chơi",
+      "broll": "job interview salary discussion office"
+    },
+    {
+      "narration": "Một lưu ý thực tế khi bạn là bên thả mỏ neo: con số mở màn phải táo bạo nhưng vẫn nằm trong vùng hợp lý có thể bảo vệ được. Nếu bạn hét một con số lố bịch, đối phương sẽ bác bỏ nó hoàn toàn và cái mỏ neo mất tác dụng, thậm chí khiến bạn mất uy tín. Sức mạnh của mỏ neo nằm ở chỗ nó đủ cao hoặc đủ thấp để dịch chuyển kỳ vọng, nhưng vẫn đủ đáng tin để đối phương coi nó là điểm khởi đầu nghiêm túc. Nắm được ranh giới đó là nắm được nghệ thuật ra giá.",
+      "caption": "Mỏ neo phải táo bạo nhưng vẫn bảo vệ được",
+      "broll": "person making confident reasonable offer handshake"
+    },
+    {
+      "narration": "Cách thứ ba: khi nghi mình đang bị neo, hãy cố tình nghĩ tới một con số ngược lại thật xa. Nếu người bán hét một giá cao, đừng vội điều chỉnh nhẹ xuống từ con số đó; hãy tự hỏi mức giá thấp nhất mà món này có thể đáng là bao nhiêu, rồi xây phán đoán từ phía đó lên. Bằng cách chủ động kéo suy nghĩ về phía đối nghịch với mỏ neo, bạn trung hoà bớt lực hút của nó. Đây là một thủ thuật được nghiên cứu kiểm chứng: tự nghĩ ra lý do vì sao mỏ neo có thể sai sẽ làm giảm đáng kể ảnh hưởng của nó.",
+      "caption": "Cách 3: Cố tình nghĩ tới con số ngược lại thật xa",
+      "broll": "person considering opposite extreme balance",
+      "emphasis": ["KÉO VỀ PHÍA ĐỐI NGHỊCH"]
+    },
+    {
+      "narration": "Có một điểm tinh tế cần làm rõ để bạn không dùng sai. Phòng thủ trước mỏ neo không có nghĩa là phớt lờ mọi con số bạn nghe. Có những mỏ neo chính đáng, dựa trên dữ liệu thật, như giá thị trường trung bình hay mức lương tham chiếu cho một vị trí. Những con số đó đáng được dùng làm điểm khởi đầu. Vấn đề chỉ nằm ở những mỏ neo tuỳ tiện hoặc được dựng lên có chủ đích để dắt mũi bạn. Kỹ năng cần rèn không phải là bỏ qua mọi con số, mà là phân biệt con số nào có cơ sở và con số nào chỉ là cái bẫy.",
+      "caption": "Phân biệt mỏ neo có cơ sở và mỏ neo dựng lên để dắt mũi",
+      "broll": "person sorting real data from fake numbers"
+    },
+    {
+      "narration": "Mỏ neo còn hoạt động cả ở những nơi không có con số, mà ta ít ngờ tới nhất, đó là cách ta nhìn nhận bản thân và người khác. Ấn tượng đầu tiên về một người trở thành mỏ neo cho mọi đánh giá về sau; ta vô thức diễn giải mọi hành động của họ sao cho khớp với ấn tượng ban đầu đó. Tương tự, lời nhận xét đầu đời mà ai đó gắn cho bạn, kiểu em học dốt môn này, có thể trở thành mỏ neo bạn mang theo nhiều năm, kéo lệch cả niềm tin vào khả năng thật của mình. Nhận ra điều này, bạn có quyền tự hỏi cái mỏ neo cũ kia có còn đúng không.",
+      "caption": "Mỏ neo cả trong ấn tượng đầu và cách ta nhìn bản thân",
+      "broll": "person reconsidering old label about themselves",
+      "emphasis": ["ẤN TƯỢNG ĐẦU cũng là MỎ NEO"]
+    },
+    {
+      "narration": "Và đây là mặt tối cần cảnh giác, vì mỏ neo là vũ khí marketing được dùng nhiều nhất. Cụm chỉ còn vài suất giá này tạo mỏ neo về sự khan hiếm. Bảng so sánh ba gói dịch vụ luôn có một gói cao chót vót đặt cạnh để gói giữa trông vừa vặn. Con số trước khi giảm thường được thổi phồng chỉ để cú giảm trông sốc hơn. Tất cả đều nhắm vào đúng cái cơ chế bạn vừa hiểu. Khi bạn nhận ra một con số đang được thả ra để neo mình, một nửa sức mạnh của nó đã tan biến.",
+      "caption": "Mặt tối: mỏ neo là vũ khí marketing được dùng nhiều nhất",
+      "broll": "limited time offer marketing pricing tactics",
+      "emphasis": ["NHẬN RA = MẤT NỬA SỨC MẠNH CỦA NÓ"]
+    },
+    {
+      "narration": "Nếu hôm nay bạn chỉ giữ lại một điều, hãy để nó là điều này: con số bạn nghe đầu tiên hiếm khi là con số trung lập. Nó là một điểm tựa, và rất có thể được đặt ở đó để kéo bạn về một hướng. Trước mỗi quyết định có dính tới con số, giá cả, lương bổng, xác suất, hãy dừng lại một nhịp và tự hỏi: con số trong đầu mình lúc này đến từ đâu, là phán đoán thật của mình, hay chỉ là tiếng vọng của cái mỏ neo ai đó vừa thả xuống? Chỉ một câu hỏi đó thôi đã trả lại cho bạn phần lớn quyền tự chủ.",
+      "caption": "Con số bạn nghe đầu tiên hiếm khi trung lập",
+      "broll": "person pausing to think before decision calm"
+    },
+    {
+      "narration": "Câu hỏi tôi muốn để lại cho bạn là: gần đây có quyết định nào mà giờ nhìn lại, bạn nghĩ mình đã bị một con số đầu tiên neo mất rồi? Hãy kể nó ở phần bình luận, và thử nhớ xem con số mỏ neo đó từ đâu mà ra. Và ở tập sau, ta sẽ đi vào một cơ chế họ hàng rất gần, thứ ẩn sau cả mỏ neo lẫn bẫy chi phí chìm: vì sao nỗi đau khi mất một trăm nghìn lại lớn hơn hẳn niềm vui khi được đúng một trăm nghìn, và điều đó âm thầm lèo lái gần như mọi lựa chọn của bạn. Nếu tập này giúp bạn nhìn rõ hơn cách những con số dẫn dắt mình, hãy để lại một lượt thích và đăng ký kênh để không bỏ lỡ những cơ chế tiếp theo. Hẹn gặp lại các bạn ở tập tiếp theo.",
+      "caption": "Quyết định nào bạn nghĩ mình đã bị một con số neo mất?",
+      "broll": "comment section engagement social media"
+    }
+  ]
+}

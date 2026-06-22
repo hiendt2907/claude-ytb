@@ -1,0 +1,11 @@
+[1/4] Ideation  ✓  Bắt Đầu Sớm 10 Năm, Giàu Gấp Đôi Dù Bỏ Ít Tiền Hơn (9 đoạn)
+[2/4] Voiceover ✓  assets/audio/bat-au-som-10-nam-giau-gap-oi-du-bo-it-tien-hon.mp3  (93.0s)
+[3/4] Render    ✓  (ai/portrait) assets/output/bat-au-som-10-nam-giau-gap-oi-du-bo-it-tien-hon.mp4
+  Loại: Clip thường
+  Lên lịch công khai lúc: 2026-06-17T07:00:00+0700
+  ✓ Đã upload: https://youtu.be/IHQtgP4Hnpc
+  ⚠ Không đặt được thumbnail (kênh cần verify?): <HttpError 403 when requesting https://youtube.googleapis.com/upload/youtube/v3/thumbnails/set?videoId=IHQtgP4Hnpc&alt=json&uploadType=media returned "The authenticated user doesn't have permissions to upload and set custom video thumbnails.". Details: "[{'message': "The authenticated user doesn't have permissions to upload and set custom video thumbnails.", 'domain': 'youtube.thumbnail', 'reason': 'forbidden', 'location': 'Authorization', 'locationType': 'header'}]">
+[4/4] Publish   ✓  uploaded=True
+  ✓ Đã đưa lên Drive (Claude-YTB): https://drive.google.com/file/d/1OYD9k-8Jz6EgylAt3srWiSVuFcsO0nRx/view?usp=drivesdk
+  ✓ Đã xoá bản local: assets/output/bat-au-som-10-nam-giau-gap-oi-du-bo-it-tien-hon.mp4
+Xong: uploaded=True url=https://youtu.be/IHQtgP4Hnpc

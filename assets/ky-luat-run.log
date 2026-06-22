@@ -1,0 +1,29 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/Users/hiendang/claude-ytb/src/ytb_pipeline/__main__.py", line 23, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "/Users/hiendang/claude-ytb/src/ytb_pipeline/__main__.py", line 14, in main
+    result = run(sys.argv[1])
+  File "/Users/hiendang/claude-ytb/src/ytb_pipeline/pipeline.py", line 22, in run
+    voiceover = synthesize(script)
+  File "/Users/hiendang/claude-ytb/src/ytb_pipeline/voiceover/tts.py", line 33, in synthesize
+    _synth_segment(seg.narration, script.voice, seg_path)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/hiendang/claude-ytb/src/ytb_pipeline/voiceover/tts.py", line 55, in _synth_segment
+    synthesize_f5(text, wav)
+    ~~~~~~~~~~~~~^^^^^^^^^^^
+  File "/Users/hiendang/claude-ytb/src/ytb_pipeline/voiceover/f5_provider.py", line 54, in synthesize_f5
+    raise RuntimeError(
+        f"F5-TTS lỗi (code {result.returncode}):\n{result.stderr[-2000:]}"
+    )
+RuntimeError: F5-TTS lỗi (code -6):
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+
+  0%|          | 0/2 [00:00<?, ?it/s]/Users/hiendang/claude-ytb/.venv-tts/lib/python3.12/site-packages/torch/functional.py:681: UserWarning: An output with one or more elements was resized since it had shape [], which does not match the required output shape [1, 450, 513]. This behavior is deprecated, and in a future PyTorch release outputs will not be resized unless they have zero elements. You can explicitly reuse an out tensor t by resizing it, inplace, to zero elements with t.resize_(0). (Triggered internally at /Users/runner/work/pytorch/pytorch/aten/src/ATen/native/Resize.cpp:38.)
+  return _VF.stft(  # type: ignore[attr-defined]
+/opt/homebrew/Cellar/python@3.12/3.12.13_2/Frameworks/Python.framework/Versions/3.12/lib/python3.12/multiprocessing/resource_tracker.py:279: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '
+
+[1/4] Ideation  ✓  Kỷ Luật Bản Thân: Cách Rèn Dù Bạn Không Có Một Chút Động Lực Nào (15 đoạn)

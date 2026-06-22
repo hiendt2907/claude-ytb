@@ -1,0 +1,163 @@
+{
+  "topic": "bay-chi-phi-chim",
+  "title": "Bẫy Chi Phí Chìm: Vì Sao Bạn Cố Đấm Ăn Xôi Dù Biết Sai",
+  "target_minutes": 10,
+  "voice": "vi-VN-NamMinhNeural",
+  "description": "Vì sao ta cố xem hết một bộ phim dở, cố theo đuổi một mối quan hệ đã nguội, cố giữ một công việc bào mòn mình, chỉ vì đã lỡ đầu tư quá nhiều vào đó? Tập này giải thích Bẫy chi phí chìm — cơ chế khiến những gì ta đã mất kéo ta tiếp tục mất thêm — và cách thoát khỏi nó để quyết định dựa trên tương lai thay vì quá khứ.\n\nChương:\n00:00 Nghịch lý: càng lỡ nhiều càng khó buông\n01:10 Vấn đề: ba cái bẫy của 'tiếc của'\n03:00 Cơ chế: thí nghiệm vé xem kịch năm 1985\n06:00 Khung áp dụng: 3 cách thoát bẫy chi phí chìm\n08:40 Mặt tối, chốt và cầu nối tập sau\n\nNguồn tham khảo: Arkes H. & Blumer C. (1985), 'The Psychology of Sunk Cost', Organizational Behavior and Human Decision Processes; ngụy biện Concorde; trò đấu giá đồng đô-la của Martin Shubik (1971); khái niệm né mất mát của Kahneman & Tversky.",
+  "tags": ["tâm lý học", "phát triển bản thân", "chi phí chìm", "ra quyết định", "khoa học hành vi", "mental models", "sunk cost", "tư duy"],
+  "compliance": {
+    "passed": true,
+    "community": "Nội dung giáo dục về tâm lý học ra quyết định, không vi phạm tiêu chuẩn cộng đồng; không nội dung nguy hiểm/thù ghét/người lớn.",
+    "copyright": "Kịch bản gốc tự viết; B-roll lấy từ Pexels (giấy phép free-to-use); không dùng nhạc/clip có bản quyền.",
+    "accuracy": "Các nghiên cứu dẫn ra đều truy được: Arkes & Blumer 1985 đăng Organizational Behavior and Human Decision Processes (thí nghiệm vé mùa xem kịch tại Đại học Ohio); ngụy biện Concorde; trò đấu giá đô-la của Martin Shubik 1971; lý thuyết né mất mát của Kahneman & Tversky.",
+    "advertiser": "Chủ đề trung tính, advertiser-friendly; không cờ bạc/thuốc/vũ khí/nội dung nhạy cảm.",
+    "coppa": "Không nhắm trẻ em; nội dung cho khán giả trưởng thành quan tâm phát triển bản thân.",
+    "notes": "Đã rà 3 gate ngách (mục 0c): không self-help hô khẩu hiệu, mật độ ý cao, mọi số liệu/tên riêng có nguồn truy được (đặc biệt thí nghiệm vé kịch và đấu giá đô-la)."
+  },
+  "sections": [
+    {
+      "narration": "Mến chào các bạn, đây là Bẫy Chi Phí Chìm: vì sao bạn cố đấm ăn xôi dù trong lòng đã biết là sai. Hãy nhớ lại một bộ phim bạn thấy rõ là dở ngay từ nửa đầu, nhưng vẫn ngồi xem cho hết, chỉ vì nghĩ mình đã bỏ ra một tiếng rồi, tiếc. Hai tiếng đời bạn trôi đi để xem một thứ bạn không thích, và lý do duy nhất là bạn đã lỡ bỏ ra một tiếng trước đó. Nghe vô lý, nhưng ai trong chúng ta cũng từng làm vậy. Đây không phải vì bạn dại. Đây là một cái bẫy được gắn sẵn trong cách bộ não tính toán.",
+      "caption": "Càng lỡ bỏ ra nhiều, càng khó buông",
+      "broll": "person watching boring movie unhappy on couch",
+      "hook": true
+    },
+    {
+      "narration": "Chi phí chìm là những gì bạn đã bỏ ra và không thể nào lấy lại được, dù bạn có quyết định thế nào tiếp theo. Một tiếng đã xem phim. Số tiền đã trả cho tấm vé. Ba năm đã dồn vào một mối quan hệ. Logic lành mạnh nói rằng những thứ đã mất thì đã mất, chúng không nên ảnh hưởng đến lựa chọn tiếp theo của bạn. Nhưng bộ não con người không vận hành theo logic lạnh lùng đó. Nó ghét cảm giác lãng phí đến mức sẵn sàng lãng phí thêm nữa chỉ để khỏi phải thừa nhận phần đã mất.",
+      "caption": "Chi phí chìm: thứ đã mất, không thể lấy lại",
+      "broll": "money draining down sink illustration",
+      "emphasis": ["ĐÃ MẤT thì ĐÃ MẤT"]
+    },
+    {
+      "narration": "Cái bẫy này có ba khuôn mặt. Khuôn mặt thứ nhất là thời gian. Bạn theo một khoá học không còn phù hợp, đọc một cuốn sách chán ngắt tới trang cuối, ngồi lì trong một cuộc họp vô bổ, tất cả chỉ vì đã trót bỏ thời gian vào đó. Bạn quên mất rằng thời gian đã bỏ ra không quay lại được dù bạn ở lại hay rời đi; điều duy nhất bạn còn quyền quyết là khoảng thời gian sắp tới sẽ dùng vào việc gì.",
+      "caption": "Khuôn mặt 1: tiếc thời gian đã bỏ ra",
+      "broll": "person stuck in pointless long meeting bored"
+    },
+    {
+      "narration": "Khuôn mặt thứ hai là tiền bạc. Bạn mua một món đồ đắt tiền rồi nhận ra mình không cần, nhưng vẫn cố dùng cho bõ. Bạn đổ tiền sửa một chiếc xe cũ hỏng lên hỏng xuống, mỗi lần sửa lại nghĩ đã trót sửa nhiều thế này rồi, bỏ thì phí. Thế là tổng số tiền đổ vào dần vượt xa giá trị thật của chiếc xe. Cái đã chi không đòi lại được; vậy mà chính nó lại trở thành lý do để bạn chi thêm.",
+      "caption": "Khuôn mặt 2: tiếc tiền đã chi",
+      "broll": "old car being repaired again expensive garage"
+    },
+    {
+      "narration": "Một ví dụ ai cũng từng gặp là tiệc buffet ăn thả ga. Bạn đã trả tiền cố định ở cửa, nên dù đã no căng, một giọng nói vang lên: ăn thêm đi cho bõ tiền. Thế là bạn nhồi nhét tới mức khó chịu, và rời quán trong tình trạng tệ hơn lúc vào. Số tiền vé đã trả là như nhau dù bạn ăn ít hay nhiều; cái duy nhất thay đổi theo lượng bạn ăn thêm là cơn đầy bụng. Vậy mà chính số tiền đã trả lại xui bạn tự làm hại mình, chỉ để khỏi có cảm giác lỗ.",
+      "caption": "Ví dụ buffet: ăn tới khó chịu chỉ 'cho bõ tiền'",
+      "broll": "person overeating at buffet uncomfortable full",
+      "emphasis": ["ĂN THÊM CHO BÕ TIỀN"]
+    },
+    {
+      "narration": "Khuôn mặt thứ ba, và là cái đau nhất, là công sức và cảm xúc. Một mối quan hệ đã cạn từ lâu nhưng ta cố níu vì đã gắn bó bao nhiêu năm. Một công việc bào mòn ta mỗi ngày nhưng ta không dám rời vì đã dồn cả thanh xuân vào nghề. Một dự án rõ ràng vô vọng nhưng cả nhóm vẫn lao vào vì đã hy sinh quá nhiều để bỏ ngang. Càng đầu tư nhiều cảm xúc, cái bẫy càng siết chặt, vì buông tay giờ đây giống như phủ nhận tất cả những gì mình đã sống.",
+      "caption": "Khuôn mặt 3: tiếc công sức và cảm xúc đã dồn vào",
+      "broll": "person emotionally trapped in stale relationship",
+      "transition": true
+    },
+    {
+      "narration": "Vậy bằng chứng khoa học ở đâu? Năm 1985, hai nhà nghiên cứu Hal Arkes và Catherine Blumer ở Đại học Ohio công bố một loạt thí nghiệm kinh điển về chi phí chìm, đăng trên một tạp chí chuyên về hành vi ra quyết định. Thí nghiệm nổi tiếng nhất diễn ra ngay tại quầy bán vé mùa của một nhà hát kịch. Những người đến mua vé xem trọn mùa được chia ngẫu nhiên thành các nhóm, và bí mật nhận các mức giá khác nhau.",
+      "caption": "1985, Đại học Ohio — thí nghiệm vé mùa xem kịch",
+      "broll": "theater ticket booth box office vintage",
+      "emphasis": ["1985"]
+    },
+    {
+      "narration": "Một nhóm trả nguyên giá, khoảng mười lăm đô-la cho một vé mùa. Một nhóm được giảm còn mười ba đô. Nhóm thứ ba được giảm mạnh chỉ còn bảy đô. Điều quan trọng là tất cả đều nhận cùng một bộ vé như nhau, ngồi xem cùng những vở kịch như nhau. Khác biệt duy nhất là số tiền họ đã bỏ ra. Rồi các nhà nghiên cứu lặng lẽ đếm: trong nửa đầu mùa diễn, mỗi nhóm thật sự đi xem bao nhiêu vở.",
+      "caption": "Cùng bộ vé, chỉ khác số tiền đã trả",
+      "broll": "rows of theater seats some empty"
+    },
+    {
+      "narration": "Kết quả rất rõ ràng. Nhóm trả nguyên giá đi xem nhiều vở hơn hẳn so với hai nhóm được giảm giá. Số vở kịch trên sân khấu y như nhau, chất lượng y như nhau, nhưng những người đã bỏ ra nhiều tiền hơn lại cảm thấy buộc phải đi xem nhiều hơn để khỏi phí số tiền đó. Họ không quyết định dựa trên việc tối nay có muốn xem kịch hay không, mà dựa trên số tiền đã trả từ nhiều tuần trước, một số tiền không thể nào lấy lại được nữa.",
+      "caption": "Người trả nhiều tiền hơn đi xem nhiều hơn — dù cùng vở",
+      "broll": "person reluctantly attending event obligation",
+      "emphasis": ["TRẢ NHIỀU HƠN = ĐI XEM NHIỀU HƠN"]
+    },
+    {
+      "narration": "Để hiểu vì sao bộ não rơi vào bẫy này, ta cần nói tới một cơ chế sâu hơn gọi là né mất mát. Các nhà tâm lý học Daniel Kahneman và Amos Tversky đã chỉ ra rằng nỗi đau khi mất một thứ mạnh hơn đáng kể so với niềm vui khi được đúng thứ đó. Mất một trăm nghìn làm ta đau hơn nhiều so với cái sướng khi nhặt được một trăm nghìn. Bỏ dở một việc đã đầu tư đồng nghĩa với việc chính thức ghi nhận một khoản mất, và bộ não sợ cái khoảnh khắc thừa nhận mất mát đó đến mức tránh né bằng mọi giá.",
+      "caption": "Cơ chế gốc: nỗi đau mất mát mạnh hơn niềm vui được",
+      "broll": "scale showing loss heavier than gain",
+      "emphasis": ["MẤT đau hơn ĐƯỢC"]
+    },
+    {
+      "narration": "Hãy hiểu cho thật kỹ điểm mấu chốt này. Khoảnh khắc bạn buông một dự án dở dang, bộ não buộc phải dán nhãn toàn bộ phần đã đầu tư là lãng phí, và nó cực kỳ ghét cái nhãn đó. Còn nếu bạn tiếp tục, bạn được phép tự nhủ rằng có thể mọi thứ rồi sẽ ổn, khoản đầu tư kia vẫn còn cơ hội được đền đáp. Tiếp tục cho bạn ảo giác rằng phần đã mất chưa thật sự mất. Đó là lý do càng đổ vào nhiều, người ta lại càng khó dừng, dù lý trí gào lên rằng nên dừng.",
+      "caption": "Tiếp tục cho ta ảo giác phần đã mất chưa thật mất",
+      "broll": "gambler doubling down at table tense"
+    },
+    {
+      "narration": "Có một lớp cơ chế thứ hai chồng lên trên, gọi là nhu cầu được nhất quán với chính mình. Một khi đã công khai dấn vào một con đường, thừa nhận nó sai đồng nghĩa với thừa nhận quyết định ban đầu của ta là sai, và bản ngã của ta chống lại điều đó kịch liệt. Vì vậy thay vì sửa hướng, ta lại bồi đắp thêm lý do để bám lấy lựa chọn cũ, biến một sai lầm nhỏ thành một câu chuyện lớn mà ta phải bảo vệ. Càng nhiều người chứng kiến ta đã cam kết, sức ì này càng mạnh.",
+      "caption": "Cơ chế thứ hai: bản ngã không muốn thừa nhận mình sai",
+      "broll": "person stubbornly defending wrong choice argument"
+    },
+    {
+      "narration": "Cơ chế này không chỉ tóm được cá nhân, nó tóm được cả những tổ chức lớn và những bộ óc thông minh nhất. Ví dụ kinh điển là chiếc máy bay siêu thanh Concorde. Chính phủ Anh và Pháp đổ tiền phát triển nó suốt nhiều năm, và đến một lúc họ đã biết rõ dự án sẽ không bao giờ có lãi về mặt thương mại. Nhưng họ vẫn tiếp tục rót tiền, với lý do đã đầu tư quá nhiều rồi, dừng bây giờ thì phí tất cả. Cái bẫy này phổ biến đến mức giới nghiên cứu đặt cho nó một cái tên riêng: ngụy biện Concorde.",
+      "caption": "Ngụy biện Concorde: cả quốc gia cũng mắc bẫy",
+      "broll": "concorde supersonic jet airplane vintage",
+      "transition": true
+    },
+    {
+      "narration": "Có một trò chơi nhỏ phơi bày cái bẫy này một cách tàn nhẫn, do nhà kinh tế Martin Shubik nghĩ ra năm một chín bảy mươi mốt. Người ta đem đấu giá một tờ một đô-la, với một luật oái oăm: người trả cao nhất được tờ đô-la, nhưng người về nhì vẫn phải trả số tiền mình đặt mà chẳng được gì. Cuộc đấu thường bắt đầu vui vẻ, vài xu một. Nhưng khi giá chạm gần một đô, hai người dẫn đầu kẹt cứng: bỏ cuộc nghĩa là mất trắng số đã đặt, nên cả hai cứ đặt cao thêm để khỏi thành kẻ thua. Người ta đã trả tới ba, bốn đô-la để mua một tờ một đô.",
+      "caption": "Trò đấu giá đô-la của Shubik, 1971",
+      "broll": "auction bidding paddles raised tense competition",
+      "emphasis": ["TRẢ 4 ĐÔ để MUA 1 ĐÔ"]
+    },
+    {
+      "narration": "Điều đáng sợ là không ai trong cuộc thấy mình phi lý. Ở mỗi bước, đặt thêm một chút để cứu khoản đã đặt trông có vẻ hợp lý. Chính chuỗi những quyết định nhỏ tưởng như hợp lý lại dẫn tới một kết cục điên rồ. Đó chính là cách bẫy chi phí chìm vận hành trong đời thật: hiếm khi là một quyết định sai lớn, mà là vô số bước nhỏ, mỗi bước đều được biện minh bằng số đã bỏ ra ở bước trước.",
+      "caption": "Chuỗi bước nhỏ 'hợp lý' dẫn tới kết cục điên rồ",
+      "broll": "dominoes falling chain reaction"
+    },
+    {
+      "narration": "Giờ ta sang phần áp dụng, vì hiểu cơ chế chỉ đáng giá khi đổi được cách quyết. Cách thứ nhất, và là chìa khoá của tất cả: khi cân nhắc có nên tiếp tục hay không, hãy bỏ hẳn câu hỏi tôi đã bỏ ra bao nhiêu, và thay bằng câu hỏi của người ngoài cuộc. Hãy tự hỏi: nếu ngay lúc này tôi mới bắt đầu từ con số không, không hề có quá khứ đầu tư nào, tôi có chọn dấn vào việc này nữa không? Nếu câu trả lời là không, thì số tiền hay thời gian đã mất không phải lý do để ở lại; nó chỉ là cái giá của một bài học đã trả xong.",
+      "caption": "Cách 1: Hỏi 'nếu bắt đầu lại từ đầu, tôi có chọn việc này?'",
+      "broll": "person at fork in road fresh start decision",
+      "emphasis": ["BẮT ĐẦU LẠI TỪ CON SỐ KHÔNG"]
+    },
+    {
+      "narration": "Lấy một ví dụ rất đời thường. Bạn đăng ký một khoá học trực tuyến đắt tiền, học được một phần ba thì nhận ra nó không hợp với mình và cũng chẳng còn cần cho công việc. Cái bẫy thì thầm: học cho hết đi, không thì phí tiền. Nhưng hãy hỏi lại theo cách của người ngoài cuộc: số tiền kia đã trả rồi, không đòi lại được dù bạn học tiếp hay dừng. Câu hỏi thật sự là, hai mươi giờ sắp tới của đời bạn nên dành cho khoá học này, hay cho thứ thật sự đưa bạn về phía trước? Khi đặt câu hỏi đúng, lựa chọn trở nên rõ ràng.",
+      "caption": "Ví dụ: khoá học đắt tiền học dở — học tiếp hay dừng?",
+      "broll": "person studying online course frustrated laptop"
+    },
+    {
+      "narration": "Cách thứ hai: tách bạch người ra quyết định hôm nay khỏi người đã đầu tư hôm qua. Một mẹo cực mạnh là tưởng tượng một người bạn đến xin lời khuyên với đúng tình huống của bạn. Họ kể đã đổ ba năm vào một công việc khiến họ kiệt sức, và hỏi có nên nghỉ không. Bạn sẽ khuyên họ thế nào? Gần như chắc chắn bạn sẽ nói đừng để ba năm cũ giam cầm ba mươi năm tới. Ta luôn sáng suốt với chuyện của người khác, vì ta không mang nỗi đau mất mát của họ. Hãy mượn chính sự sáng suốt đó cho mình.",
+      "caption": "Cách 2: Tưởng tượng bạn đang khuyên một người bạn",
+      "broll": "two friends talking giving advice cafe"
+    },
+    {
+      "narration": "Cũng nằm trong cách thứ hai là một thủ thuật ngôn từ nhỏ mà đổi cả góc nhìn: hãy thay câu tôi đã dành ba năm cho việc này bằng câu việc này đã lấy của tôi ba năm. Cùng một sự thật, nhưng cách nói thứ nhất khiến ba năm thành một khoản đầu tư cần được bảo vệ, còn cách nói thứ hai phơi bày nó như một cái giá đã trả. Khi bạn nhìn quá khứ như cái giá đã trả thay vì khoản đầu tư đang chờ sinh lời, việc buông tay bỗng nhẹ hơn rất nhiều, vì bạn không còn cảm giác phải canh giữ nó.",
+      "caption": "Đổi cách nói: 'đã lấy của tôi 3 năm' thay vì 'tôi đã dành 3 năm'",
+      "broll": "person reframing thought lightbulb realization",
+      "emphasis": ["CÁI GIÁ ĐÃ TRẢ, không phải KHOẢN ĐẦU TƯ"]
+    },
+    {
+      "narration": "Cách thứ ba: đặt ra điểm dừng từ trước, khi đầu óc còn tỉnh táo và chưa bị cảm xúc đầu tư làm mờ. Trước khi bắt đầu một dự án, một khoản đầu tư, hay một cuộc theo đuổi, hãy tự định nghĩa rõ: đến mốc nào, hoặc thấy dấu hiệu gì, thì tôi sẽ dừng lại. Viết nó ra. Khi đã lún sâu, bạn sẽ không còn đủ tỉnh để vạch ranh giới nữa, vì lúc đó mỗi bước lùi đều như một mất mát. Cái ranh giới bạn vạch ra từ lúc còn lạnh đầu chính là sợi dây cứu bạn khỏi chuỗi quyết định nóng vội về sau.",
+      "caption": "Cách 3: Đặt điểm dừng TỪ TRƯỚC, khi còn tỉnh táo",
+      "broll": "person setting boundary line on plan document",
+      "emphasis": ["VẠCH RANH GIỚI KHI CÒN LẠNH ĐẦU"],
+      "transition": true
+    },
+    {
+      "narration": "Trong giới đầu tư, nguyên tắc này có tên là lệnh cắt lỗ: định sẵn mức giá mà nếu chạm tới, ta bán ra không bàn cãi, bất kể trong lòng tiếc nuối thế nào. Nó tồn tại chính vì người ta biết rằng khi đã ôm một khoản lỗ, bản năng né mất mát sẽ xui ta giữ chặt và chờ gỡ, và cái chờ đó thường biến khoản lỗ nhỏ thành thảm hoạ. Bạn có thể mượn ý tưởng cắt lỗ này cho mọi thứ trong đời, không chỉ tiền bạc: một mốc để buông một thói quen, một dự án, hay một kế hoạch không còn phục vụ mình.",
+      "caption": "Nguyên tắc cắt lỗ: định sẵn mức buông, không bàn cãi",
+      "broll": "stock chart stop loss line trading screen"
+    },
+    {
+      "narration": "Có một cái bẫy phụ cần nói rõ, nếu không bạn sẽ đi quá đà sang phía ngược lại. Thoát bẫy chi phí chìm không có nghĩa là cứ thấy khó là bỏ ngang mọi thứ. Có những việc đáng kiên trì vì tương lai của chúng thật sự sáng, chứ không phải vì quá khứ đã đầu tư. Sự khác biệt nằm ở hướng nhìn: kiên trì lành mạnh nhìn về phía trước và hỏi việc này còn đáng không; còn mắc bẫy chi phí chìm thì nhìn về phía sau và bám vào việc tôi đã bỏ ra nhiều rồi. Cùng một hành động ở lại, nhưng hai lý do hoàn toàn khác nhau.",
+      "caption": "Phân biệt: kiên trì nhìn tương lai, mắc bẫy nhìn quá khứ",
+      "broll": "person looking forward versus looking back split"
+    },
+    {
+      "narration": "Một cách kiểm tra nhanh để phân biệt hai trường hợp là tự hỏi: bằng chứng nào sẽ khiến tôi đổi ý? Nếu bạn theo đuổi một việc và thật sự cởi mở, bạn sẽ chỉ ra được những dấu hiệu cụ thể mà nếu chúng xuất hiện, bạn sẽ dừng. Nhưng nếu bạn nhận ra không có bất cứ bằng chứng nào trên đời khiến bạn buông, thì bạn không còn đang kiên trì nữa; bạn đang bị chi phí chìm cầm tù. Một cam kết lành mạnh luôn có cửa thoát; một cái bẫy thì không.",
+      "caption": "Phép thử: 'Bằng chứng nào sẽ khiến tôi đổi ý?'",
+      "broll": "person evaluating evidence checklist thoughtful"
+    },
+    {
+      "narration": "Và đây là mặt tối cần cảnh giác, vì cơ chế này bị khai thác để moi tiền bạn. Các trò chơi điện tử miễn phí cố tình cho bạn đầu tư hàng trăm giờ và một ít tiền vào nhân vật, để rồi khi muốn dừng, bạn thấy tiếc cả gia tài ảo đã gây dựng. Các gói thành viên thiết kế sao cho bạn đã tích nhiều điểm, nhiều hạng, đến mức rời đi giống như vứt bỏ thành quả. Họ không bán cho bạn giá trị tương lai; họ giam bạn bằng chính khoản chi phí chìm mà họ khéo léo dụ bạn tạo ra.",
+      "caption": "Mặt tối: game và gói thành viên giam bạn bằng chi phí chìm",
+      "broll": "mobile game in app purchase loot screen",
+      "emphasis": ["GIAM BẠN bằng THÀNH QUẢ ẢO"]
+    },
+    {
+      "narration": "Nếu hôm nay bạn chỉ giữ lại một điều, hãy để nó là điều này: quá khứ đã trả thì đã trả, nó không phải lá phiếu quyết định tương lai của bạn. Mỗi sáng thức dậy, bạn không sở hữu những gì đã mất; bạn chỉ sở hữu thời gian, tiền bạc và sức lực còn lại kể từ giờ phút này. Người ra quyết định khôn ngoan không hỏi tôi đã bỏ ra bao nhiêu, mà hỏi từ đây trở đi, đâu là lựa chọn tốt nhất cho tôi. Buông một thứ không còn đáng không phải là thất bại; đó là từ chối trả thêm cho một sai lầm đã trả xong.",
+      "caption": "Quá khứ đã trả không phải lá phiếu quyết định tương lai",
+      "broll": "person walking away free from burden sunrise"
+    },
+    {
+      "narration": "Câu hỏi tôi muốn để lại cho bạn là: ngay lúc này, bạn đang cố bám lấy điều gì chủ yếu vì đã lỡ đầu tư quá nhiều vào nó, chứ không phải vì tương lai của nó còn đáng? Hãy viết nó xuống phần bình luận, và thử trả lời câu hỏi của người ngoài cuộc: nếu hôm nay mới bắt đầu, bạn có chọn lại nó không? Và ở tập sau, ta sẽ đi vào một cơ chế họ hàng rất gần: vì sao chỉ một con số đầu tiên xuất hiện trong đầu lại có thể âm thầm thao túng mọi phán đoán và quyết định tiếp theo của bạn. Nếu tập này giúp bạn nhìn rõ hơn cái bẫy tiếc của trong lòng mình, hãy để lại một lượt thích và đăng ký kênh để không bỏ lỡ những cơ chế tiếp theo. Hẹn gặp lại các bạn ở tập tiếp theo.",
+      "caption": "Bạn đang bám lấy điều gì chỉ vì đã lỡ đầu tư?",
+      "broll": "comment section engagement social media"
+    }
+  ]
+}

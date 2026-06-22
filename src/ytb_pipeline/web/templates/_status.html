@@ -1,0 +1,35 @@
+<h2>Trạng thái job</h2>
+<div class="status-line">
+  {% if job.running %}<span class="spinner"></span><strong>{{ job.label }}</strong>
+    <form method="post" action="/stop" style="margin-left:auto;"><button class="danger" type="submit">Dừng</button></form>
+  {% else %}<span class="badge">rảnh</span>{% if job.last_result %}<span class="muted">{{ job.last_result }}</span>{% endif %}{% endif %}
+</div>
+
+{% if pending %}
+  <h2 style="margin-top:1rem;">Chờ duyệt kịch bản</h2>
+  {% for p in pending %}
+  <div class="pending">
+    <strong>{{ p.title }}</strong>
+    <pre>{{ p.body }}</pre>
+    <form class="row" method="post" action="/approve/{{ p.id }}">
+      <input type="hidden" name="decision" value="approve">
+      <button type="submit">✅ Duyệt</button>
+    </form>
+    <form class="row" method="post" action="/approve/{{ p.id }}" style="margin-top:0.5rem;">
+      <input type="hidden" name="decision" value="revise">
+      <input type="text" name="instruction" placeholder="Yêu cầu sửa...">
+      <button class="ghost" type="submit">📝 Yêu cầu sửa</button>
+    </form>
+  </div>
+  {% endfor %}
+{% endif %}
+
+{% if auto_state %}
+  <h2 style="margin-top:1rem;">auto_state.json</h2>
+  <pre class="log">{{ auto_state | tojson(indent=2) }}</pre>
+{% endif %}
+
+{% if job.log %}
+  <h2 style="margin-top:1rem;">Log</h2>
+  <pre class="log">{{ job.log }}</pre>
+{% endif %}

@@ -1,0 +1,11 @@
+[1/4] Ideation  ✓  Trì Hoãn Cả Ngày? Quy Tắc 2 Phút Sửa Ngay (5 đoạn)
+[2/4] Voiceover ✓  assets/audio/tri-hoan-ca-ngay-quy-tac-2-phut-sua-ngay.mp3  (34.5s)
+[3/4] Render    ✓  (ai/portrait) assets/output/tri-hoan-ca-ngay-quy-tac-2-phut-sua-ngay.mp4
+  Loại: YouTube Short (dọc, <60s)
+  Lên lịch công khai lúc: 2026-06-16T20:00:00+0700
+  ✓ Đã upload: https://youtu.be/eJgwdAeaNb4
+  ⚠ Không đặt được thumbnail (kênh cần verify?): <HttpError 403 when requesting https://youtube.googleapis.com/upload/youtube/v3/thumbnails/set?videoId=eJgwdAeaNb4&alt=json&uploadType=media returned "The authenticated user doesn't have permissions to upload and set custom video thumbnails.". Details: "[{'message': "The authenticated user doesn't have permissions to upload and set custom video thumbnails.", 'domain': 'youtube.thumbnail', 'reason': 'forbidden', 'location': 'Authorization', 'locationType': 'header'}]">
+[4/4] Publish   ✓  uploaded=True
+  ✓ Đã đưa lên Drive (Claude-YTB): https://drive.google.com/file/d/1YfstckZncVZLJROrZeTyoS4F7WVeiz58/view?usp=drivesdk
+  ✓ Đã xoá bản local: assets/output/tri-hoan-ca-ngay-quy-tac-2-phut-sua-ngay.mp4
+Xong: uploaded=True url=https://youtu.be/eJgwdAeaNb4
