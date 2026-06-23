@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.claude-ytb.autoupdate</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>__PROJECT_DIR__/scripts/update/auto_update.sh</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>__PROJECT_DIR__</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>__HOME__/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+  </dict>
+
+  <!-- Job chạy-rồi-thoát, lặp lại mỗi 30 phút — không phải daemon luôn mở
+       như listener, nên không dùng KeepAlive/RunAtLoad theo kiểu service. -->
+  <key>StartInterval</key>
+  <integer>1800</integer>
+
+  <key>StandardOutPath</key>
+  <string>__PROJECT_DIR__/assets/auto_update.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>__PROJECT_DIR__/assets/auto_update.err.log</string>
+</dict>
+</plist>

@@ -1,4 +1,4 @@
-.PHONY: setup setup-f5 test run lint clean listen listen-install listen-uninstall listen-logs
+.PHONY: setup setup-f5 test run lint clean listen listen-install listen-uninstall listen-logs update-install update-uninstall update-run update-logs
 
 # Cài đặt đầy đủ trên máy mới: ffmpeg, .venv, requirements, .env, thư mục runtime.
 setup:
@@ -31,3 +31,18 @@ listen-uninstall:
 
 listen-logs:
 	tail -f assets/listener.out.log assets/listener.err.log
+
+# Cài auto-update: poll git remote mỗi 30 phút, tự pull + setup + smoke-test,
+# rollback tự động nếu fail (khác OS/lib version), báo qua Telegram.
+update-install:
+	bash scripts/update/install.sh
+
+update-uninstall:
+	bash scripts/update/uninstall.sh
+
+# Chạy thử 1 lượt ngay (không chờ launchd), để xem log trực tiếp.
+update-run:
+	bash scripts/update/auto_update.sh
+
+update-logs:
+	tail -f assets/auto_update.out.log assets/auto_update.err.log
