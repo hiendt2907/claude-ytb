@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# CLI ngắn cho claude-ytb — `ytb batch status`, `ytb batch run`, ...
+set -euo pipefail
+SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SOURCE" ]; do
+  DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ "$SOURCE" != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+ROOT="$(cd -P "$(dirname "$SOURCE")/.." && pwd)"
+cd "$ROOT"
+
+case "${1:-}" in
+  batch)
+    shift
+    exec env PYTHONPATH=src "$ROOT/.venv/bin/python" -m ytb_pipeline.orchestrator.batch_cli "$@"
+    ;;
+  *)
+    echo "Dùng: ytb batch <start -n N [--type-of-vid long|short]|status|run [--loop]|verify <id>|retry <slug>|logs <slug>|logs --warnings|ledger|queue|doctor>" >&2
+    exit 1
+    ;;
+esac
