@@ -53,7 +53,95 @@ if [[ -f .env ]]; then
   echo "   .env đã tồn tại — giữ nguyên, không đè."
 else
   cp .env.example .env
-  echo "   đã tạo .env từ .env.example — điền API key cần dùng (xem README)."
+  echo "   đã tạo .env từ .env.example."
+fi
+
+# Ghi 1 biến vào .env (giữ comment cuối dòng nếu có), thêm dòng mới nếu key
+# chưa tồn tại. Bỏ qua nếu value rỗng (giữ giá trị cũ trong .env).
+set_env_var() {
+  local key="$1" value="$2"
+  [[ -z "$value" ]] && return
+  KEY="$key" VALUE="$value" python3 - <<'PYEOF'
+import os
+path = ".env"
+key = os.environ["KEY"]
+value = os.environ["VALUE"]
+with open(path) as f:
+    lines = f.readlines()
+prefix = key + "="
+found = False
+for i, line in enumerate(lines):
+    if line.startswith(prefix):
+        rest = line[len(prefix):]
+        if "#" in rest:
+            _, comment = rest.split("#", 1)
+            lines[i] = f"{key}={value}  #{comment}"
+        else:
+            lines[i] = f"{key}={value}\n"
+        found = True
+        break
+if not found:
+    lines.append(f"{key}={value}\n")
+with open(path, "w") as f:
+    f.writelines(lines)
+PYEOF
+}
+
+# Hỏi 1 secret, hiện hướng dẫn lấy key trước, Enter để bỏ qua (điền sau trong .env).
+# Input bị ẩn (giống nhập mật khẩu) vì đây là token/API key.
+prompt_secret() {
+  local label="$1" guide="$2" __resultvar="$3"
+  echo ""
+  echo "   $label"
+  echo "   → $guide"
+  read -r -s -p "   Dán giá trị (Enter để bỏ qua): " value
+  echo ""
+  printf -v "$__resultvar" '%s' "$value"
+}
+
+if [[ ! -t 0 ]]; then
+  echo "   (không phải terminal tương tác — bỏ qua hỏi secret, điền .env thủ công sau)"
+else
+  echo ""
+  echo "==> Nhập secrets/API key (Enter để bỏ qua, điền lại sau trong .env)"
+
+  prompt_secret "Telegram Bot Token — cổng duyệt kịch bản qua Telegram" \
+    "Mở Telegram, chat với @BotFather, gõ /newbot, đặt tên bot. BotFather trả về token dạng 123456:ABC-xyz..." \
+    TELEGRAM_BOT_TOKEN_VAL
+  set_env_var TELEGRAM_BOT_TOKEN "$TELEGRAM_BOT_TOKEN_VAL"
+
+  prompt_secret "Telegram Chat ID — id của mày để bot biết gửi cho ai" \
+    "Nhắn 1 tin bất kỳ cho bot vừa tạo, rồi chat với @userinfobot để lấy ID; hoặc mở https://api.telegram.org/bot<TOKEN>/getUpdates và tìm \"chat\":{\"id\":...}" \
+    TELEGRAM_CHAT_ID_VAL
+  set_env_var TELEGRAM_CHAT_ID "$TELEGRAM_CHAT_ID_VAL"
+
+  prompt_secret "Pexels API Key — chỉ cần khi RENDER_PROVIDER=ai (B-roll stock)" \
+    "Đăng nhập https://www.pexels.com rồi vào https://www.pexels.com/api/ — key hiện ngay, free." \
+    PEXELS_API_KEY_VAL
+  set_env_var PEXELS_API_KEY "$PEXELS_API_KEY_VAL"
+
+  prompt_secret "ElevenLabs API Key — chỉ cần khi TTS_PROVIDER=elevenlabs" \
+    "Đăng nhập https://elevenlabs.io → avatar góc trên phải → Profile + API Key." \
+    ELEVENLABS_API_KEY_VAL
+  set_env_var ELEVENLABS_API_KEY "$ELEVENLABS_API_KEY_VAL"
+
+  prompt_secret "YouTube Data API Key — chỉ cần để research trending (videos.list), KHÔNG bắt buộc cho upload" \
+    "Google Cloud Console → APIs & Services → Library → bật 'YouTube Data API v3' → Credentials → Create credentials → API key." \
+    YOUTUBE_API_KEY_VAL
+  set_env_var YOUTUBE_API_KEY "$YOUTUBE_API_KEY_VAL"
+
+  echo ""
+  echo "   secrets/client_secret.json — OAuth client để UPLOAD THẬT (DRY_RUN=false)."
+  echo "   → File JSON, không nhập qua đây được. Lấy tại: Google Cloud Console →"
+  echo "     APIs & Services → Credentials → Create Credentials → OAuth client ID →"
+  echo "     Application type 'Desktop app' → Download JSON → lưu đúng đường dẫn"
+  echo "     secrets/client_secret.json (tạo OAuth consent screen trước nếu chưa có)."
+  if [[ -f secrets/client_secret.json ]]; then
+    echo "   ✅ đã thấy file tại secrets/client_secret.json."
+  else
+    echo "   ⚠️  chưa có file — DRY_RUN vẫn chạy được (render local), chỉ cần file này khi"
+    echo "      muốn upload thật. Có thể copy vào sau, không chặn setup."
+  fi
 fi
 
 if $WITH_F5; then
@@ -91,10 +179,7 @@ echo ""
 echo "✅ Setup xong."
 echo ""
 echo "Bước tiếp theo:"
-echo "  1. Mở .env, điền các key cần dùng:"
-echo "     - TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID  (cổng duyệt kịch bản qua Telegram)"
-echo "     - PEXELS_API_KEY                          (chỉ cần khi RENDER_PROVIDER=ai)"
-echo "     - ELEVENLABS_API_KEY                      (chỉ cần khi TTS_PROVIDER=elevenlabs)"
-echo "     - YOUTUBE_* + secrets/client_secret.json   (chỉ cần khi DRY_RUN=false, publish thật)"
+echo "  1. Key nào vừa bỏ qua ở trên (Enter trống) thì mở .env điền tay sau, hoặc"
+echo "     chạy lại 'bash scripts/setup.sh' để được hỏi lại (không đè key đã điền)."
 echo "  2. .venv/bin/pytest          # xác nhận môi trường chạy đúng (hoặc: make test)"
 echo "  3. make run TOPIC=\"...\"      # chạy thử pipeline (DRY_RUN=true mặc định, không upload)"

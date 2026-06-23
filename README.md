@@ -19,18 +19,21 @@ make setup              # cài ffmpeg, venv, requirements, tạo .env + thư m�
 
 `make setup` chạy `scripts/setup.sh`: kiểm tra Homebrew, cài `ffmpeg` nếu thiếu,
 tạo `.venv` + cài `requirements.txt`, tạo `secrets/` `data/` `assets/output/`
-`assets/audio/` (gitignored nên không có sẵn sau khi clone), và copy
-`.env.example` → `.env` (không đè nếu đã có). Idempotent — chạy lại an toàn.
+`assets/audio/` (gitignored nên không có sẵn sau khi clone), copy
+`.env.example` → `.env` (không đè nếu đã có), rồi **hỏi tay từng API
+key/secret** (kèm hướng dẫn lấy ở đâu) và tự điền vào `.env` — Enter để bỏ
+qua, điền lại sau cũng được. Idempotent — chạy lại an toàn, không đè key đã
+điền (chỉ ghi đè key nào mày gõ giá trị mới).
 
-Sau khi setup, mở `.env` điền key cần dùng (tuỳ tính năng, không phải tất cả
-đều bắt buộc cho lần chạy thử đầu tiên):
+Các key được hỏi (không bắt buộc phải có hết cho lần chạy thử đầu tiên):
 
 | Key | Khi nào cần |
 |---|---|
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Muốn duyệt kịch bản qua Telegram (mặc định `TELEGRAM_APPROVAL=true`) |
 | `PEXELS_API_KEY` | Chỉ khi `RENDER_PROVIDER=ai` (B-roll stock) |
 | `ELEVENLABS_API_KEY` | Chỉ khi `TTS_PROVIDER=elevenlabs` |
-| `YOUTUBE_*` + `secrets/client_secret.json` | Chỉ khi `DRY_RUN=false` (publish thật lên YouTube) |
+| `YOUTUBE_API_KEY` | Chỉ để research trending, không bắt buộc cho upload |
+| `secrets/client_secret.json` | Là file JSON nên không hỏi qua input — script chỉ in hướng dẫn lấy + báo đã thấy file hay chưa. Chỉ cần khi `DRY_RUN=false` (publish thật lên YouTube) |
 
 ```bash
 make test                                # xác nhận môi trường chạy đúng
