@@ -20,22 +20,76 @@ for arg in "$@"; do
   esac
 done
 
-echo "==> Kiểm tra hệ điều hành"
-if [[ "$(uname)" != "Darwin" ]]; then
-  echo "⚠️  Pipeline này build cho macOS (ffmpeg/launchd). Máy khác có thể lỗi ở bước sau." >&2
-fi
-
-echo "==> Kiểm tra Homebrew"
-if ! command -v brew >/dev/null 2>&1; then
-  echo "❌ Chưa có Homebrew. Cài tại https://brew.sh rồi chạy lại script này." >&2
-  exit 1
-fi
+echo "==> Chẩn đoán hệ điều hành"
+OS_NAME="$(uname -s)"   # Darwin | Linux
+ARCH="$(uname -m)"      # arm64 | x86_64 | aarch64
+case "$OS_NAME" in
+  Darwin)
+    case "$ARCH" in
+      arm64)  PLATFORM="macos-arm64" ;;
+      x86_64) PLATFORM="macos-intel" ;;
+      *)      PLATFORM="macos-unknown" ;;
+    esac
+    ;;
+  Linux)
+    case "$ARCH" in
+      x86_64)          PLATFORM="linux-x86_64" ;;
+      aarch64|arm64)   PLATFORM="linux-arm64" ;;
+      *)               PLATFORM="linux-unknown" ;;
+    esac
+    ;;
+  *)
+    PLATFORM="unknown"
+    ;;
+esac
+echo "   OS=$OS_NAME  ARCH=$ARCH  → PLATFORM=$PLATFORM"
+case "$PLATFORM" in
+  macos-arm64)
+    echo "   Apple Silicon — F5-TTS chạy được GPU (MPS), tốc độ tốt."
+    ;;
+  macos-intel)
+    echo "   ⚠️  Mac Intel — F5-TTS (nếu dùng --with-f5-voice) sẽ chạy CPU, chậm hơn nhiều" >&2
+    echo "      so với Apple Silicon. Khuyên giữ TTS_PROVIDER=edge (mặc định, miễn phí)." >&2
+    ;;
+  linux-*)
+    echo "   ⚠️  Linux chưa hỗ trợ launchd (chỉ macOS) — bước cài listener auto-start" >&2
+    echo "      (make listen-install) sẽ KHÔNG chạy được, cần thay bằng systemd tay." >&2
+    ;;
+  *)
+    echo "   ⚠️  Không nhận diện được OS/kiến trúc — các bước sau có thể cần chỉnh tay." >&2
+    ;;
+esac
 
 echo "==> ffmpeg"
 if command -v ffmpeg >/dev/null 2>&1; then
   echo "   đã có: $(ffmpeg -version | head -1)"
 else
-  brew install ffmpeg
+  case "$PLATFORM" in
+    macos-*)
+      if ! command -v brew >/dev/null 2>&1; then
+        echo "❌ Chưa có Homebrew. Cài tại https://brew.sh rồi chạy lại script này." >&2
+        exit 1
+      fi
+      brew install ffmpeg
+      ;;
+    linux-*)
+      if command -v apt-get >/dev/null 2>&1; then
+        sudo apt-get update -y && sudo apt-get install -y ffmpeg
+      elif command -v dnf >/dev/null 2>&1; then
+        sudo dnf install -y ffmpeg
+      elif command -v pacman >/dev/null 2>&1; then
+        sudo pacman -Sy --noconfirm ffmpeg
+      else
+        echo "❌ Không nhận diện được package manager Linux (apt/dnf/pacman)." >&2
+        echo "   Cài ffmpeg tay rồi chạy lại script này." >&2
+        exit 1
+      fi
+      ;;
+    *)
+      echo "❌ Không tự cài được ffmpeg trên PLATFORM=$PLATFORM. Cài tay rồi chạy lại." >&2
+      exit 1
+      ;;
+  esac
 fi
 
 echo "==> venv chính (.venv) + requirements.txt"
@@ -43,6 +97,8 @@ if [[ ! -x .venv/bin/python ]]; then
   python3 -m venv .venv
 fi
 .venv/bin/pip install --upgrade pip -q
+# requirements.txt thuần Python (pydantic, edge-tts, moviepy, Pillow, google-api-*) —
+# pip tự chọn wheel đúng theo PLATFORM, không cần file requirements riêng theo OS.
 .venv/bin/pip install -r requirements.txt -q
 
 echo "==> Thư mục runtime (gitignored, cần tồn tại trước khi chạy)"
@@ -144,12 +200,27 @@ else
   fi
 fi
 
-if $WITH_F5; then
+setup_f5() {
   echo "==> [TUỲ CHỌN] F5-TTS — giọng nhân bản local (~5.4GB model)"
+  case "$PLATFORM" in
+    macos-arm64) ;;  # MPS — tốc độ tốt, không cần cảnh báo
+    macos-intel|linux-*)
+      echo "⚠️  PLATFORM=$PLATFORM — F5-TTS sẽ chạy CPU (không GPU/MPS), chậm hơn nhiều" >&2
+      echo "   so với Apple Silicon (có thể vài phút/đoạn thay vài giây)." >&2
+      read -r -p "   Vẫn tiếp tục cài? (y/N) " confirm_f5
+      if [[ ! "$confirm_f5" =~ ^[Yy]$ ]]; then
+        echo "   Bỏ qua F5-TTS — giữ TTS_PROVIDER=edge."
+        return 0
+      fi
+      ;;
+  esac
   if ! command -v python3.12 >/dev/null 2>&1; then
     echo "❌ Cần python3.12 cho .venv-tts (F5-TTS chưa hỗ trợ Python mới hơn)." >&2
-    echo "   Cài: brew install python@3.12" >&2
-    exit 1
+    case "$PLATFORM" in
+      macos-*) echo "   Cài: brew install python@3.12" >&2 ;;
+      linux-*) echo "   Cài: sudo apt-get install -y python3.12 python3.12-venv  (hoặc dnf/pacman tương đương)" >&2 ;;
+    esac
+    return 1
   fi
   if [[ ! -x .venv-tts/bin/python ]]; then
     python3.12 -m venv .venv-tts
@@ -170,6 +241,10 @@ if $WITH_F5; then
   fi
   echo "   xong — đặt TTS_PROVIDER=f5 trong .env để dùng giọng nhân bản từ"
   echo "   assets/ref/narrator.wav (đã có sẵn trong repo)."
+}
+
+if $WITH_F5; then
+  setup_f5
 else
   echo "==> Bỏ qua F5-TTS (mặc định TTS_PROVIDER=edge, miễn phí, không cần model)."
   echo "    Muốn giọng nhân bản local: chạy lại 'bash scripts/setup.sh --with-f5-voice'"
