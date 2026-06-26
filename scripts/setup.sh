@@ -92,6 +92,16 @@ else
   esac
 fi
 
+echo "==> Claude Code CLI (claude)"
+if command -v claude >/dev/null 2>&1; then
+  echo "   đã có: $(claude --version 2>/dev/null | head -1 || echo 'ok')"
+else
+  echo "❌ Chưa cài Claude Code CLI — đây là dependency bắt buộc cho bước Ideation." >&2
+  echo "   Cài tại: https://claude.ai/code  (hoặc: npm install -g @anthropic-ai/claude-code)" >&2
+  echo "   Sau khi cài + đăng nhập ('claude'), chạy lại script này." >&2
+  exit 1
+fi
+
 echo "==> venv chính (.venv) + requirements.txt"
 if [[ ! -x .venv/bin/python ]]; then
   python3 -m venv .venv
@@ -256,5 +266,9 @@ echo ""
 echo "Bước tiếp theo:"
 echo "  1. Key nào vừa bỏ qua ở trên (Enter trống) thì mở .env điền tay sau, hoặc"
 echo "     chạy lại 'bash scripts/setup.sh' để được hỏi lại (không đè key đã điền)."
-echo "  2. .venv/bin/pytest          # xác nhận môi trường chạy đúng (hoặc: make test)"
+echo "  2. make test                  # xác nhận môi trường chạy đúng"
 echo "  3. make run TOPIC=\"...\"      # chạy thử pipeline (DRY_RUN=true mặc định, không upload)"
+echo ""
+echo "  Tuỳ chọn (cài thêm khi cần):"
+echo "  4. make listen-install        # Telegram listener — điều khiển pipeline từ Telegram"
+echo "  5. make update-install        # auto-update — tự đồng bộ code mới từ git mỗi 30 phút"
