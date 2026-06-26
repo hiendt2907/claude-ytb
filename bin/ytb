@@ -27,11 +27,15 @@ case "${1:-}" in
     shift
     _batch auth "$@"
     ;;
+  update)
+    exec bash "$ROOT/scripts/update/auto_update.sh"
+    ;;
   *)
-    echo "Dùng: ytb <batch|doctor|auth>" >&2
+    echo "Dùng: ytb <batch|doctor|auth|update>" >&2
     echo "" >&2
     echo "  ytb doctor                           # kiểm tra môi trường (shortcut)" >&2
     echo "  ytb auth                             # đăng nhập lại OAuth (shortcut)" >&2
+    echo "  ytb update                           # trigger update ngay (không chờ daemon 30 phút)" >&2
     echo "  ytb batch <lệnh>                     # toàn bộ batch workflow" >&2
     echo "" >&2
     echo "  ytb batch start -n N                 # Claude viết N kịch bản" >&2

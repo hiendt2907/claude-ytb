@@ -9,7 +9,36 @@ Pipeline tự động hoá sản xuất nội dung và kiếm tiền từ YouTub
 3. **Render** — dựng video bằng moviepy/ffmpeg, sinh thumbnail
 4. **Publish** — upload YouTube Data API + SEO + analytics
 
-## Cài đặt trên máy mới
+## Cài đặt / cập nhật — 1 lệnh duy nhất
+
+Dùng cho cả **máy mới chưa có repo** lẫn **máy đã cài muốn update ngay**:
+
+```bash
+GH_TOKEN=ghp_xxx bash <(curl -fsSL "https://$GH_TOKEN@raw.githubusercontent.com/hiendt2907/claude-ytb/main/scripts/bootstrap.sh")
+```
+
+`GH_TOKEN` là GitHub Personal Access Token (PAT) có quyền đọc repo — tạo tại
+GitHub → Settings → Developer settings → Personal access tokens → Fine-grained →
+chỉ cần permission `Contents: Read-only` cho repo này.
+
+Script tự phát hiện trạng thái máy:
+- **Chưa có repo** → clone về `~/claude-ytb` rồi chạy `setup.sh`
+- **Đã có repo** → `git pull` bản mới nhất rồi re-run `setup.sh` (idempotent, không đè key)
+
+Cuối cùng hỏi có muốn cài Telegram listener + auto-update daemon không.
+
+Token được lưu vào `remote URL` của git để auto-update daemon dùng cho các lần
+pull sau — không cần nhập lại. Nếu token hết hạn, chạy lại lệnh trên với token mới.
+
+**Trigger update thủ công** (không chờ daemon 30 phút):
+
+```bash
+ytb update
+```
+
+---
+
+## Cài đặt trên máy mới (cách thủ công)
 
 ```bash
 git clone git@github.com:hiendt2907/claude-ytb.git
