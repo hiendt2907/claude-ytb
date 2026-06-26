@@ -113,6 +113,7 @@ fi
 
 echo "==> Thư mục runtime (gitignored, cần tồn tại trước khi chạy)"
 mkdir -p secrets assets/output assets/audio data
+[[ -f data/ledger.md ]] || touch data/ledger.md
 
 echo "==> .env"
 if [[ -f .env ]]; then

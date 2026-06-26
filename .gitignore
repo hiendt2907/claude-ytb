@@ -14,6 +14,7 @@ secrets/
 client_secret*.json
 data/config.json
 data/config.json.tmp
+data/ledger.md
 
 assets/output/
 assets/audio/*.mp3
