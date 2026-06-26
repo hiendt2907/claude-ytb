@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# CLI ngắn cho claude-ytb — `ytb batch status`, `ytb batch run`, ...
+# CLI cho claude-ytb.
 set -euo pipefail
 SOURCE="${BASH_SOURCE[0]}"
 while [ -L "$SOURCE" ]; do
@@ -10,13 +10,36 @@ done
 ROOT="$(cd -P "$(dirname "$SOURCE")/.." && pwd)"
 cd "$ROOT"
 
+_batch() {
+  exec env PYTHONPATH=src "$ROOT/.venv/bin/python" -m ytb_pipeline.orchestrator.batch_cli "$@"
+}
+
 case "${1:-}" in
   batch)
     shift
-    exec env PYTHONPATH=src "$ROOT/.venv/bin/python" -m ytb_pipeline.orchestrator.batch_cli "$@"
+    _batch "$@"
+    ;;
+  doctor)
+    shift
+    _batch doctor "$@"
+    ;;
+  auth)
+    shift
+    _batch auth "$@"
     ;;
   *)
-    echo "Dùng: ytb batch <start -n N [--type-of-vid long|short]|status|run [--loop]|verify <id>|retry <slug>|logs <slug>|logs --warnings|ledger|queue|doctor>" >&2
+    echo "Dùng: ytb <batch|doctor|auth>" >&2
+    echo "" >&2
+    echo "  ytb doctor                           # kiểm tra môi trường (shortcut)" >&2
+    echo "  ytb auth                             # đăng nhập lại OAuth (shortcut)" >&2
+    echo "  ytb batch <lệnh>                     # toàn bộ batch workflow" >&2
+    echo "" >&2
+    echo "  ytb batch start -n N                 # Claude viết N kịch bản" >&2
+    echo "  ytb batch run [--loop]               # render + publish" >&2
+    echo "  ytb batch ps                         # slug + PID đang chạy" >&2
+    echo "  ytb batch logs --current             # tail log video đang chạy" >&2
+    echo "  ytb batch logs <slug> [-f]           # log 1 video cụ thể" >&2
+    echo "  ytb batch status|stop|retry|reset|cancel|verify|ledger|queue" >&2
     exit 1
     ;;
 esac

@@ -1,4 +1,4 @@
-.PHONY: setup setup-f5 test run lint clean listen listen-install listen-uninstall listen-logs update-install update-uninstall update-run update-logs
+.PHONY: setup setup-f5 test clean listen listen-install listen-uninstall listen-logs update-install update-uninstall update-run update-logs
 
 # Cài đặt đầy đủ trên máy mới: ffmpeg, .venv, requirements, .env, thư mục runtime.
 setup:
@@ -10,10 +10,6 @@ setup-f5:
 
 test:
 	.venv/bin/pytest
-
-# Chạy pipeline với 1 chủ đề (mặc định DRY_RUN=true trong .env)
-run:
-	.venv/bin/python -m ytb_pipeline "$(TOPIC)"
 
 clean:
 	rm -rf assets/output/* assets/audio/*.mp3 .pytest_cache .coverage htmlcov
