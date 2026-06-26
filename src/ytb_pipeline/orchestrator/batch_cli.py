@@ -378,7 +378,7 @@ def run_pipeline_once(
     lines: list[str] = []
     last_stage = "running-ideation"
     try:
-        with log_path.open("w", encoding="utf-8") as f:
+        with log_path.open("w", encoding="utf-8", buffering=1) as f:
             for line in proc.stdout:  # type: ignore[union-attr]
                 print(line, end="")
                 f.write(line)
@@ -1154,16 +1154,19 @@ def main(argv: list[str] | None = None) -> None:
     if args.command == "logs" and not args.warnings and not args.slug and not getattr(args, "current", False):
         parser.error("logs cần 1 slug, hoặc dùng --warnings / --current")
 
-    if args.command in PID_TRACKED_COMMANDS:
-        check_not_already_running()
-        _install_signal_handlers()
-        write_pid_file()
-        try:
+    try:
+        if args.command in PID_TRACKED_COMMANDS:
+            check_not_already_running()
+            _install_signal_handlers()
+            write_pid_file()
+            try:
+                args.func(args)
+            finally:
+                remove_pid_file()
+        else:
             args.func(args)
-        finally:
-            remove_pid_file()
-    else:
-        args.func(args)
+    except KeyboardInterrupt:
+        sys.exit(0)
 
 
 if __name__ == "__main__":
