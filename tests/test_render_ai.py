@@ -67,9 +67,9 @@ def test_text_overlay_chi_chua_chu_kich_thuoc_dung():
     assert img.size == (1080, 1920)
 
 
-def test_brightness_boost_binh_thuong_khong_bu_sang():
-    # show_captions mặc định False (không còn chèn text) -> không cần bù sáng
-    assert compose_ai.BRIGHTNESS_BOOST == 0.0
+def test_brightness_boost_duong_de_bu_sang_broll():
+    # BRIGHTNESS_BOOST dương để bù sáng B-roll (VEIL đã giảm còn ~22%)
+    assert compose_ai.BRIGHTNESS_BOOST > 0.0
 
 
 def test_dims_theo_orientation(monkeypatch):
