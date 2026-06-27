@@ -589,6 +589,54 @@ def process_next(queue_path: Path | None = None, ledger_path: Path | None = None
     return True
 
 
+def _count_pending_ideation(type_of_vid: str, auto_state_path: Path | None = None) -> tuple[int, list[str]]:
+    """Đếm scripts ĐÃ viết xong (đã có trong batch nhưng chưa done trong ledger) theo loại video.
+
+    Trả (số lượng, danh sách slug) để prompt resume nói rõ "đừng viết lại cái này".
+    """
+    auto_state_path = auto_state_path if auto_state_path is not None else AUTO_STATE_PATH
+    data = json.loads(Path(auto_state_path).read_text(encoding="utf-8"))
+    video_key = "long_videos" if type_of_vid == "long" else "short_videos"
+
+    batch_keys = sorted(k for k in data if k.startswith("shorts_funnel_batch_"))
+    if not batch_keys:
+        return 0, []
+    batch = data[batch_keys[-1]]
+    videos = batch.get(video_key, [])
+
+    done = done_slugs()
+    pending = [v["slug"] for v in videos if v["slug"] not in done]
+    return len(pending), pending
+
+
+def _build_resume_prompt(remaining: int, type_of_vid: str, type_of_rules: str, existing_slugs: list[str]) -> str:
+    """Prompt resume — nói rõ đã có bao nhiêu, cần thêm bao nhiêu, KHÔNG viết lại cũ."""
+    vid_label = "Video dài (ngang, 10-30 phút)" if type_of_vid == "long" else "Short (dọc, 1-2 phút)"
+    topic_guidance = (
+        "TỰ chọn chủ đề hợp ngách kênh (đọc memory dự án + ledger)."
+        if type_of_rules == "auto"
+        else f"Chủ đề/định hướng: {type_of_rules}"
+    )
+    slugs_str = "\n".join(f"  - {s}" for s in existing_slugs)
+    return (
+        f"RESUME IDEATION — tiếp tục batch bị dừng giữa chừng.\n\n"
+        f"Các slug SAU ĐÂY đã có script + đã đăng ký trong auto_state.json, "
+        f"TUYỆT ĐỐI KHÔNG viết lại hay đăng ký lại:\n{slugs_str}\n\n"
+        f"Cần viết THÊM {remaining} video loại \"{vid_label}\" — dùng skill youtube-ideation, "
+        f"tuân thủ ĐẦY ĐỦ .claude/skills/youtube-ideation/video-quality-rules.md "
+        f"(cổng verify mục 0, luật series mục 0d, độ dài mục 2a/2b). {topic_guidance}\n\n"
+        "Trước khi chọn chủ đề: đọc data/ledger.md, loại bỏ mọi chủ đề trùng/tương tự "
+        "(mọi status, không chỉ done). Mỗi video: viết scripts/<slug>.json đầy đủ kèm "
+        "khối compliance.passed=true, RỒI đăng ký 1 item vào assets/auto_state.json "
+        "(mảng items, đúng schema slug/topic/orientation/render_provider/dry_run/"
+        "publish_at/stage=\"ideation\"/status=\"ok\"/updated) và ghi 1 dòng vào "
+        "data/ledger.md.\n\n"
+        "TUYỆT ĐỐI KHÔNG chạy voiceover/render/publish. Khi đủ "
+        f"{remaining} video MỚI đã có script + đăng ký xong, DỪNG lại và báo tóm tắt "
+        "(slug + chủ đề từng video mới)."
+    )
+
+
 def _build_start_prompt(num_of_vid: int, type_of_vid: str, type_of_rules: str) -> str:
     """Dựng prompt giao việc SÁNG TẠO (ideation + viết kịch bản) cho Claude.
 
@@ -657,6 +705,12 @@ def _prompt_start_interactive(args: argparse.Namespace) -> argparse.Namespace:
     if raw:
         args = argparse.Namespace(**{**vars(args), "type_of_rules": raw})
 
+    # Resume
+    print(f"\nBatch này là tiếp tục batch bị dừng giữa chừng (hết token)?")
+    raw = input("Resume [y/N]: ").strip().lower()
+    if raw == "y":
+        args = argparse.Namespace(**{**vars(args), "resume": True})
+
     print()
     return args
 
@@ -665,9 +719,27 @@ def cmd_start(args: argparse.Namespace) -> None:
     if args.num_of_vid is None:
         args = _prompt_start_interactive(args)
 
-    prompt = _build_start_prompt(args.num_of_vid, args.type_of_vid, args.type_of_rules)
+    if args.resume:
+        existing_count, existing_slugs = _count_pending_ideation(args.type_of_vid)
+        remaining = args.num_of_vid - existing_count
+        if remaining <= 0:
+            print(
+                f"✓ Đã có {existing_count} script pending ({args.type_of_vid}) trong queue — "
+                f"không cần viết thêm. Chạy `ytb batch run --loop` để sản xuất."
+            )
+            return
+        print(
+            f"▶ Resume: đã có {existing_count} script, cần thêm {remaining} "
+            f"(tổng mục tiêu {args.num_of_vid})."
+        )
+        prompt = _build_resume_prompt(remaining, args.type_of_vid, args.type_of_rules, existing_slugs)
+        action_label = f"viết thêm {remaining} video ({args.type_of_vid})"
+    else:
+        prompt = _build_start_prompt(args.num_of_vid, args.type_of_vid, args.type_of_rules)
+        action_label = f"sáng tạo {args.num_of_vid} video ({args.type_of_vid})"
+
     cmd = build_claude_cmd(prompt)
-    print(f"▶️  Gọi Claude sáng tạo {args.num_of_vid} video ({args.type_of_vid})... "
+    print(f"▶️  Gọi Claude {action_label}... "
           f"có thể mất nhiều phút, không có output real-time (claude -p chỉ trả "
           f"kết quả cuối).")
     try:
@@ -1021,6 +1093,10 @@ def main(argv: list[str] | None = None) -> None:
         "--type-of-rules", default="auto",
         help="'auto' = Claude tự chọn chủ đề theo ngách kênh; hoặc 1 chuỗi mô tả "
         "chủ đề/định hướng cụ thể (mặc định auto)",
+    )
+    p_start.add_argument(
+        "--resume", action="store_true", default=False,
+        help="Tiếp tục batch bị dừng: đếm script đã có, chỉ yêu cầu Claude viết thêm phần còn thiếu",
     )
     p_start.set_defaults(func=cmd_start)
 
