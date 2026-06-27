@@ -641,14 +641,13 @@ def _prompt_start_interactive(args: argparse.Namespace) -> argparse.Namespace:
                 break
             print("  ✗ Nhập số nguyên dương.")
 
-    # Loại video
-    if args.type_of_vid not in ("long", "short"):
-        print(f"\nLoại video:")
-        print("  1) long  — video dài ngang, 10-30 phút (mặc định)")
-        print("  2) short — Short dọc, 1-2 phút")
-        raw = input("Chọn [1/2, Enter = long]: ").strip()
-        typ = "short" if raw == "2" else "long"
-        args = argparse.Namespace(**{**vars(args), "type_of_vid": typ})
+    # Loại video — luôn hỏi trong interactive mode
+    print(f"\nLoại video:")
+    print("  1) long  — video dài ngang, 10-30 phút")
+    print("  2) short — Short dọc, 1-2 phút")
+    raw = input("Chọn [1/2, Enter = long]: ").strip()
+    typ = "short" if raw == "2" else "long"
+    args = argparse.Namespace(**{**vars(args), "type_of_vid": typ})
 
     # Yêu cầu / ý tưởng
     print(f"\nYêu cầu / ý tưởng cho batch này:")
