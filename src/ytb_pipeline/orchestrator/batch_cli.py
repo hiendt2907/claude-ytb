@@ -621,7 +621,51 @@ def _build_start_prompt(num_of_vid: int, type_of_vid: str, type_of_rules: str) -
     )
 
 
+def _prompt_start_interactive(args: argparse.Namespace) -> argparse.Namespace:
+    """Hỏi tương tác khi thiếu tham số bắt buộc."""
+    import sys
+    if not sys.stdin.isatty():
+        print("✗ Thiếu --num-of-vid (-n). Ví dụ: ytb batch start -n 3 --type-of-vid long")
+        sys.exit(1)
+
+    print("╔══════════════════════════════════════════════╗")
+    print("║         ytb batch start — thiết lập         ║")
+    print("╚══════════════════════════════════════════════╝")
+
+    # Số video
+    if args.num_of_vid is None:
+        while True:
+            raw = input("\nSố video cần viết kịch bản (ví dụ: 3): ").strip()
+            if raw.isdigit() and int(raw) > 0:
+                args = argparse.Namespace(**{**vars(args), "num_of_vid": int(raw)})
+                break
+            print("  ✗ Nhập số nguyên dương.")
+
+    # Loại video
+    if args.type_of_vid not in ("long", "short"):
+        print(f"\nLoại video:")
+        print("  1) long  — video dài ngang, 10-30 phút (mặc định)")
+        print("  2) short — Short dọc, 1-2 phút")
+        raw = input("Chọn [1/2, Enter = long]: ").strip()
+        typ = "short" if raw == "2" else "long"
+        args = argparse.Namespace(**{**vars(args), "type_of_vid": typ})
+
+    # Yêu cầu / ý tưởng
+    print(f"\nYêu cầu / ý tưởng cho batch này:")
+    print("  • Để trống = Claude tự chọn chủ đề theo ngách kênh (auto)")
+    print("  • Hoặc mô tả cụ thể, ví dụ: \"chủ đề về thiên kiến nhận thức\"")
+    raw = input("Yêu cầu [Enter = auto]: ").strip()
+    if raw:
+        args = argparse.Namespace(**{**vars(args), "type_of_rules": raw})
+
+    print()
+    return args
+
+
 def cmd_start(args: argparse.Namespace) -> None:
+    if args.num_of_vid is None:
+        args = _prompt_start_interactive(args)
+
     prompt = _build_start_prompt(args.num_of_vid, args.type_of_vid, args.type_of_rules)
     cmd = build_claude_cmd(prompt)
     print(f"▶️  Gọi Claude sáng tạo {args.num_of_vid} video ({args.type_of_vid})... "
@@ -969,7 +1013,7 @@ def main(argv: list[str] | None = None) -> None:
         "  ytb batch start -n 3 --type-of-vid short\n"
         "  ytb batch start -n 1 --type-of-vid long --type-of-rules \"chủ đề về trì hoãn\"\n",
     )
-    p_start.add_argument("--num-of-vid", "-n", type=int, required=True, help="Số video cần viết kịch bản")
+    p_start.add_argument("--num-of-vid", "-n", type=int, default=None, help="Số video cần viết kịch bản (hỏi interactive nếu bỏ qua)")
     p_start.add_argument(
         "--type-of-vid", choices=["long", "short"], default="long",
         help="long = video dài ngang 10-30 phút, short = dọc 1-2 phút (mặc định long)",
