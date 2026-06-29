@@ -84,6 +84,12 @@ tế → bước áp dụng), KHÔNG nói chung chung — xem mục **2b** trong
 - **Yêu cầu output có cấu trúc** (JSON / tool use) để parse an toàn thay vì regex text tự do.
 - **Validate output LLM** trước khi đưa vào `VideoIdea`/`Script` — không tin dữ liệu sinh ra.
 - Tối ưu title/tags cho SEO ngay từ khâu này (đồng bộ với [[youtube-monetization]]).
+- **`tags` PHẢI có 5–8 từ khoá** (không cần gõ dấu `#`, viết tag thường, không
+  ký tự đặc biệt) — `publish/uploader.py::_build_hashtags()` TỰ ĐỘNG biến 3 tag
+  ĐẦU TIÊN thành hashtag chèn vào mô tả (Short luôn có thêm `#Shorts` đứng đầu).
+  Vì vậy đặt 2–3 tag **rộng + đúng ngách nhất** lên đầu mảng `tags` (vd
+  `"tâm lý học"`, `"phát triển bản thân"`), các tag ngách hẹp/đặc thù tập đó
+  để sau — thứ tự trong JSON quyết định hashtag nào lên hiển thị phía trên tiêu đề.
 
 ## Pattern dữ liệu
 

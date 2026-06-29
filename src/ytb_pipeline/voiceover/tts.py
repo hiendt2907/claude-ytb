@@ -38,8 +38,12 @@ def synthesize(script: Script) -> Voiceover:
         voiced = []
         for i, seg in enumerate(script.segments):
             seg_path = AUDIO_DIR / f"{slug}_{i:02d}.mp3"
-            _synth_segment(seg.narration, script.voice, seg_path)
-            dur = _probe_duration(seg_path)
+            # Resume: segment đã có audio hợp lệ từ lần chạy trước (bị dừng giữa
+            # voiceover) -> bỏ qua, không gọi lại edge-tts cho segment này.
+            dur = _probe_duration_or_zero(seg_path) if seg_path.exists() else 0.0
+            if dur <= 0:
+                _synth_segment(seg.narration, script.voice, seg_path)
+                dur = _probe_duration(seg_path)
             voiced.append(replace(seg, audio_path=seg_path, duration_sec=dur))
 
     combined = AUDIO_DIR / f"{slug}.mp3"
@@ -234,6 +238,14 @@ def _probe_duration(path: Path) -> float:
         capture_output=True, text=True, check=True,
     )
     return float(json.loads(out.stdout)["format"]["duration"])
+
+
+def _probe_duration_or_zero(path: Path) -> float:
+    """Như `_probe_duration` nhưng trả 0.0 nếu file dở dang/hỏng (vd bị kill giữa lúc ghi)."""
+    try:
+        return _probe_duration(path)
+    except (subprocess.CalledProcessError, KeyError, ValueError):
+        return 0.0
 
 
 def _concat_audio(parts: list[Path], out: Path) -> None:

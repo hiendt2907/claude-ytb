@@ -639,13 +639,22 @@ def test_build_start_prompt_custom_rules_used_as_topic():
 
 
 def test_cmd_start_runs_claude_and_reports_success(monkeypatch, capsys):
+    import io
     captured_cmd = {}
 
-    def fake_run(cmd, cwd=None, capture_output=None, text=None):
-        captured_cmd["cmd"] = cmd
-        return subprocess.CompletedProcess(cmd, 0, stdout="✓ Đã viết 2 kịch bản.", stderr="")
+    class FakePopen:
+        def __init__(self, cmd, **kw):
+            captured_cmd["cmd"] = cmd
+            result_line = json.dumps({"type": "result", "result": "✓ Đã viết 2 kịch bản."})
+            self.stdout = io.StringIO(result_line + "\n")
+            self.stderr = io.StringIO("")
+            self.returncode = 0
+            self.args = cmd
 
-    monkeypatch.setattr(cli.subprocess, "run", fake_run)
+        def wait(self):
+            pass
+
+    monkeypatch.setattr(cli.subprocess, "Popen", FakePopen)
     monkeypatch.setattr(cli, "build_claude_cmd", lambda prompt: ["claude", "-p", prompt])
 
     cli.cmd_start(argparse.Namespace(num_of_vid=2, type_of_vid="short", type_of_rules="auto", resume=False))
@@ -657,10 +666,19 @@ def test_cmd_start_runs_claude_and_reports_success(monkeypatch, capsys):
 
 
 def test_cmd_start_warns_and_exits_on_nonzero_return(monkeypatch, _capture_telegram):
-    def fake_run(cmd, cwd=None, capture_output=None, text=None):
-        return subprocess.CompletedProcess(cmd, 1, stdout="", stderr="lỗi API rồi")
+    import io
 
-    monkeypatch.setattr(cli.subprocess, "run", fake_run)
+    class FakePopen:
+        def __init__(self, cmd, **kw):
+            self.stdout = io.StringIO("")
+            self.stderr = io.StringIO("lỗi API rồi")
+            self.returncode = 1
+            self.args = cmd
+
+        def wait(self):
+            pass
+
+    monkeypatch.setattr(cli.subprocess, "Popen", FakePopen)
 
     with pytest.raises(SystemExit) as exc_info:
         cli.cmd_start(argparse.Namespace(num_of_vid=1, type_of_vid="long", type_of_rules="auto", resume=False))
@@ -904,10 +922,10 @@ def test_check_not_already_running_noop_without_pid_file(tmp_path, monkeypatch):
 
 
 def test_cmd_start_missing_claude_binary_exits(monkeypatch):
-    def fake_run(cmd, cwd=None, capture_output=None, text=None):
+    def fake_popen(cmd, **kw):
         raise FileNotFoundError
 
-    monkeypatch.setattr(cli.subprocess, "run", fake_run)
+    monkeypatch.setattr(cli.subprocess, "Popen", fake_popen)
 
     with pytest.raises(SystemExit) as exc_info:
         cli.cmd_start(argparse.Namespace(num_of_vid=1, type_of_vid="long", type_of_rules="auto", resume=False))

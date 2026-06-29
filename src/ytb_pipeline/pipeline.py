@@ -19,11 +19,14 @@ def run(script_source: str) -> PublishResult:
     script = load_script(script_source)
     print(f"[1/4] Ideation  ✓  {script.title} ({len(script.segments)} đoạn)")
     script = gate(script)  # cổng duyệt Telegram (bỏ qua nếu TELEGRAM_APPROVAL=false)
+    print("[2/4] Voiceover ▶  đang tạo audio...")
     voiceover = synthesize(script)
     print(f"[2/4] Voiceover ✓  {voiceover.audio_path}  ({voiceover.duration_sec:.1f}s)")
     renderer = render_video_ai if settings.render_provider == "ai" else render_video
+    print(f"[3/4] Render    ▶  đang dựng video ({settings.render_provider}/{settings.orientation})...")
     video = renderer(voiceover)
     print(f"[3/4] Render    ✓  ({settings.render_provider}/{settings.orientation}) {video.video_path}")
+    print("[4/4] Publish   ▶  đang upload...")
     result = publish(video)
     print(f"[4/4] Publish   ✓  uploaded={result.uploaded}")
 

@@ -38,6 +38,6 @@ def test_khong_do_duoc_kich_thuoc_thi_dua_vao_thoi_luong(monkeypatch):
 
 
 def test_them_shorts_tag_khong_trung_lap():
-    assert uploader._with_shorts_tag("abc").endswith("#Shorts")
-    assert uploader._with_shorts_tag("abc\n\n#Shorts") == "abc\n\n#Shorts"
-    assert uploader._with_shorts_tag("abc #shorts").count("#") == 1
+    assert uploader._with_hashtags("abc", ["#Shorts"]).endswith("#Shorts")
+    assert uploader._with_hashtags("abc\n\n#Shorts", ["#Shorts"]) == "abc\n\n#Shorts"
+    assert uploader._with_hashtags("abc #shorts", ["#Shorts"]).count("#") == 1

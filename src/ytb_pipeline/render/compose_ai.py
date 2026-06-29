@@ -27,8 +27,8 @@ from . import transitions
 OUTPUT_DIR = Path("assets/output")
 PORTRAIT_WH = (1080, 1920)
 LANDSCAPE_WH = (1920, 1080)
-VEIL = (5, 8, 12, 110)  # lớp phủ tối ~43% cho dễ đọc chữ trên B-roll (đã nâng sáng so với 150/59%)
-BRIGHTNESS_BOOST = 0.0  # show_captions mặc định False -> không còn chữ cần bù sáng
+VEIL = (10, 14, 20, 55)  # lớp phủ tối ~22% cho dễ đọc chữ trên B-roll (giảm từ 110/43% — video bị tối hơn kênh khác)
+BRIGHTNESS_BOOST = 0.08  # bù sáng B-roll (trước là 0.0 -> video tối hơn nguồn gốc)
 
 # Nhịp cắt cảnh (đồng bộ transcript): không để một cảnh tĩnh quá ~6s.
 BEAT_TARGET_SEC = 6.0     # cadence cắt cảnh thường
@@ -37,6 +37,19 @@ MAX_VARIANTS = 4          # tối đa số shot tải/segment (round-robin nếu
 FPS = 30
 COLD_BEAT_SEC = 1.3       # nhịp cắt cold-open hook (cảnh hành động dồn lên đầu)
 MAX_COLD_SHOTS = 3        # số cảnh hành động tối đa trong cold-open
+
+
+def _valid_clip(path: Path) -> bool:
+    """True nếu `path` là video đọc được, có duration > 0 — chặn file dở dang do bị kill giữa lúc ghi."""
+    try:
+        out = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=nw=1:nk=1", str(path)],
+            capture_output=True, text=True, check=True,
+        )
+        return float(out.stdout.strip()) > 0
+    except (subprocess.CalledProcessError, ValueError):
+        return False
 
 
 def _dims() -> tuple[int, int, bool]:
@@ -64,10 +77,13 @@ def render_video_ai(voiceover: Voiceover) -> RenderedVideo:
     for i, seg in enumerate(voiceover.segments):
         query = seg.broll.strip() or fallback_query
         clip = work / f"{slug}_{i:02d}.mp4"
-        _render_broll_segment(seg, index=i, total=len(voiceover.segments),
-                              query=query, work=work, prefix=f"{slug}_{i:02d}",
-                              out=clip, dims=(w, h), landscape=landscape,
-                              used=used_broll)
+        # Resume: segment đã render xong hợp lệ ở lần chạy trước (bị dừng giữa
+        # render) -> bỏ qua, không tải B-roll/dựng lại clip này.
+        if not (clip.exists() and _valid_clip(clip)):
+            _render_broll_segment(seg, index=i, total=len(voiceover.segments),
+                                  query=query, work=work, prefix=f"{slug}_{i:02d}",
+                                  out=clip, dims=(w, h), landscape=landscape,
+                                  used=used_broll)
         clips.append(clip)
         whoosh_before.append(seg.transition)
 
@@ -269,6 +285,12 @@ def _hook_coldopen(voiceover, *, dims: tuple[int, int], landscape: bool,
     Trả None nếu không segment nào đánh dấu hook hoặc thiếu B-roll keyword.
     Bám góp ý Studio: mở bằng chuyển động năng lượng cao trước khi vào kể chuyện.
     """
+    out = work / f"{slug}_cold.mp4"
+    # Resume: cold-open đã render xong hợp lệ ở lần chạy trước -> dùng lại luôn,
+    # không tải B-roll/dựng lại (tránh tốn quota Pexels + thời gian vô ích).
+    if out.exists() and _valid_clip(out):
+        return out
+
     queries = [s.broll.strip() for s in voiceover.segments
                if s.hook and s.broll.strip()][:MAX_COLD_SHOTS]
     if not queries:
@@ -284,7 +306,6 @@ def _hook_coldopen(voiceover, *, dims: tuple[int, int], landscape: bool,
     _build_background(beats, dims, bg)
     title_png = work / f"{slug}_cold_title.png"
     _coldopen_overlay(voiceover.title, dims).save(title_png)
-    out = work / f"{slug}_cold.mp4"
     _silent_overlay_clip(bg, title_png, out, dims)
     return out
 

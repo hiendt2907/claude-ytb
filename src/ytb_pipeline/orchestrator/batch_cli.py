@@ -626,11 +626,17 @@ def _build_resume_prompt(remaining: int, type_of_vid: str, type_of_rules: str, e
         f"tuân thủ ĐẦY ĐỦ .claude/skills/youtube-ideation/video-quality-rules.md "
         f"(cổng verify mục 0, luật series mục 0d, độ dài mục 2a/2b). {topic_guidance}\n\n"
         "Trước khi chọn chủ đề: đọc data/ledger.md, loại bỏ mọi chủ đề trùng/tương tự "
-        "(mọi status, không chỉ done). Mỗi video: viết scripts/<slug>.json đầy đủ kèm "
-        "khối compliance.passed=true, RỒI đăng ký 1 item vào assets/auto_state.json "
-        "(mảng items, đúng schema slug/topic/orientation/render_provider/dry_run/"
-        "publish_at/stage=\"ideation\"/status=\"ok\"/updated) và ghi 1 dòng vào "
-        "data/ledger.md.\n\n"
+        "(mọi status, không chỉ done).\n\n"
+        "QUY TRÌNH BẮT BUỘC — làm TUẦN TỰ từng video, KHÔNG làm batch:\n"
+        "  1. Chọn chủ đề + viết scripts/<slug>.json đầy đủ (compliance.passed=true)\n"
+        "  2. GHI NGAY vào assets/auto_state.json (append item vào mảng đúng — "
+        "long_videos hoặc short_videos trong batch key mới nhất; schema: "
+        "slug/topic/orientation/render_provider/dry_run/publish_at/"
+        "stage=\"ideation\"/status=\"ok\"/updated)\n"
+        "  3. GHI NGAY 1 dòng vào data/ledger.md\n"
+        "  4. Chỉ sau khi đã ghi xong cả 2 file mới được bắt đầu video tiếp theo\n\n"
+        "Lý do: nếu hết token giữa chừng, `ytb batch start --resume` đọc "
+        "auto_state.json để biết đã có bao nhiêu và chỉ viết phần còn thiếu.\n\n"
         "TUYỆT ĐỐI KHÔNG chạy voiceover/render/publish. Khi đủ "
         f"{remaining} video MỚI đã có script + đăng ký xong, DỪNG lại và báo tóm tắt "
         "(slug + chủ đề từng video mới)."
@@ -657,11 +663,18 @@ def _build_start_prompt(num_of_vid: int, type_of_vid: str, type_of_rules: str) -
         f".claude/skills/youtube-ideation/video-quality-rules.md (cổng verify mục 0, "
         f"luật series mục 0d, độ dài mục 2a/2b). {topic_guidance}\n\n"
         "Trước khi chọn chủ đề: đọc data/ledger.md, loại bỏ mọi chủ đề trùng/tương tự "
-        "(mọi status, không chỉ done). Mỗi video: viết scripts/<slug>.json đầy đủ kèm "
-        "khối compliance.passed=true, RỒI đăng ký 1 item vào assets/auto_state.json "
-        "(mảng items, đúng schema slug/topic/orientation/render_provider/dry_run/"
-        "publish_at/stage=\"ideation\"/status=\"ok\"/updated) và ghi 1 dòng vào "
-        "data/ledger.md.\n\n"
+        "(mọi status, không chỉ done).\n\n"
+        "QUY TRÌNH BẮT BUỘC — làm TUẦN TỰ từng video, KHÔNG làm batch:\n"
+        "  1. Chọn chủ đề + viết scripts/<slug>.json đầy đủ (compliance.passed=true)\n"
+        "  2. GHI NGAY vào assets/auto_state.json (append item vào mảng đúng — "
+        "long_videos hoặc short_videos trong batch key mới nhất; schema: "
+        "slug/topic/orientation/render_provider/dry_run/publish_at/"
+        "stage=\"ideation\"/status=\"ok\"/updated)\n"
+        "  3. GHI NGAY 1 dòng vào data/ledger.md\n"
+        "  4. Chỉ sau khi đã ghi xong cả 2 file mới được bắt đầu video tiếp theo\n\n"
+        "Lý do: nếu hết token giữa chừng, `ytb batch start --resume` sẽ đọc "
+        "auto_state.json để biết đã có bao nhiêu script và KHÔNG viết lại — "
+        "chỉ hoạt động đúng nếu mỗi video được ghi ngay sau khi xong.\n\n"
         "TUYỆT ĐỐI KHÔNG chạy voiceover/render/publish — đó là việc của "
         "`ytb batch run --loop` chạy bằng tay sau, không cần Claude. Khi đủ "
         f"{num_of_vid} video đã có script + đăng ký xong, DỪNG lại và báo tóm tắt "
@@ -738,20 +751,45 @@ def cmd_start(args: argparse.Namespace) -> None:
         prompt = _build_start_prompt(args.num_of_vid, args.type_of_vid, args.type_of_rules)
         action_label = f"sáng tạo {args.num_of_vid} video ({args.type_of_vid})"
 
-    cmd = build_claude_cmd(prompt)
-    print(f"▶️  Gọi Claude {action_label}... "
-          f"có thể mất nhiều phút, không có output real-time (claude -p chỉ trả "
-          f"kết quả cuối).")
+    cmd = build_claude_cmd(prompt) + ["--output-format", "stream-json", "--verbose"]
+    print(f"▶️  Gọi Claude {action_label}...")
     try:
-        result = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
+        proc = subprocess.Popen(cmd, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     except FileNotFoundError:
         print(f"✗ Không tìm thấy `{settings.claude_bin}`. Đặt CLAUDE_BIN trong .env.")
         sys.exit(1)
-    output = (result.stdout or "").strip()
-    if output:
-        print(output)
-    if result.returncode != 0:
-        emit_warning(f"ytb batch start lỗi (code {result.returncode}): {(result.stderr or '')[-500:]}")
+
+    output_lines: list[str] = []
+    assert proc.stdout is not None
+    for raw in proc.stdout:
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            obj = json.loads(raw)
+        except json.JSONDecodeError:
+            print(raw, flush=True)
+            output_lines.append(raw)
+            continue
+        # stream-json: assistant text delta
+        if obj.get("type") == "assistant":
+            for block in obj.get("message", {}).get("content", []):
+                if block.get("type") == "text":
+                    text = block["text"]
+                    print(text, end="", flush=True)
+                    output_lines.append(text)
+        # kết quả cuối
+        elif obj.get("type") == "result":
+            result_text = obj.get("result", "")
+            if result_text:
+                print(result_text, flush=True)
+                output_lines.append(result_text)
+
+    proc.wait()
+    output = "\n".join(output_lines)
+    if proc.returncode != 0:
+        stderr = (proc.stderr.read() if proc.stderr else "")[-500:]
+        emit_warning(f"ytb batch start lỗi (code {proc.returncode}): {stderr}")
         sys.exit(1)
     print("\n✓ Xong phần sáng tạo — chạy `ytb batch status` để xem queue, rồi "
           "`ytb batch run --loop` để sản xuất.")

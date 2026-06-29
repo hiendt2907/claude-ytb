@@ -14,6 +14,10 @@ Giao tiếp qua 1 file manifest JSON:
 
 In ra mỗi job 1 dòng `JOB i/n ok <out>` (flush) để pipeline cha theo dõi tiến độ.
 Thoát code != 0 nếu bất kỳ job nào lỗi.
+
+Resume: nếu `out` đã tồn tại và là wav hợp lệ (vd lần trước bị `ytb batch stop` dừng
+giữa batch), job được bỏ qua (`JOB i/n skip (đã có) <out>`) — cho phép chạy lại
+đúng từ job bị dừng, không render lại từ đầu.
 """
 
 from __future__ import annotations
@@ -23,7 +27,17 @@ import re
 import subprocess
 import sys
 import tempfile
+import wave
 from pathlib import Path
+
+
+def _is_valid_wav(path: Path) -> bool:
+    """True nếu `path` là wav đọc được và có frame — chặn file dở dang do bị kill giữa lúc ghi."""
+    try:
+        with wave.open(str(path), "rb") as f:
+            return f.getnframes() > 0
+    except (wave.Error, EOFError, OSError):
+        return False
 
 
 def _split_text(text: str, max_chars: int) -> list[str]:
@@ -97,6 +111,14 @@ def main() -> int:
     for i, job in enumerate(jobs, 1):
         out = Path(job["out"])
         out.parent.mkdir(parents=True, exist_ok=True)
+
+        # Resume: job này đã render xong ở lần chạy trước (bị dừng giữa batch) ->
+        # bỏ qua, không nạp lại model/render lại — đây là điểm mấu chốt để resume
+        # đúng ngay job bị dừng (vd job 200/250) chứ không chạy lại từ job 1.
+        if out.exists() and _is_valid_wav(out):
+            print(f"JOB {i}/{n} skip (đã có) {out}", flush=True)
+            continue
+
         chunks = _split_text(job["text"], max_chars)
 
         if len(chunks) <= 1:

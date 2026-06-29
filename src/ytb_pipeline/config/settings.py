@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     # Lên lịch tự công khai: RFC3339 (vd 2026-06-17T06:00:00+0700). Khi đặt, video
     # giữ private tới mốc này rồi YouTube tự chuyển PUBLIC. Rỗng = không lên lịch.
     youtube_publish_at: str = ""
+    # Toàn bộ video kênh này là AI-generated (voice TTS + visual AI render) -> luôn khai
+    # báo "nội dung thay đổi/tổng hợp bởi AI" (containsSyntheticMedia) khi upload, theo
+    # yêu cầu minh bạch của YouTube từ 2024. Để false chỉ khi có video KHÔNG dùng AI.
+    youtube_contains_synthetic_media: bool = True
 
     # Paths
     assets_dir: Path = Field(default=Path("assets"))

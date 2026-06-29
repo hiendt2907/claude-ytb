@@ -110,6 +110,17 @@ def ask_choice(question: str, options: list[str]) -> str:
     return options[idx]
 
 
+def ask_text(question: str) -> str:
+    """Gửi câu hỏi dạng text tự do, CHỜ user trả lời, trả về text đã trim.
+
+    Khác `ask_choice` (nút bấm cố định): dùng khi cần nhập giá trị tự do
+    (số lượng, slug, chủ đề...).
+    """
+    baseline = _latest_update_id()
+    send_message(f"❓ {question}")
+    return _wait_for_reply(after_update_id=baseline).strip()
+
+
 def _wait_for_choice(*, after_update_id: int, num_options: int) -> int:
     """Long-poll tới khi user bấm 1 nút hợp lệ. Trả về chỉ số option đã chọn."""
     _, chat_id = _require_config()
