@@ -1,6 +1,7 @@
 """Khâu 3 — Dựng video Short dọc (1080x1920): caption (Pillow) + audio (ffmpeg)."""
 
 import subprocess
+import tempfile
 from dataclasses import replace
 from pathlib import Path
 
@@ -8,6 +9,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from ..config.settings import settings
 from ..pkg.models import RenderedVideo, Voiceover
+from ..providers.registry import get_image_provider
 
 OUTPUT_DIR = Path("assets/output")
 W, H = 1080, 1920
@@ -74,8 +76,9 @@ def _render_segment(seg, index: int, total: int, work: Path,
         _image_audio_clip(png, seg.audio_path, out)
         return
 
-    bg = _background_image(index, total)
     caption = (seg.caption or "").strip()
+    prompt = caption or (seg.narration or "")[:80]
+    bg = _background_image(index, total, prompt=prompt)
     # Không caption HOẶC tắt caption chạy (settings.show_captions) → nền trơn,
     # không chữ chạy theo lời nói. Mặt video sạch.
     if not caption or not settings.show_captions:
@@ -96,9 +99,18 @@ def _render_segment(seg, index: int, total: int, work: Path,
     _caption_clip(frames, seg.audio_path, out)
 
 
-def _background_image(index: int, total: int) -> Image.Image:
-    """Nền gradient — caption phủ động ở lower-third (KHÔNG hiện số thứ tự)."""
-    return _gradient()
+def _background_image(index: int, total: int, prompt: str = "") -> Image.Image:
+    """Nền sinh từ ImageProvider (mặc định "pillow" = gradient gốc) — caption
+    phủ động ở lower-third (KHÔNG hiện số thứ tự).
+
+    Backward-compat: provider "pillow" tái lập đúng gradient GitHub dark gốc
+    khi prompt rỗng/không khớp từ khoá màu, nên hành vi mặc định KHÔNG đổi.
+    """
+    provider = get_image_provider()
+    with tempfile.TemporaryDirectory() as tmp:
+        out_path = Path(tmp) / "bg.png"
+        provider.generate(prompt=prompt, width=W, height=H, output_path=out_path)
+        return Image.open(out_path).convert("RGB")
 
 
 def _caption_image(text: str, index: int, total: int, thumbnail: bool = False,

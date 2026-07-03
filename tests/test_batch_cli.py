@@ -65,6 +65,24 @@ def test_load_queue_sorted_by_day(auto_state_file):
     assert [i.slug for i in queue] == ["a-video", "b-video", "c-video"]
 
 
+def test_load_queue_includes_short_videos_sorted_with_long(tmp_path):
+    path = tmp_path / "auto_state.json"
+    path.write_text(json.dumps({
+        "shorts_funnel_batch_2026-07-06": {
+            "long_videos": [
+                {"day": 5, "slug": "long-video", "publish_at": "2026-07-07T06:00:00+0700"},
+            ],
+            "short_videos": [
+                {"day": 2, "slug": "short-video", "publish_at": "", "shorts_status": "queued"},
+            ],
+        }
+    }), encoding="utf-8")
+
+    queue = cli.load_queue(path)
+
+    assert [i.slug for i in queue] == ["short-video", "long-video"]
+
+
 # ── done_slugs ────────────────────────────────────────────────────────────────
 def test_done_slugs_only_done_and_ok(ledger_file):
     done = cli.done_slugs(ledger_file)
@@ -593,6 +611,28 @@ def test_cmd_queue_prints_valid_json(auto_state_file, ledger_file, monkeypatch, 
     }
 
 
+def test_cmd_cancel_removes_short_video(tmp_path, monkeypatch, capsys):
+    auto_state = tmp_path / "auto_state.json"
+    auto_state.write_text(json.dumps({
+        "shorts_funnel_batch_2026-07-06": {
+            "long_videos": [],
+            "short_videos": [
+                {"day": 2, "slug": "short-video", "publish_at": "", "shorts_status": "queued"},
+            ],
+        }
+    }), encoding="utf-8")
+    ledger = tmp_path / "ledger.md"
+    ledger.write_text("# Ledger\n| Ngày | Slug | Tiêu đề | Stage | Status | URL / ghi chú |\n", encoding="utf-8")
+    monkeypatch.setattr(cli, "AUTO_STATE_PATH", auto_state)
+    monkeypatch.setattr(cli, "LEDGER_PATH", ledger)
+
+    cli.cmd_cancel(argparse.Namespace(slug="short-video"))
+
+    data = json.loads(auto_state.read_text(encoding="utf-8"))
+    assert data["shorts_funnel_batch_2026-07-06"]["short_videos"] == []
+    assert "Đã huỷ" in capsys.readouterr().out
+
+
 def test_cmd_ledger_prints_tail(ledger_file, monkeypatch, capsys):
     monkeypatch.setattr(cli, "LEDGER_PATH", ledger_file)
 
@@ -657,12 +697,110 @@ def test_cmd_start_runs_claude_and_reports_success(monkeypatch, capsys):
     monkeypatch.setattr(cli.subprocess, "Popen", FakePopen)
     monkeypatch.setattr(cli, "build_claude_cmd", lambda prompt: ["claude", "-p", prompt])
 
-    cli.cmd_start(argparse.Namespace(num_of_vid=2, type_of_vid="short", type_of_rules="auto", resume=False))
+    cli.cmd_start(argparse.Namespace(num_of_vid=2, type_of_vid="short", type_of_rules="auto", resume=False, cloud=True))
 
     out = capsys.readouterr().out
     assert "Đã viết 2 kịch bản" in out
     assert "ytb batch status" in out
     assert captured_cmd["cmd"][:2] == ["claude", "-p"]
+
+
+def test_start_parser_accepts_explicit_local_flag():
+    parser = cli.build_parser(
+        doc="test",
+        cmd_funcs={
+            "start": lambda args: None,
+            "status": lambda args: None,
+            "run": lambda args: None,
+            "verify": lambda args: None,
+            "retry": lambda args: None,
+            "logs": lambda args: None,
+            "ledger": lambda args: None,
+            "queue": lambda args: None,
+            "ps": lambda args: None,
+            "reset": lambda args: None,
+            "cancel": lambda args: None,
+            "stop": lambda args: None,
+            "doctor": lambda args: None,
+            "auth": lambda args: None,
+            "benchmark-local": lambda args: None,
+        },
+    )
+
+    args = parser.parse_args(["start", "-n", "1", "--local"])
+
+    assert args.local is True
+    assert args.cloud is False
+
+
+def test_cli_parses_start_idea_alias_and_ask_flag():
+    parser = cli.build_parser(
+        doc="test",
+        cmd_funcs={
+            "start": lambda args: None,
+            "status": lambda args: None,
+            "run": lambda args: None,
+            "verify": lambda args: None,
+            "retry": lambda args: None,
+            "logs": lambda args: None,
+            "ledger": lambda args: None,
+            "queue": lambda args: None,
+            "ps": lambda args: None,
+            "reset": lambda args: None,
+            "cancel": lambda args: None,
+            "stop": lambda args: None,
+            "doctor": lambda args: None,
+            "auth": lambda args: None,
+            "benchmark-local": lambda args: None,
+        },
+    )
+
+    args = parser.parse_args([
+        "start",
+        "-n",
+        "2",
+        "--type-of-vid",
+        "short",
+        "--idea",
+        "cơ chế trì hoãn",
+        "--ask",
+        "--clear-ledger",
+    ])
+
+    assert args.num_of_vid == 2
+    assert args.type_of_vid == "short"
+    assert args.type_of_rules == "cơ chế trì hoãn"
+    assert args.ask is True
+    assert args.clear_ledger is True
+
+
+def test_cmd_start_rejects_local_and_cloud_together():
+    with pytest.raises(SystemExit, match="--local"):
+        cli.cmd_start(
+            argparse.Namespace(
+                num_of_vid=1,
+                type_of_vid="short",
+                type_of_rules="auto",
+                resume=False,
+                local=True,
+                cloud=True,
+            )
+        )
+
+
+def test_cmd_start_rejects_clear_ledger_with_resume():
+    with pytest.raises(SystemExit, match="clear-ledger"):
+        cli.cmd_start(
+            argparse.Namespace(
+                num_of_vid=1,
+                type_of_vid="short",
+                type_of_rules="cơ chế trì hoãn",
+                resume=True,
+                local=True,
+                cloud=False,
+                clear_ledger=True,
+            )
+        )
 
 
 def test_cmd_start_warns_and_exits_on_nonzero_return(monkeypatch, _capture_telegram):
@@ -681,7 +819,7 @@ def test_cmd_start_warns_and_exits_on_nonzero_return(monkeypatch, _capture_teleg
     monkeypatch.setattr(cli.subprocess, "Popen", FakePopen)
 
     with pytest.raises(SystemExit) as exc_info:
-        cli.cmd_start(argparse.Namespace(num_of_vid=1, type_of_vid="long", type_of_rules="auto", resume=False))
+        cli.cmd_start(argparse.Namespace(num_of_vid=1, type_of_vid="long", type_of_rules="auto", resume=False, cloud=True))
 
     assert exc_info.value.code == 1
     assert any("lỗi API rồi" in m for m in _capture_telegram)
@@ -829,6 +967,31 @@ def test_cmd_retry_reports_graceful_stop(auto_state_file, monkeypatch, capsys):
     assert "dừng graceful" in capsys.readouterr().out
 
 
+def test_cmd_retry_finds_short_video(tmp_path, monkeypatch, capsys):
+    auto_state = tmp_path / "auto_state.json"
+    auto_state.write_text(json.dumps({
+        "shorts_funnel_batch_2026-07-06": {
+            "long_videos": [],
+            "short_videos": [
+                {"day": 2, "slug": "short-video", "publish_at": "", "shorts_status": "queued"},
+            ],
+        }
+    }), encoding="utf-8")
+    captured = {}
+    monkeypatch.setattr(cli, "AUTO_STATE_PATH", auto_state)
+
+    def fake_run_with_retry(item, **kw):
+        captured["slug"] = item.slug
+        return True, "ok"
+
+    monkeypatch.setattr(cli, "run_with_retry", fake_run_with_retry)
+
+    cli.cmd_retry(argparse.Namespace(slug="short-video"))
+
+    assert captured["slug"] == "short-video"
+    assert "Thành công" in capsys.readouterr().out
+
+
 def test_cmd_stop_no_pid_file(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(cli, "PID_PATH", tmp_path / "batch_cli.pid")
 
@@ -928,6 +1091,6 @@ def test_cmd_start_missing_claude_binary_exits(monkeypatch):
     monkeypatch.setattr(cli.subprocess, "Popen", fake_popen)
 
     with pytest.raises(SystemExit) as exc_info:
-        cli.cmd_start(argparse.Namespace(num_of_vid=1, type_of_vid="long", type_of_rules="auto", resume=False))
+        cli.cmd_start(argparse.Namespace(num_of_vid=1, type_of_vid="long", type_of_rules="auto", resume=False, cloud=True))
 
     assert exc_info.value.code == 1

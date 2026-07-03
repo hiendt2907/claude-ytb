@@ -1,0 +1,23 @@
+{
+  "output_name": "brand_ad_v1",
+  "transition": "fade",
+  "transition_duration": 0.6,
+  "music": null,
+  "music_volume_db": -18,
+  "clips": [
+    {
+      "file": "Library - 1 of 10.MOV",
+      "start": "00:00:02.000",
+      "end": "00:00:08.000",
+      "speed": 1.0,
+      "scene": "hook"
+    },
+    {
+      "file": "Library - 1 of 10.MOV",
+      "start": "00:00:12.000",
+      "end": "00:00:16.000",
+      "speed": 0.5,
+      "scene": "demo"
+    }
+  ]
+}

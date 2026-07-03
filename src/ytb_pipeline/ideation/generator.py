@@ -60,7 +60,8 @@ def load_script(source: str | Path) -> Script:
             code=s.get("code", ""),
             danger=bool(s.get("danger", False)),
             broll=s.get("broll", ""),
-            emphasis=tuple(s.get("emphasis", ())),
+            video_type=s.get("video_type", "image_motion"),
+            emphasis=_normalize_emphasis(s.get("emphasis", ())),
             hook=bool(s.get("hook", False)),
             transition=bool(s.get("transition", False)),
         )
@@ -129,7 +130,7 @@ def _validate_short_length(segments, name: str) -> None:
         chars_need = int(SHORT_MIN_MINUTES * CHARS_PER_MIN)
         raise ValueError(
             f"Kịch bản {name}: Short quá ngắn — ước lượng ~{est:.2f} phút, phải "
-            f"TRÊN {SHORT_MIN_MINUTES:.0f} phút (cần > ~{chars_need:,} ký tự "
+            f"TRÊN {SHORT_MIN_MINUTES:.1f} phút (cần > ~{chars_need:,} ký tự "
             "narration). Viết chi tiết hơn: mỗi ý thêm cơ chế 'tại sao' + ví dụ/"
             "con số cụ thể + bước áp dụng, KHÔNG nói chung chung."
         )
@@ -137,7 +138,7 @@ def _validate_short_length(segments, name: str) -> None:
         chars_max = int(SHORT_MAX_MINUTES * CHARS_PER_MIN)
         raise ValueError(
             f"Kịch bản {name}: Short quá dài — ước lượng ~{est:.2f} phút, phải "
-            f"DƯỚI {SHORT_MAX_MINUTES:.0f} phút (tối đa ~{chars_max:,} ký tự "
+            f"DƯỚI {SHORT_MAX_MINUTES:.1f} phút (tối đa ~{chars_max:,} ký tự "
             "narration). Cắt bớt đoạn thừa/khoảng chết, giữ nội dung cô đọng."
         )
 
@@ -190,6 +191,23 @@ def _validate_compliance(raw: dict | None, name: str) -> ComplianceCheck:
         passed=True,
         **{f: str(raw.get(f, "")) for f in _COMPLIANCE_FIELDS},
     )
+
+
+def _normalize_emphasis(raw) -> tuple[str, ...]:
+    """Normalize LLM-produced emphasis into tuple[str, ...].
+
+    Local LLMs often return `true`/`false` or a single string even though the
+    renderer expects an iterable of terms. Treat booleans/missing values as no
+    emphasis and keep single strings as one term instead of iterating chars.
+    """
+    if raw is None or isinstance(raw, bool):
+        return ()
+    if isinstance(raw, str):
+        value = raw.strip()
+        return (value,) if value else ()
+    if isinstance(raw, (list, tuple)):
+        return tuple(str(item).strip() for item in raw if str(item).strip())
+    return ()
 
 
 def _resolve(source: str | Path) -> Path:

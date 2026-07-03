@@ -15,6 +15,7 @@ import os
 import re
 import subprocess
 import tempfile
+from collections import deque
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -183,13 +184,16 @@ def run_batch(jobs: list[dict]) -> None:
             [str(F5_PYTHON), str(F5_BATCH_WORKER), str(manifest_path)],
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=env,
         )
+        tail: deque[str] = deque(maxlen=80)
         for line in proc.stdout:  # stream tiến độ từng job
             line = line.rstrip()
+            tail.append(line)
             if line.startswith("JOB ") or line.startswith("[f5-batch]"):
                 print(f"    {line}", flush=True)
         code = proc.wait()
         if code != 0:
-            raise RuntimeError(f"F5 batch worker lỗi (code {code})")
+            details = "\n".join(tail)
+            raise RuntimeError(f"F5 batch worker lỗi (code {code}):\n{details}")
     finally:
         manifest_path.unlink(missing_ok=True)
 

@@ -25,13 +25,34 @@ from pathlib import Path
 
 from ..config.settings import settings
 from ..pkg.models import PublishResult, RenderedVideo
+from ..platform.metadata import MetadataAdapter
 
 # YouTube cho phép Short tới 3 phút (180s) từ 10/2024; short của pipeline nhắm 1–2 phút.
 SHORT_MAX_SEC = 180
 
+_metadata_adapter = MetadataAdapter()
 
-def publish(video: RenderedVideo) -> PublishResult:
-    """Upload qua YouTube Data API (OAuth), set title/tags/thumbnail tối ưu SEO."""
+
+def publish(video: RenderedVideo, platform: str = "youtube_short") -> PublishResult:
+    """Upload qua YouTube Data API (OAuth), set title/tags/thumbnail tối ưu SEO.
+
+    `platform` chỉ chọn `PlatformProfile` dùng để chuẩn hoá metadata qua
+    `MetadataAdapter` (sẵn cho khâu publish khác tái dùng) — hành vi upload
+    thật ở module này vẫn luôn nhắm YouTube Data API. Tham số có default
+    "youtube_short" để `publish(video)` cũ không cần đổi lời gọi.
+    """
+    # Chuẩn hoá metadata theo platform profile (hiện chỉ dùng để giữ tương thích
+    # tương lai — title/description/tags thật vẫn build lại bên dưới như cũ).
+    _metadata_adapter.adapt(
+        title=video.title,
+        description=video.description,
+        tags=list(video.tags),
+        platform=platform,
+        privacy=settings.youtube_privacy,
+        publish_at=settings.youtube_publish_at or None,
+        contains_synthetic_media=settings.youtube_contains_synthetic_media,
+    )
+
     if settings.dry_run:
         return _dry_run(video)
 

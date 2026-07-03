@@ -19,6 +19,7 @@ class Segment:
     code: str = ""           # lệnh/đoạn code hiện trong terminal card (tùy chọn)
     danger: bool = False      # True -> tô đỏ cảnh báo
     broll: str = ""           # từ khoá (tiếng Anh) tìm B-roll stock cho render-ai
+    video_type: str = "image_motion"  # image_motion | ai_video | static_terminal
     emphasis: tuple[str, ...] = ()  # từ khoá pop lớn (visual aid), vd "Quy tắc 2 phút"
     hook: bool = False        # cảnh hành động mạnh -> dồn vào cold-open hook đầu video
     transition: bool = False  # chèn whoosh + xfade NGAY TRƯỚC đoạn này (vấn đề->giải pháp)

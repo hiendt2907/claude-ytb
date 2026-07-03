@@ -1,8 +1,8 @@
-"""Khâu 3 (biến thể AI) — dựng video với nền B-roll stock + overlay caption/terminal.
+"""Khâu 3 (biến thể AI) — dựng video bằng visual local-first + overlay caption.
 
-Khác `compose.py`: thay nền gradient tĩnh bằng video B-roll tải từ Pexels
-(`stock.fetch_broll`), phủ một lớp overlay RGBA (veil tối + caption + terminal card)
-để chữ luôn đọc rõ. Nếu thiếu key Pexels -> fail fast (theo convention ranh giới).
+Mặc định dùng Flux/ComfyUI image provider để sinh ảnh theo từng segment rồi
+animate bằng Ken Burns đúng duration audio. Pexels chỉ còn là opt-in fallback
+qua `BROLL_STRATEGY=pexels`.
 
 Hỗ trợ 2 hướng (theo settings.orientation):
   - portrait  1080x1920  -> Short dọc (mặc định)
@@ -13,6 +13,8 @@ Tái dùng helper vẽ của `compose.py` để không lặp code.
 from __future__ import annotations
 
 import subprocess
+import hashlib
+import logging
 from dataclasses import replace
 from pathlib import Path
 
@@ -20,9 +22,11 @@ from PIL import Image, ImageDraw
 
 from ..config.settings import settings
 from ..pkg.models import RenderedVideo, Voiceover
+from ..providers.registry import get_image_provider, get_video_provider
 from . import compose as slide
 from . import stock
 from . import transitions
+from .validation import validate_render
 
 OUTPUT_DIR = Path("assets/output")
 PORTRAIT_WH = (1080, 1920)
@@ -37,6 +41,7 @@ MAX_VARIANTS = 4          # tối đa số shot tải/segment (round-robin nếu
 FPS = 30
 COLD_BEAT_SEC = 1.3       # nhịp cắt cold-open hook (cảnh hành động dồn lên đầu)
 MAX_COLD_SHOTS = 3        # số cảnh hành động tối đa trong cold-open
+logger = logging.getLogger(__name__)
 
 
 def _valid_clip(path: Path) -> bool:
@@ -101,11 +106,13 @@ def render_video_ai(voiceover: Voiceover) -> RenderedVideo:
     thumb = OUTPUT_DIR / f"{slug}_thumb.jpg"
     _thumbnail(voiceover.title, dims=(w, h)).convert("RGB").save(thumb, quality=90)
 
-    return replace(
+    rendered = replace(
         RenderedVideo(**vars(voiceover)),
         video_path=video_path,
         thumbnail_path=thumb,
     )
+    validate_render(rendered, expected_dims=(w, h), expected_duration_sec=voiceover.duration_sec)
+    return rendered
 
 
 def _render_broll_segment(seg, index: int, total: int, query: str, work: Path,
@@ -124,7 +131,7 @@ def _render_broll_segment(seg, index: int, total: int, query: str, work: Path,
     w, h = dims
     caption = (seg.caption or "").strip()
     duration = slide._audio_duration(seg.audio_path)
-    bg = _moving_background(query, duration, index=index, dims=dims,
+    bg = _moving_background(query, duration, index=index, segment=seg, dims=dims,
                             landscape=landscape, work=work, prefix=prefix,
                             used=used)
 
@@ -223,10 +230,13 @@ def _beat_durations(total: float, hook: bool) -> list[float]:
     return durs
 
 
-def _moving_background(query: str, duration: float, *, index: int,
+def _moving_background(query: str, duration: float, *, index: int, segment=None,
                        dims: tuple[int, int], landscape: bool, work: Path,
                        prefix: str, used: set[str]) -> Path:
     """Nền động: chuỗi beat (shot khác nhau + Ken Burns) dài đúng `duration`."""
+    if settings.broll_strategy != "pexels":
+        return _local_background(query, duration, index=index, dims=dims, work=work, prefix=prefix, segment=segment)
+
     hook = index == 0
     durs = _beat_durations(duration, hook)
     n_variants = min(len(durs), MAX_VARIANTS)
@@ -239,6 +249,78 @@ def _moving_background(query: str, duration: float, *, index: int,
     bg_out = work / f"{prefix}_bg.mp4"
     _build_background(beats, dims, bg_out)
     return bg_out
+
+
+def _local_background(query: str, duration: float, *, index: int,
+                      dims: tuple[int, int], work: Path, prefix: str, segment=None) -> Path:
+    """Local visual background: optional local video for hooks, else image motion."""
+    w, h = dims
+    video_type = getattr(segment, "video_type", "image_motion") if segment is not None else "image_motion"
+    high_value_segment = (
+        index == 0
+        or bool(getattr(segment, "hook", False))
+        or bool(getattr(segment, "transition", False))
+        or len(getattr(segment, "emphasis", ()) or ()) >= 2
+    )
+    wants_video = video_type == "ai_video" and settings.broll_strategy in {"local_video", "mixed", "ai_video"}
+    use_video = (
+        wants_video
+        or settings.broll_strategy in {"local_video", "ai_video"}
+        or (settings.broll_strategy == "mixed" and high_value_segment and video_type != "static_terminal")
+    )
+    if use_video:
+        try:
+            return _local_video(query, duration, dims, work)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Local video generation failed; falling back to image motion: %s", exc)
+
+    image = _local_image(query, dims, work)
+    durs = _beat_durations(duration, hook=index == 0)
+    beats = [(image, d, i) for i, d in enumerate(durs)]
+    bg_out = work / f"{prefix}_bg.mp4"
+    _build_background(beats, dims, bg_out)
+    return bg_out
+
+
+def _local_video(prompt: str, duration: float, dims: tuple[int, int], work: Path) -> Path:
+    """Generate/cache a local video clip by prompt, dimensions, duration, and model."""
+    w, h = dims
+    provider = get_video_provider(settings.video_provider)
+    digest = hashlib.sha256(
+        f"{provider.name}|{settings.video_provider}|{w}x{h}|{duration:.3f}|{prompt}".encode("utf-8")
+    ).hexdigest()[:16]
+    out = work / "local_videos" / f"{digest}.mp4"
+    if out.exists() and _valid_clip(out):
+        return out
+    out.parent.mkdir(parents=True, exist_ok=True)
+    provider.generate(prompt, duration, w, h, out)
+    if not _valid_clip(out):
+        raise ValueError(f"Video provider `{provider.name}` did not create a readable clip: {out}")
+    return out
+
+
+def _local_image(prompt: str, dims: tuple[int, int], work: Path) -> Path:
+    """Generate/cache one readable image per prompt+dims+provider."""
+    w, h = dims
+    provider = get_image_provider(settings.image_provider)
+    digest = hashlib.sha256(f"{provider.name}|{w}x{h}|{prompt}".encode("utf-8")).hexdigest()[:16]
+    out = work / "local_images" / f"{digest}.png"
+    if out.exists() and _valid_image(out):
+        return out
+    out.parent.mkdir(parents=True, exist_ok=True)
+    provider.generate(prompt, w, h, out, negative_prompt="low quality, blurry, watermark, text")
+    if not _valid_image(out):
+        raise ValueError(f"Image provider `{provider.name}` did not create a readable image: {out}")
+    return out
+
+
+def _valid_image(path: Path) -> bool:
+    try:
+        with Image.open(path) as img:
+            img.verify()
+        return True
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def _build_background(beats: list[tuple[Path, float, int]], dims: tuple[int, int],
@@ -270,9 +352,9 @@ def _kenburns_beat(src: Path, dur: float, dims: tuple[int, int], idx: int,
         f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={w}x{h},setsar=1,"
         f"eq=brightness={BRIGHTNESS_BOOST}:saturation=1.08"
     )
+    input_args = ["-loop", "1", "-i", str(src)] if src.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"} else ["-stream_loop", "-1", "-i", str(src)]
     subprocess.run(
-        ["ffmpeg", "-y", "-stream_loop", "-1", "-i", str(src),
-         "-t", f"{dur:.3f}", "-an", "-vf", vf,
+        ["ffmpeg", "-y", *input_args, "-t", f"{dur:.3f}", "-an", "-vf", vf,
          "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", str(FPS), str(out)],
         capture_output=True, check=True,
     )

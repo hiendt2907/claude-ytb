@@ -4,7 +4,7 @@ Pipeline tự động hoá sản xuất nội dung và kiếm tiền từ YouTub
 
 ## 4 khâu
 
-1. **Ideation** — sinh ý tưởng + kịch bản bằng Claude
+1. **Ideation** — sinh ý tưởng + kịch bản bằng local LLM
 2. **Voiceover** — TTS (edge-tts miễn phí / ElevenLabs) + thu thập media
 3. **Render** — dựng video bằng moviepy/ffmpeg, sinh thumbnail
 4. **Publish** — upload YouTube Data API + SEO + analytics
@@ -46,7 +46,7 @@ cd claude-ytb
 make setup              # cài ffmpeg, venv, requirements, tạo .env + thư mục runtime
 ```
 
-`make setup` chạy `scripts/setup.sh`: kiểm tra Claude CLI + Homebrew, cài `ffmpeg`
+`make setup` chạy `scripts/setup.sh`: kiểm tra local runtime + Homebrew, cài `ffmpeg`
 nếu thiếu, tạo `.venv` + cài `requirements.txt`, tạo `secrets/` `data/` `assets/`
 (gitignored nên không có sẵn sau khi clone), copy `.env.example` → `.env` (không
 đè nếu đã có), rồi **hỏi tay từng API key/secret** (kèm hướng dẫn lấy ở đâu) và
@@ -101,10 +101,12 @@ ytb batch <lệnh>         # toàn bộ batch workflow (xem bên dưới)
 ### Quy trình sản xuất
 
 ```bash
-# 1. Viết kịch bản (gọi Claude — tốn token, mất vài phút)
-ytb batch start -n 5 --type-of-vid long   # Claude tự chọn chủ đề
-ytb batch start -n 3 --type-of-vid short  # video dọc 1-2 phút
-ytb batch start -n 1 --type-of-rules "chủ đề về trì hoãn"  # chủ đề chỉ định
+# 1. Viết kịch bản (mặc định dùng local LLM)
+ytb batch start -n 5 --type-of-vid long --local   # LLM tự chọn chủ đề
+ytb batch start -n 3 --type-of-vid short --local  # video dọc 1-2 phút
+ytb batch start -n 10 --type-of-vid short --local --idea "cơ chế trì hoãn"  # chủ đề chỉ định
+ytb batch start -n 10 --type-of-vid short --local --idea "cơ chế xấu hổ" --clear-ledger  # backup + reset ledger cũ
+ytb batch start --ask --local  # hỏi tương tác số lượng, loại video, ý tưởng, clear ledger
 
 # 2. Kiểm tra trước khi chạy
 ytb doctor                # token OAuth, Telegram, script JSON còn đủ không

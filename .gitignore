@@ -15,14 +15,21 @@ client_secret*.json
 data/config.json
 data/config.json.tmp
 data/ledger.md
+data/ledger.backup.*.md
+scripts/*.json
 
 assets/output/
 assets/audio/*.mp3
 assets/audio/*.wav
 assets/auto_update.pid
+assets/batch_cli.pid
 assets/auto_update.failed_sha
 assets/auto_update.out.log
 assets/auto_update.err.log
+assets/auto_state.json
+assets/*.log
+assets/batch_logs/
+assets/benchmarks/
 assets/update_logs/
 data/*.db
 *.mp4

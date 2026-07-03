@@ -57,3 +57,15 @@ def test_load_script_rejects_failed_compliance(write_script):
     # Act / Assert
     with pytest.raises(ValueError, match="verify"):
         load_script(path)
+
+
+def test_load_script_normalizes_non_list_emphasis(write_script):
+    data = make_script([{"caption": "c1", "narration": "x" * 600}, {"caption": "c2", "narration": "y" * 600}])
+    data["sections"][0]["emphasis"] = True
+    data["sections"][1]["emphasis"] = "cơ chế"
+    path = write_script(data)
+
+    script = load_script(path)
+
+    assert script.segments[0].emphasis == ()
+    assert script.segments[1].emphasis == ("cơ chế",)

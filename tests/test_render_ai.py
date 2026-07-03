@@ -95,6 +95,7 @@ def test_render_ai_giu_bat_bien_khong_mutate_voiceover(monkeypatch, tmp_path):
     monkeypatch.setattr(compose_ai, "_hook_coldopen", lambda *a, **k: None)
     monkeypatch.setattr(compose_ai.transitions, "concat_with_transitions",
                         lambda clips, flags, out, **k: None)
+    monkeypatch.setattr(compose_ai, "validate_render", lambda *a, **k: None)
 
     result = compose_ai.render_video_ai(vo)
 
