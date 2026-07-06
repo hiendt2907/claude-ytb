@@ -257,6 +257,23 @@ def test_batch_start_local_can_clear_old_ledger_for_user_idea(tmp_path, monkeypa
     assert "Chủ đề cũ không được nhắc lại" in backups[0].read_text(encoding="utf-8")
 
 
+def test_local_prompt_defines_entertainment_retention_criteria():
+    from ytb_pipeline.orchestrator import ideation_cmd
+
+    prompt = ideation_cmd._local_script_prompt(
+        1,
+        1,
+        "short",
+        "làm nội dung giải trí, người que, kéo view",
+        "",
+    )
+
+    assert "visible problem" in prompt
+    assert "physical action" in prompt
+    assert "punchline/payoff" in prompt
+    assert "not a news reader" in prompt
+
+
 def test_batch_start_local_repairs_script_before_queueing(tmp_path, monkeypatch):
     from ytb_pipeline.orchestrator import batch_cli as cli
     from ytb_pipeline.orchestrator import ideation_cmd
@@ -331,6 +348,37 @@ def test_batch_start_local_repairs_duplicate_title_without_overwrite(tmp_path, m
     fixed = _valid_short_script()
     fixed["topic"] = "Người que rơi thang máy"
     fixed["title"] = "Người Que Rơi Thang Máy Nhưng Vẫn Cố Tỏ Ra Ổn"
+    gag = (
+        "Người que bước vào thang máy với dáng rất tự tin, nhưng sàn bỗng tụt xuống nửa nhịp. "
+        "Nó cố đứng nghiêm như không có gì xảy ra, càng giữ mặt lạnh thì tay vịn càng rung mạnh. "
+        "Cuối cùng hóa ra thang máy không hỏng, nó chỉ đang đứng trên cái cân biết troll và punchline là con số hiện lên quá lố. "
+    )
+    fixed["sections"] = [
+        {
+            "caption": "Sàn tụt",
+            "narration": gag,
+            "broll": "người que bước vào thang máy rồi trượt chân khi sàn tụt xuống",
+            "emphasis": ["hook"],
+        },
+        {
+            "caption": "Cố tỏ ra ổn",
+            "narration": gag,
+            "broll": "người que đứng hình, tay bám lan can rung mạnh",
+            "emphasis": ["bất ngờ"],
+        },
+        {
+            "caption": "Càng quê",
+            "narration": gag,
+            "broll": "người que vấp ngã khi bảng số tầng bật nhảy liên tục",
+            "emphasis": ["leo thang"],
+        },
+        {
+            "caption": "Punchline",
+            "narration": gag,
+            "broll": "người que hoảng khi cái cân thang máy hiện con số quá lố",
+            "emphasis": ["punchline"],
+        },
+    ]
 
     class DuplicateThenRepairLLM:
         name = "ollama"

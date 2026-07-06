@@ -39,6 +39,54 @@ _SOURCED_CLAIM_PHRASES = (
     "research shows",
 )
 _SOURCE_HINTS = ("http://", "https://", "nguồn:", "source:", "doi:")
+_ENTERTAINMENT_HINTS = (
+    "giải trí",
+    "giai tri",
+    "người que",
+    "nguoi que",
+    "stickman",
+    "hài",
+    "hai",
+    "comedy",
+)
+_NEWSY_EXPLAINER_PHRASES = (
+    "nghiên cứu cho thấy",
+    "cơ chế",
+    "phát triển bản thân",
+    "bài học",
+    "điều này cho thấy",
+    "chúng ta sẽ",
+    "hôm nay chúng ta",
+    "mục tiêu là",
+    "theo các chuyên gia",
+)
+_ACTION_VERBS = (
+    "chạy", "ngã", "rơi", "đập", "né", "đuổi", "lao", "trượt", "va",
+    "đẩy", "kéo", "ném", "bật", "giật", "đóng", "mở", "nhảy", "té",
+    "vấp", "hoảng", "đứng hình", "quay lại", "nổ", "vỡ",
+)
+_ESCALATION_HINTS = (
+    "nhưng",
+    "bỗng",
+    "bất ngờ",
+    "càng",
+    "tưởng",
+    "lần nữa",
+    "leo thang",
+    "chưa kịp",
+)
+_PAYOFF_HINTS = (
+    "punchline",
+    "cú chốt",
+    "chốt",
+    "hóa ra",
+    "cuối cùng",
+    "lật kèo",
+    "twist",
+    "quê",
+    "đứng hình",
+    "phản ứng quá lố",
+)
 
 
 class QAAgent:
@@ -62,8 +110,9 @@ class QAAgent:
             violations.extend(_check_length(script))
             violations.extend(_check_intro(script))
             violations.extend(_check_self_help(script))
-            warnings.extend(_check_sourced_claims(script))
             violations.extend(_check_dedup(script, context.get("done_topics")))
+            violations.extend(_check_entertainment_retention(script))
+            warnings.extend(_check_sourced_claims(script))
 
             return AgentResult(
                 agent_name=self.name,
@@ -194,6 +243,80 @@ def _check_sourced_claims(script: Any) -> list[dict[str, str]]:
                         "detail": f"Cụm '{phrase}' không kèm nguồn rõ ràng.",
                     })
     return warnings
+
+
+def _check_entertainment_retention(script: Any) -> list[dict[str, str]]:
+    """Gate riêng cho ý tưởng giải trí/người que: ưu tiên retention thay vì đọc báo."""
+    if not _is_entertainment_script(script):
+        return []
+
+    segments = _segments_of(script)
+    text = _script_text(script)
+    text_lower = text.lower()
+    violations: list[dict[str, str]] = []
+
+    newsy = [phrase for phrase in _NEWSY_EXPLAINER_PHRASES if phrase in text_lower]
+    if newsy:
+        violations.append({
+            "rule": "entertainment_voice",
+            "detail": (
+                "Ý tưởng giải trí/người que không được viết như đọc báo/giải thích. "
+                f"Loại các cụm: {', '.join(newsy[:4])}."
+            ),
+        })
+
+    weak_broll = []
+    for idx, segment in enumerate(segments, start=1):
+        broll = str(_get(segment, "broll", "") or "").lower()
+        if not ("người que" in broll or "nguoi que" in broll or "stickman" in broll):
+            weak_broll.append(str(idx))
+            continue
+        if not any(verb in broll for verb in _ACTION_VERBS):
+            weak_broll.append(str(idx))
+    if weak_broll:
+        violations.append({
+            "rule": "entertainment_visual_action",
+            "detail": (
+                "Mỗi broll phải là một cảnh người que đang làm hành động cụ thể "
+                f"(không phải mô tả chung). Segment yếu: {', '.join(weak_broll)}."
+            ),
+        })
+
+    if not any(hint in text_lower for hint in _ESCALATION_HINTS):
+        violations.append({
+            "rule": "entertainment_escalation",
+            "detail": "Thiếu leo thang bất ngờ: phải có sự cố thứ hai làm tình huống tệ/hài hơn.",
+        })
+
+    tail = " ".join(_narration_of(seg) for seg in segments[-2:]).lower()
+    if not any(hint in tail for hint in _PAYOFF_HINTS):
+        violations.append({
+            "rule": "entertainment_payoff",
+            "detail": "Thiếu punchline/payoff ở đoạn cuối: cần cú chốt hình ảnh hoặc twist rõ.",
+        })
+
+    return violations
+
+
+def _is_entertainment_script(script: Any) -> bool:
+    return any(hint in _script_text(script).lower() for hint in _ENTERTAINMENT_HINTS)
+
+
+def _script_text(script: Any) -> str:
+    parts = [
+        str(_get(script, "topic", "") or ""),
+        str(_get(script, "title", "") or ""),
+        str(_get(script, "description", "") or ""),
+        " ".join(str(tag) for tag in (_get(script, "tags", ()) or ())),
+    ]
+    for segment in _segments_of(script):
+        parts.extend([
+            str(_get(segment, "caption", "") or ""),
+            str(_get(segment, "broll", "") or ""),
+            _narration_of(segment),
+            " ".join(str(item) for item in (_get(segment, "emphasis", ()) or ())),
+        ])
+    return " ".join(parts)
 
 
 def _check_dedup(script: Any, done_topics: Any) -> list[dict[str, str]]:

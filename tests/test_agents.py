@@ -449,6 +449,80 @@ async def test_qa_agent_studies_show_with_source_no_warning():
     assert not any(w["rule"] == "sourced_claims" for w in result.output["warnings"])
 
 
+async def test_qa_agent_rejects_stickman_news_reader_voice():
+    agent = QAAgent()
+    script = Script(
+        topic="giải trí người que",
+        title="Người Que Tự Làm Nhà",
+        description="Short giải trí.",
+        tags=("người que", "giải trí"),
+        compliance=ComplianceCheck(passed=True),
+        body="",
+        segments=(
+            Segment(
+                caption="Hook",
+                narration=chars_for_minutes(1.0) + " Cơ chế này cho thấy bài học về sự cố gắng.",
+                broll="abstract decision making",
+                emphasis=("cơ chế",),
+            ),
+        ),
+    )
+
+    result = await agent.run({"script": script})
+
+    assert result.output["passed"] is False
+    rules = [v["rule"] for v in result.output["violations"]]
+    assert "entertainment_voice" in rules
+    assert "entertainment_visual_action" in rules
+
+
+async def test_qa_agent_accepts_stickman_visual_gag_structure():
+    agent = QAAgent()
+    unit = (
+        "Người que mở cửa quá tự tin, nhưng tay nắm rơi xuống sàn ngay trước mặt. "
+        "Nó cúi nhặt thì bỗng cái cửa tự chạy lùi lại, càng đuổi càng xa. "
+        "Cả hành lang đứng hình, cuối cùng hóa ra cái cửa cũng có chân và cú chốt là nó tự khóa người que bên ngoài. "
+    )
+    script = Script(
+        topic="giải trí người que",
+        title="Người Que Và Cánh Cửa Biết Chạy",
+        description="Short giải trí.",
+        tags=("người que", "giải trí"),
+        compliance=ComplianceCheck(passed=True),
+        body=unit * 4,
+        segments=(
+            Segment(
+                caption="Cửa chạy",
+                narration=unit,
+                broll="người que mở cửa rồi trượt tay nắm rơi xuống",
+                emphasis=("hook",),
+            ),
+            Segment(
+                caption="Đuổi cửa",
+                narration=unit,
+                broll="người que chạy đuổi theo cánh cửa trên hành lang",
+                emphasis=("bất ngờ",),
+            ),
+            Segment(
+                caption="Càng rối",
+                narration=unit,
+                broll="người que vấp ngã khi cánh cửa bật ngược lại",
+                emphasis=("leo thang",),
+            ),
+            Segment(
+                caption="Punchline",
+                narration=unit,
+                broll="người que đứng hình khi cánh cửa khóa nó bên ngoài",
+                emphasis=("punchline",),
+            ),
+        ),
+    )
+
+    result = await agent.run({"script": script})
+
+    assert result.output["passed"] is True
+
+
 async def test_qa_agent_series_dedup_flags_done_topic():
     agent = QAAgent()
     script = _make_script(target_minutes=None, topic="Chu De Trung Lap")
