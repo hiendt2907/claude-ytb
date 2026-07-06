@@ -33,23 +33,43 @@ def test_to_hashtag_empty_for_blank_tag():
     assert uploader._to_hashtag("   ") == ""
 
 
-# ── _build_hashtags ───────────────────────────────────────────────────────────
-def test_build_hashtags_caps_at_three():
+# ── _build_hashtags / _build_seo_tags ────────────────────────────────────────
+def test_build_hashtags_adds_discovery_terms():
     video = _video(tags=("a", "b", "c", "d"))
     hashtags = uploader._build_hashtags(video, is_short=False)
-    assert hashtags == ["#a", "#b", "#c"]
+    assert hashtags[:4] == ["#a", "#b", "#c", "#d"]
+    assert "#giảitrí" in hashtags
+    assert len(hashtags) <= uploader.HASHTAG_LIMIT
 
 
 def test_build_hashtags_shorts_always_first():
     video = _video(tags=("a", "b"))
     hashtags = uploader._build_hashtags(video, is_short=True)
-    assert hashtags == ["#Shorts", "#a", "#b"]
+    assert hashtags[:3] == ["#Shorts", "#a", "#b"]
+    assert "#youtubeshorts" in hashtags
 
 
 def test_build_hashtags_dedupes_case_insensitive():
     video = _video(tags=("Shorts", "a"))
     hashtags = uploader._build_hashtags(video, is_short=True)
-    assert hashtags == ["#Shorts", "#a"]
+    assert hashtags.count("#Shorts") == 1
+    assert "#a" in hashtags
+
+
+def test_build_seo_tags_expands_stickman_entertainment_terms():
+    video = _video(
+        title="Người Que Và Cây Nhà",
+        description="Một clip người que hài hước.",
+        tags=("người que", "giải trí"),
+    )
+
+    tags = uploader._build_seo_tags(video, is_short=True)
+
+    assert "người que" in tags
+    assert "stickman" in tags
+    assert "hoạt hình" in tags
+    assert "youtube shorts" in tags
+    assert len(tags) <= uploader.YOUTUBE_TAG_LIMIT
 
 
 # ── _with_hashtags ────────────────────────────────────────────────────────────
@@ -115,6 +135,7 @@ def test_publish_real_sets_synthetic_media_flag_and_hashtags(monkeypatch, tmp_pa
     assert result.uploaded is True
     assert captured_body["status"]["containsSyntheticMedia"] is True
     assert "#tâmlýhọc" in captured_body["snippet"]["description"]
+    assert "viral shorts" in captured_body["snippet"]["tags"]
 
 
 def test_publish_real_marks_portrait_under_three_minutes_as_short(monkeypatch, tmp_path):
@@ -150,3 +171,5 @@ def test_publish_real_marks_portrait_under_three_minutes_as_short(monkeypatch, t
     assert result.uploaded is True
     assert "#Shorts" in captured_body["snippet"]["description"]
     assert "#giảitrí" in captured_body["snippet"]["description"]
+    assert "#ngườique" in captured_body["snippet"]["description"]
+    assert "stickman" in captured_body["snippet"]["tags"]

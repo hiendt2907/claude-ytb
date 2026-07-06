@@ -76,9 +76,12 @@ def test_pillow_provider_stickman_prompt_draws_non_flat_scene(tmp_path):
 
     with Image.open(out).convert("RGB") as img:
         colors = img.getcolors(maxcolors=1_000_000)
+        central = img.crop((80, 260, 260, 540))
+        bright_pixels = sum(1 for r, g, b in central.getdata() if r + g + b > 680)
 
     assert colors is not None
     assert len(colors) > 20
+    assert bright_pixels > 250
 
 
 def test_flux_provider_is_available_false_when_comfyui_unreachable():

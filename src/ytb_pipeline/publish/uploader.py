@@ -10,8 +10,9 @@ YouTube không có API riêng cho Short — xếp loại dựa trên thời lư�
 hình + hashtag #Shorts. Từ 10/2024 YouTube cho phép Short dài tới 3 phút (trước là 60s).
 
 Hashtag + khai báo AI:
-  - Tự build tối đa 3 hashtag (từ video.tags, + #Shorts nếu là Short) chèn vào mô tả
-    — YouTube hiển thị 3 hashtag đầu tìm thấy ngay phía trên tiêu đề.
+  - Tự build hashtag tìm kiếm từ video.tags + bộ tag khám phá theo ngách. #Shorts đứng
+    đầu nếu là Short; YouTube chỉ hiển thị 3 hashtag đầu nhưng phần mô tả vẫn giữ thêm
+    hashtag liên quan để tăng tín hiệu tìm kiếm/đề xuất.
   - Luôn set status.containsSyntheticMedia = settings.youtube_contains_synthetic_media
     (mặc định True) — khai báo "nội dung thay đổi/tổng hợp bởi AI", bắt buộc minh bạch
     theo chính sách YouTube từ 2024 vì kênh này 100% voice TTS + visual AI render.
@@ -29,6 +30,30 @@ from ..platform.metadata import MetadataAdapter
 
 # YouTube cho phép Short tới 3 phút (180s) từ 10/2024; short của pipeline nhắm 1–2 phút.
 SHORT_MAX_SEC = 180
+HASHTAG_LIMIT = 12
+YOUTUBE_TAG_LIMIT = 30
+DISCOVERY_TAGS = (
+    "giải trí",
+    "giai tri",
+    "hài hước",
+    "hai huoc",
+    "video hài",
+    "short hài",
+    "shorts hài",
+    "viral shorts",
+    "meme việt",
+    "meme viet",
+)
+STICKMAN_DISCOVERY_TAGS = (
+    "người que",
+    "nguoi que",
+    "stickman",
+    "hoạt hình",
+    "hoat hinh",
+    "hoạt hình vui",
+    "animation",
+    "funny stickman",
+)
 
 _metadata_adapter = MetadataAdapter()
 
@@ -60,10 +85,12 @@ def publish(video: RenderedVideo, platform: str = "youtube_short") -> PublishRes
         raise FileNotFoundError(f"Không tìm thấy file video: {video.video_path}")
 
     is_short = _is_short(video)
+    seo_tags = _build_seo_tags(video, is_short)
     hashtags = _build_hashtags(video, is_short)
     description = _with_hashtags(video.description, hashtags)
     print(f"  Loại: {'YouTube Short (dọc, ≤3p)' if is_short else 'Clip thường'}")
     print(f"  Hashtag: {' '.join(hashtags) or '(không có)'}")
+    print(f"  SEO tags: {', '.join(seo_tags)}")
 
     # import trong hàm để DRY_RUN không cần thư viện Google
     from googleapiclient.http import MediaFileUpload
@@ -76,7 +103,7 @@ def publish(video: RenderedVideo, platform: str = "youtube_short") -> PublishRes
         "snippet": {
             "title": video.title[:100],
             "description": description,
-            "tags": list(video.tags),
+            "tags": seo_tags,
             "categoryId": settings.youtube_category_id,
         },
         "status": {
@@ -148,16 +175,39 @@ def _to_hashtag(tag: str) -> str:
     return f"#{cleaned}" if cleaned else ""
 
 
+def _build_seo_tags(video: RenderedVideo, is_short: bool) -> list[str]:
+    """Tags gửi vào YouTube snippet: giữ tag script + bổ sung từ khóa khám phá an toàn."""
+    seeds: list[str] = list(video.tags)
+    haystack = " ".join([video.title, video.description, *video.tags]).lower()
+    if is_short:
+        seeds.extend(("shorts", "youtube shorts"))
+    seeds.extend(DISCOVERY_TAGS)
+    if any(word in haystack for word in ("người que", "nguoi que", "stickman")):
+        seeds.extend(STICKMAN_DISCOVERY_TAGS)
+
+    tags: list[str] = []
+    seen: set[str] = set()
+    for raw in seeds:
+        tag = " ".join(str(raw).strip().split())
+        key = tag.casefold()
+        if not tag or key in seen:
+            continue
+        tags.append(tag[:500])
+        seen.add(key)
+        if len(tags) >= YOUTUBE_TAG_LIMIT:
+            break
+    return tags
+
+
 def _build_hashtags(video: RenderedVideo, is_short: bool) -> list[str]:
-    """Tối đa 3 hashtag — đúng số YouTube hiển thị phía trên tiêu đề. #Shorts luôn
-    đứng đầu nếu là Short, còn lại lấy từ video.tags (đã chọn SEO), bỏ trùng."""
+    """Hashtag trong mô tả: #Shorts trước, sau đó tag script + tag khám phá, bỏ trùng."""
     hashtags = ["#Shorts"] if is_short else []
-    for tag in video.tags:
+    for tag in _build_seo_tags(video, is_short):
         hashtag = _to_hashtag(tag)
         if not hashtag or hashtag.lower() in (h.lower() for h in hashtags):
             continue
         hashtags.append(hashtag)
-        if len(hashtags) >= 3:
+        if len(hashtags) >= HASHTAG_LIMIT:
             break
     return hashtags
 
@@ -191,7 +241,7 @@ def _dry_run(video: RenderedVideo) -> PublishResult:
     print("── DRY RUN — không upload thật ──")
     print(f"  Loại  : {'YouTube Short (dọc, ≤3p)' if is_short else 'Clip thường'}")
     print(f"  Title : {video.title}")
-    print(f"  Tags  : {', '.join(video.tags)}")
+    print(f"  Tags  : {', '.join(_build_seo_tags(video, is_short))}")
     print(f"  Hashtag: {' '.join(_build_hashtags(video, is_short)) or '(không có)'}")
     print(f"  Made with AI (containsSyntheticMedia): {settings.youtube_contains_synthetic_media}")
     print(f"  Video : {video.video_path}")

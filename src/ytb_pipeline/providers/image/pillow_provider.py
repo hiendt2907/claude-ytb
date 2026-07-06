@@ -7,13 +7,14 @@ bằng Ken Burns trong `render/compose_ai.py`.
 """
 
 import hashlib
+import math
 from pathlib import Path
 
 from PIL import Image, ImageDraw
 
 DEFAULT_TOP = (13, 17, 23)
 DEFAULT_BOTTOM = (22, 27, 34)
-CACHE_VERSION = "pillow-scene-v2"
+CACHE_VERSION = "pillow-scene-v3"
 
 # Từ khoá màu đơn giản trong prompt → (top, bottom). Khớp gần đúng theo substring.
 COLOR_HINTS: dict[str, tuple[tuple[int, int, int], tuple[int, int, int]]] = {
@@ -72,7 +73,7 @@ def _draw_scene(img: Image.Image, prompt: str) -> None:
     seed = _seed(prompt)
     accent = _accent(seed)
 
-    horizon = int(h * 0.68)
+    horizon = int(h * 0.66)
     draw.rectangle([0, horizon, w, h], fill=(8, 12, 18, 185))
     draw.line([0, horizon, w, horizon], fill=(*accent, 190), width=max(4, w // 180))
 
@@ -102,9 +103,9 @@ def _draw_generic_scene(draw: ImageDraw.ImageDraw, prompt: str, w: int, h: int,
     draw.ellipse([cx - radius, cy - radius, cx + radius, cy + radius],
                  fill=(*accent, 210), outline=(255, 255, 255, 230), width=max(3, w // 160))
     for i in range(9):
-        angle = (seed + i * 41) % 360
-        x = cx + int((radius * 1.7) * __import__("math").cos(angle))
-        y = cy + int((radius * 1.1) * __import__("math").sin(angle))
+        angle = math.radians((seed + i * 41) % 360)
+        x = cx + int((radius * 1.7) * math.cos(angle))
+        y = cy + int((radius * 1.1) * math.sin(angle))
         r = max(8, radius // 8)
         draw.ellipse([x - r, y - r, x + r, y + r], fill=(255, 255, 255, 65))
     _draw_motion_burst(draw, (cx, cy), radius * 2, accent, w)
@@ -113,28 +114,34 @@ def _draw_generic_scene(draw: ImageDraw.ImageDraw, prompt: str, w: int, h: int,
 def _draw_stickman_scene(draw: ImageDraw.ImageDraw, prompt: str, w: int, h: int,
                          accent: tuple[int, int, int], seed: int) -> None:
     lowered = prompt.lower()
-    floor = int(h * 0.70)
-    main_x = int(w * 0.43)
-    main_y = floor - int(h * 0.08)
-    scale = max(1.0, min(w, h) / 900)
+    floor = int(h * 0.71)
+    main_x = int(w * 0.38)
+    main_y = floor - int(h * 0.03)
+    scale = max(1.45, min(w, h) / 620)
     action = _action_from_prompt(lowered)
 
     # Props derived from common entertainment prompts.
+    if any(word in lowered for word in ("đất", "mảnh đất", "dat", "land")):
+        _draw_land_patch(draw, int(w * 0.59), floor, scale, accent)
+    if any(word in lowered for word in ("nhà", "nha", "house")):
+        _draw_house(draw, int(w * 0.66), floor, scale, accent)
     if any(word in lowered for word in ("cửa", "door")):
         _draw_door(draw, int(w * 0.68), floor, scale, accent)
     if any(word in lowered for word in ("thang máy", "elevator")):
         _draw_elevator(draw, int(w * 0.68), floor, scale, accent)
     if any(word in lowered for word in ("cây", "tree")):
-        _draw_tree(draw, int(w * 0.68), floor, scale, accent)
+        _draw_tree(draw, int(w * 0.72), floor, scale, accent)
     if any(word in lowered for word in ("cân", "scale")):
         _draw_scale(draw, int(w * 0.62), floor, scale, accent)
+    if any(word in lowered for word in ("dao", "rìu", "riu", "chặt", "chop", "knife", "axe")):
+        _draw_tool(draw, main_x + int(w * 0.11), main_y - int(h * 0.10), scale, accent)
 
     _draw_stickman(draw, main_x, main_y, scale, action=action, accent=accent)
-    _draw_stickman(draw, int(w * 0.24), floor - int(h * 0.05), scale * 0.78,
+    _draw_stickman(draw, int(w * 0.19), floor - int(h * 0.02), scale * 0.72,
                    action="watch", accent=(255, 255, 255))
-    _draw_motion_burst(draw, (main_x + int(w * 0.04), main_y - int(h * 0.13)),
-                       int(min(w, h) * 0.18), accent, w)
-    _draw_impact_marks(draw, main_x + int(w * 0.12), floor - int(h * 0.18), accent, w)
+    _draw_motion_burst(draw, (main_x + int(w * 0.08), main_y - int(h * 0.17)),
+                       int(min(w, h) * 0.24), accent, w)
+    _draw_impact_marks(draw, main_x + int(w * 0.19), floor - int(h * 0.22), accent, w)
 
 
 def _action_from_prompt(lowered: str) -> str:
@@ -259,6 +266,51 @@ def _draw_scale(draw: ImageDraw.ImageDraw, x: int, floor: int, scale: float,
     draw.rectangle([x - int(26 * scale), floor - h + int(6 * scale),
                     x + int(26 * scale), floor - h + int(20 * scale)],
                    fill=(*accent, 240))
+
+
+def _draw_land_patch(draw: ImageDraw.ImageDraw, x: int, floor: int, scale: float,
+                     accent: tuple[int, int, int]) -> None:
+    w, h = int(210 * scale), int(58 * scale)
+    draw.ellipse([x - w // 2, floor - h, x + w // 2, floor + h // 3],
+                 fill=(85, 63, 42, 210), outline=(*accent, 160), width=max(3, int(4 * scale)))
+    for i in range(5):
+        px = x - w // 3 + int(i * w / 6)
+        draw.line([px, floor - int(10 * scale), px + int(24 * scale), floor - int(25 * scale)],
+                  fill=(*accent, 155), width=max(2, int(3 * scale)))
+
+
+def _draw_house(draw: ImageDraw.ImageDraw, x: int, floor: int, scale: float,
+                accent: tuple[int, int, int]) -> None:
+    w, h = int(190 * scale), int(135 * scale)
+    y0 = floor - h
+    draw.rectangle([x - w // 2, y0, x + w // 2, floor],
+                   fill=(30, 34, 46, 230), outline=(255, 255, 255, 95),
+                   width=max(3, int(4 * scale)))
+    roof = [(x - w // 2 - int(18 * scale), y0), (x, y0 - int(78 * scale)),
+            (x + w // 2 + int(18 * scale), y0)]
+    draw.polygon(roof, fill=(*accent, 195), outline=(255, 255, 255, 120))
+    door_w, door_h = int(44 * scale), int(76 * scale)
+    draw.rectangle([x - door_w // 2, floor - door_h, x + door_w // 2, floor],
+                   fill=(10, 14, 22, 245), outline=(*accent, 220),
+                   width=max(2, int(3 * scale)))
+    window = int(34 * scale)
+    draw.rectangle([x + int(35 * scale), y0 + int(36 * scale),
+                    x + int(35 * scale) + window, y0 + int(36 * scale) + window],
+                   fill=(245, 247, 250, 210))
+
+
+def _draw_tool(draw: ImageDraw.ImageDraw, x: int, y: int, scale: float,
+               accent: tuple[int, int, int]) -> None:
+    stroke = max(5, int(7 * scale))
+    length = int(118 * scale)
+    draw.line([x - length // 2, y + int(35 * scale), x + length // 2, y - int(35 * scale)],
+              fill=(245, 247, 250, 235), width=stroke)
+    blade = [
+        (x + length // 2, y - int(35 * scale)),
+        (x + length // 2 + int(46 * scale), y - int(50 * scale)),
+        (x + length // 2 + int(24 * scale), y - int(4 * scale)),
+    ]
+    draw.polygon(blade, fill=(*accent, 235), outline=(255, 255, 255, 160))
 
 
 class PillowImageProvider:
