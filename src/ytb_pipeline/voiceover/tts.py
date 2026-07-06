@@ -9,6 +9,7 @@ import asyncio
 import json
 import re
 import subprocess
+from dataclasses import dataclass
 from dataclasses import replace
 from pathlib import Path
 
@@ -23,6 +24,54 @@ SENTENCE_PUNCT = ".!?…"
 CLAUSE_PUNCT = ",;:"
 
 
+@dataclass(frozen=True)
+class VoiceProfile:
+    name: str
+    comma_sec: float
+    sentence_sec: float
+    segment_sec: float
+    edge_rate: str = "+0%"
+    edge_pitch: str = "+0Hz"
+    f5_tempo: float = 1.0
+
+
+VOICE_NEUTRAL = VoiceProfile("neutral", 0.20, 0.32, 0.28)
+VOICE_ENTERTAINMENT = VoiceProfile(
+    "entertainment",
+    comma_sec=0.06,
+    sentence_sec=0.14,
+    segment_sec=0.08,
+    edge_rate="+16%",
+    edge_pitch="+8Hz",
+    f5_tempo=1.12,
+)
+VOICE_KNOWLEDGE = VoiceProfile(
+    "knowledge",
+    comma_sec=0.24,
+    sentence_sec=0.46,
+    segment_sec=0.34,
+    edge_rate="-4%",
+    edge_pitch="-2Hz",
+    f5_tempo=0.96,
+)
+
+_ENTERTAINMENT_HINTS = (
+    "giải trí", "giai tri", "người que", "nguoi que", "stickman", "hài",
+    "hai", "meme", "viral", "kéo view", "keo view", "vui nhộn", "vui nhon",
+)
+_KNOWLEDGE_HINTS = (
+    "kiến thức", "kien thuc", "giáo dục", "giao duc", "tâm lý", "tam ly",
+    "phát triển bản thân", "phat trien ban than", "khoa học", "khoa hoc",
+    "lịch sử", "lich su", "tài chính", "tai chinh", "sức khỏe", "suc khoe",
+)
+_STAGE_DIRECTION_PATTERNS = (
+    r"\bCú hình tiếp theo\s*:\s*",
+    r"\bBeat sau\s*:\s*",
+    r"\bChốt cảnh\s*:\s*",
+    r"\bChốt\s*\.\s*",
+)
+
+
 def synthesize(script: Script) -> Voiceover:
     """Sinh audio cho từng segment, đo duration, ghép thành 1 file mp3.
 
@@ -30,23 +79,24 @@ def synthesize(script: Script) -> Voiceover:
     """
     AUDIO_DIR.mkdir(parents=True, exist_ok=True)
     slug = _slugify(script.title)
+    profile = _voice_profile(script)
 
     # F5 local: nạp model 1 lần, sinh CẢ TẬP trong 1 process (đường nhanh).
     if settings.tts_provider == "f5":
-        voiced = _synth_all_f5(script, slug)
+        voiced = _synth_all_f5(script, slug, profile)
     else:
         voiced = []
         for i, seg in enumerate(script.segments):
-            seg_path = AUDIO_DIR / f"{slug}_{i:02d}.mp3"
+            seg_path = _segment_audio_path(slug, profile, i)
             # Resume: segment đã có audio hợp lệ từ lần chạy trước (bị dừng giữa
             # voiceover) -> bỏ qua, không gọi lại edge-tts cho segment này.
             dur = _probe_duration_or_zero(seg_path) if seg_path.exists() else 0.0
             if dur <= 0:
-                _synth_segment(seg.narration, script.voice, seg_path)
+                _synth_segment(_prepare_narration(seg.narration), script.voice, seg_path, profile)
                 dur = _probe_duration(seg_path)
             voiced.append(replace(seg, audio_path=seg_path, duration_sec=dur))
 
-    combined = AUDIO_DIR / f"{slug}.mp3"
+    combined = AUDIO_DIR / f"{slug}_{profile.name}.mp3"
     _concat_audio([s.audio_path for s in voiced], combined)
     total = sum(s.duration_sec for s in voiced)
 
@@ -58,7 +108,7 @@ def synthesize(script: Script) -> Voiceover:
     )
 
 
-def _synth_all_f5(script: Script, slug: str) -> list[Segment]:
+def _synth_all_f5(script: Script, slug: str, profile: VoiceProfile) -> list[Segment]:
     """Đường nhanh cho F5: gom mọi cụm của CẢ TẬP → worker nạp model 1 lần → ghép.
 
     Giữ NGUYÊN nhịp ngắt nghỉ như edge (cùng `_split_for_pacing` + chèn im lặng),
@@ -66,7 +116,7 @@ def _synth_all_f5(script: Script, slug: str) -> list[Segment]:
     """
     cached: list[Segment] = []
     for i, seg in enumerate(script.segments):
-        seg_path = AUDIO_DIR / f"{slug}_{i:02d}.mp3"
+        seg_path = _segment_audio_path(slug, profile, i)
         dur = _probe_duration_or_zero(seg_path) if seg_path.exists() else 0.0
         if dur <= 0:
             cached = []
@@ -77,19 +127,16 @@ def _synth_all_f5(script: Script, slug: str) -> list[Segment]:
 
     from .f5_provider import run_batch
 
-    comma = settings.pause_comma_ms / 1000
-    sentence = settings.pause_sentence_ms / 1000
-    seg_pause = settings.pause_segment_ms / 1000
-
     # Pha 1 — dựng danh sách cụm/segment + job toàn tập (mỗi cụm 1 wav).
     seg_pieces: list[list[tuple[str, float, Path]]] = []
     jobs: list[dict] = []
     for i, seg in enumerate(script.segments):
-        pieces = _split_for_pacing(seg.narration, comma, sentence) \
-            or [(seg.narration.strip(), 0.0)]
+        narration = _prepare_narration(seg.narration)
+        pieces = _split_for_pacing(narration, profile.comma_sec, profile.sentence_sec) \
+            or [(narration, 0.0)]
         items: list[tuple[str, float, Path]] = []
         for j, (piece, pause) in enumerate(pieces):
-            wav = AUDIO_DIR / f"{slug}_{i:02d}.p{j:02d}.f5.wav"
+            wav = AUDIO_DIR / f"{slug}_{profile.name}_{i:02d}.p{j:02d}.f5.wav"
             jobs.append({"text": piece, "out": str(wav)})
             items.append((piece, pause, wav))
         seg_pieces.append(items)
@@ -100,12 +147,12 @@ def _synth_all_f5(script: Script, slug: str) -> list[Segment]:
     # Pha 3 — ghép từng segment: wav→mp3 + chèn im lặng + nối.
     voiced: list[Segment] = []
     for i, seg in enumerate(script.segments):
-        seg_path = AUDIO_DIR / f"{slug}_{i:02d}.mp3"
+        seg_path = _segment_audio_path(slug, profile, i)
         parts: list[Path] = []
         tmp: list[Path] = []
         for j, (_piece, pause, wav) in enumerate(seg_pieces[i]):
             raw = seg_path.with_name(f"{seg_path.stem}.p{j:02d}.mp3")
-            _to_mp3(wav, raw)
+            _to_mp3(wav, raw, tempo=profile.f5_tempo)
             wav.unlink(missing_ok=True)
             parts.append(raw)
             tmp.append(raw)
@@ -114,9 +161,9 @@ def _synth_all_f5(script: Script, slug: str) -> list[Segment]:
                 _silence_mp3(pause, sil)
                 parts.append(sil)
                 tmp.append(sil)
-        if seg_pause > 0:
+        if profile.segment_sec > 0:
             sil = seg_path.with_name(f"{seg_path.stem}.send.mp3")
-            _silence_mp3(seg_pause, sil)
+            _silence_mp3(profile.segment_sec, sil)
             parts.append(sil)
             tmp.append(sil)
         _concat_audio(parts, seg_path)
@@ -125,6 +172,37 @@ def _synth_all_f5(script: Script, slug: str) -> list[Segment]:
         dur = _probe_duration(seg_path)
         voiced.append(replace(seg, audio_path=seg_path, duration_sec=dur))
     return voiced
+
+
+def _segment_audio_path(slug: str, profile: VoiceProfile, index: int) -> Path:
+    return AUDIO_DIR / f"{slug}_{profile.name}_{index:02d}.mp3"
+
+
+def _voice_profile(script: Script) -> VoiceProfile:
+    """Pick TTS pacing by content intent, not one news-reader voice for everything."""
+    haystack = " ".join([
+        script.topic,
+        script.title,
+        script.description,
+        " ".join(script.tags),
+        " ".join(seg.caption for seg in script.segments),
+        " ".join(seg.narration for seg in script.segments),
+        " ".join(seg.broll for seg in script.segments),
+    ]).lower()
+    if any(hint in haystack for hint in _ENTERTAINMENT_HINTS):
+        return VOICE_ENTERTAINMENT
+    if any(hint in haystack for hint in _KNOWLEDGE_HINTS):
+        return VOICE_KNOWLEDGE
+    return VOICE_NEUTRAL
+
+
+def _prepare_narration(text: str) -> str:
+    """Remove leaked visual/stage directions before TTS reads them out loud."""
+    cleaned = text.strip()
+    for pattern in _STAGE_DIRECTION_PATTERNS:
+        cleaned = re.sub(pattern, "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned
 
 
 def _split_for_pacing(text: str, comma_sec: float,
@@ -159,20 +237,19 @@ def _split_for_pacing(text: str, comma_sec: float,
     return out
 
 
-def _synth_segment(text: str, voice: str, out_mp3: Path) -> None:
+def _synth_segment(text: str, voice: str, out_mp3: Path, profile: VoiceProfile | None = None) -> None:
     """Tổng hợp 1 segment với nhịp ngắt nghỉ: synth từng cụm + chèn khoảng lặng,
     rồi nối lại. Khoảng lặng cuối = pause giữa segment (để video đỡ đọc một lèo)."""
-    comma = settings.pause_comma_ms / 1000
-    sentence = settings.pause_sentence_ms / 1000
-    seg_pause = settings.pause_segment_ms / 1000
+    profile = profile or VOICE_NEUTRAL
 
-    pieces = _split_for_pacing(text, comma, sentence) or [(text.strip(), 0.0)]
+    text = _prepare_narration(text)
+    pieces = _split_for_pacing(text, profile.comma_sec, profile.sentence_sec) or [(text.strip(), 0.0)]
 
     parts: list[Path] = []
     tmp: list[Path] = []
     for i, (piece, pause) in enumerate(pieces):
         raw = out_mp3.with_name(f"{out_mp3.stem}.p{i:02d}.mp3")
-        _synth_raw(piece, voice, raw)
+        _synth_raw(piece, voice, raw, profile)
         parts.append(raw)
         tmp.append(raw)
         if pause > 0:
@@ -181,9 +258,9 @@ def _synth_segment(text: str, voice: str, out_mp3: Path) -> None:
             parts.append(sil)
             tmp.append(sil)
 
-    if seg_pause > 0:
+    if profile.segment_sec > 0:
         sil = out_mp3.with_name(f"{out_mp3.stem}.send.mp3")
-        _silence_mp3(seg_pause, sil)
+        _silence_mp3(profile.segment_sec, sil)
         parts.append(sil)
         tmp.append(sil)
 
@@ -192,18 +269,18 @@ def _synth_segment(text: str, voice: str, out_mp3: Path) -> None:
         p.unlink(missing_ok=True)
 
 
-def _synth_raw(text: str, voice: str, out_mp3: Path) -> None:
+def _synth_raw(text: str, voice: str, out_mp3: Path, profile: VoiceProfile | None = None) -> None:
     """Dispatch theo provider; CHUẨN HOÁ về mp3 44100/stereo/192k để concat copy an toàn."""
     if settings.tts_provider == "f5":
         from .f5_provider import synthesize_f5
 
         wav = out_mp3.with_suffix(".f5.wav")
         synthesize_f5(text, wav)
-        _to_mp3(wav, out_mp3)
+        _to_mp3(wav, out_mp3, tempo=(profile or VOICE_NEUTRAL).f5_tempo)
         wav.unlink(missing_ok=True)
     else:
         raw = out_mp3.with_suffix(".edge.mp3")
-        asyncio.run(_tts(text, voice, raw))
+        asyncio.run(_tts(text, voice, raw, profile or VOICE_NEUTRAL))
         _to_mp3(raw, out_mp3)
         raw.unlink(missing_ok=True)
 
@@ -217,23 +294,29 @@ def _silence_mp3(seconds: float, out: Path) -> None:
     )
 
 
-def _to_mp3(src: Path, dst: Path) -> None:
-    subprocess.run(
-        ["ffmpeg", "-y", "-i", str(src), "-ar", "44100", "-ac", "2",
-         "-b:a", "192k", str(dst)],
-        capture_output=True, check=True,
-    )
+def _to_mp3(src: Path, dst: Path, *, tempo: float = 1.0) -> None:
+    cmd = ["ffmpeg", "-y", "-i", str(src)]
+    if abs(tempo - 1.0) > 0.001:
+        cmd += ["-filter:a", f"atempo={tempo:.3f}"]
+    cmd += ["-ar", "44100", "-ac", "2", "-b:a", "192k", str(dst)]
+    subprocess.run(cmd, capture_output=True, check=True)
 
 
 TTS_MAX_RETRIES = 3
 TTS_RETRY_DELAY = 2.0  # giây
 
 
-async def _tts(text: str, voice: str, out: Path) -> None:
+async def _tts(text: str, voice: str, out: Path, profile: VoiceProfile | None = None) -> None:
     """Gọi edge-tts; retry khi rớt mạng (NoAudioReceived) — lỗi transient hay gặp."""
+    profile = profile or VOICE_NEUTRAL
     for attempt in range(1, TTS_MAX_RETRIES + 1):
         try:
-            communicate = edge_tts.Communicate(text, voice)
+            communicate = edge_tts.Communicate(
+                text,
+                voice,
+                rate=profile.edge_rate,
+                pitch=profile.edge_pitch,
+            )
             await communicate.save(str(out))
             return
         except edge_tts.exceptions.NoAudioReceived:

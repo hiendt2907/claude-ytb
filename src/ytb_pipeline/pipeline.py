@@ -156,11 +156,12 @@ async def run_project(project: Project, checkpoint: CheckpointManager) -> Projec
                 )
             total = float(data.get("duration_sec") or sum(s.duration_sec for s in voiced))
         else:
-            from .voiceover.tts import _probe_duration_or_zero, _slugify
+            from .voiceover.tts import _probe_duration_or_zero, _segment_audio_path, _slugify, _voice_profile
 
             slug = _slugify(script.title)
+            profile = _voice_profile(script)
             for i, seg in enumerate(script.segments):
-                seg_path = Path("assets/audio") / f"{slug}_{i:02d}.mp3"
+                seg_path = _segment_audio_path(slug, profile, i)
                 dur = _probe_duration_or_zero(seg_path) if seg_path.exists() else 0.0
                 voiced.append(replace(seg, audio_path=seg_path if seg_path.exists() else None, duration_sec=dur))
             total = _probe_duration_or_zero(audio_path) if audio_path.exists() else sum(s.duration_sec for s in voiced)

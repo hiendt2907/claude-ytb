@@ -51,11 +51,11 @@ def test_settings_default_to_local_first_stack():
     assert settings.llm_provider == "ollama"
     assert settings.tts_provider in {"f5", "vieneu", "vixtts"}
     assert settings.image_provider == "pillow"
-    assert settings.video_provider == "disabled"
-    assert settings.broll_strategy == "local_image_motion"
+    assert settings.video_provider == "pexels"
+    assert settings.broll_strategy == "pexels"
 
 
-def test_ai_render_provider_local_image_motion_does_not_require_pexels(monkeypatch):
+def test_ai_render_provider_requires_pexels_for_real_footage(monkeypatch):
     from ytb_pipeline.providers.render.ai_provider import AiRenderProvider
 
     original = {
@@ -64,10 +64,10 @@ def test_ai_render_provider_local_image_motion_does_not_require_pexels(monkeypat
         "pexels_api_key": settings.pexels_api_key,
     }
     try:
-        settings.broll_strategy = "local_image_motion"
+        settings.broll_strategy = "pexels"
         settings.image_provider = "pillow"
         settings.pexels_api_key = ""
-        assert AiRenderProvider().is_available() is True
+        assert AiRenderProvider().is_available() is False
     finally:
         for key, value in original.items():
             setattr(settings, key, value)

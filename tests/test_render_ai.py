@@ -79,22 +79,20 @@ def test_dims_theo_orientation(monkeypatch):
     assert compose_ai._dims() == (1080, 1920, False)
 
 
-def test_local_image_cache_key_includes_provider_version(monkeypatch, tmp_path):
-    class FakeProvider:
-        name = "pillow"
-        cache_version = "scene-test"
+def test_moving_background_rejects_local_image_motion(monkeypatch, tmp_path):
+    monkeypatch.setattr(settings, "broll_strategy", "local_image_motion")
 
-        def generate(self, prompt, width, height, output_path, **kwargs):
-            output_path.write_bytes(b"not-a-real-image")
-            return output_path
-
-    monkeypatch.setattr(compose_ai, "get_image_provider", lambda _name: FakeProvider())
-    monkeypatch.setattr(compose_ai, "_valid_image", lambda path: True)
-
-    out = compose_ai._local_image("người que chạy", (1080, 1920), tmp_path)
-
-    assert out.parent.name == "local_images"
-    assert out.name == "3e6fcabdfd0c5a66.png"
+    with pytest.raises(RuntimeError, match="Pillow"):
+        compose_ai._moving_background(
+            "prompt",
+            5.0,
+            index=0,
+            dims=(1080, 1920),
+            landscape=False,
+            work=tmp_path,
+            prefix="seg00",
+            used=set(),
+        )
 
 
 def test_render_ai_giu_bat_bien_khong_mutate_voiceover(monkeypatch, tmp_path):

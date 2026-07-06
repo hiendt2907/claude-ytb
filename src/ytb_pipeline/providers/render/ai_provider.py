@@ -15,10 +15,5 @@ class AiRenderProvider:
 
     def is_available(self) -> bool:
         from ...config.settings import settings
-        from ..registry import get_image_provider, get_video_provider
 
-        if settings.broll_strategy == "pexels":
-            return bool(getattr(settings, "pexels_api_key", None))
-        if settings.broll_strategy in {"local_video", "mixed", "ai_video"}:
-            return get_video_provider(settings.video_provider).is_available()
-        return get_image_provider(settings.image_provider).is_available()
+        return settings.broll_strategy == "pexels" and bool(getattr(settings, "pexels_api_key", None))

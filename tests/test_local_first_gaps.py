@@ -50,103 +50,23 @@ def test_load_script_preserves_segment_video_type(tmp_path):
     assert script.segments[0].video_type == "ai_video"
 
 
-def test_mixed_render_uses_cached_local_video_for_ai_video_segment(tmp_path, monkeypatch):
+def test_render_rejects_removed_local_video_strategy(tmp_path, monkeypatch):
     from ytb_pipeline.config.settings import settings
-    from ytb_pipeline.pkg.models import Segment
     from ytb_pipeline.render import compose_ai
-
-    calls: list[Path] = []
-
-    class FakeVideoProvider:
-        name = "wan"
-
-        def generate(self, prompt, duration_sec, width, height, output_path, **kwargs):
-            calls.append(Path(output_path))
-            Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-            Path(output_path).write_bytes(b"video")
-            return Path(output_path)
-
-        def is_available(self):
-            return True
 
     monkeypatch.setattr(settings, "broll_strategy", "mixed")
-    monkeypatch.setattr(settings, "video_provider", "wan")
-    monkeypatch.setattr(compose_ai, "get_video_provider", lambda _name=None: FakeVideoProvider())
-    monkeypatch.setattr(compose_ai, "_valid_clip", lambda path: Path(path).exists())
 
-    seg = Segment(
-        caption="cap",
-        narration="n",
-        broll="prompt",
-        video_type="ai_video",
-        hook=True,
-        duration_sec=5.0,
-    )
-
-    first = compose_ai._local_background(
-        "prompt",
-        5.0,
-        index=3,
-        dims=(1080, 1920),
-        work=tmp_path,
-        prefix="seg03",
-        segment=seg,
-    )
-    second = compose_ai._local_background(
-        "prompt",
-        5.0,
-        index=3,
-        dims=(1080, 1920),
-        work=tmp_path,
-        prefix="seg03b",
-        segment=seg,
-    )
-
-    assert first == second
-    assert len(calls) == 1
-    assert "local_videos" in str(first)
-
-
-def test_local_image_motion_ignores_ai_video_segment_type(tmp_path, monkeypatch):
-    from ytb_pipeline.config.settings import settings
-    from ytb_pipeline.pkg.models import Segment
-    from ytb_pipeline.render import compose_ai
-
-    image = tmp_path / "image.png"
-    image.write_bytes(b"png")
-    built: list[Path] = []
-
-    monkeypatch.setattr(settings, "broll_strategy", "local_image_motion")
-    monkeypatch.setattr(compose_ai, "get_video_provider", lambda _name=None: pytest.fail("Wan must stay disabled"))
-    monkeypatch.setattr(compose_ai, "_local_image", lambda *args, **kwargs: image)
-
-    def fake_build_background(beats, dims, out):
-        built.append(Path(out))
-        Path(out).write_bytes(b"video")
-
-    monkeypatch.setattr(compose_ai, "_build_background", fake_build_background)
-
-    seg = Segment(
-        caption="cap",
-        narration="n",
-        broll="prompt",
-        video_type="ai_video",
-        hook=True,
-        duration_sec=5.0,
-    )
-
-    out = compose_ai._local_background(
-        "prompt",
-        5.0,
-        index=0,
-        dims=(1080, 1920),
-        work=tmp_path,
-        prefix="seg00",
-        segment=seg,
-    )
-
-    assert out == tmp_path / "seg00_bg.mp4"
-    assert built == [out]
+    with pytest.raises(RuntimeError, match="BROLL_STRATEGY"):
+        compose_ai._moving_background(
+            "prompt",
+            5.0,
+            index=0,
+            dims=(1080, 1920),
+            landscape=False,
+            work=tmp_path,
+            prefix="seg00",
+            used=set(),
+        )
 
 
 def test_local_benchmark_writes_report_for_available_and_missing_providers(tmp_path, monkeypatch):

@@ -167,18 +167,16 @@ def run_local_doctor_checks() -> list[tuple[str, bool, str]]:
         ))
 
         video = get_video_provider(cli.settings.video_provider)
-        needs_video_model = cli.settings.broll_strategy in {"local_video", "mixed", "ai_video"}
         video_status = (
             video.availability_status()
             if hasattr(video, "availability_status")
             else (video.is_available(), f"provider={video.name}" if video.is_available() else "provider unavailable")
         )
         checks.append((
-            "Wan/LTX local video",
-            (not needs_video_model) or video_status[0],
-            "không bắt buộc cho local_image_motion"
-            if not needs_video_model
-            else video_status[1],
+            "Pexels footage provider",
+            cli.settings.broll_strategy == "pexels" and video_status[0],
+            video_status[1] if cli.settings.broll_strategy == "pexels"
+            else "BROLL_STRATEGY phải là pexels để render footage thật",
         ))
     except Exception as exc:  # noqa: BLE001
         checks.append(("Provider registry", False, str(exc)))

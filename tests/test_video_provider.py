@@ -24,7 +24,7 @@ def test_disabled_video_provider_is_intentional_image_motion_mode(tmp_path):
     ok, detail = p.availability_status()
 
     assert ok is False
-    assert "local_image_motion" in detail
+    assert "BROLL_STRATEGY=pexels" in detail
     assert p.is_available() is False
     with pytest.raises(ProviderUnavailableError):
         p.generate("prompt", 5.0, 1080, 1920, tmp_path / "out.mp4")

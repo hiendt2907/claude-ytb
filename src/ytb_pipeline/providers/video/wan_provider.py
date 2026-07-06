@@ -62,7 +62,7 @@ class WanVideoProvider:
         if not ok:
             raise ProviderUnavailableError(
                 f"WanVideoProvider không khả dụng: {detail}. "
-                "Cài Wan/LTX runner hoặc dùng BROLL_STRATEGY=local_image_motion."
+                "Cài Wan/LTX runner hoặc dùng BROLL_STRATEGY=pexels cho footage thật."
             )
 
         cli = settings.wan_cli

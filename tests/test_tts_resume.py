@@ -30,11 +30,12 @@ def _script() -> Script:
 def test_synthesize_skips_segment_with_existing_valid_audio(monkeypatch, tmp_path):
     script = _script()
     slug = tts._slugify(script.title)
-    seg0_path = tmp_path / f"{slug}_00.mp3"
+    profile = tts._voice_profile(script)
+    seg0_path = tts._segment_audio_path(slug, profile, 0)
     seg0_path.write_bytes(b"fake-but-present")  # nội dung không quan trọng, ffprobe bị mock
 
     synth_calls = []
-    monkeypatch.setattr(tts, "_synth_segment", lambda text, voice, out: synth_calls.append(out))
+    monkeypatch.setattr(tts, "_synth_segment", lambda text, voice, out, profile=None: synth_calls.append(out))
 
     def _fake_probe(path: Path) -> float:
         if path == seg0_path:
@@ -49,18 +50,19 @@ def test_synthesize_skips_segment_with_existing_valid_audio(monkeypatch, tmp_pat
     # Segment 0 đã có audio hợp lệ -> KHÔNG gọi lại _synth_segment cho nó.
     assert seg0_path not in synth_calls
     # Segment 1 chưa có file -> phải synth.
-    assert tmp_path / f"{slug}_01.mp3" in synth_calls
+    assert tts._segment_audio_path(slug, profile, 1) in synth_calls
 
 
 @pytest.mark.unit
 def test_synthesize_resynths_segment_with_corrupt_existing_audio(monkeypatch, tmp_path):
     script = _script()
     slug = tts._slugify(script.title)
-    seg0_path = tmp_path / f"{slug}_00.mp3"
+    profile = tts._voice_profile(script)
+    seg0_path = tts._segment_audio_path(slug, profile, 0)
     seg0_path.write_bytes(b"corrupt")
 
     synth_calls = []
-    monkeypatch.setattr(tts, "_synth_segment", lambda text, voice, out: synth_calls.append(out))
+    monkeypatch.setattr(tts, "_synth_segment", lambda text, voice, out, profile=None: synth_calls.append(out))
 
     import subprocess
 
@@ -88,8 +90,9 @@ def test_synthesize_f5_skips_batch_when_all_segments_cached(monkeypatch, tmp_pat
     monkeypatch.setattr(settings, "tts_provider", "f5")
     script = _script()
     slug = tts._slugify(script.title)
+    profile = tts._voice_profile(script)
     for i in range(len(script.segments)):
-        (tmp_path / f"{slug}_{i:02d}.mp3").write_bytes(b"cached")
+        tts._segment_audio_path(slug, profile, i).write_bytes(b"cached")
 
     def _fake_probe(path: Path) -> float:
         if path.name.endswith(".mp3"):
@@ -102,7 +105,7 @@ def test_synthesize_f5_skips_batch_when_all_segments_cached(monkeypatch, tmp_pat
     voiceover = tts.synthesize(script)
 
     assert [s.audio_path for s in voiceover.segments] == [
-        tmp_path / f"{slug}_00.mp3",
-        tmp_path / f"{slug}_01.mp3",
+        tts._segment_audio_path(slug, profile, 0),
+        tts._segment_audio_path(slug, profile, 1),
     ]
     assert voiceover.duration_sec == 8.0

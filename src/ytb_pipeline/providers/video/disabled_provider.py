@@ -13,8 +13,8 @@ class DisabledVideoProvider:
     def availability_status(self) -> tuple[bool, str]:
         return (
             False,
-            "local video generation disabled; dùng BROLL_STRATEGY=local_image_motion "
-            "hoặc cấu hình VIDEO_PROVIDER=wan trên máy GPU phù hợp",
+            "video provider disabled; production render dùng BROLL_STRATEGY=pexels "
+            "và VIDEO_PROVIDER=pexels để lấy footage thật",
         )
 
     def is_available(self) -> bool:

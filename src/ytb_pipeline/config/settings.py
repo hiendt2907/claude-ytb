@@ -25,8 +25,8 @@ class Settings(BaseSettings):
 
     # Render
     render_provider: str = "ai"  # slide | ai
-    image_provider: str = "pillow"  # pillow | flux
-    broll_strategy: str = "local_image_motion"  # local_image_motion | local_video | mixed | pexels
+    image_provider: str = "pillow"  # dùng cho thumbnail/overlay; không dùng làm video chính
+    broll_strategy: str = "pexels"  # pexels = footage thật; local_image_motion đã bỏ khỏi production
     comfyui_url: str = "http://127.0.0.1:8188"  # ComfyUI local API (Flux)
     flux_checkpoint_name: str = "flux1-dev-fp8.safetensors"
     orientation: str = "portrait"   # portrait (1080x1920 Short) | landscape (1920x1080 clip)
@@ -95,22 +95,22 @@ class Settings(BaseSettings):
     ollama_coder_model: str = "qwen2.5-coder:7b"
 
     # Video generation
-    video_provider: str = "disabled"      # disabled | wan | ltx | pexels
+    video_provider: str = "pexels"        # pexels là đường render footage thật mặc định
     wan_model_path: str = ""              # path to Wan2.2 model weights
     wan_cli: str = "wan2.2"
     render_validation_max_drift_sec: float = 1.0
 
-    # Local stack shortcut: set OMNI_LOCAL=true to use the hardware-safe local stack
-    # (ollama LLM + f5 voice + Pillow image + ffmpeg image-motion render)
+    # Local stack shortcut: set OMNI_LOCAL=true for local LLM/TTS only.
+    # Render vẫn dùng Pexels footage thật; không quay lại Pillow image-motion.
     local_mode: bool = False
     allow_cloud_providers: bool = False
 
     def model_post_init(self, __context) -> None:  # noqa: ANN001
         """Make local-first the default even when legacy .env still names cloud providers.
 
-        Cloud/stock providers remain available, but they must be explicitly enabled with
-        ALLOW_CLOUD_PROVIDERS=true. This keeps old .env files from silently pulling the
-        normal production path back to Claude/edge/Pexels.
+        Legacy LLM/TTS cloud providers still need ALLOW_CLOUD_PROVIDERS=true.
+        Pexels is the production video-footage path and is not downgraded to
+        Pillow image-motion anymore.
         """
         if self.allow_cloud_providers:
             return
@@ -118,10 +118,6 @@ class Settings(BaseSettings):
             self.llm_provider = "ollama"
         if self.tts_provider in {"edge", "elevenlabs"}:
             self.tts_provider = "f5"
-        if self.video_provider in {"pexels", "wan"} and self.broll_strategy == "local_image_motion":
-            self.video_provider = "disabled"
-        if self.broll_strategy == "pexels":
-            self.broll_strategy = "local_image_motion"
 
 
 settings = Settings()

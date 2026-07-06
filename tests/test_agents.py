@@ -311,6 +311,34 @@ async def test_voice_director_without_code_recommends_edge_provider():
     assert result.output["pause_adjustments"]["pace"] == "normal"
 
 
+async def test_voice_director_entertainment_recommends_fast_profile():
+    agent = VoiceDirectorAgent()
+    script = {
+        "topic": "giải trí người que",
+        "segments": [{"narration": "Người que chạy rồi té cái rầm.", "broll": "người que chạy"}],
+        "voice": "vi-VN-NamMinhNeural",
+    }
+
+    result = await agent.run({"script": script})
+
+    assert result.output["pause_adjustments"]["pace"] == "fast"
+    assert result.output["pause_adjustments"]["profile"] == "entertainment"
+
+
+async def test_voice_director_knowledge_recommends_inspiring_profile():
+    agent = VoiceDirectorAgent()
+    script = {
+        "topic": "kiến thức tâm lý",
+        "segments": [{"narration": "Một cơ chế nhỏ có thể đổi hành vi.", "broll": "psychology"}],
+        "voice": "vi-VN-NamMinhNeural",
+    }
+
+    result = await agent.run({"script": script})
+
+    assert result.output["pause_adjustments"]["pace"] == "inspiring"
+    assert result.output["pause_adjustments"]["profile"] == "knowledge"
+
+
 async def test_voice_director_voice_clone_required_prefers_f5():
     agent = VoiceDirectorAgent()
     script = {"segments": [{"narration": "n1", "code": ""}], "voice": "custom"}
