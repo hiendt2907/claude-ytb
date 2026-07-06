@@ -15,6 +15,7 @@ from __future__ import annotations
 import subprocess
 import hashlib
 import logging
+import re
 from dataclasses import replace
 from pathlib import Path
 
@@ -92,6 +93,7 @@ def render_video_ai(voiceover: Voiceover) -> RenderedVideo:
     work.mkdir(exist_ok=True)
     slug = slide._slug(voiceover)
     w, h, landscape = _dims()
+    visual_suffix = _visual_cache_suffix()
     fallback_query = _fallback_query(voiceover.title)
 
     # Bộ đếm link B-roll đã dùng — chống lặp clip XUYÊN SUỐT video (nhiều segment
@@ -102,13 +104,14 @@ def render_video_ai(voiceover: Voiceover) -> RenderedVideo:
     whoosh_before: list[bool] = []
     for i, seg in enumerate(voiceover.segments):
         query = seg.broll.strip() or fallback_query
-        clip = work / f"{slug}_{i:02d}.mp4"
+        prefix = f"{slug}_{visual_suffix}_{i:02d}"
+        clip = work / f"{prefix}.mp4"
         expected_duration = slide._audio_duration(seg.audio_path)
         # Resume: segment đã render xong hợp lệ ở lần chạy trước (bị dừng giữa
         # render) -> bỏ qua, không tải B-roll/dựng lại clip này.
         if not (clip.exists() and _valid_clip(clip, expected_duration=expected_duration, expected_dims=(w, h))):
             _render_broll_segment(seg, index=i, total=len(voiceover.segments),
-                                  query=query, work=work, prefix=f"{slug}_{i:02d}",
+                                  query=query, work=work, prefix=prefix,
                                   out=clip, dims=(w, h), landscape=landscape,
                                   used=used_broll)
         clips.append(clip)
@@ -116,7 +119,7 @@ def render_video_ai(voiceover: Voiceover) -> RenderedVideo:
 
     # Cold-open hook: dồn các cảnh hành động (seg.hook) lên đầu video.
     cold = _hook_coldopen(voiceover, dims=(w, h), landscape=landscape,
-                          work=work, slug=slug, used=used_broll)
+                          work=work, slug=f"{slug}_{visual_suffix}", used=used_broll)
     if cold is not None:
         clips.insert(0, cold)
         whoosh_before.insert(0, False)
@@ -136,6 +139,23 @@ def render_video_ai(voiceover: Voiceover) -> RenderedVideo:
     )
     validate_render(rendered, expected_dims=(w, h), expected_duration_sec=expected_duration)
     return rendered
+
+
+def _visual_cache_suffix() -> str:
+    """Cache namespace for rendered segment clips.
+
+    Segment mp4 files are resumable, so the filename must include the visual
+    strategy. Otherwise switching from image-motion to Pexels would silently
+    reuse old clips that only matched duration/dimensions.
+    """
+    raw = "|".join((
+        settings.broll_strategy,
+        settings.video_provider,
+        settings.image_provider,
+        settings.orientation,
+    ))
+    safe = re.sub(r"[^a-z0-9_-]+", "-", raw.lower()).strip("-")
+    return safe[:56] or "visual"
 
 
 def _timeline_duration(clips: list[Path], *, xfade: float = transitions.XFADE_SEC) -> float:

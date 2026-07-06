@@ -123,6 +123,23 @@ def test_render_ai_giu_bat_bien_khong_mutate_voiceover(monkeypatch, tmp_path):
     assert vo.segments[0].broll == "x"  # input nguyên vẹn
 
 
+def test_visual_cache_suffix_separates_pexels_from_image_motion(monkeypatch):
+    monkeypatch.setattr(compose_ai.settings, "broll_strategy", "pexels")
+    monkeypatch.setattr(compose_ai.settings, "video_provider", "pexels")
+    monkeypatch.setattr(compose_ai.settings, "image_provider", "pillow")
+    monkeypatch.setattr(compose_ai.settings, "orientation", "portrait")
+
+    pexels_suffix = compose_ai._visual_cache_suffix()
+
+    monkeypatch.setattr(compose_ai.settings, "broll_strategy", "local_image_motion")
+    monkeypatch.setattr(compose_ai.settings, "video_provider", "disabled")
+
+    image_suffix = compose_ai._visual_cache_suffix()
+
+    assert pexels_suffix != image_suffix
+    assert "pexels" in pexels_suffix
+
+
 def test_beat_durations_giu_tong_va_cat_nhieu_canh():
     # Đoạn 24s, cadence thường ~6s -> 4 beat đều, tổng giữ nguyên
     durs = compose_ai._beat_durations(24.0, hook=False)

@@ -154,6 +154,9 @@ def test_build_env_forces_telegram_approval_false():
     assert env["TELEGRAM_APPROVAL"] == "false"
     assert env["YOUTUBE_PUBLISH_AT"] == item.publish_at
     assert env["RENDER_PROVIDER"] == "ai"
+    assert env["ALLOW_CLOUD_PROVIDERS"] == "true"
+    assert env["BROLL_STRATEGY"] == "pexels"
+    assert env["VIDEO_PROVIDER"] == "pexels"
     assert env["DRY_RUN"] == "false"
 
 

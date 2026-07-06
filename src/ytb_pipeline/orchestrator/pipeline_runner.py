@@ -81,6 +81,9 @@ def build_env(item: QueueItem) -> dict:
         {
             "TELEGRAM_APPROVAL": "false",
             "RENDER_PROVIDER": "ai",
+            "ALLOW_CLOUD_PROVIDERS": "true",
+            "BROLL_STRATEGY": "pexels",
+            "VIDEO_PROVIDER": "pexels",
             "ORIENTATION": item.orientation,
             "DRY_RUN": "false",
             "YOUTUBE_PUBLISH_AT": item.publish_at,
