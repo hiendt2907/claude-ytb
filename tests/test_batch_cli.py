@@ -157,6 +157,42 @@ def test_build_env_forces_telegram_approval_false():
     assert env["DRY_RUN"] == "false"
 
 
+def test_build_env_uses_queue_orientation_for_shorts():
+    item = cli.QueueItem(
+        day=1,
+        slug="short-video",
+        publish_at="",
+        shorts_status="queued",
+        orientation="portrait",
+    )
+
+    env = cli.build_env(item)
+
+    assert env["ORIENTATION"] == "portrait"
+
+
+def test_load_queue_preserves_item_orientation(tmp_path):
+    auto_state = tmp_path / "auto_state.json"
+    auto_state.write_text(json.dumps({
+        "shorts_funnel_batch_2026-07-06": {
+            "long_videos": [],
+            "short_videos": [
+                {
+                    "day": 1,
+                    "slug": "short-video",
+                    "publish_at": "",
+                    "shorts_status": "queued",
+                    "orientation": "portrait",
+                },
+            ],
+        }
+    }), encoding="utf-8")
+
+    queue = cli.load_queue(auto_state)
+
+    assert queue[0].orientation == "portrait"
+
+
 # ── run_with_retry ────────────────────────────────────────────────────────────
 def _completed(returncode, stdout="", stderr=""):
     return subprocess.CompletedProcess(args=[], returncode=returncode, stdout=stdout, stderr=stderr)

@@ -59,18 +59,18 @@ def publish(video: RenderedVideo, platform: str = "youtube_short") -> PublishRes
     if video.video_path is None or not video.video_path.exists():
         raise FileNotFoundError(f"Không tìm thấy file video: {video.video_path}")
 
+    is_short = _is_short(video)
+    hashtags = _build_hashtags(video, is_short)
+    description = _with_hashtags(video.description, hashtags)
+    print(f"  Loại: {'YouTube Short (dọc, ≤3p)' if is_short else 'Clip thường'}")
+    print(f"  Hashtag: {' '.join(hashtags) or '(không có)'}")
+
     # import trong hàm để DRY_RUN không cần thư viện Google
     from googleapiclient.http import MediaFileUpload
 
     from .youtube_auth import get_youtube_client
 
     youtube = get_youtube_client()
-
-    is_short = _is_short(video)
-    hashtags = _build_hashtags(video, is_short)
-    description = _with_hashtags(video.description, hashtags)
-    print(f"  Loại: {'YouTube Short (dọc, ≤3p)' if is_short else 'Clip thường'}")
-    print(f"  Hashtag: {' '.join(hashtags) or '(không có)'}")
 
     body = {
         "snippet": {

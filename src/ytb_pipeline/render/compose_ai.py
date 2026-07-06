@@ -44,7 +44,12 @@ MAX_COLD_SHOTS = 3        # số cảnh hành động tối đa trong cold-open
 logger = logging.getLogger(__name__)
 
 
-def _valid_clip(path: Path, *, expected_duration: float | None = None) -> bool:
+def _valid_clip(
+    path: Path,
+    *,
+    expected_duration: float | None = None,
+    expected_dims: tuple[int, int] | None = None,
+) -> bool:
     """True nếu `path` là video đọc được, có duration hợp lệ.
 
     Khi resume render segment, file cũ có thể đọc được nhưng lệch duration do
@@ -61,8 +66,14 @@ def _valid_clip(path: Path, *, expected_duration: float | None = None) -> bool:
         if duration <= 0:
             return False
         if expected_duration is None:
+            duration_ok = True
+        else:
+            duration_ok = abs(duration - expected_duration) <= settings.render_validation_max_drift_sec
+        if not duration_ok:
+            return False
+        if expected_dims is None:
             return True
-        return abs(duration - expected_duration) <= settings.render_validation_max_drift_sec
+        return _clip_dims(path) == expected_dims
     except (subprocess.CalledProcessError, ValueError):
         return False
 
@@ -95,7 +106,7 @@ def render_video_ai(voiceover: Voiceover) -> RenderedVideo:
         expected_duration = slide._audio_duration(seg.audio_path)
         # Resume: segment đã render xong hợp lệ ở lần chạy trước (bị dừng giữa
         # render) -> bỏ qua, không tải B-roll/dựng lại clip này.
-        if not (clip.exists() and _valid_clip(clip, expected_duration=expected_duration)):
+        if not (clip.exists() and _valid_clip(clip, expected_duration=expected_duration, expected_dims=(w, h))):
             _render_broll_segment(seg, index=i, total=len(voiceover.segments),
                                   query=query, work=work, prefix=f"{slug}_{i:02d}",
                                   out=clip, dims=(w, h), landscape=landscape,
@@ -132,6 +143,20 @@ def _timeline_duration(clips: list[Path], *, xfade: float = transitions.XFADE_SE
     if not clips:
         return 0.0
     return max(0.0, sum(transitions._duration(c) for c in clips) - xfade * (len(clips) - 1))
+
+
+def _clip_dims(path: Path) -> tuple[int, int] | None:
+    try:
+        out = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "v:0",
+             "-show_entries", "stream=width,height", "-of", "csv=p=0:s=x", str(path)],
+            capture_output=True, text=True, check=True,
+        )
+        raw = out.stdout.strip().splitlines()[0]
+        w, h = raw.split("x", 1)
+        return int(w), int(h)
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def _render_broll_segment(seg, index: int, total: int, query: str, work: Path,
@@ -322,7 +347,8 @@ def _local_image(prompt: str, dims: tuple[int, int], work: Path) -> Path:
     """Generate/cache one readable image per prompt+dims+provider."""
     w, h = dims
     provider = get_image_provider(settings.image_provider)
-    digest = hashlib.sha256(f"{provider.name}|{w}x{h}|{prompt}".encode("utf-8")).hexdigest()[:16]
+    cache_version = getattr(provider, "cache_version", "v1")
+    digest = hashlib.sha256(f"{provider.name}|{cache_version}|{w}x{h}|{prompt}".encode("utf-8")).hexdigest()[:16]
     out = work / "local_images" / f"{digest}.png"
     if out.exists() and _valid_image(out):
         return out

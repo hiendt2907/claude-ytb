@@ -41,6 +41,7 @@ class QueueItem:
     slug: str
     publish_at: str
     shorts_status: str
+    orientation: str = "landscape"
 
 
 def load_queue(auto_state_path: Path | None = None, batch_key: str | None = None) -> list[QueueItem]:
@@ -60,6 +61,7 @@ def load_queue(auto_state_path: Path | None = None, batch_key: str | None = None
             v["slug"],
             v.get("publish_at", ""),
             v.get("shorts_status", v.get("status", "queued")),
+            v.get("orientation", "landscape"),
         )
         for v in videos
     ]

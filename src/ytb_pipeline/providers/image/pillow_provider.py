@@ -1,17 +1,19 @@
-"""Adapter — bọc logic gradient hiện có trong `render/compose.py` thành ImageProvider.
+"""Adapter — visual keyframe generator bằng Pillow.
 
-KHÔNG xoá `_gradient()` khỏi compose.py (giữ backward compat) — provider này chỉ
-tái lập logic tương đương để dùng qua interface chung `ImageProvider`. Khi
-`prompt` chứa từ khoá màu (dark/blue/warm/...), gradient đổi sắc tương ứng;
-mặc định giữ tông GitHub dark gốc (13,17,23 → 22,27,34).
+Provider này là fallback local-first khi không dùng Flux/Wan. Nó không chỉ vẽ
+gradient: mỗi prompt tạo một keyframe có nền, mặt sàn, chủ thể, action marks và
+stickman scene nếu prompt có người que/stickman. FFmpeg sau đó animate keyframe
+bằng Ken Burns trong `render/compose_ai.py`.
 """
 
+import hashlib
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageDraw
 
 DEFAULT_TOP = (13, 17, 23)
 DEFAULT_BOTTOM = (22, 27, 34)
+CACHE_VERSION = "pillow-scene-v2"
 
 # Từ khoá màu đơn giản trong prompt → (top, bottom). Khớp gần đúng theo substring.
 COLOR_HINTS: dict[str, tuple[tuple[int, int, int], tuple[int, int, int]]] = {
@@ -44,13 +46,229 @@ def _draw_gradient(width: int, height: int,
     return base
 
 
+def _seed(prompt: str) -> int:
+    return int(hashlib.sha256((prompt or "").encode("utf-8")).hexdigest()[:8], 16)
+
+
+def _is_stickman_prompt(prompt: str) -> bool:
+    lowered = (prompt or "").lower()
+    return any(word in lowered for word in ("người que", "nguoi que", "stickman"))
+
+
+def _accent(seed: int) -> tuple[int, int, int]:
+    palette = (
+        (246, 196, 83),
+        (91, 192, 190),
+        (238, 108, 77),
+        (139, 211, 70),
+        (239, 118, 122),
+    )
+    return palette[seed % len(palette)]
+
+
+def _draw_scene(img: Image.Image, prompt: str) -> None:
+    draw = ImageDraw.Draw(img, "RGBA")
+    w, h = img.size
+    seed = _seed(prompt)
+    accent = _accent(seed)
+
+    horizon = int(h * 0.68)
+    draw.rectangle([0, horizon, w, h], fill=(8, 12, 18, 185))
+    draw.line([0, horizon, w, horizon], fill=(*accent, 190), width=max(4, w // 180))
+
+    # Background depth: deterministic panels/props so the frame is not a flat card.
+    for i in range(4):
+        x = int((i + 0.5) * w / 4 + ((seed >> (i * 3)) % 45) - 22)
+        top = int(h * (0.16 + 0.04 * (i % 2)))
+        panel_w = int(w * (0.11 + 0.02 * ((seed >> i) % 3)))
+        draw.rounded_rectangle(
+            [x - panel_w, top, x + panel_w, horizon - 24],
+            radius=max(8, w // 80),
+            fill=(255, 255, 255, 18 + 8 * (i % 2)),
+            outline=(255, 255, 255, 35),
+            width=max(1, w // 360),
+        )
+
+    if _is_stickman_prompt(prompt):
+        _draw_stickman_scene(draw, prompt, w, h, accent, seed)
+    else:
+        _draw_generic_scene(draw, prompt, w, h, accent, seed)
+
+
+def _draw_generic_scene(draw: ImageDraw.ImageDraw, prompt: str, w: int, h: int,
+                        accent: tuple[int, int, int], seed: int) -> None:
+    cx, cy = w // 2, int(h * 0.52)
+    radius = max(44, min(w, h) // 9)
+    draw.ellipse([cx - radius, cy - radius, cx + radius, cy + radius],
+                 fill=(*accent, 210), outline=(255, 255, 255, 230), width=max(3, w // 160))
+    for i in range(9):
+        angle = (seed + i * 41) % 360
+        x = cx + int((radius * 1.7) * __import__("math").cos(angle))
+        y = cy + int((radius * 1.1) * __import__("math").sin(angle))
+        r = max(8, radius // 8)
+        draw.ellipse([x - r, y - r, x + r, y + r], fill=(255, 255, 255, 65))
+    _draw_motion_burst(draw, (cx, cy), radius * 2, accent, w)
+
+
+def _draw_stickman_scene(draw: ImageDraw.ImageDraw, prompt: str, w: int, h: int,
+                         accent: tuple[int, int, int], seed: int) -> None:
+    lowered = prompt.lower()
+    floor = int(h * 0.70)
+    main_x = int(w * 0.43)
+    main_y = floor - int(h * 0.08)
+    scale = max(1.0, min(w, h) / 900)
+    action = _action_from_prompt(lowered)
+
+    # Props derived from common entertainment prompts.
+    if any(word in lowered for word in ("cửa", "door")):
+        _draw_door(draw, int(w * 0.68), floor, scale, accent)
+    if any(word in lowered for word in ("thang máy", "elevator")):
+        _draw_elevator(draw, int(w * 0.68), floor, scale, accent)
+    if any(word in lowered for word in ("cây", "tree")):
+        _draw_tree(draw, int(w * 0.68), floor, scale, accent)
+    if any(word in lowered for word in ("cân", "scale")):
+        _draw_scale(draw, int(w * 0.62), floor, scale, accent)
+
+    _draw_stickman(draw, main_x, main_y, scale, action=action, accent=accent)
+    _draw_stickman(draw, int(w * 0.24), floor - int(h * 0.05), scale * 0.78,
+                   action="watch", accent=(255, 255, 255))
+    _draw_motion_burst(draw, (main_x + int(w * 0.04), main_y - int(h * 0.13)),
+                       int(min(w, h) * 0.18), accent, w)
+    _draw_impact_marks(draw, main_x + int(w * 0.12), floor - int(h * 0.18), accent, w)
+
+
+def _action_from_prompt(lowered: str) -> str:
+    if any(word in lowered for word in ("ngã", "té", "vấp", "trượt", "rơi")):
+        return "fall"
+    if any(word in lowered for word in ("chạy", "đuổi", "lao", "né")):
+        return "run"
+    if any(word in lowered for word in ("hoảng", "đứng hình", "bất ngờ")):
+        return "shock"
+    if any(word in lowered for word in ("kéo", "đẩy", "mở", "đóng")):
+        return "pull"
+    return "run"
+
+
+def _draw_stickman(draw: ImageDraw.ImageDraw, x: int, y: int, scale: float, *,
+                   action: str, accent: tuple[int, int, int]) -> None:
+    line = max(5, int(7 * scale))
+    head = int(24 * scale)
+    torso = int(70 * scale)
+    arm = int(48 * scale)
+    leg = int(56 * scale)
+    color = (245, 247, 250, 255)
+
+    if action == "fall":
+        head_c = (x + int(22 * scale), y - int(82 * scale))
+        body_top = (x, y - int(62 * scale))
+        body_bottom = (x + int(74 * scale), y - int(34 * scale))
+        draw.ellipse([head_c[0] - head, head_c[1] - head, head_c[0] + head, head_c[1] + head],
+                     outline=color, width=line)
+        draw.line([body_top, body_bottom], fill=color, width=line)
+        draw.line([body_top, (x - arm, y - int(84 * scale))], fill=color, width=line)
+        draw.line([body_top, (x + arm, y - int(96 * scale))], fill=color, width=line)
+        draw.line([body_bottom, (x + int(110 * scale), y - int(10 * scale))], fill=color, width=line)
+        draw.line([body_bottom, (x + int(38 * scale), y + int(10 * scale))], fill=color, width=line)
+        return
+
+    head_c = (x, y - torso - head)
+    neck = (x, y - torso)
+    hip = (x, y - int(22 * scale))
+    draw.ellipse([head_c[0] - head, head_c[1] - head, head_c[0] + head, head_c[1] + head],
+                 outline=color, width=line)
+    draw.line([neck, hip], fill=color, width=line)
+
+    if action == "run":
+        arms = [((x - arm, y - int(58 * scale)), (x + arm, y - int(88 * scale)))]
+        legs = [((x - leg, y + int(18 * scale)), (x + leg, y + int(14 * scale)))]
+    elif action == "shock":
+        arms = [((x - arm, y - int(116 * scale)), (x + arm, y - int(116 * scale)))]
+        legs = [((x - int(34 * scale), y + int(20 * scale)), (x + int(34 * scale), y + int(20 * scale)))]
+        draw.ellipse([x - int(8 * scale), head_c[1] - int(5 * scale),
+                      x + int(8 * scale), head_c[1] + int(12 * scale)], fill=(*accent, 230))
+    elif action == "pull":
+        arms = [((x + arm, y - int(80 * scale)), (x + int(arm * 1.6), y - int(86 * scale)))]
+        legs = [((x - leg, y + int(18 * scale)), (x + int(30 * scale), y + int(22 * scale)))]
+    else:
+        arms = [((x - arm, y - int(70 * scale)), (x + arm, y - int(70 * scale)))]
+        legs = [((x - leg, y + int(16 * scale)), (x + leg, y + int(16 * scale)))]
+
+    for a, b in arms:
+        draw.line([(x, y - int(74 * scale)), a], fill=color, width=line)
+        draw.line([(x, y - int(74 * scale)), b], fill=color, width=line)
+    for a, b in legs:
+        draw.line([hip, a], fill=color, width=line)
+        draw.line([hip, b], fill=color, width=line)
+
+
+def _draw_motion_burst(draw: ImageDraw.ImageDraw, center: tuple[int, int], radius: int,
+                       accent: tuple[int, int, int], width: int) -> None:
+    cx, cy = center
+    stroke = max(3, width // 260)
+    for dx, dy in ((-1, -1), (1, -1), (1, 1), (-1, 1), (0, -1), (1, 0)):
+        draw.line([cx + dx * radius // 3, cy + dy * radius // 3,
+                   cx + dx * radius, cy + dy * radius],
+                  fill=(*accent, 180), width=stroke)
+
+
+def _draw_impact_marks(draw: ImageDraw.ImageDraw, x: int, y: int,
+                       accent: tuple[int, int, int], width: int) -> None:
+    stroke = max(3, width // 250)
+    draw.line([x - 26, y - 26, x + 26, y + 26], fill=(*accent, 230), width=stroke)
+    draw.line([x + 26, y - 26, x - 26, y + 26], fill=(*accent, 230), width=stroke)
+    draw.ellipse([x - 44, y - 44, x + 44, y + 44], outline=(*accent, 160), width=stroke)
+
+
+def _draw_door(draw: ImageDraw.ImageDraw, x: int, floor: int, scale: float,
+               accent: tuple[int, int, int]) -> None:
+    w, h = int(95 * scale), int(185 * scale)
+    draw.rounded_rectangle([x - w // 2, floor - h, x + w // 2, floor],
+                           radius=int(10 * scale), fill=(30, 34, 46, 235),
+                           outline=(*accent, 230), width=max(3, int(5 * scale)))
+    draw.ellipse([x + w // 4, floor - h // 2, x + w // 4 + 10, floor - h // 2 + 10],
+                 fill=(*accent, 255))
+
+
+def _draw_elevator(draw: ImageDraw.ImageDraw, x: int, floor: int, scale: float,
+                   accent: tuple[int, int, int]) -> None:
+    w, h = int(165 * scale), int(210 * scale)
+    draw.rectangle([x - w // 2, floor - h, x + w // 2, floor],
+                   fill=(24, 28, 38, 235), outline=(255, 255, 255, 95),
+                   width=max(3, int(4 * scale)))
+    draw.line([x, floor - h, x, floor], fill=(*accent, 210), width=max(3, int(4 * scale)))
+    draw.rectangle([x - 28, floor - h - 34, x + 28, floor - h - 10], fill=(*accent, 220))
+
+
+def _draw_tree(draw: ImageDraw.ImageDraw, x: int, floor: int, scale: float,
+               accent: tuple[int, int, int]) -> None:
+    trunk_w, trunk_h = int(24 * scale), int(130 * scale)
+    draw.rectangle([x - trunk_w // 2, floor - trunk_h, x + trunk_w // 2, floor],
+                   fill=(102, 74, 48, 255))
+    for ox, oy, r in ((0, -150, 58), (-42, -116, 46), (45, -112, 48)):
+        rr = int(r * scale)
+        draw.ellipse([x + int(ox * scale) - rr, floor + int(oy * scale) - rr,
+                      x + int(ox * scale) + rr, floor + int(oy * scale) + rr],
+                     fill=(*accent, 185))
+
+
+def _draw_scale(draw: ImageDraw.ImageDraw, x: int, floor: int, scale: float,
+                accent: tuple[int, int, int]) -> None:
+    w, h = int(120 * scale), int(34 * scale)
+    draw.rounded_rectangle([x - w // 2, floor - h, x + w // 2, floor],
+                           radius=int(12 * scale), fill=(245, 247, 250, 235))
+    draw.rectangle([x - int(26 * scale), floor - h + int(6 * scale),
+                    x + int(26 * scale), floor - h + int(20 * scale)],
+                   fill=(*accent, 240))
+
+
 class PillowImageProvider:
-    """Gradient background sinh bằng Pillow — luôn khả dụng, không cần model."""
+    """Deterministic Pillow scene generator — always available, no image model."""
 
     name = "pillow"
+    cache_version = CACHE_VERSION
 
     def availability_status(self) -> tuple[bool, str]:
-        return True, "Pillow image backgrounds + ffmpeg image-motion; không cần model ảnh"
+        return True, "Pillow scene keyframes + ffmpeg image-motion; không cần model ảnh"
 
     def generate(
         self,
@@ -64,6 +282,7 @@ class PillowImageProvider:
     ) -> Path:
         top, bottom = _pick_gradient_colors(prompt)
         img = _draw_gradient(width, height, top, bottom)
+        _draw_scene(img, prompt)
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         img.save(output_path)

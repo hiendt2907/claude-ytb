@@ -81,7 +81,7 @@ def build_env(item: QueueItem) -> dict:
         {
             "TELEGRAM_APPROVAL": "false",
             "RENDER_PROVIDER": "ai",
-            "ORIENTATION": "landscape",
+            "ORIENTATION": item.orientation,
             "DRY_RUN": "false",
             "YOUTUBE_PUBLISH_AT": item.publish_at,
         }

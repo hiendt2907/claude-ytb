@@ -115,3 +115,38 @@ def test_publish_real_sets_synthetic_media_flag_and_hashtags(monkeypatch, tmp_pa
     assert result.uploaded is True
     assert captured_body["status"]["containsSyntheticMedia"] is True
     assert "#tâmlýhọc" in captured_body["snippet"]["description"]
+
+
+def test_publish_real_marks_portrait_under_three_minutes_as_short(monkeypatch, tmp_path):
+    monkeypatch.setattr(uploader.settings, "dry_run", False)
+    monkeypatch.setattr(uploader.settings, "youtube_contains_synthetic_media", True)
+    monkeypatch.setattr(uploader.settings, "youtube_publish_at", "")
+
+    video_path = tmp_path / "short.mp4"
+    video_path.write_bytes(b"fake")
+    video = _video(video_path=video_path, duration_sec=75.0, tags=("giải trí", "người que"))
+
+    captured_body = {}
+
+    class _FakeRequest:
+        def next_chunk(self):
+            return None, {"id": "SHORTID"}
+
+    class _FakeVideos:
+        def insert(self, part, body, media_body):
+            captured_body.update(body)
+            return _FakeRequest()
+
+    class _FakeYoutube:
+        def videos(self):
+            return _FakeVideos()
+
+    monkeypatch.setattr(uploader, "_dimensions", lambda path: (1080, 1920))
+    monkeypatch.setattr("ytb_pipeline.publish.youtube_auth.get_youtube_client", lambda: _FakeYoutube())
+    monkeypatch.setattr("googleapiclient.http.MediaFileUpload", lambda *a, **kw: object())
+
+    result = uploader.publish(video)
+
+    assert result.uploaded is True
+    assert "#Shorts" in captured_body["snippet"]["description"]
+    assert "#giảitrí" in captured_body["snippet"]["description"]

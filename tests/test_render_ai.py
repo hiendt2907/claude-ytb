@@ -79,6 +79,24 @@ def test_dims_theo_orientation(monkeypatch):
     assert compose_ai._dims() == (1080, 1920, False)
 
 
+def test_local_image_cache_key_includes_provider_version(monkeypatch, tmp_path):
+    class FakeProvider:
+        name = "pillow"
+        cache_version = "scene-test"
+
+        def generate(self, prompt, width, height, output_path, **kwargs):
+            output_path.write_bytes(b"not-a-real-image")
+            return output_path
+
+    monkeypatch.setattr(compose_ai, "get_image_provider", lambda _name: FakeProvider())
+    monkeypatch.setattr(compose_ai, "_valid_image", lambda path: True)
+
+    out = compose_ai._local_image("người que chạy", (1080, 1920), tmp_path)
+
+    assert out.parent.name == "local_images"
+    assert out.name == "3e6fcabdfd0c5a66.png"
+
+
 def test_render_ai_giu_bat_bien_khong_mutate_voiceover(monkeypatch, tmp_path):
     # Arrange — chặn mọi I/O ngoài (stock + ffmpeg + concat)
     seg = Segment(caption="cap", narration="n", broll="x")
@@ -133,6 +151,23 @@ def test_timeline_duration_tru_overlap_transition(monkeypatch, tmp_path):
                         lambda path: durations[path])
 
     assert compose_ai._timeline_duration(clips, xfade=0.4) == pytest.approx(24.2)
+
+
+def test_valid_clip_rejects_cached_segment_with_wrong_dimensions(monkeypatch, tmp_path):
+    clip = tmp_path / "segment.mp4"
+    clip.write_bytes(b"fake")
+
+    class Result:
+        stdout = "10.0\n"
+
+    monkeypatch.setattr(compose_ai.subprocess, "run", lambda *a, **k: Result())
+    monkeypatch.setattr(compose_ai, "_clip_dims", lambda path: (1920, 1080))
+
+    assert compose_ai._valid_clip(
+        clip,
+        expected_duration=10.0,
+        expected_dims=(1080, 1920),
+    ) is False
 
 
 def test_fetch_broll_variants_tra_nhieu_shot_khac_nhau(monkeypatch, tmp_path):

@@ -63,6 +63,24 @@ def test_pillow_provider_generate_default_dimensions(tmp_path):
         assert img.size == (1080, 1920)
 
 
+def test_pillow_provider_stickman_prompt_draws_non_flat_scene(tmp_path):
+    provider = PillowImageProvider()
+    out = tmp_path / "stickman.png"
+
+    provider.generate(
+        prompt="người que chạy đuổi theo cánh cửa rồi trượt chân",
+        width=360,
+        height=640,
+        output_path=out,
+    )
+
+    with Image.open(out).convert("RGB") as img:
+        colors = img.getcolors(maxcolors=1_000_000)
+
+    assert colors is not None
+    assert len(colors) > 20
+
+
 def test_flux_provider_is_available_false_when_comfyui_unreachable():
     provider = FluxImageProvider()
 
