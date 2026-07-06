@@ -81,3 +81,28 @@ def test_synthesize_resynths_segment_with_corrupt_existing_audio(monkeypatch, tm
 
     # File cũ hỏng -> coi như chưa xong -> phải resynth.
     assert seg0_path in synth_calls
+
+
+@pytest.mark.unit
+def test_synthesize_f5_skips_batch_when_all_segments_cached(monkeypatch, tmp_path):
+    monkeypatch.setattr(settings, "tts_provider", "f5")
+    script = _script()
+    slug = tts._slugify(script.title)
+    for i in range(len(script.segments)):
+        (tmp_path / f"{slug}_{i:02d}.mp3").write_bytes(b"cached")
+
+    def _fake_probe(path: Path) -> float:
+        if path.name.endswith(".mp3"):
+            return 4.0
+        return 0.0
+
+    monkeypatch.setattr(tts, "_probe_duration", _fake_probe)
+    monkeypatch.setattr(tts, "_concat_audio", lambda parts, out: None)
+
+    voiceover = tts.synthesize(script)
+
+    assert [s.audio_path for s in voiceover.segments] == [
+        tmp_path / f"{slug}_00.mp3",
+        tmp_path / f"{slug}_01.mp3",
+    ]
+    assert voiceover.duration_sec == 8.0

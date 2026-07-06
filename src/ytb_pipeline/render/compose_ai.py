@@ -44,15 +44,25 @@ MAX_COLD_SHOTS = 3        # số cảnh hành động tối đa trong cold-open
 logger = logging.getLogger(__name__)
 
 
-def _valid_clip(path: Path) -> bool:
-    """True nếu `path` là video đọc được, có duration > 0 — chặn file dở dang do bị kill giữa lúc ghi."""
+def _valid_clip(path: Path, *, expected_duration: float | None = None) -> bool:
+    """True nếu `path` là video đọc được, có duration hợp lệ.
+
+    Khi resume render segment, file cũ có thể đọc được nhưng lệch duration do
+    ffmpeg `-shortest` không cắt sát audio. Nếu có expected_duration, coi file
+    lệch quá ngưỡng validation là stale và render lại.
+    """
     try:
         out = subprocess.run(
             ["ffprobe", "-v", "error", "-show_entries", "format=duration",
              "-of", "default=nw=1:nk=1", str(path)],
             capture_output=True, text=True, check=True,
         )
-        return float(out.stdout.strip()) > 0
+        duration = float(out.stdout.strip())
+        if duration <= 0:
+            return False
+        if expected_duration is None:
+            return True
+        return abs(duration - expected_duration) <= settings.render_validation_max_drift_sec
     except (subprocess.CalledProcessError, ValueError):
         return False
 
@@ -82,9 +92,10 @@ def render_video_ai(voiceover: Voiceover) -> RenderedVideo:
     for i, seg in enumerate(voiceover.segments):
         query = seg.broll.strip() or fallback_query
         clip = work / f"{slug}_{i:02d}.mp4"
+        expected_duration = slide._audio_duration(seg.audio_path)
         # Resume: segment đã render xong hợp lệ ở lần chạy trước (bị dừng giữa
         # render) -> bỏ qua, không tải B-roll/dựng lại clip này.
-        if not (clip.exists() and _valid_clip(clip)):
+        if not (clip.exists() and _valid_clip(clip, expected_duration=expected_duration)):
             _render_broll_segment(seg, index=i, total=len(voiceover.segments),
                                   query=query, work=work, prefix=f"{slug}_{i:02d}",
                                   out=clip, dims=(w, h), landscape=landscape,
@@ -102,6 +113,7 @@ def render_video_ai(voiceover: Voiceover) -> RenderedVideo:
 
     video_path = OUTPUT_DIR / f"{slug}.mp4"
     transitions.concat_with_transitions(clips, whoosh_before, video_path)
+    expected_duration = _timeline_duration(clips)
 
     thumb = OUTPUT_DIR / f"{slug}_thumb.jpg"
     _thumbnail(voiceover.title, dims=(w, h)).convert("RGB").save(thumb, quality=90)
@@ -111,8 +123,15 @@ def render_video_ai(voiceover: Voiceover) -> RenderedVideo:
         video_path=video_path,
         thumbnail_path=thumb,
     )
-    validate_render(rendered, expected_dims=(w, h), expected_duration_sec=voiceover.duration_sec)
+    validate_render(rendered, expected_dims=(w, h), expected_duration_sec=expected_duration)
     return rendered
+
+
+def _timeline_duration(clips: list[Path], *, xfade: float = transitions.XFADE_SEC) -> float:
+    """Expected final duration after transition overlap between rendered clips."""
+    if not clips:
+        return 0.0
+    return max(0.0, sum(transitions._duration(c) for c in clips) - xfade * (len(clips) - 1))
 
 
 def _render_broll_segment(seg, index: int, total: int, query: str, work: Path,
@@ -525,6 +544,7 @@ def _broll_clip(bg: Path, overlay_png: Path, audio: Path, out: Path,
                 dims: tuple[int, int]) -> None:
     """Nền B-roll (loop+crop W:H) + overlay PNG + audio, cắt theo độ dài audio."""
     w, h = dims
+    duration = slide._audio_duration(audio)
     subprocess.run(
         ["ffmpeg", "-y",
          "-stream_loop", "-1", "-i", str(bg),
@@ -535,7 +555,8 @@ def _broll_clip(bg: Path, overlay_png: Path, audio: Path, out: Path,
          f"crop={w}:{h},setsar=1,fps=30[bg];[bg][1:v]overlay=0:0[v]",
          "-map", "[v]", "-map", "2:a",
          "-c:v", "libx264", "-pix_fmt", "yuv420p",
-         "-c:a", "aac", "-b:a", "192k", "-shortest", str(out)],
+         "-c:a", "aac", "-b:a", "192k", "-t", f"{duration:.3f}",
+         "-shortest", str(out)],
         capture_output=True, check=True,
     )
 
@@ -545,6 +566,7 @@ def _broll_caption_clip(bg: Path, base_png: Path,
                         audio: Path, out: Path, dims: tuple[int, int]) -> None:
     """B-roll + veil/band cố định + chữ hiện dần từng từ (enable theo thời gian)."""
     w, h = dims
+    duration = slide._audio_duration(audio)
     inputs = ["-stream_loop", "-1", "-i", str(bg),
               "-loop", "1", "-i", str(base_png)]
     for png, _, _ in overlays:
@@ -568,7 +590,8 @@ def _broll_caption_clip(bg: Path, base_png: Path,
         ["ffmpeg", "-y", *inputs, "-filter_complex", ";".join(chain),
          "-map", f"[{prev}]", "-map", f"{audio_idx}:a",
          "-c:v", "libx264", "-pix_fmt", "yuv420p",
-         "-c:a", "aac", "-b:a", "192k", "-shortest", str(out)],
+         "-c:a", "aac", "-b:a", "192k", "-t", f"{duration:.3f}",
+         "-shortest", str(out)],
         capture_output=True, check=True,
     )
 

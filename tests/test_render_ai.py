@@ -95,6 +95,7 @@ def test_render_ai_giu_bat_bien_khong_mutate_voiceover(monkeypatch, tmp_path):
     monkeypatch.setattr(compose_ai, "_hook_coldopen", lambda *a, **k: None)
     monkeypatch.setattr(compose_ai.transitions, "concat_with_transitions",
                         lambda clips, flags, out, **k: None)
+    monkeypatch.setattr(compose_ai, "_timeline_duration", lambda clips: 2.0)
     monkeypatch.setattr(compose_ai, "validate_render", lambda *a, **k: None)
 
     result = compose_ai.render_video_ai(vo)
@@ -123,6 +124,15 @@ def test_beat_durations_hook_cat_day_hon():
 def test_beat_durations_doan_ngan_mot_beat():
     durs = compose_ai._beat_durations(2.0, hook=False)
     assert durs == [2.0]
+
+
+def test_timeline_duration_tru_overlap_transition(monkeypatch, tmp_path):
+    clips = [tmp_path / "a.mp4", tmp_path / "b.mp4", tmp_path / "c.mp4"]
+    durations = {clips[0]: 10.0, clips[1]: 8.0, clips[2]: 7.0}
+    monkeypatch.setattr(compose_ai.transitions, "_duration",
+                        lambda path: durations[path])
+
+    assert compose_ai._timeline_duration(clips, xfade=0.4) == pytest.approx(24.2)
 
 
 def test_fetch_broll_variants_tra_nhieu_shot_khac_nhau(monkeypatch, tmp_path):
@@ -161,6 +171,45 @@ def test_hook_coldopen_none_khi_khong_co_segment_hook():
     assert compose_ai._hook_coldopen(
         vo, dims=(1080, 1920), landscape=False,
         work=__import__("pathlib").Path("/tmp"), slug="s", used=set()) is None
+
+
+def test_broll_clip_ep_duration_theo_audio(monkeypatch, tmp_path):
+    calls = []
+    monkeypatch.setattr(compose_ai.slide, "_audio_duration", lambda audio: 12.345)
+    monkeypatch.setattr(compose_ai.subprocess, "run",
+                        lambda cmd, **kw: calls.append(cmd))
+
+    compose_ai._broll_clip(
+        tmp_path / "bg.mp4",
+        tmp_path / "overlay.png",
+        tmp_path / "audio.mp3",
+        tmp_path / "out.mp4",
+        dims=(1080, 1920),
+    )
+
+    cmd = calls[0]
+    assert "-t" in cmd
+    assert cmd[cmd.index("-t") + 1] == "12.345"
+
+
+def test_broll_caption_clip_ep_duration_theo_audio(monkeypatch, tmp_path):
+    calls = []
+    monkeypatch.setattr(compose_ai.slide, "_audio_duration", lambda audio: 7.89)
+    monkeypatch.setattr(compose_ai.subprocess, "run",
+                        lambda cmd, **kw: calls.append(cmd))
+
+    compose_ai._broll_caption_clip(
+        tmp_path / "bg.mp4",
+        tmp_path / "base.png",
+        [(tmp_path / "word.png", 0.0, 1.0)],
+        tmp_path / "audio.mp3",
+        tmp_path / "out.mp4",
+        dims=(1080, 1920),
+    )
+
+    cmd = calls[0]
+    assert "-t" in cmd
+    assert cmd[cmd.index("-t") + 1] == "7.890"
 
 
 def test_fetch_broll_variants_dedup_xuyen_video(monkeypatch, tmp_path):

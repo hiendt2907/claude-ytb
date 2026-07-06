@@ -64,6 +64,17 @@ def _synth_all_f5(script: Script, slug: str) -> list[Segment]:
     Giữ NGUYÊN nhịp ngắt nghỉ như edge (cùng `_split_for_pacing` + chèn im lặng),
     chỉ khác: model nạp 1 lần thay vì cold-start mỗi cụm.
     """
+    cached: list[Segment] = []
+    for i, seg in enumerate(script.segments):
+        seg_path = AUDIO_DIR / f"{slug}_{i:02d}.mp3"
+        dur = _probe_duration_or_zero(seg_path) if seg_path.exists() else 0.0
+        if dur <= 0:
+            cached = []
+            break
+        cached.append(replace(seg, audio_path=seg_path, duration_sec=dur))
+    if cached and len(cached) == len(script.segments):
+        return cached
+
     from .f5_provider import run_batch
 
     comma = settings.pause_comma_ms / 1000
