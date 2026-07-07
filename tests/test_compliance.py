@@ -69,3 +69,29 @@ def test_load_script_normalizes_non_list_emphasis(write_script):
 
     assert script.segments[0].emphasis == ()
     assert script.segments[1].emphasis == ("cơ chế",)
+
+
+def test_load_script_accepts_structured_claude_schema(write_script):
+    data = make_script([
+        {
+            "caption": "Hook",
+            "voiceover": "Đừng cố kỷ luật hơn trước khi hiểu vì sao não né việc khó. "
+            * 18,
+            "visual_intent": "Một người trì hoãn trước laptop.",
+            "pexels_query": "person procrastinating at laptop",
+            "time_goal": 5,
+            "hook": True,
+            "transition": "Não không lười, nó đang né rủi ro.",
+            "payoff": "Người xem hiểu cơ chế né đau.",
+        }
+    ])
+    data["video_type"] = "short"
+    data["voice_profile"] = "knowledge"
+
+    script = load_script(write_script(data))
+
+    assert script.video_type == "short"
+    assert script.voice_profile == "knowledge"
+    assert script.segments[0].narration == script.segments[0].voiceover
+    assert script.segments[0].broll == "person procrastinating at laptop"
+    assert script.segments[0].pexels_query == "person procrastinating at laptop"

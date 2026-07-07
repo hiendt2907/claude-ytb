@@ -16,6 +16,10 @@ class Segment:
 
     caption: str
     narration: str
+    time_goal: float | None = None  # mục tiêu thời lượng section, nếu Claude khai báo
+    voiceover: str = ""       # alias schema mới; loader đồng bộ với narration
+    visual_intent: str = ""    # mô tả hình ảnh/hành động cần thấy
+    pexels_query: str = ""     # query Pexels chuẩn; broll giữ tương thích cũ
     code: str = ""           # lệnh/đoạn code hiện trong terminal card (tùy chọn)
     danger: bool = False      # True -> tô đỏ cảnh báo
     broll: str = ""           # từ khoá (tiếng Anh) tìm B-roll stock cho render-ai
@@ -23,6 +27,9 @@ class Segment:
     emphasis: tuple[str, ...] = ()  # từ khoá pop lớn (visual aid), vd "Quy tắc 2 phút"
     hook: bool = False        # cảnh hành động mạnh -> dồn vào cold-open hook đầu video
     transition: bool = False  # chèn whoosh + xfade NGAY TRƯỚC đoạn này (vấn đề->giải pháp)
+    hook_text: str = ""       # schema mới: lý do section này là hook
+    transition_text: str = "" # schema mới: câu/cảnh chuyển ý
+    payoff: str = ""          # schema mới: giá trị/chốt ý của section
     audio_path: Path | None = None
     duration_sec: float = 0.0
 
@@ -52,6 +59,9 @@ class VideoIdea:
     title: str
     description: str
     tags: tuple[str, ...] = ()
+    video_type: str = "short"  # short | long
+    voice_profile: str = ""  # knowledge | inspiring; rỗng = tự suy luận legacy
+    target_minutes: float | None = None
     voice: str = "vi-VN-NamMinhNeural"
     compliance: ComplianceCheck | None = None
 

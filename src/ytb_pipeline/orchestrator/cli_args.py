@@ -25,7 +25,7 @@ Các lệnh:
   benchmark-local  Benchmark local AI stack và ghi JSON report
 
 Quy trình thường dùng:
-  ytb batch start -n 5 --type-of-vid long   # local LLM viết 5 kịch bản
+  ytb batch start -n 5 --type-of-vid long   # Claude Haiku viết, fail QA thì Sonnet sửa
   ytb doctor                # kiểm tra môi trường trước (shortcut top-level)
   ytb batch status          # xem còn video nào pending
   ytb batch run             # chạy 1 video, lặp lại lệnh này cho video kế
@@ -69,10 +69,11 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
     p_start = _sub(
         sub, "start",
         help="Sinh phần SÁNG TẠO (ideation + viết N kịch bản)",
-        description="Mặc định dùng local LLM provider (Ollama/Qwen) để chọn chủ đề "
+        description="Mặc định dùng Claude khi LLM_PROVIDER=claude (Haiku trước, QA fail thì Sonnet), "
+        "hoặc local LLM provider khi cấu hình local/Ollama, để chọn chủ đề "
         "(chống trùng data/ledger.md), viết kịch bản đầy đủ cho N video vào "
         "scripts/<slug>.json, và đăng ký từng video vào assets/auto_state.json. "
-        "Dùng --cloud nếu muốn gọi Claude legacy.\n\n"
+        "Dùng --cloud nếu muốn gọi Claude legacy không qua local QA loop.\n\n"
         "Luồng legacy chạy 1 phiên `claude -p` (TỐN TOKEN, mất nhiều phút, không có "
         "output real-time) yêu cầu Claude: chọn chủ đề (chống trùng data/ledger.md), "
         "viết kịch bản đầy đủ cho N video vào scripts/<slug>.json, và đăng ký từng "
@@ -121,7 +122,7 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
     )
     p_start.add_argument(
         "--local", action="store_true", default=False,
-        help="Explicit dùng local LLM provider cho ideation; đây là mặc định, thêm để tương thích acceptance command",
+        help="Ép dùng local LLM provider cho ideation, bỏ qua Claude Haiku/Sonnet",
     )
     p_start.add_argument(
         "--cloud", action="store_true", default=False,

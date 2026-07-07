@@ -112,15 +112,26 @@ Current/target stack by capability:
 
 ## 5. Evolution Path
 
-- **v1 (current):** YouTube-only pipeline. `script.json` artifact. Edge-TTS
+- **v1 (legacy):** YouTube-only pipeline. `script.json` artifact. Edge-TTS
   default, Pexels-backed `render.ai` path, monolithic `batch_cli.py`.
-- **v2:** Introduce `Provider` ports for LLM/Voice/Image/Video. Migrate
-  `script.json` → `project.json`. Make F5-TTS the default voice provider.
-  Replace Pexels-default render with local diffusion-backed image/video
-  generation as the default `render.ai` strategy.
-- **v3:** Full DAG executor with per-node checkpointing and resume.
-  `batch_cli.py` decomposed into orchestrator + CLI thin client. Structured
-  logging across all stages.
+- **v2 (in progress, 2026-07-06):** `Provider` ports for LLM/Voice/Image/
+  Video/Publish/Render **done** (`providers/base.py` protocols +
+  `providers/registry.py`, no if/elif branching). F5-TTS is now the default
+  voice provider. Still outstanding: Pexels remains the default `render.ai`
+  B-roll source (`settings.video_provider`/`broll_strategy = "pexels"`,
+  confirmed live in `render/compose_ai.py`) — local diffusion has not
+  replaced it as default yet. `script.json` → `project.json` migration:
+  the new domain model exists (`project/models.py`,
+  `project/checkpoint.py`, `project/workflow.py`) but is not wired into the
+  production orchestrator yet (see v3).
+- **v3 (partially built, not wired):** DAG executor exists —
+  `project/workflow.py::WorkflowGraph` (Kahn topo-sort) +
+  `project/checkpoint.py::CheckpointManager` (atomic write, per-node
+  pending/running/done/failed). `batch_cli.py` has been decomposed (1330 →
+  382 lines) but still runs the old linear `assets/auto_state.json` state
+  machine — it does not yet call into `WorkflowGraph`/`CheckpointManager`.
+  Next step for v3 completion: wire `batch_cli.py` (or its successor) to the
+  DAG executor instead of maintaining two parallel state systems.
 - **v4:** Multi-platform `Publisher` adapters (Shorts, TikTok, Instagram,
   Podcast). Plugin discovery/registration mechanism for third-party
   providers.

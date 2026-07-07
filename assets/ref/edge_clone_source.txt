@@ -1,0 +1,1 @@
+Đây là giọng mẫu dùng để clone bằng F5 TTS. Tôi sẽ đọc tự nhiên, rõ chữ, có nhịp nhanh vừa phải, phù hợp cho video ngắn giải trí và giữ chân người xem.

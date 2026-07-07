@@ -35,13 +35,13 @@ class VoiceProfile:
     f5_tempo: float = 1.0
 
 
-VOICE_NEUTRAL = VoiceProfile("neutral", 0.20, 0.32, 0.28)
+VOICE_NEUTRAL = VoiceProfile("neutral", 0.20, 0.32, 0.28, edge_rate="+100%")
 VOICE_ENTERTAINMENT = VoiceProfile(
     "entertainment",
     comma_sec=0.06,
     sentence_sec=0.14,
     segment_sec=0.08,
-    edge_rate="+16%",
+    edge_rate="+116%",
     edge_pitch="+8Hz",
     f5_tempo=1.12,
 )
@@ -50,9 +50,18 @@ VOICE_KNOWLEDGE = VoiceProfile(
     comma_sec=0.24,
     sentence_sec=0.46,
     segment_sec=0.34,
-    edge_rate="-4%",
+    edge_rate="+96%",
     edge_pitch="-2Hz",
     f5_tempo=0.96,
+)
+VOICE_INSPIRING = VoiceProfile(
+    "inspiring",
+    comma_sec=0.28,
+    sentence_sec=0.52,
+    segment_sec=0.42,
+    edge_rate="+88%",
+    edge_pitch="-1Hz",
+    f5_tempo=0.94,
 )
 
 _ENTERTAINMENT_HINTS = (
@@ -85,16 +94,7 @@ def synthesize(script: Script) -> Voiceover:
     if settings.tts_provider == "f5":
         voiced = _synth_all_f5(script, slug, profile)
     else:
-        voiced = []
-        for i, seg in enumerate(script.segments):
-            seg_path = _segment_audio_path(slug, profile, i)
-            # Resume: segment đã có audio hợp lệ từ lần chạy trước (bị dừng giữa
-            # voiceover) -> bỏ qua, không gọi lại edge-tts cho segment này.
-            dur = _probe_duration_or_zero(seg_path) if seg_path.exists() else 0.0
-            if dur <= 0:
-                _synth_segment(_prepare_narration(seg.narration), script.voice, seg_path, profile)
-                dur = _probe_duration(seg_path)
-            voiced.append(replace(seg, audio_path=seg_path, duration_sec=dur))
+        voiced = _synth_all_edge_parallel(script, slug, profile)
 
     combined = AUDIO_DIR / f"{slug}_{profile.name}.mp3"
     _concat_audio([s.audio_path for s in voiced], combined)
@@ -106,6 +106,44 @@ def synthesize(script: Script) -> Voiceover:
         audio_path=combined,
         duration_sec=total,
     )
+
+
+EDGE_MAX_WORKERS = 1
+
+
+def _synth_all_edge_parallel(script: Script, slug: str, profile: VoiceProfile) -> list[Segment]:
+    """Sinh audio edge-tts cho mọi segment SONG SONG (mỗi segment đã tự cắt cụm
+    nhỏ qua `_split_for_pacing`, độc lập file — an toàn chạy đa luồng vì mỗi
+    segment ghi ra `seg_path` riêng, không tranh chấp).
+
+    Segment đã có audio hợp lệ từ lần chạy trước (resume) được bỏ qua, không
+    gọi lại edge-tts. Thứ tự kết quả trả về LUÔN khớp thứ tự segment gốc.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    pending: list[tuple[int, Segment, Path]] = []
+    voiced: list[Segment | None] = [None] * len(script.segments)
+
+    for i, seg in enumerate(script.segments):
+        seg_path = _segment_audio_path(slug, profile, i)
+        dur = _probe_duration_or_zero(seg_path) if seg_path.exists() else 0.0
+        if dur > 0:
+            voiced[i] = replace(seg, audio_path=seg_path, duration_sec=dur)
+        else:
+            pending.append((i, seg, seg_path))
+
+    def _work(item: tuple[int, Segment, Path]) -> tuple[int, Segment]:
+        i, seg, seg_path = item
+        _synth_segment(_prepare_narration(seg.narration), script.voice, seg_path, profile)
+        dur = _probe_duration(seg_path)
+        return i, replace(seg, audio_path=seg_path, duration_sec=dur)
+
+    if pending:
+        with ThreadPoolExecutor(max_workers=EDGE_MAX_WORKERS) as pool:
+            for i, done_seg in pool.map(_work, pending):
+                voiced[i] = done_seg
+
+    return [v for v in voiced if v is not None]
 
 
 def _synth_all_f5(script: Script, slug: str, profile: VoiceProfile) -> list[Segment]:
@@ -178,8 +216,18 @@ def _segment_audio_path(slug: str, profile: VoiceProfile, index: int) -> Path:
     return AUDIO_DIR / f"{slug}_{profile.name}_{index:02d}.mp3"
 
 
+def _edge_rate_pct(edge_rate: str) -> int:
+    """Parse edge-tts rate string (vd "+100%", "-4%") thành số nguyên % có dấu."""
+    return int(edge_rate.strip().rstrip("%"))
+
+
 def _voice_profile(script: Script) -> VoiceProfile:
     """Pick TTS pacing by content intent, not one news-reader voice for everything."""
+    declared = getattr(script, "voice_profile", "")
+    if declared == "inspiring":
+        return VOICE_INSPIRING
+    if declared == "knowledge":
+        return VOICE_KNOWLEDGE
     haystack = " ".join([
         script.topic,
         script.title,

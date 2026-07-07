@@ -48,8 +48,8 @@ def _valid_short_script() -> dict:
 
 
 def test_settings_default_to_local_first_stack():
-    assert settings.llm_provider == "ollama"
-    assert settings.tts_provider in {"f5", "vieneu", "vixtts"}
+    # llm_provider/tts_provider giờ chọn tường minh qua .env (claude+edge —
+    # xem CLAUDE.md amendment 2026-07-06); chỉ image/video còn cố định local-first.
     assert settings.image_provider == "pillow"
     assert settings.video_provider == "pexels"
     assert settings.broll_strategy == "pexels"
@@ -257,7 +257,7 @@ def test_batch_start_local_can_clear_old_ledger_for_user_idea(tmp_path, monkeypa
     assert "Chủ đề cũ không được nhắc lại" in backups[0].read_text(encoding="utf-8")
 
 
-def test_local_prompt_defines_entertainment_retention_criteria():
+def test_local_prompt_blocks_entertainment_for_current_channel_scope():
     from ytb_pipeline.orchestrator import ideation_cmd
 
     prompt = ideation_cmd._local_script_prompt(
@@ -268,10 +268,10 @@ def test_local_prompt_defines_entertainment_retention_criteria():
         "",
     )
 
-    assert "visible problem" in prompt
-    assert "physical action" in prompt
-    assert "punchline/payoff" in prompt
-    assert "not a news reader" in prompt
+    assert "not entertainment" in prompt
+    assert "Do NOT write comedy" in prompt
+    assert "stickman/người que" in prompt
+    assert "real stock footage" in prompt
 
 
 def test_batch_start_local_repairs_script_before_queueing(tmp_path, monkeypatch):

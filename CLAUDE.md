@@ -26,6 +26,13 @@ amendment ghi rõ ngày + lý do trong chính file đó):
    thầm thay default.
 3. **Không stock video làm default.** Pexels không bao giờ là nguồn B-roll
    mặc định. Ảnh/video AI-generated là default path của `render.ai`.
+   **CHƯA ĐẠT (2026-07-06):** `settings.video_provider`/`broll_strategy`
+   default hiện vẫn là `"pexels"`, và `render/compose_ai.py` xác nhận Pexels
+   là production path thật — đây là vi phạm invariant đã biết, ghi nhận là
+   technical debt trong `PROJECT_VISION.md` §5 (v1→v2), KHÔNG được coi là
+   "đã đúng" chỉ vì code chạy được. Không mở rộng thêm tính năng dựa trên
+   Pexels-as-default; ưu tiên migrate sang local diffusion khi lên kế hoạch
+   Phase tiếp theo.
 4. **Provider Pattern cho mọi capability ngoài.** LLM/Voice/Image/Video/
    Publish đều là `Protocol` port + adapter — thêm provider mới = thêm 1
    file, không sửa code domain/pipeline.
@@ -48,6 +55,14 @@ amendment ghi rõ ngày + lý do trong chính file đó):
   cứng). Mỗi node checkpoint độc lập (`pending/running/done/failed`) trong
   `project.json`. Resume = skip node `done`, retry node `failed`, không bao
   giờ recompute toàn bộ vì 1 node lỗi.
+  **Trạng thái thực tế (2026-07-06):** `project/models.py` +
+  `project/workflow.py` (`WorkflowGraph`, Kahn topo-sort) +
+  `project/checkpoint.py` (`CheckpointManager`, atomic write) ĐÃ tồn tại và
+  hoạt động độc lập — nhưng `orchestrator/batch_cli.py` CHƯA import/dùng
+  chúng, vẫn chạy linear qua `assets/auto_state.json` cũ. Đây là 2 hệ thống
+  song song chưa hợp nhất — không viết thêm logic mới dựa trên
+  `auto_state.json`, ưu tiên wire batch_cli vào `WorkflowGraph` khi có cơ hội
+  refactor lớn (cần phê duyệt trước, xem Repository Evolution Rules).
 - **Gateway/Worker separation** (khi áp dụng pattern đa-service trong
   tương lai): code share → package chung, không service nào import trực
   tiếp internals của service khác.
@@ -67,9 +82,10 @@ buộc:
   (`"voiceover.segment.synthesized"`), correlation ID (`project_id`)
   bind 1 lần qua contextvars. Không `print()`/`logging.info(f"...")` trong
   `src/ytb_pipeline/`.
-- **File size.** Tối đa 400 dòng/file. `batch_cli.py` hiện 1330 dòng — VI
-  PHẠM, đang trong kế hoạch split (Phase 0,
-  `docs/constitution/29-MIGRATION_PLAN.md`).
+- **File size.** Tối đa 400 dòng/file. `batch_cli.py` đã được split (còn
+  382 dòng — ĐẠT). Hiện đang VI PHẠM: `orchestrator/ideation_cmd.py` (746
+  dòng) và `render/compose_ai.py` (573 dòng) — cần tách trước khi thêm logic
+  mới vào 2 file này (xem Refactoring Rules bên dưới).
 - **No hardcoded path.** Mọi path qua `settings.<field>`.
 - **Naming.** `snake_case` hàm/biến, `PascalCase` class/Protocol/enum,
   `UPPER_SNAKE_CASE` constant.

@@ -8,11 +8,14 @@ KHÔNG còn `if tts_provider == ...` / `if render_provider == ...` ở đây.
 """
 
 import asyncio
+import json
 from dataclasses import replace
 from pathlib import Path
 
 from .ideation.generator import load_script
 from .ideation.approval import gate
+from .agents.base import AgentStatus
+from .agents.qa_agent import QAAgent
 from .project.checkpoint import CheckpointManager
 from .project.models import Project
 from .project.workflow import NodeDef, WorkflowGraph
@@ -20,6 +23,8 @@ from .providers.registry import get_publish_provider, get_render_provider, get_v
 from .config.settings import settings
 from .pkg.models import PublishResult, RenderedVideo, Voiceover
 from .publish.multiplatform import publish_to_platforms
+from .render.validation import validate_final_video
+from .voiceover.validation import validate_audio
 
 
 def run(script_source: str) -> PublishResult:
@@ -27,15 +32,18 @@ def run(script_source: str) -> PublishResult:
     script = load_script(script_source)
     print(f"[1/4] Ideation  ✓  {script.title} ({len(script.segments)} đoạn)")
     script = gate(script)  # cổng duyệt Telegram (bỏ qua nếu TELEGRAM_APPROVAL=false)
+    _validate_script_qa(script)
 
     voice = get_voice_provider()
     print("[2/4] Voiceover ▶  đang tạo audio...")
     voiceover = asyncio.run(voice.synthesise(script, Path("assets/audio")))
+    validate_audio(voiceover)
     print(f"[2/4] Voiceover ✓  {voiceover.audio_path}  ({voiceover.duration_sec:.1f}s)")
 
     renderer = get_render_provider()
     print(f"[3/4] Render    ▶  đang dựng video ({settings.render_provider}/{settings.orientation})...")
     video = asyncio.run(renderer.render(voiceover, Path("assets/output")))
+    validate_final_video(video)
     print(f"[3/4] Render    ✓  ({settings.render_provider}/{settings.orientation}) {video.video_path}")
 
     print("[4/4] Publish   ▶  đang upload...")
@@ -48,6 +56,7 @@ def run(script_source: str) -> PublishResult:
         from .publish.drive import backup_to_drive
         try:
             backup_to_drive(result.video_path, move=True)
+            _cleanup_after_success(result)
         except Exception as exc:  # noqa: BLE001
             print(f"  ⚠ Đưa lên Drive thất bại (giữ bản local): {exc}")
 
@@ -195,6 +204,7 @@ async def run_project(project: Project, checkpoint: CheckpointManager) -> Projec
         script = load_script(_node_script_path(current))
         print(f"[1/4] Ideation  ✓  {script.title} ({len(script.segments)} đoạn)")
         script = gate(script)
+        await _validate_script_qa_async(script)
         state["script"] = script
         return _node_script_path(current), {"title": script.title, "segments": len(script.segments)}
 
@@ -204,9 +214,11 @@ async def run_project(project: Project, checkpoint: CheckpointManager) -> Projec
             script = load_script(_node_script_path(current))
             if not checkpoint.is_done(current, "ideation"):
                 script = gate(script)
+                await _validate_script_qa_async(script)
         voice = get_voice_provider()
         print("[2/4] Voiceover ▶  đang tạo audio...")
         voiceover = await voice.synthesise(script, Path("assets/audio"))
+        validate_audio(voiceover)
         print(f"[2/4] Voiceover ✓  {voiceover.audio_path}  ({voiceover.duration_sec:.1f}s)")
         state["voiceover"] = voiceover
         return str(voiceover.audio_path), _voiceover_output_data(voiceover)
@@ -216,6 +228,7 @@ async def run_project(project: Project, checkpoint: CheckpointManager) -> Projec
         renderer = get_render_provider()
         print(f"[3/4] Render    ▶  đang dựng video ({settings.render_provider}/{settings.orientation})...")
         video = await renderer.render(voiceover, Path("assets/output"))
+        validate_final_video(video)
         print(f"[3/4] Render    ✓  ({settings.render_provider}/{settings.orientation}) {video.video_path}")
         state["video"] = video
         return str(video.video_path), _rendered_output_data(video)
@@ -231,6 +244,7 @@ async def run_project(project: Project, checkpoint: CheckpointManager) -> Projec
             from .publish.drive import backup_to_drive
             try:
                 backup_to_drive(result.video_path, move=True)
+                _cleanup_after_success(result)
             except Exception as exc:  # noqa: BLE001
                 print(f"  ⚠ Đưa lên Drive thất bại (giữ bản local): {exc}")
 
@@ -246,3 +260,42 @@ async def run_project(project: Project, checkpoint: CheckpointManager) -> Projec
 
     graph = WorkflowGraph(nodes, checkpoint)
     return await graph.execute(project)
+
+
+def _cleanup_after_success(result: PublishResult) -> None:
+    """Clean local render/audio artifacts only after YouTube upload + Drive backup."""
+    import shutil
+
+    paths: set[Path] = set()
+    if result.thumbnail_path:
+        paths.add(Path(result.thumbnail_path))
+    if result.audio_path:
+        paths.add(Path(result.audio_path))
+    for segment in result.segments:
+        if segment.audio_path:
+            paths.add(Path(segment.audio_path))
+    for path in paths:
+        path.unlink(missing_ok=True)
+    shutil.rmtree(Path("assets/output") / "_frames_ai", ignore_errors=True)
+    print("  ✓ Đã clean up audio/render artifacts sau khi backup Drive.")
+
+
+def _validate_script_qa(script) -> None:
+    result = asyncio.run(QAAgent().run({"script": script, "strict": True}))
+    _raise_if_qa_failed(result)
+
+
+async def _validate_script_qa_async(script) -> None:
+    result = await QAAgent().run({"script": script, "strict": True})
+    _raise_if_qa_failed(result)
+
+
+def _raise_if_qa_failed(result) -> None:
+    if result.status != AgentStatus.SUCCESS:
+        raise ValueError(f"Codex QA script lỗi: {result.error}")
+    output = result.output or {}
+    if not output.get("passed"):
+        raise ValueError(
+            "Codex QA script BLOCK/REPAIRABLE trước TTS:\n"
+            + json.dumps(output, ensure_ascii=False, indent=2)
+        )

@@ -5,6 +5,7 @@ nhận để khớp Protocol nhưng tts.py tự quản lý AUDIO_DIR riêng — 
 hành vi gốc.
 """
 
+import asyncio
 from pathlib import Path
 
 from ...pkg.models import Script, Voiceover
@@ -16,7 +17,9 @@ class EdgeVoiceProvider:
     async def synthesise(self, script: Script, output_dir: Path) -> Voiceover:
         from ...voiceover.tts import synthesize
 
-        return synthesize(script)
+        # synthesize() gọi asyncio.run() lồng bên trong (nhánh edge-tts) —
+        # phải chạy trong thread riêng vì ta đang ở giữa 1 event loop đang chạy.
+        return await asyncio.to_thread(synthesize, script)
 
     def is_available(self) -> bool:
         try:

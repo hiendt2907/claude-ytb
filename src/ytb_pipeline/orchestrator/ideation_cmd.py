@@ -10,11 +10,13 @@ import argparse
 import asyncio
 import json
 import re
+import shutil
 import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
 
+from ..claude_cli import build_claude_cmd
 from ..agents.base import AgentStatus
 from ..agents.qa_agent import QAAgent
 from ..ideation.generator import CHARS_PER_MIN, SHORT_MAX_MINUTES, SHORT_MIN_MINUTES, load_script
@@ -26,6 +28,8 @@ LEDGER_HEADER = "# Ledger\n| Ngày | Slug | Tiêu đề | Stage | Status | URL /
 SHORT_TARGET_CHARS = int(CHARS_PER_MIN * 1.0)
 SHORT_MIN_CHARS = int(CHARS_PER_MIN * SHORT_MIN_MINUTES) + 60
 SHORT_MAX_CHARS = int(CHARS_PER_MIN * SHORT_MAX_MINUTES) - 60
+CLAUDE_HAIKU_MODEL = "haiku"
+CLAUDE_SONNET_MODEL = "sonnet"
 
 
 def _cli():
@@ -219,10 +223,17 @@ def _json_from_llm(text: str) -> dict:
     """Parse structured LLM output, tolerating fenced JSON wrappers."""
     raw = text.strip()
     if raw.startswith("```"):
-        raw = raw.strip("`")
+        raw = raw.strip("`").strip()
         if raw.lower().startswith("json"):
             raw = raw[4:].strip()
-    return json.loads(raw)
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        start = raw.find("{")
+        end = raw.rfind("}")
+        if start >= 0 and end > start:
+            return json.loads(raw[start:end + 1])
+        raise
 
 
 def _local_start_log_path() -> Path:
@@ -239,6 +250,34 @@ def _append_local_start_log(path: Path, title: str, body: str) -> None:
         f.write("\n")
 
 
+class _ClaudeStartProvider:
+    name = "claude"
+
+    def __init__(self, model: str):
+        self._model = model
+
+    def is_available(self):
+        return shutil.which(_cli().settings.claude_bin) is not None
+
+    def model_name(self):
+        return self._model
+
+    async def complete(self, prompt: str, **_kwargs) -> str:
+        cmd = build_claude_cmd(prompt, model=self._model)
+        return await asyncio.to_thread(self._invoke, cmd)
+
+    def _invoke(self, cmd: list[str]) -> str:
+        result = subprocess.run(
+            cmd,
+            cwd=_cli().ROOT,
+            capture_output=True,
+            text=True,
+            timeout=300,
+            check=True,
+        )
+        return result.stdout
+
+
 def _local_script_prompt(
     index: int,
     total: int,
@@ -248,9 +287,9 @@ def _local_script_prompt(
     generated_summaries: list[str] | None = None,
 ) -> str:
     target = (
-        '"target_minutes": 10-12 and 20-30 rich sections'
+        '"video_type": "long", "target_minutes": 10-12 and 20-30 rich sections'
         if type_of_vid == "long"
-        else "no target_minutes and enough narration for a 1-2 minute Short"
+        else '"video_type": "short", no target_minutes and enough narration for a 1-2 minute Short'
     )
     generated_summaries = generated_summaries or []
     topic = (
@@ -267,16 +306,10 @@ def _local_script_prompt(
         "\nCustom idea rules:\n"
         "- The user's idea overrides the default channel niche and old ledger topics.\n"
         "- Use the ledger ONLY as a blacklist of topics/titles to avoid, not as inspiration.\n"
-        "- If the user asks for entertainment/stickman/người que, write visual comedy built from "
-        "stickman actions, conflict, escalation, and punchline. Do NOT turn it into a psychology, "
-        "self-help, or research explainer unless the user explicitly asks for that.\n"
-        "- Entertainment retention criteria: first 2 seconds must be a visible problem, every "
-        "section must add a new physical action, the middle must escalate with an unexpected "
-        "second problem, and the final section must land a clear visual punchline/payoff.\n"
-        "- Entertainment narration must sound like a quick setup for the visual gag, not a news "
-        "reader. Ban abstract explainer phrases such as 'cơ chế', 'bài học', 'điều này cho thấy', "
-        "'nghiên cứu cho thấy', 'phát triển bản thân', and 'hôm nay chúng ta'.\n"
-        "- For stickman concepts, every broll should describe a concrete người que scene/action.\n"
+        "- Current channel scope is sharing/knowledge, not entertainment. Do NOT write comedy, "
+        "stickman/người que scenes, punchline structure, or gag narration for this channel.\n"
+        "- Write a clear Vietnamese knowledge short: concrete everyday example, mechanism, "
+        "application step, and grounded Pexels queries for real stock footage.\n"
     )
     return (
         "You are writing a Vietnamese YouTube script JSON for a local-first pipeline.\n"
@@ -290,8 +323,10 @@ def _local_script_prompt(
         "Blocked historical titles/topics:\n"
         f"{blocked_titles or '- none'}\n\n"
         "Return ONLY one JSON object with keys: slug, topic, title, description, tags, "
-        "sections, compliance. Each section needs caption, narration, broll, emphasis, "
-        "and may set video_type to one of image_motion, ai_video, static_terminal.\n"
+        "video_type, voice_profile, sections, compliance. video_type is only long or short. "
+        "voice_profile is knowledge or inspiring. Each section needs time_goal, voiceover, "
+        "visual_intent, pexels_query, caption, hook, transition, payoff, emphasis. "
+        "Keep legacy narration equal to voiceover and broll equal to pexels_query for compatibility.\n"
         "compliance.passed must be true and include community/copyright/accuracy/"
         "advertiser/coppa/notes."
     )
@@ -308,14 +343,14 @@ def _repair_prompt(payload: dict, qa_output: dict | None, validation_error: str 
         "Preserve the topic and core story unless a listed violation requires a narrow fix.\n"
         f"For Shorts without target_minutes, total narration MUST be {SHORT_MIN_CHARS}-{SHORT_MAX_CHARS} "
         "Vietnamese characters. Do not overshoot. Do not add greetings.\n"
-        "If the script is entertainment/stickman/người que: rewrite as visual comedy, not as "
-        "news/explainer narration. It must have visible-problem hook, physical action every "
-        "section, escalation in the middle, and a clear final punchline/payoff. Ban phrases "
-        "like 'cơ chế', 'bài học', 'điều này cho thấy', 'nghiên cứu cho thấy', "
-        "'phát triển bản thân', and 'hôm nay chúng ta'.\n"
-        "Required schema: slug, topic, title, description, tags, sections, compliance. "
-        "Each section needs caption, narration, broll, emphasis, and optional video_type "
-        "in image_motion, ai_video, static_terminal. compliance.passed must be true.\n\n"
+        "Current channel scope is sharing/knowledge, not entertainment. Remove comedy, "
+        "stickman/người que, punchline, and gag narration if present. Keep a concrete "
+        "everyday example, mechanism, application step, and real-stock-footage Pexels queries.\n"
+        "Required schema: slug, topic, title, description, tags, video_type, voice_profile, "
+        "sections, compliance. video_type is only short or long. voice_profile is knowledge "
+        "or inspiring. Each section needs time_goal, voiceover, visual_intent, pexels_query, "
+        "caption, hook, transition, payoff, emphasis. Also include legacy narration=voiceover "
+        "and broll=pexels_query. compliance.passed must be true.\n\n"
         f"Issues:\n{json.dumps(issues, ensure_ascii=False, indent=2)}\n\n"
         f"Current JSON:\n{json.dumps(payload, ensure_ascii=False, indent=2)}"
     )
@@ -348,7 +383,8 @@ def _trim_to_sentence(text: str, limit: int) -> str:
 
 
 def _short_narration_chars(payload: dict) -> int:
-    return sum(len(section.get("narration", "") or "") for section in payload.get("sections", []) or [])
+    return sum(len(section.get("voiceover") or section.get("narration", "") or "")
+               for section in payload.get("sections", []) or [])
 
 
 def _normalize_short_narration(payload: dict) -> tuple[dict, str | None]:
@@ -361,10 +397,11 @@ def _normalize_short_narration(payload: dict) -> tuple[dict, str | None]:
 
     changed = False
     for section in sections:
-        narration = section.get("narration", "")
+        narration = section.get("voiceover") or section.get("narration", "")
         if isinstance(narration, str):
             cleaned = _strip_short_greeting(narration)
             if cleaned != narration:
+                section["voiceover"] = cleaned
                 section["narration"] = cleaned
                 changed = True
 
@@ -373,29 +410,31 @@ def _normalize_short_narration(payload: dict) -> tuple[dict, str | None]:
         ratio = SHORT_TARGET_CHARS / total
         remaining = SHORT_TARGET_CHARS
         for idx, section in enumerate(sections):
-            narration = str(section.get("narration", ""))
+            narration = str(section.get("voiceover") or section.get("narration", ""))
             left = len(sections) - idx
             budget = max(120, min(len(narration), remaining - 80 * (left - 1)))
             proportional = max(120, int(len(narration) * ratio))
             budget = min(budget, proportional)
-            section["narration"] = _trim_to_sentence(narration, budget)
-            remaining -= len(section["narration"])
+            section["voiceover"] = _trim_to_sentence(narration, budget)
+            section["narration"] = section["voiceover"]
+            remaining -= len(section["voiceover"])
         changed = True
     elif total < SHORT_MIN_CHARS:
         needed = min(SHORT_TARGET_CHARS - total, SHORT_MAX_CHARS - total)
         idx = 0
         fillers = (
-            " Cú hình tiếp theo: người que khựng lại nửa giây, nhìn thẳng camera rồi phản ứng quá lố để tạo punchline.",
-            " Beat sau: một chi tiết nhỏ xuất hiện sai thời điểm, người que cố chữa cháy nhưng càng làm cảnh buồn cười hơn.",
-            " Chốt cảnh: nhân vật tưởng đã thoát, nền hình đổi nhịp nhanh và cú ngã cuối biến thành điểm gây cười.",
+            " Ví dụ cụ thể: bạn mở laptop để làm việc, nhưng chỉ cần nhìn thấy một nhiệm vụ hơi khó là tay tự động với sang điện thoại.",
+            " Cơ chế nằm ở chỗ não không né công việc, nó né cảm giác mơ hồ và nguy cơ làm sai trong vài giây đầu.",
+            " Cách áp dụng là thu nhỏ bước đầu tiên đến mức không còn đáng sợ: chỉ mở file, viết một dòng nháp, rồi mới quyết định làm tiếp.",
         )
         while needed > 0 and sections:
             addition = fillers[idx % len(fillers)]
             if len(addition) > needed:
                 addition = _trim_to_sentence(addition, needed)
-            sections[idx % len(sections)]["narration"] = (
-                str(sections[idx % len(sections)].get("narration", "")).rstrip() + addition
+            sections[idx % len(sections)]["voiceover"] = (
+                str(sections[idx % len(sections)].get("voiceover") or sections[idx % len(sections)].get("narration", "")).rstrip() + addition
             ).strip()
+            sections[idx % len(sections)]["narration"] = sections[idx % len(sections)]["voiceover"]
             needed -= len(addition)
             idx += 1
         changed = True
@@ -414,6 +453,7 @@ async def _validate_or_repair_script(
     max_attempts: int = 3,
     log_path: Path | None = None,
     console_prefix: str = "",
+    strict: bool = True,
 ) -> dict:
     """Write, validate, QA, and repair a local LLM script JSON with bounded retries."""
     qa = QAAgent()
@@ -448,7 +488,7 @@ async def _validate_or_repair_script(
                 _append_local_start_log(log_path, f"VALIDATION_ERROR {attempt}", last_validation_error)
 
         if script is not None:
-            result = await qa.run({"script": script, "done_topics": done_topics})
+            result = await qa.run({"script": script, "done_topics": done_topics, "strict": strict})
             if result.status == AgentStatus.SUCCESS:
                 last_qa_output = result.output
                 if log_path:
@@ -495,7 +535,7 @@ async def _validate_or_repair_script(
             f"validation={last_validation_error!r}\nqa={last_qa_output!r}",
         )
     raise SystemExit(
-        "✗ Local LLM tạo script không qua QA sau "
+        "✗ LLM tạo script không qua QA sau "
         f"{max_attempts} lần. validation={last_validation_error!r} qa={last_qa_output!r}"
     )
 
@@ -581,16 +621,17 @@ def _write_local_batch_item(script_path: Path, payload: dict, args: argparse.Nam
         payload.get("title", ""),
         "ideation",
         "ok",
-        f"Local LLM script validated: {script_path}",
+        f"LLM script validated: {script_path}",
     )
 
 
 async def _cmd_start_local(args: argparse.Namespace) -> None:
     cli = _cli()
-    provider = get_llm_provider()
+    provider = getattr(args, "_provider", None) or get_llm_provider()
+    strict_qa = getattr(args, "_strict_qa", getattr(provider, "name", "") == "claude")
     if not provider.is_available():
         raise SystemExit(
-            f"✗ Local LLM provider `{provider.name}` chưa sẵn sàng. "
+            f"✗ LLM provider `{provider.name}` chưa sẵn sàng. "
             f"Chạy `ytb batch doctor --local` hoặc cấu hình {cli.settings.ollama_url}."
         )
 
@@ -609,7 +650,7 @@ async def _cmd_start_local(args: argparse.Namespace) -> None:
     generated_summaries: list[str] = []
 
     written: list[str] = []
-    print(f"▶ Local ideation: {args.num_of_vid} video ({args.type_of_vid}) bằng {provider.name}/{provider.model_name()}", flush=True)
+    print(f"▶ Ideation: {args.num_of_vid} video ({args.type_of_vid}) bằng {provider.name}/{provider.model_name()}", flush=True)
     print(f"  ý tưởng: {args.type_of_rules}", flush=True)
     print(f"  log chi tiết: {log_path}", flush=True)
     for i in range(1, args.num_of_vid + 1):
@@ -634,7 +675,10 @@ async def _cmd_start_local(args: argparse.Namespace) -> None:
         )
         _append_local_start_log(log_path, f"RAW_LLM_RESPONSE {i}", text)
         print(f"{prefix} LLM: response received", flush=True)
-        payload = _json_from_llm(text)
+        try:
+            payload = _json_from_llm(text)
+        except json.JSONDecodeError as exc:
+            raise SystemExit(f"✗ LLM không trả JSON hợp lệ: {exc}") from exc
         base_slug = slugify(payload.get("slug") or payload.get("title") or payload.get("topic") or f"video-{i}")
         slug = _unique_slug(base_slug, used_slugs, scripts_dir)
         if slug != base_slug:
@@ -649,15 +693,16 @@ async def _cmd_start_local(args: argparse.Namespace) -> None:
             ledger_text,
             log_path=log_path,
             console_prefix=prefix,
+            strict=strict_qa,
         )
         _write_local_batch_item(script_path, payload, args)
-        ledger_text += f"\n| local | {slug} | {payload.get('title', '')} | ideation | ok | local LLM |\n"
+        ledger_text += f"\n| local | {slug} | {payload.get('title', '')} | ideation | ok | LLM |\n"
         used_slugs.add(slug)
         generated_summaries.append(f"{slug} | {payload.get('title', '')} | {payload.get('topic', '')}")
         written.append(slug)
         print(f"{prefix} queued: {slug}", flush=True)
 
-    print("✓ Local ideation xong:")
+    print("✓ Ideation xong:")
     for slug in written:
         print(f"  - {slug}")
 
@@ -673,9 +718,27 @@ def cmd_start(args: argparse.Namespace) -> None:
         if getattr(args, "resume", False):
             raise SystemExit("✗ --clear-ledger không dùng cùng --resume; resume cần ledger cũ để tránh chạy nhầm.")
 
-    if not getattr(args, "cloud", False):
+    if getattr(args, "local", False):
         asyncio.run(_cmd_start_local(args))
         return
+
+    if not getattr(args, "cloud", False):
+        configured_provider = get_llm_provider()
+        if getattr(configured_provider, "name", "") != "claude":
+            setattr(args, "_provider", configured_provider)
+            asyncio.run(_cmd_start_local(args))
+            return
+        try:
+            setattr(args, "_provider", _ClaudeStartProvider(CLAUDE_HAIKU_MODEL))
+            setattr(args, "_strict_qa", True)
+            asyncio.run(_cmd_start_local(args))
+            return
+        except SystemExit as exc:
+            print(f"⚠ Claude Haiku chưa qua QA: {exc}. Thử lại bằng Sonnet...", flush=True)
+            setattr(args, "_provider", _ClaudeStartProvider(CLAUDE_SONNET_MODEL))
+            setattr(args, "_strict_qa", True)
+            asyncio.run(_cmd_start_local(args))
+            return
 
     if args.resume:
         existing_count, existing_slugs = cli._count_pending_ideation(args.type_of_vid)

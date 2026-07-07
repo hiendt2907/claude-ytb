@@ -39,6 +39,21 @@ _SOURCED_CLAIM_PHRASES = (
     "research shows",
 )
 _SOURCE_HINTS = ("http://", "https://", "nguồn:", "source:", "doi:")
+_STAGE_DIRECTION_PATTERNS = (
+    "cú hình tiếp theo:",
+    "beat sau:",
+    "chốt cảnh:",
+    "[",
+    "]",
+)
+_CONCRETE_EXAMPLE_HINTS = (
+    "ví dụ",
+    "chẳng hạn",
+    "cụ thể",
+    "trong thực tế",
+    "một người",
+    "khi bạn",
+)
 _ENTERTAINMENT_HINTS = (
     "giải trí",
     "giai tri",
@@ -111,6 +126,11 @@ class QAAgent:
             violations.extend(_check_intro(script))
             violations.extend(_check_self_help(script))
             violations.extend(_check_dedup(script, context.get("done_topics")))
+            if context.get("strict", False):
+                violations.extend(_check_hook_strength(script))
+                violations.extend(_check_stage_direction_leak(script))
+                violations.extend(_check_knowledge_examples(script))
+                violations.extend(_check_pexels_queries(script))
             violations.extend(_check_entertainment_retention(script))
             warnings.extend(_check_sourced_claims(script))
 
@@ -229,6 +249,85 @@ def _check_self_help(script: Any) -> list[dict[str, str]]:
     return violations
 
 
+def _repair(rule: str, detail: str, suggestion: str) -> dict[str, str]:
+    return {"rule": rule, "detail": detail, "suggestion": suggestion}
+
+
+def _script_video_type(script: Any) -> str:
+    raw = str(_get(script, "video_type", "") or "").lower()
+    if raw in {"long", "short"}:
+        return raw
+    return "long" if _get(script, "target_minutes") is not None else "short"
+
+
+def _check_hook_strength(script: Any) -> list[dict[str, str]]:
+    segments = _segments_of(script)
+    if not segments:
+        return []
+    first = _narration_of(segments[0]).strip()
+    first_words = first.split()[:28]
+    first_text = " ".join(first_words).lower()
+    if _script_video_type(script) == "long" and first.startswith(GREETING_PREFIX):
+        first_text = first_text.replace(GREETING_PREFIX.lower(), "", 1).strip()
+    strong_markers = (
+        "vì sao", "thật ra", "nghịch lý", "sai lầm", "bí mật", "đừng", "không phải",
+        "nhưng", "bỗng", "ngay trước mặt", "hóa ra", "mở laptop", "cầm điện thoại",
+    )
+    has_question_hook = "?" in first
+    if len(first_words) < 8 or not (has_question_hook or any(marker in first_text for marker in strong_markers)):
+        return [_repair(
+            "hook",
+            "Hook 3-5 giây đầu chưa đủ mạnh hoặc chưa có nghịch lý/vấn đề rõ.",
+            "Viết lại câu mở đầu thành một mâu thuẫn cụ thể: 'Bạn tưởng X, nhưng thật ra Y...' hoặc 'Đừng làm X trước khi hiểu Y'.",
+        )]
+    return []
+
+
+def _check_stage_direction_leak(script: Any) -> list[dict[str, str]]:
+    violations: list[dict[str, str]] = []
+    for index, segment in enumerate(_segments_of(script), start=1):
+        narration_lower = _narration_of(segment).lower()
+        leaked = [p for p in _STAGE_DIRECTION_PATTERNS if p in narration_lower]
+        if leaked:
+            violations.append(_repair(
+                "stage_direction",
+                f"Section {index} có stage direction bị lẫn vào voiceover: {', '.join(leaked)}.",
+                "Chuyển chỉ dẫn hình ảnh sang visual_intent/pexels_query; voiceover chỉ giữ lời đọc tự nhiên.",
+            ))
+    return violations
+
+
+def _check_knowledge_examples(script: Any) -> list[dict[str, str]]:
+    if _is_entertainment_script(script):
+        return []
+    text = _script_text(script).lower()
+    if not any(hint in text for hint in _CONCRETE_EXAMPLE_HINTS):
+        return [_repair(
+            "concrete_example",
+            "Video chia sẻ/kiến thức thiếu ví dụ cụ thể để người xem bám vào.",
+            "Thêm ít nhất một ví dụ đời thường cụ thể: bối cảnh, hành động, hậu quả, và cách áp dụng.",
+        )]
+    return []
+
+
+def _segment_query(segment: Any) -> str:
+    return str(_get(segment, "pexels_query", "") or _get(segment, "broll", "") or "")
+
+
+def _check_pexels_queries(script: Any) -> list[dict[str, str]]:
+    weak = {"", "video", "stock footage", "broll", "background", "abstract"}
+    violations: list[dict[str, str]] = []
+    for index, segment in enumerate(_segments_of(script), start=1):
+        query = _segment_query(segment).strip().lower()
+        if query in weak or len(query.split()) < 2:
+            violations.append(_repair(
+                "pexels_query",
+                f"Section {index} có Pexels query yếu/thiếu: {query or '<empty>'}.",
+                "Viết query tiếng Anh mô tả cảnh cụ thể có chủ thể + hành động, ví dụ 'person checking phone at desk' hoặc 'busy street decision making'.",
+            ))
+    return violations
+
+
 def _check_sourced_claims(script: Any) -> list[dict[str, str]]:
     warnings: list[dict[str, str]] = []
     for segment in _segments_of(script):
@@ -299,7 +398,13 @@ def _check_entertainment_retention(script: Any) -> list[dict[str, str]]:
 
 
 def _is_entertainment_script(script: Any) -> bool:
-    return any(hint in _script_text(script).lower() for hint in _ENTERTAINMENT_HINTS)
+    metadata_text = " ".join([
+        str(_get(script, "topic", "") or ""),
+        str(_get(script, "title", "") or ""),
+        str(_get(script, "description", "") or ""),
+        " ".join(str(tag) for tag in (_get(script, "tags", ()) or ())),
+    ]).lower()
+    return any(hint in metadata_text for hint in _ENTERTAINMENT_HINTS)
 
 
 def _script_text(script: Any) -> str:

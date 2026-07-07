@@ -66,7 +66,7 @@ def test_voice_profile_knowledge_is_slower_and_more_inspiring():
 
     assert profile.name == "knowledge"
     assert profile.sentence_sec > tts.VOICE_NEUTRAL.sentence_sec
-    assert profile.edge_rate.startswith("-")
+    assert tts._edge_rate_pct(profile.edge_rate) < tts._edge_rate_pct(tts.VOICE_NEUTRAL.edge_rate)
 
 
 def test_prepare_narration_removes_leaked_stage_directions():

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import tempfile
 from pathlib import Path
 
 from ..config.settings import settings
@@ -63,3 +64,52 @@ def validate_render(
             f"Render lệch timeline {drift:.2f}s > {settings.render_validation_max_drift_sec:.2f}s "
             f"(video={duration:.2f}s, audio={expected_duration_sec:.2f}s)"
         )
+
+
+def validate_final_video(video: RenderedVideo) -> None:
+    """Codex final QA gate before upload."""
+    if video.video_path is None:
+        raise FileNotFoundError("Final QA: video_path trống.")
+    path = Path(video.video_path)
+    if not path.exists():
+        raise FileNotFoundError(f"Final QA: không tìm thấy video: {path}")
+    data = _ffprobe(path)
+    streams = data.get("streams", [])
+    video_stream = next((s for s in streams if s.get("codec_type") == "video"), None)
+    audio_stream = next((s for s in streams if s.get("codec_type") == "audio"), None)
+    if video_stream is None or audio_stream is None:
+        raise ValueError("Final QA: thiếu audio hoặc video stream.")
+
+    width = int(video_stream.get("width") or 0)
+    height = int(video_stream.get("height") or 0)
+    declared_type = getattr(video, "video_type", "short")
+    if declared_type == "short" and height <= width:
+        raise ValueError(f"Final QA: Short phải là video dọc, hiện tại {width}x{height}.")
+    if declared_type == "long" and width <= height:
+        raise ValueError(f"Final QA: Long phải là video ngang, hiện tại {width}x{height}.")
+
+    duration = float(data.get("format", {}).get("duration") or 0)
+    if duration <= 0:
+        raise ValueError("Final QA: duration không hợp lệ.")
+    if declared_type == "short" and duration > 180:
+        raise ValueError(f"Final QA: Short dài quá 180s: {duration:.1f}s.")
+    if not video.description or len(video.tags) < 3:
+        raise ValueError("Final QA: metadata thiếu description hoặc tags (<3).")
+    _check_not_blank(path)
+
+
+def _check_not_blank(path: Path) -> None:
+    """Sample frames and reject fully black/blank-looking renders."""
+    with tempfile.TemporaryDirectory() as tmp:
+        frame = Path(tmp) / "frame.jpg"
+        subprocess.run(
+            ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-ss", "1", "-i", str(path),
+             "-frames:v", "1", str(frame)],
+            check=True,
+        )
+        from PIL import Image
+
+        img = Image.open(frame).convert("L")
+        extrema = img.getextrema()
+        if extrema[1] < 12:
+            raise ValueError("Final QA: frame mẫu gần như đen/blank.")
