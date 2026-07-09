@@ -1382,6 +1382,7 @@ Hoặc: video 1: 1.1,1.2, 2.3, 3.1"></textarea>
           <textarea id="contentTopic" rows="2" placeholder="VD: thói quen dậy sớm giúp tập trung hơn"></textarea>
           <div class="picker-row" style="margin-top:8px">
             <button type="button" id="contentGenerateBtn" class="secondary">Claude tự sinh kịch bản</button>
+            <button type="button" id="contentDiscoverBtn" class="secondary">Tự tìm chủ đề trending</button>
             <span id="contentGenerateStatus" class="job-kind"></span>
           </div>
           <label for="contentScriptJson" style="margin-top:12px">Kịch bản (JSON — có thể tự sửa)</label>
@@ -3171,6 +3172,28 @@ contentGenerateBtn.addEventListener("click", async () => {
     contentGenerateStatus.textContent = `Lỗi: ${err.message}`;
   } finally {
     contentGenerateBtn.disabled = false;
+  }
+});
+
+const contentDiscoverBtn = document.getElementById("contentDiscoverBtn");
+
+contentDiscoverBtn.addEventListener("click", async () => {
+  contentDiscoverBtn.disabled = true;
+  contentGenerateStatus.textContent = "Đang tìm chủ đề trending + để Claude chọn + viết kịch bản...";
+  try {
+    const res = await fetch("/api/content/discover-topic", { method: "POST" });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    const script = await res.json();
+    document.getElementById("contentTopic").value = script.title;
+    contentScriptJson.value = JSON.stringify(script, null, 2);
+    contentGenerateStatus.textContent = `Đã tự chọn: "${script.title}" (${script.segments.length} đoạn).`;
+  } catch (err) {
+    contentGenerateStatus.textContent = `Lỗi: ${err.message}`;
+  } finally {
+    contentDiscoverBtn.disabled = false;
   }
 });
 

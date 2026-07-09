@@ -63,6 +63,39 @@ các output) đồng bộ với voice track cố định.
 - `webui/store.py` — tách `JobStore` singleton ra khỏi `app.py` để
   `content_routes.py` dùng chung mà không circular-import với `app.py`.
 
+## Tự tìm chủ đề + QA gate + ledger (mới, 2026-07-09 amendment 2)
+
+Sau khi audit kỹ hệ ideation của `claude-ytb` (xem PROJECT_VISION.md Amendment
+Log), đã port 3 phần theo yêu cầu user — **không port toàn bộ**, chỉ phần
+được chọn:
+
+- `content/research.py` — port từ `claude-ytb/ideation/research.py`: gọi
+  YouTube Data API `videos.list(chart=mostPopular, regionCode=VN)` + YouTube
+  autocomplete (không cần key) để lấy chủ đề trending + seo_pool
+  (hashtag/keyword). Cần `YOUTUBE_API_KEY` trong `.env` — fail fast nếu thiếu
+  (KHÔNG bịa dữ liệu).
+- `content/ledger.py` — rút gọn từ `ideation/series.py` (chỉ giữ
+  `slugify`/dedup, bỏ phần lên lịch series 30 ngày không cần thiết). Lưu JSON
+  tại `data/content_ledger.json` (gitignored, giống `claude-ytb` ignore
+  `data/ledger.md` — state cục bộ, không phải code).
+- `content/qa.py` — rút gọn từ `agents/qa_agent.py` cho schema Script đơn
+  giản của dự án này (không có compliance dict/long-form/topic/tags/broll như
+  bản gốc): check độ dài Short (0.8–1.2 phút theo `CHARS_PER_MIN=1197`),
+  chặn self-help sáo rỗng, chặn chỉ dẫn dàn cảnh lẫn vào lời đọc, chặn
+  visual_keywords quá yếu/chung chung, dedup theo ledger (chặn), cảnh báo
+  claim thiếu nguồn (không chặn). **Lưu ý khi đọc code cũ:** bản gốc
+  `qa_agent.py` có nhiều gate hơn (hook strength, entertainment retention...)
+  — cố tình KHÔNG port hết vì không áp dụng cho use case Short đơn giản này.
+- `script_gen.py` thêm `generate_script_auto()` (tự chọn 1 chủ đề trending
+  chưa có trong ledger rồi viết luôn kịch bản, 1 lần gọi Claude) và
+  `repair_script()` (gọi Claude sửa lại đúng các lỗi QA liệt kê, tối đa 3 lần
+  — xem `content/jobs.py::_ensure_qa_passed`). QA + ghi ledger chạy **luôn**
+  trong pipeline (`content/jobs.py`), bất kể script đến từ đâu (tự nhập tay,
+  Claude sinh theo topic, hay tự tìm chủ đề) — không có đường tắt bỏ qua QA.
+- UI: nút "Tự tìm chủ đề trending" gọi `POST /api/content/discover-topic`,
+  đổ kết quả vào ô kịch bản để user xem/sửa trước khi submit — giống hệt nút
+  "Claude tự sinh kịch bản" hiện có, chỉ khác nguồn chủ đề.
+
 ## Ngoài phạm vi (vẫn giữ)
 
 - Multi-platform publish khác YouTube (TikTok/Reels...) — chưa làm, chỉ

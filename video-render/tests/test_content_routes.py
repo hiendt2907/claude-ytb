@@ -48,6 +48,30 @@ def test_generate_script_endpoint_returns_400_on_claude_failure(monkeypatch):
     assert "claude lỗi" in resp.json()["detail"]
 
 
+def test_discover_topic_endpoint_returns_script_json(monkeypatch):
+    monkeypatch.setattr(content_routes, "load_ledger", lambda: [])
+    monkeypatch.setattr(content_routes, "generate_script_auto", lambda ledger, num_segments=6: _script())
+
+    resp = _client().post("/api/content/discover-topic")
+
+    assert resp.status_code == 200
+    assert resp.json()["title"] == "Thói quen dậy sớm"
+
+
+def test_discover_topic_endpoint_returns_400_when_no_new_topics(monkeypatch):
+    monkeypatch.setattr(content_routes, "load_ledger", lambda: [])
+
+    def boom(ledger, num_segments=6):
+        raise RuntimeError("đã có trong ledger")
+
+    monkeypatch.setattr(content_routes, "generate_script_auto", boom)
+
+    resp = _client().post("/api/content/discover-topic")
+
+    assert resp.status_code == 400
+    assert "ledger" in resp.json()["detail"]
+
+
 def test_start_pipeline_requires_topic_or_script_json():
     resp = _client().post("/api/content/jobs", data={"product_name": "p"})
     assert resp.status_code == 400

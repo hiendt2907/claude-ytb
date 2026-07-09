@@ -20,9 +20,10 @@ from ytb_pipeline.content.jobs import (
     get_content_job,
     start_content_pipeline,
 )
+from ytb_pipeline.content.ledger import load_ledger
 from ytb_pipeline.content.models import Script, ScriptSegment
 from ytb_pipeline.content.publish import publish_video
-from ytb_pipeline.content.script_gen import generate_script
+from ytb_pipeline.content.script_gen import generate_script, generate_script_auto, script_to_dict
 from ytb_pipeline.webui.jobs import RenderRequest, run_render_job
 from ytb_pipeline.webui.store import store
 
@@ -39,18 +40,20 @@ def generate_script_endpoint(topic: str = Form(...), num_segments: int = Form(6)
         script = generate_script(topic, num_segments=num_segments)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(400, f"Sinh kịch bản thất bại: {exc}") from exc
-    return _script_to_dict(script)
+    return script_to_dict(script)
 
 
-def _script_to_dict(script: Script) -> dict:
-    return {
-        "title": script.title,
-        "description": script.description,
-        "segments": [
-            {"narration": s.narration, "visual_keywords": list(s.visual_keywords)}
-            for s in script.segments
-        ],
-    }
+@router.post("/discover-topic")
+def discover_topic_endpoint(num_segments: int = Form(6)) -> dict:
+    """Tự tìm chủ đề trending (YouTube) + để Claude chọn 1 chưa có trong ledger
+    rồi viết luôn kịch bản — trả cùng shape với /generate-script để user xem/sửa
+    trước khi submit."""
+    ledger = load_ledger()
+    try:
+        script = generate_script_auto(ledger, num_segments=num_segments)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(400, f"Tự tìm chủ đề thất bại: {exc}") from exc
+    return script_to_dict(script)
 
 
 def _script_from_json(data: dict) -> Script:

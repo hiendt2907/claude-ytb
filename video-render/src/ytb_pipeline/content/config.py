@@ -12,11 +12,13 @@ class ContentSettings:
     claude_model: str
     claude_fallback_model: str
     pexels_api_key: str
+    youtube_api_key: str
     youtube_client_secret_path: str
     youtube_token_path: str
     youtube_privacy: str
     youtube_category_id: str
     youtube_contains_synthetic_media: bool
+    ledger_path: str
 
 
 def load_content_settings() -> ContentSettings:
@@ -25,6 +27,7 @@ def load_content_settings() -> ContentSettings:
         claude_model=os.environ.get("CLAUDE_MODEL", "sonnet"),
         claude_fallback_model=os.environ.get("CLAUDE_FALLBACK_MODEL", "haiku"),
         pexels_api_key=os.environ.get("PEXELS_API_KEY", ""),
+        youtube_api_key=os.environ.get("YOUTUBE_API_KEY", ""),
         # Mặc định trỏ vào credentials copy từ claude-ytb/secrets/ (đã chốt dùng
         # lại cùng kênh YouTube) — xem CLAUDE.md mục Publish.
         youtube_client_secret_path=os.environ.get(
@@ -37,4 +40,5 @@ def load_content_settings() -> ContentSettings:
             "YOUTUBE_CONTAINS_SYNTHETIC_MEDIA", "true"
         ).lower()
         in ("1", "true", "yes"),
+        ledger_path=os.environ.get("CONTENT_LEDGER_PATH", "data/content_ledger.json"),
     )

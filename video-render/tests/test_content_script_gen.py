@@ -7,6 +7,8 @@ import json
 import pytest
 
 from ytb_pipeline.content import script_gen
+from ytb_pipeline.content.ledger import LedgerEntry
+from ytb_pipeline.content.models import Script, ScriptSegment
 
 
 def _fake_claude_json() -> str:
@@ -69,3 +71,77 @@ def test_generate_script_parses_stdout_on_success(monkeypatch):
     script = script_gen.generate_script("chủ đề bất kỳ")
 
     assert script.title == "Thói quen dậy sớm"
+
+
+def test_generate_script_auto_raises_when_all_topics_in_ledger(monkeypatch):
+    monkeypatch.setattr(
+        script_gen.research,
+        "research_trending",
+        lambda **kw: {
+            "research": [{"topic": "Chủ đề đã làm"}],
+            "seo_pool": {"keywords": []},
+        },
+    )
+    ledger = [LedgerEntry(slug="chu-de-da-lam", title="Chủ đề đã làm", created_at="2026-07-01")]
+
+    with pytest.raises(RuntimeError, match="đã có trong ledger"):
+        script_gen.generate_script_auto(ledger)
+
+
+def test_generate_script_auto_picks_candidate_and_calls_claude(monkeypatch):
+    monkeypatch.setattr(
+        script_gen.research,
+        "research_trending",
+        lambda **kw: {
+            "research": [{"topic": "Chủ đề mới"}, {"topic": "Chủ đề đã làm"}],
+            "seo_pool": {"keywords": ["tu khoa a", "tu khoa b"]},
+        },
+    )
+    ledger = [LedgerEntry(slug="chu-de-da-lam", title="Chủ đề đã làm", created_at="2026-07-01")]
+
+    captured_prompt = {}
+
+    class FakeResult:
+        returncode = 0
+        stdout = _fake_claude_json()
+        stderr = ""
+
+    def fake_run(cmd, **kwargs):
+        captured_prompt["prompt"] = cmd[-1]
+        return FakeResult()
+
+    monkeypatch.setattr(script_gen.subprocess, "run", fake_run)
+
+    script = script_gen.generate_script_auto(ledger)
+
+    assert script.title == "Thói quen dậy sớm"
+    assert "Chủ đề mới" in captured_prompt["prompt"]
+    assert "Chủ đề đã làm" not in captured_prompt["prompt"]
+
+
+def test_repair_script_sends_violations_and_returns_fixed_script(monkeypatch):
+    original = Script(
+        title="t",
+        description="",
+        segments=(ScriptSegment(narration="a", visual_keywords=("x",)),),
+    )
+    violations = [{"rule": "length", "detail": "Quá ngắn."}]
+
+    captured_prompt = {}
+
+    class FakeResult:
+        returncode = 0
+        stdout = _fake_claude_json()
+        stderr = ""
+
+    def fake_run(cmd, **kwargs):
+        captured_prompt["prompt"] = cmd[-1]
+        return FakeResult()
+
+    monkeypatch.setattr(script_gen.subprocess, "run", fake_run)
+
+    fixed = script_gen.repair_script(original, violations)
+
+    assert fixed.title == "Thói quen dậy sớm"
+    assert "length" in captured_prompt["prompt"]
+    assert "Quá ngắn" in captured_prompt["prompt"]

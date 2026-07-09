@@ -24,3 +24,6 @@ secrets/
 *token*.json
 client_secret*.json
 .env
+
+# Ledger chủ đề đã tạo (state cục bộ, giống cách claude-ytb ignore data/ledger.md)
+data/content_ledger.json

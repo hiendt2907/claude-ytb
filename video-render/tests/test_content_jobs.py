@@ -34,7 +34,19 @@ def _wait_until_terminal(job_id: str, timeout: float = 2.0) -> dict:
     raise TimeoutError(f"job {job_id} không kết thúc trong {timeout}s: {job}")
 
 
+def _pass_qa_and_isolate_ledger(monkeypatch):
+    """Test orchestration (script→voice→pexels→render), không phải QA/ledger
+    (đã có test riêng: test_content_qa.py/test_content_ledger.py) — bypass để
+    không cần narration đủ dài/không gọi claude -p thật khi cần sửa lỗi QA."""
+    monkeypatch.setattr(
+        content_jobs.qa, "check_script", lambda script, ledger=None: {"passed": True, "violations": [], "warnings": []}
+    )
+    monkeypatch.setattr(content_jobs.ledger_mod, "load_ledger", lambda: [])
+    monkeypatch.setattr(content_jobs.ledger_mod, "append_ledger", lambda title, created_at: None)
+
+
 def test_pipeline_runs_script_voice_pexels_then_render(monkeypatch, tmp_path):
+    _pass_qa_and_isolate_ledger(monkeypatch)
     monkeypatch.setattr(content_jobs.script_gen, "generate_script", lambda topic: _script())
     monkeypatch.setattr(
         content_jobs.voiceover, "synthesize", lambda script, out_dir: _FakeVoiceover(out_dir / "v.mp3")
@@ -71,6 +83,7 @@ def test_pipeline_runs_script_voice_pexels_then_render(monkeypatch, tmp_path):
 
 
 def test_pipeline_uses_manual_script_without_calling_claude(monkeypatch, tmp_path):
+    _pass_qa_and_isolate_ledger(monkeypatch)
     called = []
     monkeypatch.setattr(
         content_jobs.script_gen, "generate_script", lambda topic: called.append(topic) or _script()

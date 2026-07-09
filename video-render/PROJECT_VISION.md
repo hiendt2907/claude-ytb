@@ -264,3 +264,45 @@ section overrides Section 2.*
   AI-generated (non-stock) B-roll — Pexels stock footage remains the source,
   matching `claude-ytb`'s own known technical debt on this point (see
   `claude-ytb/CLAUDE.md` invariant #3).
+
+- 2026-07-09 (amendment 2) — **Auto topic-discovery + QA gate + ledger
+  dedup, ported selectively from claude-ytb's ideation system after a full
+  audit.** Rationale: the user asked "did you wire in Claude auto-searching
+  for a topic" — it hadn't been (topic was always user-typed). Before
+  coding, a thorough audit of `claude-ytb`'s `ideation_cmd.py`,
+  `ideation/generator.py`, `ideation/research.py`, `ideation/series.py`,
+  `ideation/approval.py`, and all `agents/*.py` (incl. `qa_agent.py`) was
+  done and reported back; the user then picked exactly 3 of 4 offered scopes
+  to port: (1) trending topic auto-search, (2) a QA quality gate, (3) ledger-
+  style dedup against prior topics. Telegram approval gate and the 30-day
+  series scheduler were explicitly NOT requested and were not ported.
+
+  **What was ported (simplified/re-scoped, not copy-pasted verbatim):**
+  `content/research.py` (YouTube mostPopular + autocomplete — the only real
+  "auto topic search" mechanism that exists anywhere in claude-ytb; there is
+  no competitor analysis or general web search), `content/ledger.py` (just
+  `slugify` + dedup from `ideation/series.py`, with the 30-day scheduling
+  machinery deliberately dropped as unneeded here), `content/qa.py` (a
+  narrow subset of `agents/qa_agent.py`'s rule-based checks — length,
+  self-help-mantra blocklist, stage-direction leak, weak visual_keywords,
+  ledger dedup, unsourced-claim warning — rescoped to this project's
+  Short-only, compliance-free `Script` schema; hook-strength/entertainment-
+  retention/compliance checks from the original were NOT ported, they don't
+  apply to this simpler schema).
+
+  **Important finding surfaced during the audit, worth remembering:** in
+  `claude-ytb` itself, `qa_agent.py`'s "3-gate ngách" (self-help ban / idea
+  density / sourced claims) is only PARTIALLY code-enforced — idea-density-
+  per-chapter has no code check at all, and sourced-claims is a warning, not
+  a block. The same limitation carries over here: `content/qa.py`'s
+  sourced-claims check is a warning too, not a hard gate. This is a known,
+  accepted gap, not an oversight.
+
+  **New pipeline behavior:** every script — whether typed by hand, generated
+  from a user topic, or auto-discovered — now passes through
+  `content/jobs.py::_ensure_qa_passed` before voice/pexels/render begin.
+  Failing QA triggers up to 3 automatic repair round-trips to Claude
+  (`script_gen.repair_script`) before the job is marked failed. A passing
+  script is appended to `data/content_ledger.json` (gitignored local state,
+  mirroring how claude-ytb treats `data/ledger.md`) so future auto-discovery
+  and dedup checks see it.

@@ -12,10 +12,12 @@ from __future__ import annotations
 
 import threading
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
-from . import pexels_fetch, script_gen, voiceover
+from . import ledger as ledger_mod
+from . import pexels_fetch, qa, script_gen, voiceover
 from .models import Script
 
 _lock = threading.Lock()
@@ -24,6 +26,7 @@ _jobs: dict[str, dict[str, Any]] = {}
 StartRenderFn = Callable[[Path, Path], dict[str, Any]]
 
 DEFAULT_CANDIDATES_PER_SCENE = 3
+MAX_QA_REPAIR_ATTEMPTS = 3
 
 
 def create_content_job() -> str:
@@ -37,6 +40,7 @@ def create_content_job() -> str:
             "scenes_dir": None,
             "voice_track": None,
             "script": None,
+            "qa": None,
             "error": None,
         }
     return job_id
@@ -95,17 +99,12 @@ def _run_content_pipeline(
         else:
             _update(job_id, stage="script", message="Claude đang sinh kịch bản...")
             script = script_gen.generate_script(topic)
-        _update(
-            job_id,
-            script={
-                "title": script.title,
-                "description": script.description,
-                "segments": [
-                    {"narration": s.narration, "visual_keywords": list(s.visual_keywords)}
-                    for s in script.segments
-                ],
-            },
-        )
+
+        _update(job_id, stage="qa", message="Đang kiểm tra chất lượng kịch bản...")
+        script, qa_result = _ensure_qa_passed(job_id, script)
+        ledger_mod.append_ledger(script.title, _now_iso())
+
+        _update(job_id, script=script_gen.script_to_dict(script), qa=qa_result)
 
         _update(job_id, stage="voice", message="Đang tổng hợp giọng đọc edge-tts...")
         voice_result = voiceover.synthesize(script, work_dir / "voice")
@@ -135,3 +134,32 @@ def _run_content_pipeline(
         )
     except Exception as exc:  # noqa: BLE001 — job nền, phải ghi lỗi lại cho UI thay vì raise mất
         _update(job_id, stage="failed", message=f"Lỗi: {exc}", error=str(exc))
+
+
+def _ensure_qa_passed(job_id: str, script: Script) -> tuple[Script, dict]:
+    """Chạy cổng QA; nếu fail, nhờ Claude sửa lại (tối đa MAX_QA_REPAIR_ATTEMPTS lần).
+
+    Ném RuntimeError nếu vẫn không đạt sau khi hết lượt sửa — dừng pipeline
+    thay vì âm thầm render một kịch bản không đạt chuẩn.
+    """
+    ledger_entries = ledger_mod.load_ledger()
+    result = qa.check_script(script, ledger_entries)
+    attempts = 0
+    while not result["passed"] and attempts < MAX_QA_REPAIR_ATTEMPTS:
+        attempts += 1
+        _update(
+            job_id,
+            message=f"QA phát hiện {len(result['violations'])} lỗi — nhờ Claude sửa lần {attempts}...",
+        )
+        script = script_gen.repair_script(script, result["violations"])
+        result = qa.check_script(script, ledger_entries)
+
+    if not result["passed"]:
+        detail = "; ".join(f"[{v['rule']}] {v['detail']}" for v in result["violations"])
+        raise RuntimeError(f"Kịch bản không đạt QA sau {MAX_QA_REPAIR_ATTEMPTS} lần sửa: {detail}")
+
+    return script, result
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
