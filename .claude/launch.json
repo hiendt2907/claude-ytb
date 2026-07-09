@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "video-render",
+      "runtimeExecutable": "/Users/hiendang/claude-ytb/video-render/scripts/run_dev.sh",
+      "runtimeArgs": [],
+      "port": 8010
+    }
+  ]
+}

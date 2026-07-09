@@ -33,3 +33,15 @@ assets/benchmarks/
 assets/update_logs/
 data/*.db
 *.mp4
+
+# video-render (copy từ Documents/video-render, đọc CLAUDE.md của nó)
+video-render/demo_data/
+video-render/.venv/
+video-render/.venv-tts/
+video-render/node_modules/
+video-render/build/
+video-render/dist/
+video-render/output/
+video-render/.pytest_cache/
+video-render/.coverage*
+video-render/test-results/

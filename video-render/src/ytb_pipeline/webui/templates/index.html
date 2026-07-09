@@ -1,0 +1,3318 @@
+<title>video-render — Assembler</title>
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --bg: #f5f7f8;
+    --panel: #ffffff;
+    --ink: #182027;
+    --muted: #66717c;
+    --line: #dce3e8;
+    --soft: #eef3f5;
+    --brand: #145c53;
+    --brand-strong: #0d4039;
+    --accent: #1f6feb;
+    --warn: #8a5a00;
+    --danger: #a42a1f;
+    --ok-bg: #def4e8;
+    --ok: #17613a;
+    --review-bg: #fff0c7;
+    --review: #73510b;
+    --bad-bg: #ffe1db;
+    --shadow: 0 16px 50px rgba(24, 32, 39, 0.10);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: var(--ink);
+    background:
+      linear-gradient(135deg, rgba(20, 92, 83, 0.10), transparent 38%),
+      linear-gradient(315deg, rgba(31, 111, 235, 0.08), transparent 34%),
+      var(--bg);
+  }
+
+  .app-shell {
+    width: min(1180px, calc(100% - 32px));
+    margin: 0 auto;
+    padding: 28px 0 40px;
+  }
+
+  .app-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 22px;
+  }
+
+  .eyebrow {
+    margin: 0 0 6px;
+    color: var(--brand);
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(1.65rem, 2.6vw, 2.45rem);
+    line-height: 1.08;
+    letter-spacing: 0;
+  }
+
+  .subhead {
+    max-width: 680px;
+    margin: 10px 0 0;
+    color: var(--muted);
+    font-size: 1rem;
+    line-height: 1.55;
+  }
+
+  .status-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+
+  .status-chip {
+    min-height: 34px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.72);
+    color: #3b4650;
+    font-size: 0.84rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .main-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 20px;
+    align-items: start;
+  }
+
+  .workflow-panel,
+  .side-panel,
+  .progress-panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+  }
+
+  .workflow-panel { overflow: hidden; }
+
+  .side-panel {
+    position: sticky;
+    top: 18px;
+    padding: 18px;
+  }
+
+  .step-section {
+    display: grid;
+    grid-template-columns: 132px minmax(0, 1fr);
+    gap: 20px;
+    padding: 22px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .step-section:last-of-type { border-bottom: none; }
+
+  .step-marker {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .step-number {
+    width: 34px;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: var(--brand);
+    color: #fff;
+    font-weight: 900;
+  }
+
+  .step-title {
+    font-weight: 850;
+    line-height: 1.25;
+  }
+
+  .step-note {
+    color: var(--muted);
+    font-size: 0.85rem;
+    line-height: 1.45;
+  }
+
+  .field-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .field-span { grid-column: 1 / -1; }
+
+  label {
+    display: block;
+    margin: 0;
+    font-weight: 780;
+    font-size: 0.92rem;
+  }
+
+  .label-text {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 7px;
+  }
+
+  input,
+  select,
+  textarea {
+    width: 100%;
+    margin: 0;
+    border: 1px solid #cbd5dc;
+    border-radius: 7px;
+    background: #fff;
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.98rem;
+  }
+
+  input,
+  select { min-height: 42px; padding: 0 12px; }
+
+  textarea {
+    min-height: 118px;
+    padding: 10px 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.9rem;
+    line-height: 1.45;
+  }
+
+  input:focus,
+  select:focus,
+  textarea:focus {
+    outline: 3px solid rgba(31, 111, 235, 0.16);
+    border-color: var(--accent);
+  }
+
+  button,
+  .output-actions a {
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 0 14px;
+    border: 1px solid #c6d0d8;
+    border-radius: 7px;
+    background: #fff;
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.94rem;
+    font-weight: 780;
+    line-height: 1.2;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  button:hover,
+  .output-actions a:hover { border-color: #9cadb9; background: #f8fafb; }
+
+  button.primary {
+    background: var(--brand);
+    border-color: var(--brand);
+    color: #fff;
+  }
+
+  button.primary:hover {
+    background: var(--brand-strong);
+    border-color: var(--brand-strong);
+  }
+
+  button.secondary {
+    background: #eaf5f1;
+    border-color: #b7d8cd;
+    color: var(--brand-strong);
+  }
+
+  .picker-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .picker-row.triple { grid-template-columns: minmax(0, 1fr) auto auto; }
+
+  .path-display {
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    padding: 9px 12px;
+    border: 1px dashed #c8d3da;
+    border-radius: 7px;
+    background: var(--soft);
+    color: #46525d;
+    font-size: 0.9rem;
+    word-break: break-word;
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin-top: 9px;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 28px;
+    padding: 0 8px 0 10px;
+    border-radius: 999px;
+    background: #e9f0ff;
+    color: #214a87;
+    font-size: 0.82rem;
+    font-weight: 760;
+  }
+
+  .chip button {
+    width: 20px;
+    min-height: 20px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: #7a2630;
+  }
+
+  .hint {
+    margin-top: 7px;
+    color: var(--muted);
+    font-size: 0.82rem;
+    line-height: 1.45;
+  }
+
+  .assist-box {
+    margin-top: 12px;
+    padding: 12px;
+    border-radius: 7px;
+    background: #f7faf8;
+    border: 1px solid #d9e7df;
+    color: #41524a;
+    font-size: 0.88rem;
+    line-height: 1.5;
+  }
+
+  #scanResult {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 7px;
+    background: #f8fafb;
+    border: 1px solid var(--line);
+    color: #3f4a54;
+    font-size: 0.9rem;
+    white-space: pre-wrap;
+  }
+
+  #scanResult:empty { display: none; }
+
+  .radio-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .radio-row label {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: #fff;
+    font-weight: 700;
+  }
+
+  .radio-row input { width: auto; min-height: auto; margin: 0; }
+
+  .advanced {
+    margin-top: 14px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: #fbfcfd;
+  }
+
+  .advanced summary {
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    cursor: pointer;
+    font-weight: 820;
+  }
+
+  .advanced-body {
+    padding: 0 12px 12px;
+  }
+
+  .advanced-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .tuning-grid {
+    display: grid;
+    gap: 14px;
+  }
+
+  .tuning-row {
+    display: grid;
+    grid-template-columns: 160px 1fr 56px;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .tuning-row input[type="range"] {
+    width: 100%;
+  }
+
+  .tuning-row .tuning-value {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.85rem;
+    color: var(--muted, #666);
+  }
+
+  .tuning-reset-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 4px;
+  }
+
+  .output-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 180px;
+    gap: 16px;
+    align-items: end;
+  }
+
+  .action-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 10px;
+  }
+
+  .action-row button { width: 100%; }
+
+  .summary-title {
+    margin: 0 0 12px;
+    font-size: 0.95rem;
+    font-weight: 900;
+  }
+
+  .summary-list {
+    display: grid;
+    gap: 10px;
+    margin: 0 0 16px;
+    padding: 0;
+    list-style: none;
+  }
+
+  .summary-list li {
+    display: grid;
+    grid-template-columns: 26px minmax(0, 1fr);
+    gap: 9px;
+    align-items: start;
+    color: #41505b;
+    font-size: 0.88rem;
+    line-height: 1.45;
+  }
+
+  .summary-list span {
+    width: 26px;
+    height: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: var(--soft);
+    color: var(--brand);
+    font-weight: 900;
+  }
+
+  .quick-note {
+    padding: 12px;
+    border-radius: 7px;
+    background: #eff7ff;
+    border: 1px solid #c8ddff;
+    color: #25486f;
+    font-size: 0.86rem;
+    line-height: 1.45;
+  }
+
+  .help {
+    margin-top: 14px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.74);
+  }
+
+  .help summary {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    cursor: pointer;
+    font-weight: 820;
+  }
+
+  .help-content {
+    padding: 0 14px 14px;
+    color: #4a5660;
+    font-size: 0.88rem;
+    line-height: 1.5;
+  }
+
+  .help ol,
+  .help ul { margin: 8px 0 8px 18px; padding: 0; }
+
+  .help li { margin: 5px 0; }
+
+  .help code {
+    padding: 1px 5px;
+    border-radius: 5px;
+    background: #eef2f5;
+  }
+
+  .error { color: var(--danger); }
+  .hidden { display: none !important; }
+
+  progress {
+    width: 100%;
+    height: 12px;
+    margin-top: 8px;
+    accent-color: var(--brand);
+  }
+
+  .progress-panel {
+    padding: 20px;
+  }
+
+  #overallBar {
+    margin: 12px 0 18px;
+    padding: 14px;
+    border-radius: 7px;
+    background: var(--soft);
+  }
+
+  #backBtn { margin-bottom: 12px; }
+
+  .job-card {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px;
+    margin-top: 12px;
+    background: #fff;
+  }
+
+  .job-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
+  .job-kind {
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+
+  .status-pill {
+    min-height: 28px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 10px;
+    border-radius: 999px;
+    background: #edf1f4;
+    color: #41505b;
+    font-size: 0.8rem;
+    font-weight: 850;
+    white-space: nowrap;
+  }
+
+  .status-ready { background: var(--ok-bg); color: var(--ok); }
+  .status-review { background: var(--review-bg); color: var(--review); }
+  .status-rerender { background: var(--bad-bg); color: var(--danger); }
+
+  .quality-box {
+    margin-top: 10px;
+    padding: 12px;
+    border-radius: 7px;
+    background: #f7faf8;
+    border: 1px solid #dce8df;
+  }
+
+  .quality-box strong {
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .quality-box ul {
+    margin: 8px 0 0 18px;
+    padding: 0;
+  }
+
+  .quality-box li { margin: 4px 0; }
+
+  .output-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .job-log {
+    height: 130px;
+    margin-top: 10px;
+    padding: 10px;
+    overflow-y: auto;
+    border-radius: 7px;
+    background: #101820;
+    color: #9af0b4;
+    font: 0.76rem/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    white-space: pre-wrap;
+  }
+
+  .output-page-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .output-product-group {
+    margin-bottom: 28px;
+  }
+
+  .output-product-title {
+    font-size: 1rem;
+    font-weight: 900;
+    margin-bottom: 10px;
+  }
+
+  .output-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 14px;
+  }
+
+  .output-card {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .output-card video {
+    width: 100%;
+    aspect-ratio: 9 / 16;
+    background: #101820;
+    border-radius: 6px;
+    object-fit: contain;
+  }
+
+  .output-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .output-card-title {
+    font-weight: 800;
+    font-size: 0.88rem;
+  }
+
+  .output-badge {
+    font-size: 0.72rem;
+    font-weight: 850;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #edf1f4;
+    color: #41505b;
+    white-space: nowrap;
+  }
+
+  .output-badge.badge-final { background: var(--ok-bg); color: var(--ok); }
+  .output-badge.badge-issue { background: var(--bad-bg); color: var(--danger); }
+
+  .output-card-issue {
+    font-size: 0.78rem;
+    color: var(--danger);
+  }
+
+  .output-card-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .output-card-actions a,
+  .output-card-actions button {
+    width: 100%;
+  }
+
+  .output-card-actions .retry-action {
+    grid-column: 1 / -1;
+  }
+
+  .modal {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    background: rgba(16, 24, 32, 0.46);
+    backdrop-filter: blur(4px);
+  }
+
+  .modal.hidden { display: none; }
+
+  .modal-content {
+    width: min(580px, 100%);
+    max-height: 84vh;
+    display: flex;
+    flex-direction: column;
+    padding: 18px;
+    overflow: auto;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 24px 70px rgba(0,0,0,0.22);
+  }
+
+  .preview-content { width: min(860px, 100%); }
+
+  .preview-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .preview-head h3,
+  .modal-content h3 {
+    margin: 0;
+    font-size: 1.15rem;
+  }
+
+  #previewVideo {
+    width: 100%;
+    max-height: 54vh;
+    margin-top: 12px;
+    border-radius: 8px;
+    background: #101820;
+  }
+
+  #previewStatus {
+    margin-top: 12px;
+    font-weight: 800;
+  }
+
+  #previewActions { margin-top: 12px; }
+  #previewLog { height: 100px; }
+
+  .cut-content { width: min(920px, 100%); }
+
+  .cut-video-wrap {
+    position: relative;
+    margin-top: 12px;
+    flex-shrink: 0;
+  }
+
+  #cutVideo {
+    width: 100%;
+    max-height: 42vh;
+    border-radius: 8px;
+    background: #101820;
+    display: block;
+    transition: filter 120ms ease-out;
+  }
+
+  #cutVideo.cut-dimmed {
+    filter: brightness(0.32) saturate(0.6);
+  }
+
+  .cut-dim-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 900;
+    font-size: 1rem;
+    letter-spacing: 0.02em;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease-out;
+  }
+
+  .cut-dim-overlay.active { opacity: 1; }
+
+  .cut-timeline {
+    position: relative;
+    height: 110px;
+    flex-shrink: 0;
+    margin-top: 12px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: #101820;
+    cursor: crosshair;
+    user-select: none;
+  }
+
+  .cut-time-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 3;
+    min-width: 78px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: rgba(16, 24, 32, 0.76);
+    color: #fff;
+    font-size: 0.78rem;
+    font-weight: 850;
+    text-align: center;
+    pointer-events: none;
+  }
+
+  .cut-timeline-frames {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .cut-range {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    background: rgba(164, 42, 31, 0.46);
+    border-left: 2px solid var(--danger);
+    border-right: 2px solid var(--danger);
+    box-shadow: inset 0 0 0 1000px rgba(16, 24, 32, 0.18);
+    cursor: pointer;
+  }
+
+  .cut-range:not(.pending):hover {
+    background: rgba(164, 42, 31, 0.66);
+    box-shadow: inset 0 0 0 1000px rgba(16, 24, 32, 0.32);
+  }
+
+  .cut-range.pending {
+    background: rgba(164, 42, 31, 0.28);
+    border-left: 2px dashed var(--danger);
+    border-right: 2px dashed var(--danger);
+  }
+
+  .cut-playhead {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--brand);
+    pointer-events: none;
+  }
+
+  .cut-review-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 260px;
+    gap: 14px;
+    margin-top: 12px;
+    flex-shrink: 0;
+  }
+
+  .cut-content .job-log {
+    flex-shrink: 0;
+  }
+
+  #cutRangesText { min-height: 104px; }
+
+  .cut-range-list {
+    display: grid;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .cut-range-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: #f8fafb;
+    font-size: 0.86rem;
+  }
+
+  .cut-range-item button {
+    min-height: 32px;
+    padding: 0 10px;
+  }
+
+  .cut-note {
+    margin-top: 8px;
+    color: var(--muted);
+    font-size: 0.86rem;
+    line-height: 1.45;
+  }
+
+  #browserPath {
+    margin-bottom: 10px;
+    color: var(--muted);
+    font-size: 0.88rem;
+    word-break: break-word;
+  }
+
+  .browser-shortcuts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .browser-shortcuts button {
+    min-height: 32px;
+    padding: 0 10px;
+    font-size: 0.82rem;
+  }
+
+  #browserList {
+    flex: 1;
+    min-height: 220px;
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    list-style: none;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+  }
+
+  #browserList li {
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px;
+    border-bottom: 1px solid #eef2f4;
+    cursor: pointer;
+  }
+
+  #browserList li:hover { background: #f6faf8; }
+  #browserList li.dir::before { content: "DIR"; color: var(--brand); font-size: 0.72rem; font-weight: 900; }
+  #browserList li.file::before { content: "FILE"; color: var(--accent); font-size: 0.72rem; font-weight: 900; }
+
+  .modal-actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 14px;
+  }
+
+  #estimateItems {
+    margin: 12px 0;
+    font-size: 0.92rem;
+  }
+
+  #estimateItems div {
+    padding: 8px 0;
+    border-bottom: 1px solid #eef2f4;
+  }
+
+  #estimateTotal {
+    margin-top: 10px;
+    font-weight: 850;
+  }
+
+  @media (max-width: 980px) {
+    .main-layout { grid-template-columns: 1fr; }
+    .side-panel { position: static; }
+    .app-header { align-items: flex-start; flex-direction: column; }
+    .status-strip { justify-content: flex-start; }
+  }
+
+  @media (max-width: 720px) {
+    .app-shell { width: min(100% - 22px, 1180px); padding-top: 18px; }
+    .step-section { grid-template-columns: 1fr; gap: 12px; padding: 18px; }
+    .step-marker { flex-direction: row; align-items: center; }
+    .field-grid,
+    .advanced-grid,
+    .output-row,
+    .cut-review-grid,
+    .radio-row,
+    .action-row { grid-template-columns: 1fr; }
+    .picker-row,
+    .picker-row.triple { grid-template-columns: 1fr; }
+    button,
+    .output-actions a { width: 100%; }
+    .modal-actions { flex-direction: column; }
+  }
+
+  .mode-switch {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 18px;
+  }
+  .mode-switch-btn {
+    background: var(--soft);
+    color: var(--muted);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 8px 16px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .mode-switch-btn.active {
+    background: var(--brand);
+    color: #fff;
+    border-color: var(--brand);
+  }
+  .content-output-card {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 12px;
+    margin-top: 12px;
+    background: var(--panel);
+  }
+  .content-output-card video { width: 100%; border-radius: 8px; }
+  .content-publish-form label { display: block; margin-top: 8px; font-size: 0.85rem; }
+  .content-publish-form input,
+  .content-publish-form textarea { width: 100%; }
+</style>
+
+<div class="app-shell">
+  <header class="app-header">
+    <div>
+      <p class="eyebrow">Auto editor cho KOL/KOC/Affiliate</p>
+      <h1>Dựng video bán hàng từ clip có sẵn</h1>
+      <p class="subhead">Chọn thư mục clip, chọn voice, render bản thô rồi review/cắt. Voice chỉ được gắn ở bước cuối để giữ nguyên nội dung bán hàng.</p>
+    </div>
+    <div class="status-strip" aria-label="Các bước chính">
+      <span class="status-chip">1. Chọn nguyên liệu</span>
+      <span class="status-chip">2. Xem thử</span>
+      <span class="status-chip">3. Review & xuất final</span>
+    </div>
+  </header>
+
+  <nav class="mode-switch" aria-label="Chế độ làm việc">
+    <button type="button" id="modeManualBtn" class="mode-switch-btn active">Chế độ thủ công</button>
+    <button type="button" id="modeContentBtn" class="mode-switch-btn">Chế độ tự động (Claude → Pexels → Publish)</button>
+  </nav>
+
+  <div id="manualModeRoot">
+  <div id="formPage">
+    <div class="main-layout">
+      <form id="renderForm" class="workflow-panel">
+        <section class="step-section">
+          <div class="step-marker">
+            <span class="step-number">1</span>
+            <div>
+              <div class="step-title">Nguyên liệu</div>
+              <div class="step-note">Video theo cảnh và file voice.</div>
+            </div>
+          </div>
+          <div class="field-grid">
+            <div class="field-span">
+              <label>
+                <span class="label-text">Thư mục video theo cảnh</span>
+                <div class="picker-row">
+                  <div class="path-display" id="scenesDirDisplay">Chưa chọn thư mục clip</div>
+                  <button type="button" id="pickScenesBtn">Chọn thư mục</button>
+                </div>
+              </label>
+              <div class="assist-box">Mỗi thư mục con là một cảnh. App render bản thô trước để bạn hoặc hệ thống cắt hậu kỳ sau.</div>
+              <button type="button" id="scanBtn" class="secondary" style="margin-top:10px">Kiểm tra video nguồn</button>
+              <div id="scanResult"></div>
+              <div id="profileSuggestionBox" class="assist-box hidden">
+                <strong id="profileSuggestionTitle"></strong>
+                <div id="profileSuggestionReason"></div>
+                <button type="button" id="applyProfileSuggestionBtn" class="secondary" style="margin-top:10px">Dùng gợi ý</button>
+              </div>
+            </div>
+
+            <div class="field-span">
+              <label>
+                <span class="label-text">Voice sản phẩm</span>
+                <div class="picker-row">
+                  <div class="path-display" id="voiceTracksDisplay">Chưa chọn file voice</div>
+                  <button type="button" id="pickVoiceBtn">Chọn file</button>
+                </div>
+              </label>
+              <div class="chips" id="voiceChips"></div>
+              <div class="hint">Có thể chọn nhiều voice nếu muốn render nhiều sản phẩm trong một lần.</div>
+            </div>
+
+            <label class="field-span">
+              <span class="label-text">Tên sản phẩm hoặc chiến dịch</span>
+              <input type="text" id="product_name" name="product_name" required placeholder="VD: serum_ngay_8_7">
+            </label>
+          </div>
+        </section>
+
+        <section class="step-section">
+          <div class="step-marker">
+            <span class="step-number">2</span>
+            <div>
+              <div class="step-title">Kiểu dựng</div>
+              <div class="step-note">Chọn cảm giác video. Không cần chỉnh timeline.</div>
+            </div>
+          </div>
+          <div class="field-grid">
+            <label class="field-span">
+              <span class="label-text">Kiểu video muốn tạo</span>
+              <select name="edit_profile_name" id="editProfileSelect">
+                <option value="affiliate_default">Affiliate mặc định</option>
+              </select>
+            </label>
+            <div class="hint field-span" id="editProfileHint">Motion, transition và nhịp dựng phù hợp profile. Cắt đoạn xấu được xử lý sau khi có bản thô.</div>
+
+            <label class="field-span">
+              <span class="label-text">Cách xử lý đoạn xấu</span>
+              <select name="trim_mode" id="trimModeSelect">
+                <option value="manual_review">Tự xem rồi cắt</option>
+                <option value="auto_smart">Hệ thống tự tối ưu</option>
+                <option value="none">Không cắt</option>
+              </select>
+            </label>
+            <div class="hint field-span">Render bản thô trước. Voice sẽ chỉ được gắn sau khi video đã chốt để không bị cắt chung.</div>
+
+            <label class="field-span">
+              <span class="label-text">Emoji / sticker bán hàng</span>
+              <select name="emoji_preset" id="emojiPresetSelect">
+                <option value="none">Không dùng</option>
+                <option value="light">Nhẹ</option>
+                <option value="sales">Bán hàng</option>
+                <option value="bold">Nổi bật mạnh</option>
+              </select>
+            </label>
+            <div class="hint field-span">Preset emoji được lưu theo render plan; overlay thật sẽ áp ở bước final/sticker sau.</div>
+
+            <label>
+              <span class="label-text">Khung hình</span>
+              <select name="aspect_ratio">
+                <option value="16:9">Ngang 16:9</option>
+                <option value="9:16">Dọc 9:16</option>
+              </select>
+            </label>
+
+            <label>
+              <span class="label-text">Cách fit clip</span>
+              <select name="fit_mode" id="fitModeSelect">
+                <option value="pad">Giữ đủ hình</option>
+                <option value="crop">Lấp đầy khung</option>
+              </select>
+            </label>
+
+            <details class="advanced field-span">
+              <summary>Tuỳ chọn thêm</summary>
+              <div class="advanced-body">
+                <div class="advanced-grid">
+                  <label>
+                    <span class="label-text">Template đã lưu</span>
+                    <select id="templateSelect"><option value="">Không dùng template</option></select>
+                  </label>
+                  <div class="picker-row" style="align-self:end">
+                    <button type="button" id="loadTemplateBtn">Tải template</button>
+                  </div>
+                  <label>
+                    <span class="label-text">Lưu cấu hình hiện tại</span>
+                    <input type="text" id="templateNameInput" placeholder="VD: skincare_9x16">
+                  </label>
+                  <div class="picker-row" style="align-self:end">
+                    <button type="button" id="saveTemplateBtn">Lưu template</button>
+                  </div>
+                </div>
+
+                <div style="margin-top:14px">
+                  <label>
+                    <span class="label-text">Watermark / logo</span>
+                    <div class="picker-row triple">
+                      <div class="path-display" id="watermarkDisplay">Không dùng watermark</div>
+                      <button type="button" id="pickWatermarkBtn">Chọn ảnh</button>
+                      <button type="button" id="clearWatermarkBtn">Xoá</button>
+                    </div>
+                  </label>
+                  <div id="watermarkOptions" class="hidden">
+                    <div class="advanced-grid" style="margin-top:12px">
+                      <label>Vị trí
+                        <select name="watermark_position">
+                          <option value="bottom-right">Góc dưới phải</option>
+                          <option value="bottom-left">Góc dưới trái</option>
+                          <option value="top-right">Góc trên phải</option>
+                          <option value="top-left">Góc trên trái</option>
+                        </select>
+                      </label>
+                      <label>Kích thước logo
+                        <input type="number" name="watermark_scale_pct" min="1" max="50" value="15">
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <div style="margin-top:14px">
+                  <div class="tuning-reset-row">
+                    <span class="label-text">Transition &amp; chuyển động (nâng cao)</span>
+                    <button type="button" id="resetTuningBtn" class="secondary">Khôi phục theo profile</button>
+                  </div>
+                  <div class="hint" style="margin-bottom:10px">
+                    Đổi profile ở trên sẽ nạp lại giá trị mặc định của profile đó vào đây. Chỉnh tay sẽ ghi đè cho lần render/xem thử tiếp theo.
+                  </div>
+                  <div class="tuning-grid" id="tuningGrid">
+                    <div class="tuning-row">
+                      <span class="label-text">Độ dài chuyển cảnh (s)</span>
+                      <input type="range" id="tuning_scene_transition_duration" min="0" max="2" step="0.05">
+                      <span class="tuning-value" id="tuning_scene_transition_duration_value"></span>
+                    </div>
+                    <div class="tuning-row">
+                      <span class="label-text">Độ dài chuyển clip (s)</span>
+                      <input type="range" id="tuning_clip_transition_duration" min="0" max="2" step="0.05">
+                      <span class="tuning-value" id="tuning_clip_transition_duration_value"></span>
+                    </div>
+                    <div class="tuning-row">
+                      <span class="label-text">Độ mạnh zoom</span>
+                      <input type="range" id="tuning_motion_scale" min="1" max="1.3" step="0.005">
+                      <span class="tuning-value" id="tuning_motion_scale_value"></span>
+                    </div>
+                    <div class="tuning-row">
+                      <span class="label-text">Độ mạnh pan ngang</span>
+                      <input type="range" id="tuning_pan_strength_x" min="0" max="1" step="0.01">
+                      <span class="tuning-value" id="tuning_pan_strength_x_value"></span>
+                    </div>
+                    <div class="tuning-row">
+                      <span class="label-text">Độ mạnh pan dọc</span>
+                      <input type="range" id="tuning_pan_strength_y" min="0" max="1" step="0.01">
+                      <span class="tuning-value" id="tuning_pan_strength_y_value"></span>
+                    </div>
+                    <div class="tuning-row">
+                      <span class="label-text">Tốc độ pan ngang</span>
+                      <input type="range" id="tuning_pan_speed_x" min="0" max="2" step="0.01">
+                      <span class="tuning-value" id="tuning_pan_speed_x_value"></span>
+                    </div>
+                    <div class="tuning-row">
+                      <span class="label-text">Tốc độ pan dọc</span>
+                      <input type="range" id="tuning_pan_speed_y" min="0" max="2" step="0.01">
+                      <span class="tuning-value" id="tuning_pan_speed_y_value"></span>
+                    </div>
+                    <div class="tuning-row">
+                      <span class="label-text">Độ dài fade cuối (s)</span>
+                      <input type="range" id="tuning_end_fade_duration" min="0" max="2" step="0.05">
+                      <span class="tuning-value" id="tuning_end_fade_duration_value"></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </details>
+          </div>
+        </section>
+
+        <section class="step-section">
+          <div class="step-marker">
+            <span class="step-number">3</span>
+            <div>
+              <div class="step-title">Xuất video</div>
+              <div class="step-note">Xem thử trước, render hàng loạt sau.</div>
+            </div>
+          </div>
+          <div class="field-grid">
+            <div class="output-row field-span">
+              <label>
+                <span class="label-text">Thư mục lưu kết quả</span>
+                <div class="picker-row">
+                  <div class="path-display" id="outputDirDisplay">Mặc định: output</div>
+                  <button type="button" id="pickOutputBtn">Chọn thư mục</button>
+                </div>
+              </label>
+              <label id="randomModeFields">
+                <span class="label-text">Số video</span>
+                <input type="number" name="n_outputs" min="1" value="5">
+              </label>
+            </div>
+
+            <details class="advanced field-span">
+              <summary>Cài đặt nâng cao</summary>
+              <div class="advanced-body">
+                <div class="advanced-grid">
+                  <div>
+                    <span class="label-text">Cách chia clip</span>
+                    <div class="radio-row">
+                      <label><input type="radio" name="mode" value="random" checked> App tự chọn</label>
+                      <label><input type="radio" name="mode" value="manual"> Tự chọn clip</label>
+                    </div>
+                  </div>
+                  <label>
+                    <span class="label-text">Canh thời lượng</span>
+                    <select name="duration_mode">
+                      <option value="clip_length">Theo đoạn app chọn</option>
+                      <option value="voice_silence">Theo khoảng lặng voice</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span class="label-text">Seed</span>
+                    <input type="number" name="seed" placeholder="Để trống nếu không cần lặp lại">
+                  </label>
+                </div>
+                <div id="manualModeFields" class="hidden" style="margin-top:14px">
+                  <label>
+                    <span class="label-text">Danh sách clip muốn dùng</span>
+                    <textarea name="manual_plan_text" rows="5" placeholder="1.1, 2.1, 3.2
+1.2, 2.3, 3.1
+
+Hoặc: video 1: 1.1,1.2, 2.3, 3.1"></textarea>
+                  </label>
+                  <div class="hint">Mỗi dòng là một video. Có thể nhập nhanh dạng 1.1, 2.1, 3.2 hoặc dạng có nhãn video 1: ...</div>
+                  <div class="action-row compact-actions" style="margin-top:10px">
+                    <button type="button" id="createManualSampleBtn">Tạo mẫu từ clip đang có</button>
+                    <button type="button" id="checkManualPlanBtn" class="secondary">Kiểm tra danh sách</button>
+                  </div>
+                  <div id="manualPlanPreview" class="assist-box manual-preview hidden"></div>
+                </div>
+              </div>
+            </details>
+
+            <div class="action-row field-span">
+              <button type="button" id="previewBtn" class="secondary">Xem thử</button>
+              <button type="submit" id="submitBtn" class="primary">Render bản thô</button>
+              <button type="button" id="resetBtn">Làm lại</button>
+            </div>
+          </div>
+        </section>
+      </form>
+
+      <aside class="side-panel">
+        <h2 class="summary-title">App sẽ tự làm</h2>
+        <ul class="summary-list">
+          <li><span>1</span><div>Ghép các cảnh theo đúng thứ tự thành video thô chưa có voice.</div></li>
+          <li><span>2</span><div>Cho review/cắt đoạn xấu hoặc áp dụng tối ưu tự động sau render.</div></li>
+          <li><span>3</span><div>Gắn voice sau cùng và kiểm tra video final.</div></li>
+        </ul>
+        <div class="quick-note">Nên bấm <strong>Xem thử</strong> trước. Nếu preview ổn, render full sẽ dùng cùng kiểu dựng.</div>
+
+        <details class="help">
+          <summary>Cách chuẩn bị file</summary>
+          <div class="help-content">
+            <ul>
+              <li>Tạo một thư mục lớn chứa các thư mục cảnh: <code>scene_01</code>, <code>scene_02</code>, ...</li>
+              <li>Mỗi thư mục cảnh chứa các clip ứng viên cho cảnh đó.</li>
+              <li>Chuẩn bị file voice dạng <code>.wav</code>, <code>.mp3</code>, <code>.m4a</code> hoặc <code>.aac</code>.</li>
+            </ul>
+          </div>
+        </details>
+      </aside>
+    </div>
+  </div>
+
+  <div id="progressPage" class="hidden progress-panel">
+    <button type="button" id="backBtn">Quay lại form</button>
+    <div id="overallBar">
+      <div>Tổng tiến độ: <span id="overallText">0/0</span></div>
+      <progress id="overallProgress" value="0" max="1"></progress>
+    </div>
+    <div id="jobList"></div>
+  </div>
+
+  <div id="outputPage" class="hidden progress-panel">
+    <div class="output-page-head">
+      <div>
+        <strong>Kết quả render</strong>
+        <div class="job-kind">Xem qua từng video, chọn cái ưng ý rồi Edit hoặc tải về dùng app khác.</div>
+      </div>
+      <div class="picker-row">
+        <button type="button" id="viewProgressLogBtn" class="secondary">Xem log render</button>
+        <button type="button" id="outputBackBtn">Quay lại form</button>
+      </div>
+    </div>
+    <div id="outputGroups"></div>
+  </div>
+  </div>
+
+  <div id="contentPage" class="hidden">
+    <div class="main-layout">
+      <form id="contentForm" class="workflow-panel">
+        <section class="step-section">
+          <div class="step-marker">
+            <span class="step-number">1</span>
+            <div>
+              <div class="step-title">Kịch bản</div>
+              <div class="step-desc">Nhập chủ đề để Claude tự viết, hoặc tự nhập/sửa JSON kịch bản bên dưới.</div>
+            </div>
+          </div>
+          <label for="contentTopic">Chủ đề</label>
+          <textarea id="contentTopic" rows="2" placeholder="VD: thói quen dậy sớm giúp tập trung hơn"></textarea>
+          <div class="picker-row" style="margin-top:8px">
+            <button type="button" id="contentGenerateBtn" class="secondary">Claude tự sinh kịch bản</button>
+            <span id="contentGenerateStatus" class="job-kind"></span>
+          </div>
+          <label for="contentScriptJson" style="margin-top:12px">Kịch bản (JSON — có thể tự sửa)</label>
+          <textarea id="contentScriptJson" rows="10" placeholder='{"title": "...", "description": "...", "segments": [{"narration": "...", "visual_keywords": ["..."]}]}'></textarea>
+        </section>
+
+        <section class="step-section">
+          <div class="step-marker">
+            <span class="step-number">2</span>
+            <div>
+              <div class="step-title">Cấu hình render</div>
+              <div class="step-desc">Số lượng candidate Pexels/cảnh, số output, tỉ lệ khung hình.</div>
+            </div>
+          </div>
+          <label for="contentProductName">Tên sản phẩm/video (dùng đặt tên output)</label>
+          <input type="text" id="contentProductName" placeholder="vd: thoi-quen-day-som">
+          <div class="picker-row" style="margin-top:8px">
+            <div>
+              <label for="contentNOutputs">Số output (N)</label>
+              <input type="number" id="contentNOutputs" value="1" min="1" style="width:80px">
+            </div>
+            <div>
+              <label for="contentCandidates">Candidate Pexels/cảnh</label>
+              <input type="number" id="contentCandidates" value="3" min="1" max="10" style="width:80px">
+            </div>
+            <div>
+              <label for="contentAspect">Tỉ lệ khung hình</label>
+              <select id="contentAspect">
+                <option value="9:16" selected>9:16 (dọc, Short)</option>
+                <option value="16:9">16:9 (ngang)</option>
+              </select>
+            </div>
+          </div>
+          <button type="button" id="contentSubmitBtn" style="margin-top:14px">Bắt đầu (script → voice → pexels → render)</button>
+        </section>
+      </form>
+
+      <aside class="workflow-panel">
+        <div class="step-title">Tiến độ</div>
+        <div id="contentProgress" class="job-kind">Chưa bắt đầu.</div>
+        <div id="contentOutputs"></div>
+      </aside>
+    </div>
+  </div>
+</div>
+
+<div class="modal hidden" id="confirmModal">
+  <div class="modal-content">
+    <h3>Xác nhận render</h3>
+    <div id="estimateItems"></div>
+    <div id="estimateTotal"></div>
+    <div class="modal-actions">
+      <button type="button" id="confirmRenderBtn">Xác nhận, bắt đầu render</button>
+      <button type="button" id="cancelRenderBtn">Huỷ</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal hidden" id="previewModal">
+  <div class="modal-content preview-content">
+    <div class="preview-head">
+      <h3>Bản xem thử</h3>
+      <button type="button" id="closePreviewBtn">Đóng</button>
+    </div>
+    <div id="previewStatus">Đang chuẩn bị bản xem thử...</div>
+    <progress id="previewProgress" value="0" max="1"></progress>
+    <video id="previewVideo" class="hidden" controls></video>
+    <div id="previewQuality"></div>
+    <div class="output-actions" id="previewActions"></div>
+    <pre class="job-log" id="previewLog"></pre>
+  </div>
+</div>
+
+<div class="modal hidden" id="cutReviewModal">
+  <div class="modal-content cut-content">
+    <div class="preview-head">
+      <h3>Review & cắt</h3>
+      <button type="button" id="closeCutReviewBtn">Đóng</button>
+    </div>
+    <div id="cutReviewStatus">Kéo trên timeline để tô đoạn muốn bỏ.</div>
+    <div class="cut-video-wrap">
+      <video id="cutVideo" controls></video>
+      <div class="cut-dim-overlay" id="cutDimOverlay">Đoạn này sẽ bị cắt</div>
+    </div>
+    <div class="cut-timeline" id="cutTimeline">
+      <canvas class="cut-timeline-frames" id="cutTimelineFrames"></canvas>
+      <div class="cut-playhead" id="cutPlayhead"></div>
+      <div class="cut-time-badge" id="cutHoverTime">00:00.00</div>
+    </div>
+    <video id="cutThumbSource" muted playsinline style="display:none"></video>
+    <div class="cut-review-grid">
+      <label>
+        <span class="label-text">Các đoạn sẽ bỏ</span>
+        <textarea id="cutRangesText" placeholder="00:03-00:05&#10;12.5-14"></textarea>
+      </label>
+      <div>
+        <div class="hint">Bạn đang cắt video thô chưa có voice. Voice sẽ được gắn sau khi bấm xuất final.</div>
+        <div class="cut-note">Kéo trên timeline để thêm đoạn. Bấm vùng đỏ hoặc nút xoá từng dòng để huỷ riêng đoạn đó.</div>
+        <div class="cut-range-list" id="cutRangeList"></div>
+        <div class="action-row" style="margin-top:10px">
+          <button type="button" id="clearCutRangesBtn">Xoá vùng cắt</button>
+          <button type="button" id="submitCutBtn" class="primary">Xuất final giữ voice</button>
+        </div>
+      </div>
+    </div>
+    <pre class="job-log" id="cutReviewLog"></pre>
+  </div>
+</div>
+
+<div class="modal hidden" id="browserModal">
+  <div class="modal-content">
+    <div class="browser-shortcuts" id="browserShortcuts"></div>
+    <div id="browserPath"></div>
+    <ul id="browserList"></ul>
+    <div class="picker-row" id="newFolderRow" style="display:none">
+      <input type="text" id="newFolderName" placeholder="Tên thư mục mới">
+      <button type="button" id="newFolderBtn">Tạo thư mục</button>
+    </div>
+    <div class="modal-actions">
+      <button type="button" id="browserConfirmBtn"></button>
+      <button type="button" id="browserCancelBtn">Huỷ</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const form = document.getElementById("renderForm");
+const formPage = document.getElementById("formPage");
+const progressPage = document.getElementById("progressPage");
+const scenesDirDisplay = document.getElementById("scenesDirDisplay");
+const voiceTracksDisplay = document.getElementById("voiceTracksDisplay");
+const outputDirDisplay = document.getElementById("outputDirDisplay");
+const voiceChips = document.getElementById("voiceChips");
+const scanResult = document.getElementById("scanResult");
+const profileSuggestionBox = document.getElementById("profileSuggestionBox");
+const profileSuggestionTitle = document.getElementById("profileSuggestionTitle");
+const profileSuggestionReason = document.getElementById("profileSuggestionReason");
+const applyProfileSuggestionBtn = document.getElementById("applyProfileSuggestionBtn");
+const jobList = document.getElementById("jobList");
+const overallText = document.getElementById("overallText");
+const overallProgress = document.getElementById("overallProgress");
+const outputPage = document.getElementById("outputPage");
+const outputGroups = document.getElementById("outputGroups");
+const cutReviewModal = document.getElementById("cutReviewModal");
+const cutVideo = document.getElementById("cutVideo");
+const cutTimeline = document.getElementById("cutTimeline");
+const cutPlayhead = document.getElementById("cutPlayhead");
+const cutDimOverlay = document.getElementById("cutDimOverlay");
+const cutTimelineFrames = document.getElementById("cutTimelineFrames");
+const cutThumbSource = document.getElementById("cutThumbSource");
+const cutHoverTime = document.getElementById("cutHoverTime");
+const cutRangeList = document.getElementById("cutRangeList");
+let thumbGenerationToken = 0;
+const cutRangesText = document.getElementById("cutRangesText");
+const cutReviewStatus = document.getElementById("cutReviewStatus");
+const cutReviewLog = document.getElementById("cutReviewLog");
+const OUTPUT_SESSION_KEY = "video_render_recent_output_jobs";
+const SCAN_CACHE_PREFIX = "video_render_scan_cache:";
+
+let scenesDir = "";
+let voiceTracks = [];
+let outputDir = "";
+let latestScannedScenes = [];
+let latestProfileSuggestion = null;
+let cutReviewState = null;
+const jobStats = {}; // jobId -> {completed, total}
+
+// ---- Phase 1 (render thô) -> trang Output (Phase 2: edit/export) ----
+const phase1Jobs = {}; // jobId -> {productName, voicePath}
+const phase1Snapshots = {}; // jobId -> job JSON mới nhất từ poll
+let outputGalleryShown = false;
+
+function resetPhase1Tracking() {
+  Object.keys(phase1Jobs).forEach((k) => delete phase1Jobs[k]);
+  Object.keys(phase1Snapshots).forEach((k) => delete phase1Snapshots[k]);
+  outputGalleryShown = false;
+  outputGroups.innerHTML = "";
+  outputPage.classList.add("hidden");
+  localStorage.removeItem(OUTPUT_SESSION_KEY);
+}
+
+function saveOutputSession() {
+  const jobs = Object.entries(phase1Jobs).map(([jobId, meta]) => ({
+    jobId,
+    productName: meta.productName,
+    voicePath: meta.voicePath,
+  }));
+  if (jobs.length) localStorage.setItem(OUTPUT_SESSION_KEY, JSON.stringify(jobs));
+}
+
+async function restoreOutputSession() {
+  let jobs = [];
+  try {
+    jobs = JSON.parse(localStorage.getItem(OUTPUT_SESSION_KEY) || "[]");
+  } catch {
+    localStorage.removeItem(OUTPUT_SESSION_KEY);
+    return;
+  }
+  if (!jobs.length) return;
+
+  for (const item of jobs) {
+    try {
+      const res = await fetch(`/api/jobs/${item.jobId}`);
+      if (!res.ok) throw new Error("missing job");
+      const job = await res.json();
+      if (job.status !== "done" && job.status !== "failed") return;
+      phase1Jobs[item.jobId] = { productName: item.productName, voicePath: item.voicePath };
+      phase1Snapshots[item.jobId] = job;
+    } catch {
+      localStorage.removeItem(OUTPUT_SESSION_KEY);
+      return;
+    }
+  }
+  outputGalleryShown = true;
+  buildOutputGallery();
+  formPage.classList.add("hidden");
+  progressPage.classList.add("hidden");
+  outputPage.classList.remove("hidden");
+}
+
+function maybeShowOutputGallery() {
+  if (outputGalleryShown) return;
+  const jobIds = Object.keys(phase1Jobs);
+  if (!jobIds.length) return;
+  const allTerminal = jobIds.every((id) => {
+    const snap = phase1Snapshots[id];
+    return snap && (snap.status === "done" || snap.status === "failed");
+  });
+  if (!allTerminal) return;
+  outputGalleryShown = true;
+  saveOutputSession();
+  buildOutputGallery();
+  progressPage.classList.add("hidden");
+  outputPage.classList.remove("hidden");
+}
+
+function planForOutput(job, index) {
+  return (job.render_plans || []).find((p) => p.output_index === index) || job.render_plans?.[index] || null;
+}
+
+function outputStatusBadge(plan) {
+  if (!plan) return { text: "Bản thô, chưa có voice", cls: "" };
+  if (plan.final_video_path) return { text: "Final đã có voice", cls: "badge-final" };
+  return { text: "Bản thô, chưa có voice", cls: "" };
+}
+
+function buildOutputCard(jobId, index, job) {
+  const plan = planForOutput(job, index);
+  const badge = outputStatusBadge(plan);
+  const result = (job.quality_results || [])[index];
+  const needsRetry = result && result.status !== "ready";
+
+  const card = document.createElement("div");
+  card.className = "output-card";
+  card.dataset.jobId = jobId;
+  card.dataset.outputIndex = String(index);
+  card.innerHTML = `
+    <div class="output-card-head">
+      <span class="output-card-title">Video ${index + 1}</span>
+      <span class="output-badge ${badge.cls}" data-badge>${badge.text}</span>
+    </div>
+    <video controls preload="none" data-lazy-src="/api/download/${jobId}/${index}"></video>
+    ${needsRetry ? `<div class="output-card-issue">${escapeHtml(result.issues?.[0]?.message || "Chất lượng chưa đạt")}</div>` : ""}
+    <div class="output-card-actions">
+      <button type="button" data-edit-video>Review & cắt video</button>
+      <a href="/api/download/${jobId}/${index}" download>Tải về</a>
+      ${needsRetry ? `<button type="button" class="retry-action" data-retry-output="${index}">Render lại video ${index + 1}</button>` : ""}
+    </div>
+  `;
+
+  const video = card.querySelector("video");
+  video.addEventListener("play", () => {
+    if (!video.src && video.dataset.lazySrc) video.src = video.dataset.lazySrc;
+  }, { once: true });
+
+  card.querySelector("[data-edit-video]").addEventListener("click", () => {
+    openCutReview(card.dataset.jobId, Number(card.dataset.outputIndex), card);
+  });
+
+  const retryBtn = card.querySelector("[data-retry-output]");
+  if (retryBtn) {
+    retryBtn.addEventListener("click", async () => {
+      retryBtn.disabled = true;
+      retryBtn.textContent = "Đang render lại...";
+      try {
+        const res = await fetch(`/api/jobs/${jobId}/retry/${index}`, { method: "POST" });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Không render lại được");
+        await pollRetryIntoCard(data.job_id, card, jobId, index);
+      } catch (err) {
+        retryBtn.disabled = false;
+        retryBtn.textContent = `Lỗi: ${err.message}`;
+      }
+    });
+  }
+
+  return card;
+}
+
+async function pollRetryIntoCard(retryJobId, card, originalJobId, index) {
+  const badge = card.querySelector("[data-badge]");
+  badge.textContent = "Đang render lại...";
+  const timer = setInterval(async () => {
+    const res = await fetch(`/api/jobs/${retryJobId}`);
+    const job = await res.json();
+    if (job.status === "failed") {
+      badge.textContent = "Render lại lỗi";
+      badge.className = "output-badge badge-issue";
+      clearInterval(timer);
+      return;
+    }
+    if (job.status === "done") {
+      clearInterval(timer);
+      // Render lại chỉ sinh đúng 1 output — thay video/badge/issue tại chỗ,
+      // không tạo card mới, để trang Output vẫn phẳng theo từng video.
+      const video = card.querySelector("video");
+      video.pause();
+      video.removeAttribute("src");
+      video.dataset.lazySrc = `/api/download/${retryJobId}/0`;
+      video.addEventListener("play", () => {
+        if (!video.src && video.dataset.lazySrc) video.src = video.dataset.lazySrc;
+      }, { once: true });
+      const issueEl = card.querySelector(".output-card-issue");
+      if (issueEl) issueEl.remove();
+      const retryBtn = card.querySelector("[data-retry-output]");
+      if (retryBtn) retryBtn.remove();
+      const downloadLink = card.querySelector('a[download]');
+      if (downloadLink) downloadLink.href = `/api/download/${retryJobId}/0`;
+      card.dataset.jobId = retryJobId;
+      card.dataset.outputIndex = "0";
+      badge.textContent = "Bản thô, chưa có voice";
+      badge.className = "output-badge";
+    }
+  }, 1000);
+}
+
+function buildOutputGallery() {
+  outputGroups.innerHTML = "";
+  for (const [jobId, meta] of Object.entries(phase1Jobs)) {
+    const job = phase1Snapshots[jobId];
+    if (!job) continue;
+    const group = document.createElement("div");
+    group.className = "output-product-group";
+    const title = document.createElement("div");
+    title.className = "output-product-title";
+    title.textContent = job.status === "failed"
+      ? `${meta.productName} — render lỗi`
+      : `${meta.productName} (${job.output_paths.length} video)`;
+    group.appendChild(title);
+
+    if (job.status === "failed") {
+      const err = document.createElement("div");
+      err.className = "error";
+      err.textContent = job.error || "Render lỗi, xem log để biết chi tiết.";
+      group.appendChild(err);
+      outputGroups.appendChild(group);
+      continue;
+    }
+
+    const gallery = document.createElement("div");
+    gallery.className = "output-gallery";
+    job.output_paths.forEach((_, index) => {
+      gallery.appendChild(buildOutputCard(jobId, index, job));
+    });
+    group.appendChild(gallery);
+
+    const folderBtn = document.createElement("button");
+    folderBtn.type = "button";
+    folderBtn.className = "secondary";
+    folderBtn.style.marginTop = "10px";
+    folderBtn.textContent = "Mở thư mục kết quả";
+    folderBtn.addEventListener("click", async () => {
+      await fetch(`/api/jobs/${jobId}/open-output`, { method: "POST" });
+    });
+    group.appendChild(folderBtn);
+
+    outputGroups.appendChild(group);
+  }
+}
+
+document.getElementById("viewProgressLogBtn").addEventListener("click", () => {
+  outputPage.classList.add("hidden");
+  progressPage.classList.remove("hidden");
+});
+
+document.getElementById("outputBackBtn").addEventListener("click", () => {
+  resetPhase1Tracking();
+  formPage.classList.remove("hidden");
+});
+
+// ---- File browser modal ----
+const modal = document.getElementById("browserModal");
+const browserPath = document.getElementById("browserPath");
+const browserList = document.getElementById("browserList");
+const browserShortcuts = document.getElementById("browserShortcuts");
+const confirmBtn = document.getElementById("browserConfirmBtn");
+const cancelBtn = document.getElementById("browserCancelBtn");
+const newFolderRow = document.getElementById("newFolderRow");
+const newFolderName = document.getElementById("newFolderName");
+const newFolderBtn = document.getElementById("newFolderBtn");
+
+let browseState = null; // { onlyDirs, multiple, selected: Set, onConfirm, recentKey }
+let browserHomePath = "";
+
+function renderBrowserShortcuts() {
+  const shortcuts = [
+    ["Home", ""],
+    ...(browserHomePath ? [["Documents", `${browserHomePath}/Documents`], ["Movies", `${browserHomePath}/Movies`]] : []),
+  ].filter(([, p]) => p !== "__missing__");
+  const recent = browseState.recentKey ? localStorage.getItem(browseState.recentKey) : "";
+  browserShortcuts.innerHTML = "";
+  if (recent) shortcuts.unshift(["Gần nhất", recent]);
+  for (const [label, target] of shortcuts) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = label;
+    button.addEventListener("click", () => fetchAndRender(target));
+    browserShortcuts.appendChild(button);
+  }
+}
+
+async function fetchAndRender(path) {
+  const qs = new URLSearchParams({ path: path || "", only_dirs: String(browseState.onlyDirs) });
+  const res = await fetch(`/api/browse?${qs}`);
+  const data = await res.json();
+  if (!res.ok) {
+    browserPath.innerHTML = `<span class="error">${data.detail}</span>`;
+    return;
+  }
+  if (!path) {
+    browserHomePath = data.current_path;
+    renderBrowserShortcuts();
+  }
+  browserPath.textContent = data.current_path;
+  browserList.innerHTML = "";
+
+  if (data.parent_path) {
+    const up = document.createElement("li");
+    up.className = "dir";
+    up.textContent = "..";
+    up.addEventListener("click", () => fetchAndRender(data.parent_path));
+    browserList.appendChild(up);
+  }
+
+  for (const entry of data.entries) {
+    const li = document.createElement("li");
+    li.className = entry.is_dir ? "dir" : "file";
+    if (entry.is_dir) {
+      li.textContent = entry.name;
+      li.addEventListener("click", () => fetchAndRender(entry.path));
+    } else if (browseState.multiple) {
+      const checked = browseState.selected.has(entry.path);
+      li.innerHTML = `<input type="checkbox" ${checked ? "checked" : ""}> <span>${entry.name}</span>`;
+      li.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const cb = li.querySelector("input");
+        if (e.target !== cb) cb.checked = !cb.checked;
+        if (cb.checked) browseState.selected.add(entry.path);
+        else browseState.selected.delete(entry.path);
+      });
+    } else {
+      li.textContent = entry.name;
+      li.addEventListener("click", () => {
+        browseState.onConfirm(entry.path);
+        if (browseState.recentKey && browseState.currentPath) {
+          localStorage.setItem(browseState.recentKey, browseState.currentPath);
+        }
+        modal.classList.add("hidden");
+      });
+    }
+    browserList.appendChild(li);
+  }
+  browseState.currentPath = data.current_path;
+}
+
+function openBrowser({ onlyDirs, multiple, onConfirm, allowCreate, recentKey }) {
+  browseState = { onlyDirs, multiple, selected: new Set(), onConfirm, currentPath: "", recentKey };
+  confirmBtn.style.display = (!onlyDirs && !multiple) ? "none" : "inline-block";
+  confirmBtn.textContent = onlyDirs ? "Chọn thư mục này" : "Xong";
+  newFolderRow.style.display = allowCreate ? "flex" : "none";
+  newFolderName.value = "";
+  modal.classList.remove("hidden");
+  renderBrowserShortcuts();
+  fetchAndRender("");
+}
+
+confirmBtn.addEventListener("click", () => {
+  if (browseState.onlyDirs) {
+    browseState.onConfirm(browseState.currentPath);
+    if (browseState.recentKey) localStorage.setItem(browseState.recentKey, browseState.currentPath);
+  } else {
+    browseState.onConfirm(Array.from(browseState.selected));
+    if (browseState.recentKey && browseState.currentPath) {
+      localStorage.setItem(browseState.recentKey, browseState.currentPath);
+    }
+  }
+  modal.classList.add("hidden");
+});
+cancelBtn.addEventListener("click", () => modal.classList.add("hidden"));
+
+newFolderBtn.addEventListener("click", async () => {
+  const name = newFolderName.value.trim();
+  if (!name) return;
+  try {
+    const res = await fetch("/api/browse/mkdir", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ parent: browseState.currentPath, name }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Lỗi không rõ");
+    newFolderName.value = "";
+    fetchAndRender(data.path);
+  } catch (err) {
+    alert("Lỗi tạo thư mục: " + err.message);
+  }
+});
+
+document.getElementById("pickScenesBtn").addEventListener("click", () => {
+  openBrowser({
+    onlyDirs: true,
+    multiple: false,
+    allowCreate: false,
+    recentKey: "video_render_recent_scenes_dir",
+    onConfirm: (path) => {
+      scenesDir = path;
+      scenesDirDisplay.textContent = path;
+    },
+  });
+});
+
+document.getElementById("pickVoiceBtn").addEventListener("click", () => {
+  openBrowser({
+    onlyDirs: false,
+    multiple: true,
+    allowCreate: false,
+    recentKey: "video_render_recent_voice_dir",
+    onConfirm: (paths) => {
+      const merged = new Set([...voiceTracks, ...paths]);
+      voiceTracks = Array.from(merged);
+      renderVoiceChips();
+    },
+  });
+});
+
+document.getElementById("pickOutputBtn").addEventListener("click", () => {
+  openBrowser({
+    onlyDirs: true,
+    multiple: false,
+    allowCreate: true,
+    recentKey: "video_render_recent_output_dir",
+    onConfirm: (path) => {
+      outputDir = path;
+      outputDirDisplay.textContent = path;
+    },
+  });
+});
+
+// ---- Watermark ----
+let watermarkPath = "";
+const watermarkDisplay = document.getElementById("watermarkDisplay");
+const watermarkOptions = document.getElementById("watermarkOptions");
+
+document.getElementById("pickWatermarkBtn").addEventListener("click", () => {
+  openBrowser({
+    onlyDirs: false,
+    multiple: false,
+    allowCreate: false,
+    recentKey: "video_render_recent_asset_dir",
+    onConfirm: (path) => {
+      watermarkPath = path;
+      watermarkDisplay.textContent = path;
+      watermarkOptions.classList.remove("hidden");
+    },
+  });
+});
+
+document.getElementById("clearWatermarkBtn").addEventListener("click", () => {
+  watermarkPath = "";
+  watermarkDisplay.textContent = "(không dùng watermark)";
+  watermarkOptions.classList.add("hidden");
+});
+
+// ---- Template cấu hình (load/save) ----
+const templateSelect = document.getElementById("templateSelect");
+const templateNameInput = document.getElementById("templateNameInput");
+const editProfileSelect = document.getElementById("editProfileSelect");
+const editProfileHint = document.getElementById("editProfileHint");
+let editProfiles = [];
+
+async function refreshTemplateList() {
+  const res = await fetch("/api/templates");
+  const data = await res.json();
+  templateSelect.innerHTML = '<option value="">(không dùng template)</option>' +
+    data.names.map((n) => `<option value="${n}">${n}</option>`).join("");
+}
+refreshTemplateList();
+
+async function refreshEditProfiles() {
+  const res = await fetch("/api/edit-profiles");
+  const data = await res.json();
+  editProfiles = data.profiles || [];
+  editProfileSelect.innerHTML = editProfiles.map((p) =>
+    `<option value="${p.name}">${p.label}</option>`
+  ).join("");
+  if (!editProfileSelect.value) editProfileSelect.value = "affiliate_default";
+  updateEditProfileHint();
+  loadTuningDefaultsForCurrentProfile();
+}
+
+function updateEditProfileHint() {
+  const profile = editProfiles.find((p) => p.name === editProfileSelect.value);
+  editProfileHint.textContent = profile
+    ? `${profile.description} Style: ${profile.style_name}. Cắt đoạn xấu xử lý ở bước review.`
+    : "Motion, transition và nhịp dựng phù hợp profile. Cắt đoạn xấu xử lý ở bước review.";
+}
+editProfileSelect.addEventListener("change", () => {
+  updateEditProfileHint();
+  loadTuningDefaultsForCurrentProfile();
+});
+refreshEditProfiles();
+
+// ---- Tuỳ chỉnh transition/motion (nâng cao) ----
+const TUNING_FIELDS = [
+  "scene_transition_duration",
+  "clip_transition_duration",
+  "motion_scale",
+  "pan_strength_x",
+  "pan_strength_y",
+  "pan_speed_x",
+  "pan_speed_y",
+  "end_fade_duration",
+];
+let tuningOverrides = {}; // chỉ chứa field người dùng đã tự chỉnh tay
+
+function currentProfileTuning() {
+  const profile = editProfiles.find((p) => p.name === editProfileSelect.value);
+  return profile ? profile.tuning : null;
+}
+
+function loadTuningDefaultsForCurrentProfile() {
+  const tuning = currentProfileTuning();
+  if (!tuning) return;
+  tuningOverrides = {};
+  for (const field of TUNING_FIELDS) {
+    const input = document.getElementById(`tuning_${field}`);
+    if (!input) continue;
+    input.value = tuning[field];
+    document.getElementById(`tuning_${field}_value`).textContent = tuning[field];
+  }
+}
+
+for (const field of TUNING_FIELDS) {
+  const input = document.getElementById(`tuning_${field}`);
+  if (!input) continue;
+  input.addEventListener("input", () => {
+    const value = Number(input.value);
+    document.getElementById(`tuning_${field}_value`).textContent = value;
+    tuningOverrides[field] = value;
+  });
+}
+
+document.getElementById("resetTuningBtn").addEventListener("click", loadTuningDefaultsForCurrentProfile);
+
+function collectTuningOverridesJson() {
+  return Object.keys(tuningOverrides).length ? JSON.stringify(tuningOverrides) : "";
+}
+
+const rememberedFitMode = localStorage.getItem("video_render_fit_mode");
+if (rememberedFitMode) form.fit_mode.value = rememberedFitMode;
+
+document.getElementById("loadTemplateBtn").addEventListener("click", async () => {
+  const name = templateSelect.value;
+  if (!name) return;
+  try {
+    const res = await fetch(`/api/templates/${encodeURIComponent(name)}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Lỗi không rõ");
+    if (data.aspect_ratio) form.aspect_ratio.value = data.aspect_ratio;
+    if (data.fit_mode) form.fit_mode.value = data.fit_mode;
+    if (data.duration_mode) form.duration_mode.value = data.duration_mode;
+    if (data.edit_profile_name) {
+      form.edit_profile_name.value = data.edit_profile_name;
+      updateEditProfileHint();
+    }
+    if (data.mode) {
+      form.querySelector(`input[name="mode"][value="${data.mode}"]`).checked = true;
+      randomModeFields.classList.toggle("hidden", data.mode === "manual");
+      manualModeFields.classList.toggle("hidden", data.mode !== "manual");
+    }
+  } catch (err) {
+    alert("Lỗi tải template: " + err.message);
+  }
+});
+
+document.getElementById("saveTemplateBtn").addEventListener("click", async () => {
+  const name = templateNameInput.value.trim();
+  if (!name) { alert("Nhập tên template trước."); return; }
+  try {
+    const body = new URLSearchParams({
+      aspect_ratio: form.aspect_ratio.value,
+      fit_mode: form.fit_mode.value,
+      duration_mode: form.duration_mode.value,
+      mode: form.mode.value,
+      edit_profile_name: form.edit_profile_name.value,
+    });
+    const res = await fetch(`/api/templates/${encodeURIComponent(name)}`, { method: "POST", body });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Lỗi không rõ");
+    templateNameInput.value = "";
+    await refreshTemplateList();
+    templateSelect.value = name;
+  } catch (err) {
+    alert("Lỗi lưu template: " + err.message);
+  }
+});
+
+function renderVoiceChips() {
+  voiceTracksDisplay.textContent = voiceTracks.length ? `${voiceTracks.length} file đã chọn` : "(chưa chọn)";
+  voiceChips.innerHTML = "";
+  for (const path of voiceTracks) {
+    const chip = document.createElement("span");
+    chip.className = "chip";
+    const name = path.split("/").pop();
+    chip.innerHTML = `<span>${name}</span>`;
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.textContent = "✕";
+    removeBtn.addEventListener("click", () => {
+      voiceTracks = voiceTracks.filter((p) => p !== path);
+      renderVoiceChips();
+    });
+    chip.appendChild(removeBtn);
+    voiceChips.appendChild(chip);
+  }
+}
+
+// ---- Toggle random / manual mode fields ----
+const randomModeFields = document.getElementById("randomModeFields");
+const manualModeFields = document.getElementById("manualModeFields");
+const manualPlanPreview = document.getElementById("manualPlanPreview");
+for (const radio of form.querySelectorAll('input[name="mode"]')) {
+  radio.addEventListener("change", () => {
+    const isManual = form.mode.value === "manual";
+    randomModeFields.classList.toggle("hidden", isManual);
+    manualModeFields.classList.toggle("hidden", !isManual);
+    if (!isManual) {
+      manualPlanPreview.classList.add("hidden");
+      manualPlanPreview.innerHTML = "";
+    }
+  });
+}
+
+// ---- Scan ----
+function scanCacheKey() {
+  return `${SCAN_CACHE_PREFIX}${scenesDir}|${form.aspect_ratio.value}|${form.mode.value}`;
+}
+
+function renderScanData(data, fromCache = false) {
+  latestScannedScenes = data.scenes || [];
+  const lines = latestScannedScenes.map((s) => {
+    const refs = (s.clips || []).map((clip) => `${clip.ref}=${clip.filename}`).join(", ");
+    return `cảnh ${s.scene_index + 1} (${s.folder}): ${s.clip_count} clip${refs ? ` — ${refs}` : ""}`;
+  });
+  scanResult.textContent = [
+    fromCache ? "Đã dùng kết quả quét gần nhất để bạn không phải chờ lại." : "",
+    ...lines,
+  ].filter(Boolean).join("\n") || "Không tìm thấy thư mục cảnh nào.";
+  latestProfileSuggestion = data.suggestion || null;
+  renderProfileSuggestion();
+}
+
+document.getElementById("scanBtn").addEventListener("click", async () => {
+  const scanBtn = document.getElementById("scanBtn");
+  if (!scenesDir) {
+    scanResult.textContent = "Chọn thư mục scenes trước.";
+    scanResult.className = "error";
+    return;
+  }
+  const cacheKey = scanCacheKey();
+  try {
+    const cached = JSON.parse(localStorage.getItem(cacheKey) || "null");
+    if (cached && Date.now() - cached.createdAt < 10 * 60 * 1000) {
+      scanResult.className = "";
+      renderScanData(cached.data, true);
+      return;
+    }
+  } catch {
+    localStorage.removeItem(cacheKey);
+  }
+
+  scanResult.textContent = "Đang phân tích video nguồn... Việc này có thể mất vài giây nếu thư mục có nhiều clip.";
+  scanResult.className = "";
+  scanBtn.disabled = true;
+  scanBtn.textContent = "Đang phân tích...";
+  try {
+    const res = await fetch("/api/scan/jobs", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        scenes_dir: scenesDir,
+        aspect_ratio: form.aspect_ratio.value,
+        mode: form.mode.value,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Lỗi không rõ");
+    let result = null;
+    while (!result) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const statusRes = await fetch(`/api/scan/jobs/${data.job_id}`);
+      const status = await statusRes.json();
+      if (!statusRes.ok) throw new Error(status.detail || "Không đọc được trạng thái scan");
+      if (status.status === "failed") throw new Error(status.error || status.message || "Scan lỗi");
+      const total = Number(status.total_clips || 0);
+      const done = Number(status.completed_clips || 0);
+      scanResult.textContent = total > 0
+        ? `${status.message}\nĐã phân tích ${done}/${total} clip đại diện.`
+        : status.message;
+      if (status.status === "done") result = status.result;
+    }
+    localStorage.setItem(cacheKey, JSON.stringify({ createdAt: Date.now(), data: result }));
+    renderScanData(result);
+  } catch (err) {
+    latestScannedScenes = [];
+    latestProfileSuggestion = null;
+    renderProfileSuggestion();
+    scanResult.textContent = "Lỗi: " + err.message;
+    scanResult.className = "error";
+  } finally {
+    scanBtn.disabled = false;
+    scanBtn.textContent = "Kiểm tra video nguồn";
+  }
+});
+
+function renderProfileSuggestion() {
+  if (!latestProfileSuggestion) {
+    profileSuggestionBox.classList.add("hidden");
+    profileSuggestionTitle.textContent = "";
+    profileSuggestionReason.textContent = "";
+    return;
+  }
+  profileSuggestionTitle.textContent = `Gợi ý: ${latestProfileSuggestion.label}`;
+  profileSuggestionReason.textContent = latestProfileSuggestion.reason;
+  profileSuggestionBox.classList.remove("hidden");
+}
+
+applyProfileSuggestionBtn.addEventListener("click", () => {
+  if (!latestProfileSuggestion) return;
+  form.edit_profile_name.value = latestProfileSuggestion.profile_name;
+  updateEditProfileHint();
+  loadTuningDefaultsForCurrentProfile();
+  profileSuggestionReason.textContent = `${latestProfileSuggestion.reason} Đã dùng gợi ý này.`;
+});
+
+function stem(path) {
+  const name = path.split("/").pop();
+  return name.replace(/\.[^.]+$/, "");
+}
+
+function formatDuration(totalSeconds) {
+  const s = Math.round(totalSeconds);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) return `${h}h ${m}m ${sec}s`;
+  if (m > 0) return `${m}m ${sec}s`;
+  return `${sec}s`;
+}
+
+// ---- Render / preview flow ----
+let pendingCommon = null;
+let activeCommon = null;
+let previewDraftCommon = null;
+let previewPollTimer = null;
+
+function renderManualPlanItems(items) {
+  if (!items.length) return "";
+  return items.map((item) => {
+    const scenes = (item.scenes || []).map((scene) =>
+      `<li><strong>${escapeHtml(scene.scene_label)}</strong>: ${escapeHtml((scene.clips || []).join(", "))}</li>`
+    ).join("");
+    return `<div class="manual-preview-item"><strong>${escapeHtml(item.video_label)}</strong><ul>${scenes}</ul></div>`;
+  }).join("");
+}
+
+async function validateManualPlan(showSuccess) {
+  const previewBox = document.getElementById("manualPlanPreview");
+  if (form.mode.value !== "manual") {
+    previewBox.classList.add("hidden");
+    previewBox.innerHTML = "";
+    return true;
+  }
+  if (!scenesDir) {
+    previewBox.classList.remove("hidden");
+    previewBox.innerHTML = '<div class="error">Chọn thư mục video trước khi kiểm tra danh sách clip.</div>';
+    return false;
+  }
+  if (!form.manual_plan_text.value.trim()) {
+    previewBox.classList.remove("hidden");
+    previewBox.innerHTML = '<div class="error">Nhập danh sách clip trước. Mỗi dòng là một video.</div>';
+    return false;
+  }
+
+  previewBox.classList.remove("hidden");
+  previewBox.textContent = "Đang kiểm tra danh sách clip...";
+  const body = new URLSearchParams({
+    scenes_dir: scenesDir,
+    manual_plan_text: form.manual_plan_text.value,
+  });
+  try {
+    const res = await fetch("/api/manual-plan/preview", { method: "POST", body });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Danh sách clip chưa hợp lệ");
+    previewBox.innerHTML = `${showSuccess ? "<strong>Danh sách hợp lệ</strong>" : ""}${renderManualPlanItems(data.items || [])}`;
+    return true;
+  } catch (err) {
+    previewBox.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+    return false;
+  }
+}
+
+function collectRenderSettings() {
+  if (!scenesDir) { alert("Chọn thư mục scenes trước."); return null; }
+  if (voiceTracks.length === 0) { alert("Chọn ít nhất 1 voice track."); return null; }
+
+  const mode = form.mode.value;
+  if (mode === "manual" && !form.manual_plan_text.value.trim()) {
+    alert("Nhập plan thủ công trước (mỗi dòng 1 video).");
+    return null;
+  }
+
+  const baseName = form.product_name.value.trim();
+  if (!baseName) {
+    alert("Nhập tên sản phẩm trước.");
+    return null;
+  }
+
+  localStorage.setItem("video_render_fit_mode", form.fit_mode.value);
+  return {
+    scenesDir,
+    voiceTracks: [...voiceTracks],
+    baseName,
+    n_outputs: form.n_outputs.value,
+    output_dir: outputDir || "output",
+    duration_mode: form.duration_mode.value,
+    seed: form.seed.value,
+    aspect_ratio: form.aspect_ratio.value,
+    fit_mode: form.fit_mode.value,
+    edit_profile_name: form.edit_profile_name.value,
+    tuning_overrides: collectTuningOverridesJson(),
+    trim_mode: form.trim_mode.value,
+    emoji_preset: form.emoji_preset.value,
+    mode,
+    manual_plan_text: form.manual_plan_text.value,
+    watermark_path: watermarkPath,
+    watermark_position: form.watermark_position.value,
+    watermark_scale: Number(form.watermark_scale_pct.value) / 100,
+  };
+}
+
+document.getElementById("previewBtn").addEventListener("click", async () => {
+  const common = collectRenderSettings();
+  if (!common) return;
+  if (!(await validateManualPlan(false))) return;
+  activeCommon = common;
+  previewDraftCommon = { ...common };
+  const voicePath = common.voiceTracks[0];
+  const productName = `${common.baseName}_xem_thu`;
+  await startPreviewJob(previewDraftCommon, voicePath, productName);
+});
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  pendingCommon = collectRenderSettings();
+  if (!pendingCommon) return;
+  if (!(await validateManualPlan(false))) {
+    pendingCommon = null;
+    return;
+  }
+
+  const estimateItems = document.getElementById("estimateItems");
+  const estimateTotal = document.getElementById("estimateTotal");
+  estimateItems.textContent = "Đang tính toán...";
+  estimateTotal.textContent = "";
+  document.getElementById("confirmModal").classList.remove("hidden");
+
+  try {
+    const body = new URLSearchParams();
+    body.append("scenes_dir", pendingCommon.scenesDir);
+    for (const v of pendingCommon.voiceTracks) body.append("voice_tracks", v);
+    body.append("product_name", pendingCommon.baseName);
+    body.append("n_outputs", pendingCommon.n_outputs);
+    body.append("duration_mode", pendingCommon.duration_mode);
+    body.append("edit_profile_name", pendingCommon.edit_profile_name);
+    body.append("emoji_preset", pendingCommon.emoji_preset);
+    body.append("trim_mode", pendingCommon.trim_mode);
+    body.append("seed", pendingCommon.seed);
+    body.append("mode", pendingCommon.mode);
+    body.append("manual_plan_text", pendingCommon.manual_plan_text);
+
+    const res = await fetch("/api/estimate", { method: "POST", body });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Lỗi không rõ");
+
+    estimateItems.innerHTML = data.items.map((it) => {
+      const dupWarning = (it.duplicate_output_groups || []).length
+        ? `<div class="error">⚠ Trùng tổ hợp clip: ${it.duplicate_output_groups.map(
+            (g) => g.map((i) => `variant_${i + 1}`).join(" = ")
+          ).join("; ")}</div>`
+        : "";
+      return `<div><strong>${it.product_name}</strong> — ${it.n_outputs} output, ước tính ${formatDuration(it.estimated_seconds)}${dupWarning}</div>`;
+    }).join("");
+    estimateTotal.textContent = `Tổng thời gian ước tính: ${formatDuration(data.grand_total_estimated_seconds)} (con số gần đúng, thực tế có thể khác tuỳ máy)`;
+    pendingCommon.actualCounts = {};
+    for (const it of data.items) pendingCommon.actualCounts[it.product_name] = it.n_outputs;
+  } catch (err) {
+    estimateItems.innerHTML = `<div class="error">Lỗi ước tính: ${err.message}</div>`;
+    estimateTotal.textContent = "";
+  }
+});
+
+document.getElementById("cancelRenderBtn").addEventListener("click", () => {
+  document.getElementById("confirmModal").classList.add("hidden");
+  pendingCommon = null;
+});
+
+document.getElementById("closePreviewBtn").addEventListener("click", () => {
+  document.getElementById("previewModal").classList.add("hidden");
+  if (previewPollTimer) {
+    clearInterval(previewPollTimer);
+    previewPollTimer = null;
+  }
+});
+
+document.getElementById("checkManualPlanBtn").addEventListener("click", async () => {
+  await validateManualPlan(true);
+});
+
+document.getElementById("createManualSampleBtn").addEventListener("click", () => {
+  const previewBox = document.getElementById("manualPlanPreview");
+  if (!latestScannedScenes.length) {
+    previewBox.classList.remove("hidden");
+    previewBox.innerHTML = '<div class="error">Bấm Kiểm tra video nguồn trước để app biết các mã clip.</div>';
+    return;
+  }
+  const scenesWithClips = latestScannedScenes.filter((scene) => (scene.clips || []).length);
+  if (scenesWithClips.length !== latestScannedScenes.length) {
+    previewBox.classList.remove("hidden");
+    previewBox.innerHTML = '<div class="error">Có cảnh chưa có clip, chưa tạo được mẫu.</div>';
+    return;
+  }
+  const requested = Number(form.n_outputs.value || 1);
+  const maxClipCount = Math.max(...scenesWithClips.map((scene) => scene.clips.length));
+  const rowCount = Math.max(1, Math.min(requested || 1, maxClipCount));
+  const rows = [];
+  for (let row = 0; row < rowCount; row += 1) {
+    rows.push(scenesWithClips.map((scene) => scene.clips[row % scene.clips.length].ref).join(", "));
+  }
+  form.manual_plan_text.value = rows.join("\n");
+  previewBox.classList.remove("hidden");
+  previewBox.innerHTML = "<strong>Đã tạo mẫu. Bạn có thể sửa lại từng dòng rồi bấm Kiểm tra danh sách.</strong>";
+});
+
+document.getElementById("confirmRenderBtn").addEventListener("click", async () => {
+  document.getElementById("confirmModal").classList.add("hidden");
+  if (!pendingCommon) return;
+
+  formPage.classList.add("hidden");
+  progressPage.classList.remove("hidden");
+  jobList.innerHTML = "";
+  Object.keys(jobStats).forEach((k) => delete jobStats[k]);
+  resetPhase1Tracking();
+  activeCommon = pendingCommon;
+  updateOverallBar();
+
+  for (const voicePath of pendingCommon.voiceTracks) {
+    const productName = pendingCommon.voiceTracks.length > 1
+      ? `${pendingCommon.baseName}_${stem(voicePath)}`
+      : pendingCommon.baseName;
+    await startSingleJob(pendingCommon, voicePath, productName, false);
+  }
+});
+
+document.getElementById("backBtn").addEventListener("click", () => {
+  progressPage.classList.add("hidden");
+  formPage.classList.remove("hidden");
+});
+
+document.getElementById("resetBtn").addEventListener("click", () => {
+  form.reset();
+  scenesDir = "";
+  voiceTracks = [];
+  outputDir = "";
+  scenesDirDisplay.textContent = "(chưa chọn)";
+  outputDirDisplay.textContent = "(chưa chọn — mặc định \"output\")";
+  scanResult.textContent = "";
+  latestProfileSuggestion = null;
+  renderProfileSuggestion();
+  randomModeFields.classList.remove("hidden");
+  manualModeFields.classList.add("hidden");
+  manualPlanPreview.classList.add("hidden");
+  manualPlanPreview.innerHTML = "";
+  watermarkPath = "";
+  watermarkDisplay.textContent = "(không dùng watermark)";
+  watermarkOptions.classList.add("hidden");
+  if (rememberedFitMode) form.fit_mode.value = rememberedFitMode;
+  renderVoiceChips();
+});
+
+async function startSingleJob(common, voicePath, productName, isPreview) {
+  const card = createJobCard(productName, isPreview ? "Bản xem thử" : "Render bản thô", voicePath);
+  try {
+    const body = new URLSearchParams({
+      scenes_dir: common.scenesDir,
+      voice_track: voicePath,
+      product_name: productName,
+      n_outputs: common.n_outputs,
+      output_dir: common.output_dir,
+      duration_mode: common.duration_mode,
+      seed: common.seed,
+      aspect_ratio: common.aspect_ratio,
+      fit_mode: common.fit_mode,
+      edit_profile_name: common.edit_profile_name,
+      tuning_overrides: common.tuning_overrides || "",
+      emoji_preset: common.emoji_preset,
+      trim_mode: common.trim_mode,
+      mode: common.mode,
+      manual_plan_text: common.manual_plan_text,
+      watermark_path: common.watermark_path,
+      watermark_position: common.watermark_position,
+      watermark_scale: common.watermark_scale,
+    });
+    const res = await fetch(isPreview ? "/api/preview" : "/api/render", { method: "POST", body });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Lỗi không rõ");
+    const expectedTotal = isPreview
+      ? 1
+      : (common.actualCounts?.[productName] ?? Number(common.n_outputs));
+    jobStats[data.job_id] = { completed: 0, total: expectedTotal };
+    if (!isPreview) {
+      phase1Jobs[data.job_id] = { productName, voicePath };
+      saveOutputSession();
+    }
+    pollJob(data.job_id, card);
+  } catch (err) {
+    card.querySelector(".job-body").innerHTML = `<div class="error">Lỗi: ${err.message}</div>`;
+  }
+}
+
+function applyPreviewDraftToForm() {
+  if (!previewDraftCommon) return;
+  activeCommon = { ...previewDraftCommon };
+  form.edit_profile_name.value = previewDraftCommon.edit_profile_name;
+  form.seed.value = previewDraftCommon.seed || "";
+  updateEditProfileHint();
+}
+
+async function renderAdjustedPreview(changes) {
+  if (!previewDraftCommon) return;
+  previewDraftCommon = {
+    ...previewDraftCommon,
+    ...changes,
+  };
+  const voicePath = previewDraftCommon.voiceTracks[0];
+  const suffix = changes.edit_profile_name || (changes.seed ? "doi_doan" : "xem_thu");
+  await startPreviewJob(
+    previewDraftCommon,
+    voicePath,
+    `${previewDraftCommon.baseName}_xem_thu_${suffix}`
+  );
+}
+
+async function startPreviewJob(common, voicePath, productName) {
+  const modal = document.getElementById("previewModal");
+  const status = document.getElementById("previewStatus");
+  const progress = document.getElementById("previewProgress");
+  const video = document.getElementById("previewVideo");
+  const quality = document.getElementById("previewQuality");
+  const actions = document.getElementById("previewActions");
+  const log = document.getElementById("previewLog");
+
+  if (previewPollTimer) clearInterval(previewPollTimer);
+  modal.classList.remove("hidden");
+  status.textContent = "Đang tạo bản xem thử video thô...";
+  progress.value = 0;
+  progress.max = 1;
+  video.classList.add("hidden");
+  video.removeAttribute("src");
+  quality.innerHTML = "";
+  actions.innerHTML = "";
+  log.textContent = "";
+
+  try {
+    const body = new URLSearchParams({
+      scenes_dir: common.scenesDir,
+      voice_track: voicePath,
+      product_name: productName,
+      n_outputs: common.n_outputs,
+      output_dir: common.output_dir,
+      duration_mode: common.duration_mode,
+      seed: common.seed,
+      aspect_ratio: common.aspect_ratio,
+      fit_mode: common.fit_mode,
+      edit_profile_name: common.edit_profile_name,
+      tuning_overrides: common.tuning_overrides || "",
+      emoji_preset: common.emoji_preset,
+      trim_mode: common.trim_mode,
+      mode: common.mode,
+      manual_plan_text: common.manual_plan_text,
+      watermark_path: common.watermark_path,
+      watermark_position: common.watermark_position,
+      watermark_scale: common.watermark_scale,
+    });
+    const res = await fetch("/api/preview", { method: "POST", body });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Lỗi không rõ");
+    pollPreviewJob(data.job_id);
+  } catch (err) {
+    status.innerHTML = `<span class="error">Lỗi: ${escapeHtml(err.message)}</span>`;
+  }
+}
+
+function pollPreviewJob(jobId) {
+  const status = document.getElementById("previewStatus");
+  const progress = document.getElementById("previewProgress");
+  const video = document.getElementById("previewVideo");
+  const quality = document.getElementById("previewQuality");
+  const actions = document.getElementById("previewActions");
+  const log = document.getElementById("previewLog");
+  let logCount = 0;
+  let actionsRendered = false;
+
+  previewPollTimer = setInterval(async () => {
+    const res = await fetch(`/api/jobs/${jobId}`);
+    const job = await res.json();
+    const newLines = job.log_lines.slice(logCount);
+    if (newLines.length) {
+      log.textContent += (log.textContent ? "\n" : "") + newLines.join("\n");
+      log.scrollTop = log.scrollHeight;
+      logCount = job.log_lines.length;
+    }
+
+    progress.value = job.completed_outputs;
+    progress.max = job.total_outputs || 1;
+
+    if (job.status === "failed") {
+      status.innerHTML = '<span class="error">Tạo bản xem thử lỗi — xem log bên dưới</span>';
+      clearInterval(previewPollTimer);
+      previewPollTimer = null;
+      return;
+    }
+
+    status.textContent = job.status === "done"
+      ? "Bản xem thử đã sẵn sàng"
+      : "Đang render video thô...";
+    quality.innerHTML = renderQuality(job);
+    if (job.output_paths.length && !actionsRendered) {
+      video.src = `/api/download/${jobId}/0`;
+      video.classList.remove("hidden");
+      actions.innerHTML = `
+        <a href="/api/download/${jobId}/0" target="_blank">Mở video</a>
+        <button type="button" data-preview-open-folder>Mở thư mục kết quả</button>
+        <button type="button" data-preview-profile="smooth_retry">Mượt hơn</button>
+        <button type="button" data-preview-profile="tiktok_shop_fast">Nhanh hơn</button>
+        <button type="button" data-preview-profile="voiceover_catalog">Ít zoom hơn</button>
+        <button type="button" data-preview-profile="product_review_smooth">Giữ cảnh lâu hơn</button>
+        <button type="button" data-preview-new-seed>Đổi đoạn khác</button>
+        <button type="button" data-preview-apply>Dùng kiểu này</button>
+      `;
+      const openBtn = actions.querySelector("[data-preview-open-folder]");
+      openBtn.addEventListener("click", async () => {
+        await fetch(`/api/jobs/${jobId}/open-output`, { method: "POST" });
+      });
+      for (const button of actions.querySelectorAll("[data-preview-profile]")) {
+        button.addEventListener("click", async () => {
+          button.disabled = true;
+          await renderAdjustedPreview({ edit_profile_name: button.dataset.previewProfile });
+        });
+      }
+      const newSeedBtn = actions.querySelector("[data-preview-new-seed]");
+      newSeedBtn.addEventListener("click", async () => {
+        newSeedBtn.disabled = true;
+        await renderAdjustedPreview({ seed: String(Date.now() % 100000) });
+      });
+      const applyBtn = actions.querySelector("[data-preview-apply]");
+      applyBtn.addEventListener("click", () => {
+        applyPreviewDraftToForm();
+        applyBtn.textContent = "Đã dùng kiểu này";
+        applyBtn.disabled = true;
+      });
+      actionsRendered = true;
+    }
+
+    if (job.status === "done") {
+      clearInterval(previewPollTimer);
+      previewPollTimer = null;
+    }
+  }, 1000);
+}
+
+function createJobCard(productName, kindLabel, voicePath) {
+  const card = document.createElement("div");
+  card.className = "job-card";
+  card.dataset.logCount = "0";
+  card.dataset.productName = productName;
+  card.dataset.voicePath = voicePath;
+  card.innerHTML = `
+    <div class="job-head">
+      <div><strong>${productName}</strong><div class="job-kind">${kindLabel}</div></div>
+      <span class="status-pill">Đang chuẩn bị</span>
+    </div>
+    <div class="job-body">Đang khởi tạo job...</div>
+    <pre class="job-log"></pre>
+  `;
+  jobList.appendChild(card);
+  return card;
+}
+
+function updateOverallBar() {
+  const stats = Object.values(jobStats);
+  const completed = stats.reduce((a, s) => a + s.completed, 0);
+  const total = stats.reduce((a, s) => a + s.total, 0) || 1;
+  overallText.textContent = `${completed}/${total}`;
+  overallProgress.value = completed;
+  overallProgress.max = total;
+}
+
+function pollJob(jobId, card) {
+  const body = card.querySelector(".job-body");
+  const log = card.querySelector(".job-log");
+  const pill = card.querySelector(".status-pill");
+  const timer = setInterval(async () => {
+    const res = await fetch(`/api/jobs/${jobId}`);
+    const job = await res.json();
+
+    const newLines = job.log_lines.slice(Number(card.dataset.logCount));
+    if (newLines.length) {
+      log.textContent += (log.textContent ? "\n" : "") + newLines.join("\n");
+      log.scrollTop = log.scrollHeight;
+      card.dataset.logCount = String(job.log_lines.length);
+    }
+
+    if (jobStats[jobId]) {
+      jobStats[jobId].completed = job.completed_outputs;
+      updateOverallBar();
+    }
+    if (phase1Jobs[jobId]) {
+      phase1Snapshots[jobId] = job;
+    }
+
+    if (job.status === "failed") {
+      body.innerHTML = `<div class="error">Render lỗi — xem log bên dưới</div>`;
+      pill.textContent = "Render lỗi";
+      pill.className = "status-pill status-rerender";
+      clearInterval(timer);
+      maybeShowOutputGallery();
+      return;
+    }
+    const quality = renderQuality(job);
+    if (job.quality_summary) {
+      pill.textContent = job.quality_summary.title;
+      pill.className = `status-pill status-${job.quality_summary.status}`;
+    } else {
+      pill.textContent = job.status === "done" ? "Đang kiểm tra" : "Đang render";
+      pill.className = "status-pill";
+    }
+    body.innerHTML = `
+      <div>${job.status === "done" ? "Hoàn tất" : "Đang render"} (${job.completed_outputs}/${job.total_outputs})</div>
+      <progress value="${job.completed_outputs}" max="${job.total_outputs}"></progress>
+      ${quality}
+      ${job.status === "done" ? '<div class="hint">Video đã sẵn sàng ở trang Kết quả.</div>' : ""}
+    `;
+    if (job.status === "done") {
+      clearInterval(timer);
+      maybeShowOutputGallery();
+    }
+  }, 1000);
+}
+
+function escapeHtml(text) {
+  return String(text).replace(/[&<>"']/g, (ch) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;",
+  }[ch]));
+}
+
+function renderQuality(job) {
+  if (!job.quality_summary) return "";
+  const summary = job.quality_summary;
+  const batchMessages = (summary.messages || []).map((m) => `<li>${escapeHtml(m)}</li>`).join("");
+  const resultIssues = (job.quality_results || []).flatMap((result, index) =>
+    (result.issues || []).map((issue) =>
+      `<li>Video ${index + 1}: ${escapeHtml(issue.message)}</li>`
+    )
+  ).join("");
+  const messages = batchMessages + resultIssues;
+  return `
+    <div class="quality-box">
+      <strong>${escapeHtml(summary.title)}</strong>
+      <div>${escapeHtml(summary.summary)}</div>
+      ${messages ? `<ul>${messages}</ul>` : ""}
+    </div>
+  `;
+}
+
+function formatSeconds(value) {
+  const total = Math.max(0, value || 0);
+  const minutes = Math.floor(total / 60);
+  const seconds = total - minutes * 60;
+  return `${String(minutes).padStart(2, "0")}:${seconds.toFixed(2).padStart(5, "0")}`;
+}
+
+function cutRangesToText(ranges) {
+  return ranges.map((range) => `${formatSeconds(range.start)}-${formatSeconds(range.end)}`).join("\n");
+}
+
+function removeCutRange(range) {
+  if (!cutReviewState) return;
+  cutReviewState.ranges = cutReviewState.ranges.filter((r) => r !== range);
+  cutReviewStatus.textContent = `Đã huỷ vùng cắt ${formatSeconds(range.start)}-${formatSeconds(range.end)}.`;
+  redrawCutTimeline();
+  updateCutDimOverlay();
+}
+
+function renderCutRangeList() {
+  if (!cutReviewState || !cutRangeList) return;
+  cutRangeList.innerHTML = "";
+  if (!cutReviewState.ranges.length) {
+    const empty = document.createElement("div");
+    empty.className = "hint";
+    empty.textContent = "Chưa có vùng cắt nào.";
+    cutRangeList.appendChild(empty);
+    return;
+  }
+  cutReviewState.ranges.forEach((range, index) => {
+    const row = document.createElement("div");
+    row.className = "cut-range-item";
+    row.innerHTML = `<span>Vùng ${index + 1}: ${formatSeconds(range.start)}-${formatSeconds(range.end)}</span>`;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = "Xoá";
+    button.addEventListener("click", () => removeCutRange(range));
+    row.appendChild(button);
+    cutRangeList.appendChild(row);
+  });
+}
+
+function redrawCutTimeline(pendingRange) {
+  if (!cutReviewState || !cutVideo.duration) return;
+  cutTimeline.querySelectorAll(".cut-range").forEach((el) => el.remove());
+  const duration = cutVideo.duration;
+  const drawRange = (range, extraClass) => {
+    const el = document.createElement("div");
+    el.className = extraClass ? `cut-range ${extraClass}` : "cut-range";
+    el.style.left = `${Math.max(0, Math.min(100, (range.start / duration) * 100))}%`;
+    el.style.width = `${Math.max(0, Math.min(100, ((range.end - range.start) / duration) * 100))}%`;
+    if (!extraClass) {
+      el.title = "Bấm để huỷ đoạn cắt này";
+      // Bấm vào 1 đoạn đã chọn để huỷ riêng đoạn đó, không phải xoá hết.
+      // stopPropagation để không bị hiểu nhầm thành bắt đầu kéo mới.
+      el.addEventListener("mousedown", (event) => {
+        event.stopPropagation();
+        removeCutRange(range);
+      });
+    }
+    cutTimeline.appendChild(el);
+  };
+  for (const range of cutReviewState.ranges) drawRange(range);
+  if (pendingRange) drawRange(pendingRange, "pending");
+  cutRangesText.value = cutRangesToText(cutReviewState.ranges);
+  renderCutRangeList();
+}
+
+// Snap thời gian kéo/hover về đúng lưới khung hình 60fps để user căn chỉnh
+// điểm cắt chính xác theo từng khung, không bị lệch do số thực liên tục.
+const CUT_FRAME_RATE = 60;
+
+function snapToFrame(time) {
+  return Math.round(time * CUT_FRAME_RATE) / CUT_FRAME_RATE;
+}
+
+function timelineTimeFromEvent(event) {
+  const rect = cutTimeline.getBoundingClientRect();
+  const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+  return snapToFrame(ratio * (cutVideo.duration || 0));
+}
+
+function isTimeInsideRanges(time, ranges) {
+  return ranges.some((range) => time >= range.start && time <= range.end);
+}
+
+function updateCutDimOverlay() {
+  if (!cutReviewState) return;
+  const ranges = cutReviewState.pendingRange
+    ? [...cutReviewState.ranges, cutReviewState.pendingRange]
+    : cutReviewState.ranges;
+  const dimmed = isTimeInsideRanges(cutVideo.currentTime, ranges);
+  cutVideo.classList.toggle("cut-dimmed", dimmed);
+  cutDimOverlay.classList.toggle("active", dimmed);
+}
+
+function seekThumbSource(time) {
+  return new Promise((resolve) => {
+    const onSeeked = () => {
+      cutThumbSource.removeEventListener("seeked", onSeeked);
+      resolve();
+    };
+    cutThumbSource.addEventListener("seeked", onSeeked);
+    cutThumbSource.currentTime = time;
+  });
+}
+
+function drawThumbFrame(ctx, x, slotWidth, height) {
+  const vw = cutThumbSource.videoWidth;
+  const vh = cutThumbSource.videoHeight;
+  if (!vw || !vh) return;
+  // Cover-fit: crop giữ tỉ lệ khung hình gốc thay vì kéo méo vào từng ô.
+  const slotRatio = slotWidth / height;
+  const frameRatio = vw / vh;
+  let sx, sy, sw, sh;
+  if (frameRatio > slotRatio) {
+    sh = vh;
+    sw = vh * slotRatio;
+    sx = (vw - sw) / 2;
+    sy = 0;
+  } else {
+    sw = vw;
+    sh = vw / slotRatio;
+    sx = 0;
+    sy = (vh - sh) / 2;
+  }
+  ctx.drawImage(cutThumbSource, sx, sy, sw, sh, x, 0, slotWidth, height);
+}
+
+async function generateTimelineThumbnails(src, duration) {
+  const token = ++thumbGenerationToken;
+  const rect = cutTimeline.getBoundingClientRect();
+  const width = Math.max(1, Math.round(rect.width));
+  const height = Math.max(1, Math.round(rect.height));
+  cutTimelineFrames.width = width;
+  cutTimelineFrames.height = height;
+  const ctx = cutTimelineFrames.getContext("2d");
+  ctx.fillStyle = "#101820";
+  ctx.fillRect(0, 0, width, height);
+  if (!duration || duration <= 0) return;
+
+  const frameCount = Math.max(8, Math.min(24, Math.round(width / 65)));
+  const slotWidth = width / frameCount;
+
+  cutThumbSource.src = src;
+  await new Promise((resolve) => {
+    if (cutThumbSource.readyState >= 1) return resolve();
+    cutThumbSource.addEventListener("loadedmetadata", resolve, { once: true });
+  });
+  if (token !== thumbGenerationToken) return;
+
+  for (let i = 0; i < frameCount; i++) {
+    if (token !== thumbGenerationToken) return;
+    const t = Math.min(duration - 0.05, (i + 0.5) * (duration / frameCount));
+    await seekThumbSource(t);
+    if (token !== thumbGenerationToken) return;
+    drawThumbFrame(ctx, i * slotWidth, slotWidth, height);
+  }
+}
+
+function openCutReview(jobId, outputIndex, galleryCard) {
+  cutReviewState = {
+    jobId,
+    outputIndex,
+    galleryCard: galleryCard || null,
+    ranges: [],
+    draggingStart: null,
+    pendingRange: null,
+  };
+  const src = `/api/download/${jobId}/${outputIndex}`;
+  cutVideo.src = src;
+  cutRangesText.value = "";
+  cutRangeList.innerHTML = "";
+  cutReviewLog.textContent = "";
+  cutReviewStatus.textContent = "Bạn đang cắt video thô chưa có voice. Kéo trên timeline để tô đoạn muốn bỏ.";
+  cutHoverTime.textContent = "00:00.00";
+  cutReviewModal.classList.remove("hidden");
+  cutTimelineFrames.getContext("2d").clearRect(0, 0, cutTimelineFrames.width, cutTimelineFrames.height);
+  redrawCutTimeline();
+  cutVideo.addEventListener("loadedmetadata", () => {
+    generateTimelineThumbnails(src, cutVideo.duration);
+  }, { once: true });
+}
+
+document.getElementById("closeCutReviewBtn").addEventListener("click", () => {
+  cutReviewModal.classList.add("hidden");
+  cutVideo.pause();
+  cutVideo.removeAttribute("src");
+  cutVideo.classList.remove("cut-dimmed");
+  cutDimOverlay.classList.remove("active");
+  cutReviewState = null;
+  thumbGenerationToken++;
+  cutThumbSource.removeAttribute("src");
+});
+
+document.getElementById("clearCutRangesBtn").addEventListener("click", () => {
+  if (!cutReviewState) return;
+  cutReviewState.ranges = [];
+  cutReviewStatus.textContent = "Đã xoá toàn bộ vùng cắt.";
+  redrawCutTimeline();
+  updateCutDimOverlay();
+});
+
+cutVideo.addEventListener("timeupdate", () => {
+  if (!cutVideo.duration) return;
+  cutPlayhead.style.left = `${Math.min(100, (cutVideo.currentTime / cutVideo.duration) * 100)}%`;
+  updateCutDimOverlay();
+});
+
+cutVideo.addEventListener("loadedmetadata", redrawCutTimeline);
+
+cutTimeline.addEventListener("mousedown", (event) => {
+  if (!cutReviewState || !cutVideo.duration) return;
+  cutReviewState.draggingStart = timelineTimeFromEvent(event);
+});
+
+cutTimeline.addEventListener("mousemove", (event) => {
+  if (!cutReviewState || !cutVideo.duration) return;
+  // Snap theo khung 60fps (timelineTimeFromEvent đã snap) để tua/preview
+  // đúng khung hình, không lệch do số thực liên tục — kể cả khi chỉ rê
+  // chuột xem trước (chưa bấm kéo) cũng thấy đúng khung tại vị trí đó.
+  const pointerTime = timelineTimeFromEvent(event);
+  cutHoverTime.textContent = formatSeconds(pointerTime);
+  if (cutReviewState.draggingStart !== null) {
+    const start = cutReviewState.draggingStart;
+    cutReviewState.pendingRange = { start: Math.min(start, pointerTime), end: Math.max(start, pointerTime) };
+    redrawCutTimeline(cutReviewState.pendingRange);
+  }
+  cutVideo.currentTime = pointerTime;
+  cutPlayhead.style.left = `${Math.min(100, (pointerTime / cutVideo.duration) * 100)}%`;
+  updateCutDimOverlay();
+});
+
+cutTimeline.addEventListener("mouseup", (event) => {
+  if (!cutReviewState || cutReviewState.draggingStart === null || !cutVideo.duration) return;
+  const end = timelineTimeFromEvent(event);
+  const start = cutReviewState.draggingStart;
+  cutReviewState.draggingStart = null;
+  cutReviewState.pendingRange = null;
+  if (Math.abs(end - start) < 0.15) {
+    cutReviewStatus.textContent = "Vùng cắt quá ngắn, chưa thêm.";
+    redrawCutTimeline();
+    updateCutDimOverlay();
+    return;
+  }
+  const range = { start: Math.min(start, end), end: Math.max(start, end) };
+  cutReviewState.ranges.push(range);
+  cutReviewState.ranges.sort((a, b) => a.start - b.start);
+  cutReviewStatus.textContent = `Đã thêm vùng cắt ${formatSeconds(range.start)}-${formatSeconds(range.end)}.`;
+  redrawCutTimeline();
+  updateCutDimOverlay();
+});
+
+cutTimeline.addEventListener("mouseleave", () => {
+  if (!cutReviewState || cutReviewState.draggingStart === null) return;
+  cutReviewState.draggingStart = null;
+  cutReviewState.pendingRange = null;
+  redrawCutTimeline();
+  updateCutDimOverlay();
+});
+
+document.getElementById("submitCutBtn").addEventListener("click", async () => {
+  if (!cutReviewState) return;
+  if (!cutRangesText.value.trim() && !window.confirm("Xuất final không cắt đoạn nào?")) return;
+  const body = new URLSearchParams({
+    cut_ranges_text: cutRangesText.value,
+  });
+  cutReviewStatus.textContent = "Đang xuất final và giữ nguyên voice...";
+  cutReviewLog.textContent = "";
+  try {
+    const res = await fetch(`/api/jobs/${cutReviewState.jobId}/cut/${cutReviewState.outputIndex}`, {
+      method: "POST",
+      body,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Không tạo được final");
+    cutReviewStatus.textContent = "Đang xuất final trong nền, có thể đóng cửa sổ này...";
+    pollFinalizeIntoCard(data.job_id, cutReviewState.galleryCard);
+  } catch (err) {
+    cutReviewStatus.innerHTML = `<span class="error">Lỗi: ${escapeHtml(err.message)}</span>`;
+  }
+});
+
+async function pollFinalizeIntoCard(finalizeJobId, galleryCard) {
+  if (!galleryCard) return;
+  const badge = galleryCard.querySelector("[data-badge]");
+  if (badge) {
+    badge.textContent = "Đang xuất final...";
+    badge.className = "output-badge";
+  }
+  const timer = setInterval(async () => {
+    const res = await fetch(`/api/jobs/${finalizeJobId}`);
+    const job = await res.json();
+    if (job.status === "failed") {
+      clearInterval(timer);
+      if (badge) {
+        badge.textContent = "Xuất final lỗi";
+        badge.className = "output-badge badge-issue";
+      }
+      return;
+    }
+    if (job.status === "done") {
+      clearInterval(timer);
+      const previousJobId = galleryCard.dataset.jobId;
+      const previousMeta = phase1Jobs[previousJobId] || { productName: "Kết quả gần đây", voicePath: "" };
+      const video = galleryCard.querySelector("video");
+      video.pause();
+      video.removeAttribute("src");
+      video.dataset.lazySrc = `/api/download/${finalizeJobId}/0`;
+      video.addEventListener("play", () => {
+        if (!video.src && video.dataset.lazySrc) video.src = video.dataset.lazySrc;
+      }, { once: true });
+      const downloadLink = galleryCard.querySelector('a[download]');
+      if (downloadLink) downloadLink.href = `/api/download/${finalizeJobId}/0`;
+      galleryCard.dataset.jobId = finalizeJobId;
+      galleryCard.dataset.outputIndex = "0";
+      delete phase1Jobs[previousJobId];
+      delete phase1Snapshots[previousJobId];
+      phase1Jobs[finalizeJobId] = previousMeta;
+      phase1Snapshots[finalizeJobId] = job;
+      saveOutputSession();
+      if (badge) {
+        badge.textContent = "Final đã có voice";
+        badge.className = "output-badge badge-final";
+      }
+    }
+  }, 1000);
+}
+
+restoreOutputSession();
+
+// ---- Chế độ tự động (Claude → Pexels → Publish) ----
+const manualModeRoot = document.getElementById("manualModeRoot");
+const contentPage = document.getElementById("contentPage");
+const modeManualBtn = document.getElementById("modeManualBtn");
+const modeContentBtn = document.getElementById("modeContentBtn");
+
+modeManualBtn.addEventListener("click", () => {
+  manualModeRoot.classList.remove("hidden");
+  contentPage.classList.add("hidden");
+  modeManualBtn.classList.add("active");
+  modeContentBtn.classList.remove("active");
+});
+modeContentBtn.addEventListener("click", () => {
+  manualModeRoot.classList.add("hidden");
+  contentPage.classList.remove("hidden");
+  modeContentBtn.classList.add("active");
+  modeManualBtn.classList.remove("active");
+});
+
+const contentGenerateBtn = document.getElementById("contentGenerateBtn");
+const contentGenerateStatus = document.getElementById("contentGenerateStatus");
+const contentScriptJson = document.getElementById("contentScriptJson");
+const contentSubmitBtn = document.getElementById("contentSubmitBtn");
+const contentProgress = document.getElementById("contentProgress");
+const contentOutputs = document.getElementById("contentOutputs");
+
+contentGenerateBtn.addEventListener("click", async () => {
+  const topic = document.getElementById("contentTopic").value.trim();
+  if (!topic) {
+    contentGenerateStatus.textContent = "Nhập chủ đề trước đã.";
+    return;
+  }
+  contentGenerateBtn.disabled = true;
+  contentGenerateStatus.textContent = "Claude đang viết kịch bản...";
+  try {
+    const body = new URLSearchParams({ topic });
+    const res = await fetch("/api/content/generate-script", { method: "POST", body });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    const script = await res.json();
+    contentScriptJson.value = JSON.stringify(script, null, 2);
+    contentGenerateStatus.textContent = `Đã sinh: "${script.title}" (${script.segments.length} đoạn).`;
+  } catch (err) {
+    contentGenerateStatus.textContent = `Lỗi: ${err.message}`;
+  } finally {
+    contentGenerateBtn.disabled = false;
+  }
+});
+
+contentSubmitBtn.addEventListener("click", async () => {
+  const topic = document.getElementById("contentTopic").value.trim();
+  const scriptJson = contentScriptJson.value.trim();
+  const productName = document.getElementById("contentProductName").value.trim();
+  const nOutputs = document.getElementById("contentNOutputs").value || "1";
+  const candidates = document.getElementById("contentCandidates").value || "3";
+  const aspectRatio = document.getElementById("contentAspect").value;
+
+  if (!topic && !scriptJson) {
+    contentProgress.textContent = "Cần chủ đề (để Claude tự sinh) hoặc kịch bản JSON.";
+    return;
+  }
+  if (!productName) {
+    contentProgress.textContent = "Cần nhập tên sản phẩm/video.";
+    return;
+  }
+
+  contentSubmitBtn.disabled = true;
+  contentOutputs.innerHTML = "";
+  contentProgress.textContent = "Đang bắt đầu...";
+
+  try {
+    const body = new URLSearchParams({
+      topic,
+      script_json: scriptJson,
+      product_name: productName,
+      n_outputs: nOutputs,
+      candidates_per_scene: candidates,
+      aspect_ratio: aspectRatio,
+    });
+    const res = await fetch("/api/content/jobs", { method: "POST", body });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    pollContentJob(data.content_job_id);
+  } catch (err) {
+    contentProgress.textContent = `Lỗi: ${err.message}`;
+    contentSubmitBtn.disabled = false;
+  }
+});
+
+const CONTENT_STAGE_LABELS = {
+  pending: "Đang chuẩn bị...",
+  script: "Claude đang viết kịch bản...",
+  voice: "Đang tổng hợp giọng đọc edge-tts...",
+  pexels: "Đang tải B-roll từ Pexels...",
+  rendering: "Đã chuyển sang render — theo dõi bên dưới...",
+  done: "Đã chuyển sang render.",
+  failed: "Thất bại.",
+};
+
+function pollContentJob(contentJobId) {
+  const timer = setInterval(async () => {
+    const res = await fetch(`/api/content/jobs/${contentJobId}`);
+    if (!res.ok) return;
+    const job = await res.json();
+    contentProgress.textContent = `[${job.stage}] ${job.message || CONTENT_STAGE_LABELS[job.stage] || ""}`;
+    if (job.stage === "failed") {
+      clearInterval(timer);
+      contentSubmitBtn.disabled = false;
+    } else if (job.stage === "done" && job.render_job_id) {
+      clearInterval(timer);
+      pollContentRenderJob(job.render_job_id);
+    }
+  }, 1500);
+}
+
+function pollContentRenderJob(renderJobId) {
+  const timer = setInterval(async () => {
+    const res = await fetch(`/api/jobs/${renderJobId}`);
+    if (!res.ok) return;
+    const job = await res.json();
+    const lastLog = (job.log_lines && job.log_lines.length) ? job.log_lines[job.log_lines.length - 1] : "";
+    contentProgress.textContent = `Render: ${job.completed_outputs || 0}/${job.total_outputs || "?"} — ${lastLog || job.status || ""}`;
+    if (job.status === "failed") {
+      clearInterval(timer);
+      contentProgress.textContent = `Render thất bại: ${job.error || ""}`;
+      contentSubmitBtn.disabled = false;
+    } else if (job.status === "done") {
+      clearInterval(timer);
+      contentSubmitBtn.disabled = false;
+      renderContentOutputs(renderJobId, job.output_paths || []);
+    }
+  }, 1500);
+}
+
+function renderContentOutputs(renderJobId, outputPaths) {
+  contentOutputs.innerHTML = "";
+  outputPaths.forEach((path, index) => {
+    const card = document.createElement("div");
+    card.className = "content-output-card";
+    card.innerHTML = `
+      <video controls preload="none" src="/api/download/${renderJobId}/${index}"></video>
+      <div class="content-publish-form">
+        <label>Tiêu đề YouTube</label>
+        <input type="text" class="pub-title" placeholder="Tiêu đề video">
+        <label>Mô tả</label>
+        <textarea class="pub-description" rows="3" placeholder="Mô tả video"></textarea>
+        <label>Tags (phân cách bằng dấu phẩy)</label>
+        <input type="text" class="pub-tags" placeholder="tag1, tag2">
+        <label>Lên lịch công khai (để trống = đăng ngay ở chế độ private)</label>
+        <input type="datetime-local" class="pub-publish-at">
+        <button type="button" class="pub-submit" style="margin-top:10px">Đăng lên YouTube</button>
+        <div class="pub-status job-kind"></div>
+      </div>
+    `;
+    const submitBtn = card.querySelector(".pub-submit");
+    const statusEl = card.querySelector(".pub-status");
+    submitBtn.addEventListener("click", async () => {
+      const title = card.querySelector(".pub-title").value.trim();
+      if (!title) {
+        statusEl.textContent = "Cần nhập tiêu đề.";
+        return;
+      }
+      const description = card.querySelector(".pub-description").value;
+      const tags = card.querySelector(".pub-tags").value;
+      const publishAtLocal = card.querySelector(".pub-publish-at").value;
+      const publishAt = publishAtLocal ? new Date(publishAtLocal).toISOString() : "";
+
+      submitBtn.disabled = true;
+      statusEl.textContent = "Đang upload lên YouTube...";
+      try {
+        const body = new URLSearchParams({ title, description, tags, publish_at: publishAt });
+        const res = await fetch(`/api/content/publish/${renderJobId}/${index}`, { method: "POST", body });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || `HTTP ${res.status}`);
+        }
+        const result = await res.json();
+        statusEl.innerHTML = `✓ Đã đăng: <a href="${result.url}" target="_blank">${result.url}</a>`;
+      } catch (err) {
+        statusEl.textContent = `Lỗi: ${err.message}`;
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+    contentOutputs.appendChild(card);
+  });
+}
+</script>
