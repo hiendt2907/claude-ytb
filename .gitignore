@@ -45,3 +45,4 @@ video-render/output/
 video-render/.pytest_cache/
 video-render/.coverage*
 video-render/test-results/
+assets/projects/

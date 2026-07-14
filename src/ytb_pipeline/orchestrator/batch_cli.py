@@ -25,10 +25,12 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import signal
 import subprocess
 import sys
 from datetime import datetime, time, timedelta, timezone
+from pathlib import Path
 
 from ..claude_cli import build_claude_cmd
 from ..config.settings import settings
@@ -320,6 +322,12 @@ def cmd_reset(args: argparse.Namespace) -> None:
         print(f"✗ '{args.slug}' đang được xử lý. Dùng `ytb batch stop` trước.")
         return
     update_ledger(args.slug, "", "reset", "reset", "Reset thủ công về pending qua `ytb batch reset`")
+    # Xoá checkpoint project.json — nếu giữ, WorkflowGraph sẽ skip node DONE cũ
+    # và "chạy lại từ đầu" thành no-op.
+    project_dir = Path(settings.projects_dir) / args.slug
+    if project_dir.exists():
+        shutil.rmtree(project_dir)
+        print(f"✓ Đã xoá checkpoint {project_dir} (chạy lại từ đầu thật sự).")
     print(f"✓ Đã reset '{args.slug}' về pending — sẽ được `ytb batch run` nhặt ở lượt kế tiếp.")
 
 

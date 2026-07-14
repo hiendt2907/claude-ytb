@@ -1,13 +1,17 @@
-"""Orchestrator: nối 4 khâu thành pipeline tuần tự.
+"""Orchestrator: chạy 1 project qua WorkflowGraph 4 node (DAG + checkpoint).
 
 Ideation = nạp kịch bản Claude viết sẵn (scripts/*.json). Mỗi khâu sau là hàm
 thuần nhận model trước, trả model làm giàu thêm qua replace().
+
+Trạng thái từng node persist vào `<projects_dir>/<slug>/project.json`
+(CheckpointManager) — resume skip node DONE, node stale được reset qua
+`load_or_create_project`. Đường linear `run()` cũ đã bỏ: `python -m
+ytb_pipeline` giờ là caller duy nhất, đi qua `run_project`.
 
 Voiceover/Render/Publish chọn provider qua `providers/registry.py` —
 KHÔNG còn `if tts_provider == ...` / `if render_provider == ...` ở đây.
 """
 
-import asyncio
 import json
 from dataclasses import replace
 from pathlib import Path
@@ -17,9 +21,9 @@ from .ideation.approval import gate
 from .agents.base import AgentStatus
 from .agents.qa_agent import QAAgent
 from .project.checkpoint import CheckpointManager
-from .project.models import Project
+from .project.models import NodeStatus, Project
 from .project.workflow import NodeDef, WorkflowGraph
-from .providers.registry import get_publish_provider, get_render_provider, get_voice_provider
+from .providers.registry import get_render_provider, get_voice_provider
 from .config.settings import settings
 from .pkg.models import PublishResult, RenderedVideo, Voiceover
 from .publish.multiplatform import publish_to_platforms
@@ -27,40 +31,68 @@ from .render.validation import validate_final_video
 from .voiceover.validation import validate_audio
 
 
-def run(script_source: str) -> PublishResult:
-    """Chạy pipeline từ 1 kịch bản Claude đã viết sẵn (scripts/*.json)."""
-    script = load_script(script_source)
-    print(f"[1/4] Ideation  ✓  {script.title} ({len(script.segments)} đoạn)")
-    script = gate(script)  # cổng duyệt Telegram (bỏ qua nếu TELEGRAM_APPROVAL=false)
-    _validate_script_qa(script)
+def load_or_create_project(script_source: str, checkpoint: CheckpointManager) -> Project:
+    """Load project.json đã có (resume) hoặc tạo Project mới cho 1 kịch bản.
 
-    voice = get_voice_provider()
-    print("[2/4] Voiceover ▶  đang tạo audio...")
-    voiceover = asyncio.run(voice.synthesise(script, Path("assets/audio")))
-    validate_audio(voiceover)
-    print(f"[2/4] Voiceover ✓  {voiceover.audio_path}  ({voiceover.duration_sec:.1f}s)")
+    Node stale được reset về PENDING trước khi trả (xem `_reset_stale_nodes`),
+    và project được save lại ngay để trạng thái trên đĩa nhất quán.
+    """
+    from .ideation.generator import _resolve
 
-    renderer = get_render_provider()
-    print(f"[3/4] Render    ▶  đang dựng video ({settings.render_provider}/{settings.orientation})...")
-    video = asyncio.run(renderer.render(voiceover, Path("assets/output")))
-    validate_final_video(video)
-    print(f"[3/4] Render    ✓  ({settings.render_provider}/{settings.orientation}) {video.video_path}")
+    path = _resolve(script_source)
+    existing = checkpoint.load(path.stem)
+    if existing is None:
+        project = Project(project_id=path.stem, script_path=str(path))
+    else:
+        project = replace(existing, script_path=str(path))
+    project = _reset_stale_nodes(project)
+    checkpoint.save(project)
+    return project
 
-    print("[4/4] Publish   ▶  đang upload...")
-    result = _primary_publish_result(asyncio.run(publish_to_platforms(video)))
-    print(f"[4/4] Publish   ✓  uploaded={result.uploaded}")
 
-    # Sau khi upload thật, MOVE video lên Drive (xoá local). Lỗi Drive không hỏng pipeline
-    # và KHÔNG xoá local (move chỉ chạy khi Drive nhận file thành công).
-    if result.uploaded and settings.drive_backup:
-        from .publish.drive import backup_to_drive
-        try:
-            backup_to_drive(result.video_path, move=True)
-            _cleanup_after_success(result)
-        except Exception as exc:  # noqa: BLE001
-            print(f"  ⚠ Đưa lên Drive thất bại (giữ bản local): {exc}")
+def _reset_stale_nodes(project: Project) -> Project:
+    """Đưa node DONE nhưng stale về PENDING trước khi resume.
 
-    return result
+    - `publish` DONE nhưng chưa từng upload thật (dry-run/export tay trước đó)
+      -> luôn chạy lại publish; chỉ upload thật (uploaded=True) mới được skip.
+    - `render`/`voiceover` DONE nhưng file output không còn trên đĩa (và khâu
+      sau chưa DONE để rehydrate từ đó) -> phải chạy lại.
+    """
+    current = project
+
+    publish = current.nodes.get("publish")
+    if publish is not None and publish.status == NodeStatus.DONE:
+        platforms = (publish.output_data or {}).get("platforms", {})
+        if not any(entry.get("uploaded") for entry in platforms.values()):
+            current = current.with_node(_pending_again(publish))
+
+    for node_id, next_id in (("render", "publish"), ("voiceover", "render")):
+        node = current.nodes.get(node_id)
+        nxt = current.nodes.get(next_id)
+        next_done = nxt is not None and nxt.status == NodeStatus.DONE
+        if node is not None and node.status == NodeStatus.DONE and not next_done:
+            if not node.output_ref or not Path(node.output_ref).exists():
+                current = current.with_node(_pending_again(node))
+
+    return current
+
+
+def _pending_again(node):
+    return replace(node, status=NodeStatus.PENDING, output_ref=None,
+                   output_data={}, completed_at=None, error=None)
+
+
+def publish_summary(project: Project, checkpoint: CheckpointManager) -> tuple[bool, str | None]:
+    """(uploaded, url) của platform chính từ output node publish trong checkpoint."""
+    platforms = checkpoint.get_output_data(project, "publish").get("platforms", {})
+    entry: dict = {}
+    for key in ("youtube_short", "youtube_long", "youtube"):
+        if key in platforms:
+            entry = platforms[key]
+            break
+    else:
+        entry = next(iter(platforms.values()), {})
+    return bool(entry.get("uploaded")), entry.get("url")
 
 
 def _primary_publish_result(results: dict[str, PublishResult]) -> PublishResult:
@@ -278,11 +310,6 @@ def _cleanup_after_success(result: PublishResult) -> None:
         path.unlink(missing_ok=True)
     shutil.rmtree(Path("assets/output") / "_frames_ai", ignore_errors=True)
     print("  ✓ Đã clean up audio/render artifacts sau khi backup Drive.")
-
-
-def _validate_script_qa(script) -> None:
-    result = asyncio.run(QAAgent().run({"script": script, "strict": True}))
-    _raise_if_qa_failed(result)
 
 
 async def _validate_script_qa_async(script) -> None:

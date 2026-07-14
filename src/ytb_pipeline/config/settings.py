@@ -77,6 +77,9 @@ class Settings(BaseSettings):
     # Paths
     assets_dir: Path = Field(default=Path("assets"))
     output_dir: Path = Field(default=Path("assets/output"))
+    # Checkpoint DAG: mỗi video 1 file <projects_dir>/<slug>/project.json —
+    # resume skip node đã DONE (xem project/workflow.py).
+    projects_dir: Path = Field(default=Path("assets/projects"))
 
     # Drive — sau khi upload YouTube THẬT, MOVE video lên Drive rồi xoá file local
     # (chỉ giữ trên máy tới khi upload xong). Cần token có scope drive.file.

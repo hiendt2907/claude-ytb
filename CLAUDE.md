@@ -55,14 +55,16 @@ amendment ghi rõ ngày + lý do trong chính file đó):
   cứng). Mỗi node checkpoint độc lập (`pending/running/done/failed`) trong
   `project.json`. Resume = skip node `done`, retry node `failed`, không bao
   giờ recompute toàn bộ vì 1 node lỗi.
-  **Trạng thái thực tế (2026-07-06):** `project/models.py` +
-  `project/workflow.py` (`WorkflowGraph`, Kahn topo-sort) +
-  `project/checkpoint.py` (`CheckpointManager`, atomic write) ĐÃ tồn tại và
-  hoạt động độc lập — nhưng `orchestrator/batch_cli.py` CHƯA import/dùng
-  chúng, vẫn chạy linear qua `assets/auto_state.json` cũ. Đây là 2 hệ thống
-  song song chưa hợp nhất — không viết thêm logic mới dựa trên
-  `auto_state.json`, ưu tiên wire batch_cli vào `WorkflowGraph` khi có cơ hội
-  refactor lớn (cần phê duyệt trước, xem Repository Evolution Rules).
+  **Trạng thái thực tế (2026-07-14):** ĐÃ WIRE. `python -m ytb_pipeline`
+  (subprocess mà `ytb batch run` spawn) chạy qua `pipeline.run_project` →
+  `WorkflowGraph` 4 node + `CheckpointManager`, checkpoint per-video tại
+  `settings.projects_dir` (`assets/projects/<slug>/project.json`); node stale
+  (file output mất, publish dry-run cũ) tự reset qua
+  `pipeline._reset_stale_nodes`. Đường linear `pipeline.run()` cũ đã xoá.
+  `auto_state.json` vẫn là QUEUE cấp batch (thứ tự video, publish_at) —
+  hợp lệ; nhưng trạng thái per-node của 1 video là việc của `project.json`,
+  không thêm state mới kiểu đó vào `auto_state.json`. `ytb batch reset <slug>`
+  xoá cả checkpoint để chạy lại từ đầu thật sự.
 - **Gateway/Worker separation** (khi áp dụng pattern đa-service trong
   tương lai): code share → package chung, không service nào import trực
   tiếp internals của service khác.
@@ -82,10 +84,11 @@ buộc:
   (`"voiceover.segment.synthesized"`), correlation ID (`project_id`)
   bind 1 lần qua contextvars. Không `print()`/`logging.info(f"...")` trong
   `src/ytb_pipeline/`.
-- **File size.** Tối đa 400 dòng/file. `batch_cli.py` đã được split (còn
-  382 dòng — ĐẠT). Hiện đang VI PHẠM: `orchestrator/ideation_cmd.py` (746
-  dòng) và `render/compose_ai.py` (573 dòng) — cần tách trước khi thêm logic
-  mới vào 2 file này (xem Refactoring Rules bên dưới).
+- **File size.** Tối đa 400 dòng/file. `batch_cli.py` đã split — ĐẠT.
+  `ideation_cmd.py` đã split 2026-07-14 (367 dòng + ideation_prompts/
+  ideation_script_fix/ideation_state) — ĐẠT. Còn VI PHẠM:
+  `render/compose_ai.py` (~577 dòng) — cần tách trước khi thêm logic mới
+  vào file này (xem Refactoring Rules bên dưới).
 - **No hardcoded path.** Mọi path qua `settings.<field>`.
 - **Naming.** `snake_case` hàm/biến, `PascalCase` class/Protocol/enum,
   `UPPER_SNAKE_CASE` constant.
