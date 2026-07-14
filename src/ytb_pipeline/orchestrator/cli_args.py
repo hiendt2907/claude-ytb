@@ -30,6 +30,7 @@ Quy trình thường dùng:
   ytb batch status          # xem còn video nào pending
   ytb batch run             # chạy 1 video, lặp lại lệnh này cho video kế
   ytb batch run --loop      # hoặc chạy hết queue luôn, không cần lặp tay
+  ytb batch run --schedule --loop  # tự gán lịch publish_at rồi chạy hết queue
   ytb batch logs --current  # terminal khác — theo dõi log video đang chạy
   ytb batch ps              # xem slug + thời gian đang chạy
   ytb batch stop            # dừng ngay, an toàn — resume lại sau
@@ -148,12 +149,31 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
         "Lỗi khác (script sai, thiếu file...) bỏ qua ngay, KHÔNG retry. Mọi thất bại cuối "
         "cùng đều bắn cảnh báo Telegram + ghi assets/batch_cli_warnings.log.\n\n"
         "Mặc định chỉ chạy ĐÚNG 1 video rồi dừng (an toàn để theo dõi); dùng --loop nếu "
-        "muốn chạy liên tục cho tới khi queue hết video pending.",
+        "muốn chạy liên tục cho tới khi queue hết video pending. Dùng --schedule để tự "
+        "gán publish_at cho các video pending chưa có lịch trước khi chạy.",
         epilog="Ví dụ:\n"
         "  ytb batch run            # chạy 1 video kế tiếp rồi dừng\n"
-        "  ytb batch run --loop     # chạy hết các video pending còn lại\n",
+        "  ytb batch run --loop     # chạy hết các video pending còn lại\n"
+        "  ytb batch run --schedule --loop  # lên lịch rồi chạy hết queue\n"
+        "  ytb batch run --schedule --schedule-slots 09:00,12:00,20:30 --loop\n",
     )
     p_run.add_argument("--loop", action="store_true", help="Chạy hết queue, không chỉ 1 video")
+    p_run.add_argument(
+        "--schedule",
+        action="store_true",
+        help="Tự gán publish_at cho video pending chưa có lịch trước khi chạy",
+    )
+    p_run.add_argument(
+        "--schedule-slots",
+        default="11:30,20:30",
+        help="Các giờ publish trong ngày, cách nhau bằng dấu phẩy (mặc định 11:30,20:30 giờ VN)",
+    )
+    p_run.add_argument(
+        "--schedule-start-days",
+        type=int,
+        default=1,
+        help="Bắt đầu schedule sau N ngày tính từ hôm nay giờ VN; 0=hôm nay, 1=ngày mai (mặc định)",
+    )
     p_run.set_defaults(func=cmd_funcs["run"])
 
     p_verify = _sub(

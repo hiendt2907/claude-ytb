@@ -28,7 +28,7 @@ import os
 import signal
 import subprocess
 import sys
-from datetime import datetime
+from datetime import datetime, time, timedelta, timezone
 
 from ..claude_cli import build_claude_cmd
 from ..config.settings import settings
@@ -81,6 +81,8 @@ from .queue_manager import (
 # những lệnh chạy lâu, lồng subprocess pipeline con (run/retry). `start` (gọi
 # Claude) và các lệnh đọc-only khác không cần.
 PID_TRACKED_COMMANDS = {"run", "retry"}
+VN_TZ = timezone(timedelta(hours=7))
+DEFAULT_SCHEDULE_SLOTS = "11:30,20:30"
 
 # Tiến trình `python -m ytb_pipeline <script>` đang chạy lồng bên trong (nếu
 # có) — signal handler forward SIGTERM xuống đây để không bỏ orphan, và cờ
@@ -166,7 +168,72 @@ def cmd_status(args: argparse.Namespace) -> None:
         print(f"day {item.day:>2}  {mark:<10}  {item.slug}  (publish_at={item.publish_at})")
 
 
+def _parse_schedule_slots(raw: str) -> list[time]:
+    slots: list[time] = []
+    for part in raw.split(","):
+        value = part.strip()
+        if not value:
+            continue
+        try:
+            hour_text, minute_text = value.split(":", 1)
+            slots.append(time(hour=int(hour_text), minute=int(minute_text)))
+        except ValueError as exc:
+            raise SystemExit(f"✗ Slot schedule không hợp lệ: '{value}'. Dùng dạng HH:MM, vd 11:30,20:30.") from exc
+    if not slots:
+        raise SystemExit("✗ Cần ít nhất 1 slot schedule, vd --schedule-slots 11:30,20:30.")
+    return slots
+
+
+def _latest_batch_key(data: dict) -> str:
+    batch_keys = sorted(k for k in data if k.startswith("shorts_funnel_batch_"))
+    if not batch_keys:
+        raise SystemExit("✗ Không tìm thấy batch shorts_funnel_batch_* trong assets/auto_state.json.")
+    return batch_keys[-1]
+
+
+def schedule_pending_videos(args: argparse.Namespace, *, now: datetime | None = None) -> int:
+    """Gán publish_at cho video pending chưa có lịch trong batch mới nhất.
+
+    Không ghi đè video đã có publish_at để tránh đổi lịch đã set tay/đã upload.
+    """
+    if not AUTO_STATE_PATH.exists():
+        raise SystemExit(f"✗ Không tìm thấy queue: {AUTO_STATE_PATH}")
+
+    data = json.loads(AUTO_STATE_PATH.read_text(encoding="utf-8"))
+    batch_key = _latest_batch_key(data)
+    batch = data[batch_key]
+    done = done_slugs()
+    slots = _parse_schedule_slots(getattr(args, "schedule_slots", DEFAULT_SCHEDULE_SLOTS))
+    start_days = getattr(args, "schedule_start_days", 1)
+    if start_days < 0:
+        raise SystemExit("✗ --schedule-start-days không được âm.")
+
+    base_now = now or datetime.now(VN_TZ)
+    start_date = base_now.astimezone(VN_TZ).date() + timedelta(days=start_days)
+    videos = list(batch.get("long_videos", [])) + list(batch.get("short_videos", []))
+    pending = [
+        video
+        for video in sorted(videos, key=lambda v: int(v.get("day", 0)))
+        if video.get("slug") not in done and not str(video.get("publish_at", "")).strip()
+    ]
+
+    for index, video in enumerate(pending):
+        slot = slots[index % len(slots)]
+        scheduled_date = start_date + timedelta(days=index // len(slots))
+        scheduled_at = datetime.combine(scheduled_date, slot, tzinfo=VN_TZ)
+        video["publish_at"] = scheduled_at.isoformat(timespec="seconds")
+
+    if pending:
+        AUTO_STATE_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    slot_text = ",".join(f"{slot.hour:02d}:{slot.minute:02d}" for slot in slots)
+    print(f"✓ Đã schedule {len(pending)} video pending trong {batch_key} từ {start_date.isoformat()} (slots={slot_text}).")
+    return len(pending)
+
+
 def cmd_run(args: argparse.Namespace) -> None:
+    if getattr(args, "schedule", False):
+        schedule_pending_videos(args)
     while True:
         processed = process_next()
         if _stop_requested:

@@ -9,6 +9,7 @@ import argparse
 import json
 import os
 import subprocess
+from datetime import datetime
 
 import pytest
 
@@ -813,6 +814,36 @@ def test_cli_parses_start_idea_alias_and_ask_flag():
     assert args.clear_ledger is True
 
 
+def test_cli_parses_run_schedule_loop_flags():
+    parser = cli.build_parser(
+        doc="test",
+        cmd_funcs={
+            "start": lambda args: None,
+            "status": lambda args: None,
+            "run": lambda args: None,
+            "verify": lambda args: None,
+            "retry": lambda args: None,
+            "logs": lambda args: None,
+            "ledger": lambda args: None,
+            "queue": lambda args: None,
+            "ps": lambda args: None,
+            "reset": lambda args: None,
+            "cancel": lambda args: None,
+            "stop": lambda args: None,
+            "doctor": lambda args: None,
+            "auth": lambda args: None,
+            "benchmark-local": lambda args: None,
+        },
+    )
+
+    args = parser.parse_args(["run", "--schedule", "--loop"])
+
+    assert args.schedule is True
+    assert args.loop is True
+    assert args.schedule_slots == "11:30,20:30"
+    assert args.schedule_start_days == 1
+
+
 def test_cmd_start_rejects_local_and_cloud_together():
     with pytest.raises(SystemExit, match="--local"):
         cli.cmd_start(
@@ -990,6 +1021,90 @@ def test_cmd_run_stops_loop_when_stop_requested(monkeypatch, capsys):
 
     assert len(calls) == 1  # dừng ngay sau lần đầu, không tiếp tục loop
     assert "dừng graceful" in capsys.readouterr().out
+
+
+def test_schedule_pending_videos_assigns_publish_at_without_overwriting_done_or_existing(
+    tmp_path, monkeypatch, capsys
+):
+    auto_state = tmp_path / "auto_state.json"
+    ledger = tmp_path / "ledger.md"
+    auto_state.write_text(json.dumps({
+        "shorts_funnel_batch_2026-07-06": {
+            "long_videos": [
+                {"day": 3, "slug": "already-scheduled", "publish_at": "2026-07-20T09:00:00+07:00"},
+            ],
+            "short_videos": [
+                {"day": 1, "slug": "first-short", "publish_at": "", "shorts_status": "queued"},
+                {"day": 2, "slug": "done-short", "publish_at": "", "shorts_status": "queued"},
+                {"day": 4, "slug": "second-short", "publish_at": "", "shorts_status": "queued"},
+                {"day": 5, "slug": "third-short", "publish_at": "", "shorts_status": "queued"},
+            ],
+        }
+    }), encoding="utf-8")
+    ledger.write_text(
+        "# Ledger\n"
+        "| Ngày | Slug | Tiêu đề | Stage | Status | URL / ghi chú |\n"
+        "|---|---|---|---|---|---|\n"
+        "| 2026-07-07 | done-short | Done | done | ok | https://youtu.be/xxx |\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(cli, "AUTO_STATE_PATH", auto_state)
+    monkeypatch.setattr(cli, "LEDGER_PATH", ledger)
+
+    count = cli.schedule_pending_videos(
+        argparse.Namespace(schedule_slots="11:30,20:30", schedule_start_days=1),
+        now=datetime(2026, 7, 7, 9, 0, tzinfo=cli.VN_TZ),
+    )
+
+    data = json.loads(auto_state.read_text(encoding="utf-8"))
+    videos = {
+        v["slug"]: v
+        for v in (
+            data["shorts_funnel_batch_2026-07-06"]["long_videos"]
+            + data["shorts_funnel_batch_2026-07-06"]["short_videos"]
+        )
+    }
+    assert count == 3
+    assert videos["first-short"]["publish_at"] == "2026-07-08T11:30:00+07:00"
+    assert videos["done-short"]["publish_at"] == ""
+    assert videos["already-scheduled"]["publish_at"] == "2026-07-20T09:00:00+07:00"
+    assert videos["second-short"]["publish_at"] == "2026-07-08T20:30:00+07:00"
+    assert videos["third-short"]["publish_at"] == "2026-07-09T11:30:00+07:00"
+    assert "Đã schedule 3 video" in capsys.readouterr().out
+
+
+def test_cmd_run_schedules_before_processing(tmp_path, monkeypatch):
+    auto_state = tmp_path / "auto_state.json"
+    ledger = tmp_path / "ledger.md"
+    auto_state.write_text(json.dumps({
+        "shorts_funnel_batch_2026-07-06": {
+            "long_videos": [],
+            "short_videos": [
+                {"day": 1, "slug": "short-video", "publish_at": "", "shorts_status": "queued"},
+            ],
+        }
+    }), encoding="utf-8")
+    ledger.write_text(
+        "# Ledger\n"
+        "| Ngày | Slug | Tiêu đề | Stage | Status | URL / ghi chú |\n"
+        "|---|---|---|---|---|---|\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(cli, "AUTO_STATE_PATH", auto_state)
+    monkeypatch.setattr(cli, "LEDGER_PATH", ledger)
+    calls = []
+
+    def fake_process_next():
+        calls.append(1)
+        return False
+
+    monkeypatch.setattr(cli, "process_next", fake_process_next)
+
+    cli.cmd_run(argparse.Namespace(loop=False, schedule=True, schedule_slots="11:30", schedule_start_days=1))
+
+    data = json.loads(auto_state.read_text(encoding="utf-8"))
+    assert data["shorts_funnel_batch_2026-07-06"]["short_videos"][0]["publish_at"]
+    assert calls == [1]
 
 
 def test_cmd_retry_reports_graceful_stop(auto_state_file, monkeypatch, capsys):
