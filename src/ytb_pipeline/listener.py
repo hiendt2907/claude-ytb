@@ -54,7 +54,8 @@ _YTB_CMD_TEXT = (
     "• `/batch start -n 5 --type-of-vid long` — Claude viết N kịch bản (TỐN TOKEN, "
     "chạy đồng bộ, mất nhiều phút, --type-of-vid long|short, --type-of-rules auto|<mô tả>)\n"
     "• `/batch status` — video nào done/pending trong queue\n"
-    "• `/batch run` — chạy video kế tiếp (thêm `--loop` để chạy hết queue)\n"
+    "• `/batch run` — chạy video kế tiếp (`--loop` chạy hết queue, thêm "
+    "`--schedule` để tự xếp lịch publish cho video chưa có lịch)\n"
     "• `/batch retry <slug>` — chạy lại tay 1 slug cụ thể\n"
     "• `/batch verify <youtube_id>` — xác minh video có thật trên YouTube\n"
     "• `/batch logs <slug>` — log của 1 video (`/batch logs --warnings` để xem cảnh báo)\n"
@@ -105,10 +106,32 @@ def _status_text() -> str:
     parts.append(
         f"`auto_state.json`: {'có' if _STATE.exists() else 'chưa có'}"
     )
+    parts.append(_pipeline_progress_text())
+    if _STATE.exists():
+        parts.append(_batch_run_summary())
     if _LEDGER.exists():
         lines = [ln for ln in _LEDGER.read_text(encoding="utf-8").splitlines() if ln.strip()]
         parts.append("\n_Ledger (6 dòng cuối):_\n" + ("\n".join(lines[-6:]) or "(trống)"))
     return "\n".join(parts)
+
+
+def _pipeline_progress_text() -> str:
+    """1 dòng: video nào đang được batch run xử lý + đang ở khâu nào (từ ledger).
+
+    Khác `_Job.label` (job do CHÍNH listener spawn): batch run có thể được start
+    từ terminal/launchd — dòng này nhìn qua pid file + log mtime nên bắt được cả
+    trường hợp đó.
+    """
+    try:
+        from .orchestrator import batch_cli
+
+        slug = batch_cli.current_running_slug()
+        if not slug:
+            return "🎬 Pipeline: không có video nào đang render/upload."
+        stage = batch_cli.last_stage_for_slug(slug).removeprefix("running-") or "?"
+        return f"🎬 Pipeline: đang chạy '{slug}' — khâu {stage}."
+    except Exception as exc:  # noqa: BLE001 — /status không được chết vì lỗi đọc phụ
+        return f"🎬 Pipeline: (không đọc được trạng thái: {exc})"
 
 
 def _logs_text(n: int) -> str:
@@ -334,8 +357,16 @@ def _run_ytb_wizard() -> None:
         return
 
     if choice == "run":
-        mode = telegram.ask_choice("Chạy bao nhiêu?", ["1 video", "Hết queue (--loop)"])
-        args = ["run"] if mode == "1 video" else ["run", "--loop"]
+        mode = telegram.ask_choice(
+            "Chạy bao nhiêu?",
+            ["1 video", "Hết queue (--loop)", "Hết queue + tự xếp lịch (--loop --schedule)"],
+        )
+        if mode == "1 video":
+            args = ["run"]
+        elif mode.endswith("(--loop)"):
+            args = ["run", "--loop"]
+        else:
+            args = ["run", "--loop", "--schedule"]
     elif choice == "retry":
         slug = telegram.ask_text("Nhập slug cần retry (xem `/batch status`):")
         args = ["retry", slug]

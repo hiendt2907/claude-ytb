@@ -207,3 +207,20 @@ def test_stop_terminates_running(_capture_sends):
     listener._dispatch("/stop")
     assert proc.terminated
     assert any("Đã yêu cầu dừng" in m for m in _capture_sends)
+
+
+def test_wizard_run_loop_schedule(monkeypatch, _no_spawn):
+    choices = iter(["run", "Hết queue + tự xếp lịch (--loop --schedule)"])
+    monkeypatch.setattr(listener.telegram, "ask_choice", lambda q, opts: next(choices))
+
+    listener._run_ytb_wizard()
+
+    _, cmd = _no_spawn[0]
+    assert cmd[-3:] == ["run", "--loop", "--schedule"]
+
+
+def test_status_includes_pipeline_progress_line(_capture_sends, _no_spawn):
+    listener._dispatch("/status")
+
+    assert len(_capture_sends) == 1
+    assert "🎬 Pipeline:" in _capture_sends[0]

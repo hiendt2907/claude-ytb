@@ -261,12 +261,17 @@ def process_next(queue_path: Path | None = None, ledger_path: Path | None = None
     """
     cli = _cli()
     queue = cli.load_queue(queue_path)
-    item = cli.next_pending(queue, cli.done_slugs(ledger_path))
+    done = cli.done_slugs(ledger_path)
+    item = cli.next_pending(queue, done)
     if item is None:
         print("✓ Queue đã hết — không còn video pending.")
         return False
 
+    position = sum(1 for q in queue if q.slug in done) + 1
     print(f"▶ Chạy video '{item.slug}' (day {item.day}, publish_at={item.publish_at})")
+    cli.notify_progress(
+        f"🎬 [{position}/{len(queue)}] Bắt đầu '{item.slug}' (publish_at={item.publish_at})"
+    )
     ok, output = cli.run_with_retry(item, ledger_path=ledger_path)
 
     if cli._stop_requested:
@@ -336,4 +341,8 @@ def process_next(queue_path: Path | None = None, ledger_path: Path | None = None
         ledger_path=ledger_path,
     )
     print(f"✓ Video '{item.slug}' done — https://youtu.be/{video_id}")
+    cli.notify_progress(
+        f"✅ [{position}/{len(queue)}] '{item.slug}' đã lên YouTube: https://youtu.be/{video_id}\n"
+        f"privacy={verified.get('privacy_status')}, publishAt={verified.get('publish_at')}"
+    )
     return True

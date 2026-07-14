@@ -60,6 +60,13 @@ def _redirect_warn_log(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "WARN_LOG_PATH", tmp_path / "batch_cli_warnings.log")
 
 
+@pytest.fixture(autouse=True)
+def _progress_off(monkeypatch):
+    """Tắt Telegram tiến độ mặc định trong test — các test cũ chỉ assert kênh
+    CẢNH BÁO. Test nào kiểm tra kênh tiến độ tự bật lại telegram_progress."""
+    monkeypatch.setattr(cli.settings, "telegram_progress", False)
+
+
 # ── load_queue ────────────────────────────────────────────────────────────────
 def test_load_queue_sorted_by_day(auto_state_file):
     queue = cli.load_queue(auto_state_file)
@@ -1248,3 +1255,52 @@ def test_cmd_start_missing_claude_binary_exits(monkeypatch):
         cli.cmd_start(argparse.Namespace(num_of_vid=1, type_of_vid="long", type_of_rules="auto", resume=False, cloud=True))
 
     assert exc_info.value.code == 1
+
+
+# ── notify_progress (Telegram tiến độ từng video) ─────────────────────────────
+def test_process_next_sends_progress_start_and_done(
+    auto_state_file, ledger_file, monkeypatch, _capture_telegram
+):
+    # Arrange — bật kênh tiến độ (fixture autouse đã tắt mặc định trong test)
+    monkeypatch.setattr(cli.settings, "telegram_progress", True)
+    monkeypatch.setattr(
+        cli, "run_with_retry",
+        lambda item, **kw: (True, "✓ Đã upload: https://youtu.be/NEWID12345"),
+    )
+    monkeypatch.setattr(
+        cli, "verify_youtube_video",
+        lambda video_id: {
+            "exists": True, "title": "T", "privacy_status": "private",
+            "publish_at": "2026-06-23T23:00:00Z",
+        },
+    )
+
+    # Act
+    handled = cli.process_next(queue_path=auto_state_file, ledger_path=ledger_file)
+
+    # Assert — 2 tin tiến độ: bắt đầu + xong (kèm URL và vị trí trong queue)
+    assert handled is True
+    assert len(_capture_telegram) == 2
+    assert "🎬 [2/3] Bắt đầu 'b-video'" in _capture_telegram[0]
+    assert "✅ [2/3] 'b-video'" in _capture_telegram[1]
+    assert "https://youtu.be/NEWID12345" in _capture_telegram[1]
+
+
+def test_notify_progress_disabled_sends_nothing(monkeypatch, _capture_telegram):
+    monkeypatch.setattr(cli.settings, "telegram_progress", False)
+
+    cli.notify_progress("🎬 test")
+
+    assert _capture_telegram == []
+
+
+def test_notify_progress_swallows_send_errors(monkeypatch):
+    # Arrange — bật tiến độ nhưng Telegram chết: KHÔNG được raise ra batch run
+    monkeypatch.setattr(cli.settings, "telegram_progress", True)
+
+    def _boom(_text):
+        raise RuntimeError("telegram down")
+
+    monkeypatch.setattr(cli.telegram, "send_message", _boom)
+
+    cli.notify_progress("🎬 test")  # không raise là pass

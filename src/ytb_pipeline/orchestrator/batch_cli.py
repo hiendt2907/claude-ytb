@@ -73,6 +73,7 @@ from .queue_manager import (
     last_stage_for_slug,
     load_queue,
     next_pending,
+    notify_progress,
     tail_text,
     update_ledger,
 )

@@ -152,6 +152,23 @@ def emit_warning(message: str, *, log_path: Path | None = None) -> None:
             f.write(f"[{timestamp}] (Gửi Telegram cho cảnh báo trên bị lỗi: {exc})\n")
 
 
+def notify_progress(message: str) -> None:
+    """Bắn Telegram tiến độ batch (best-effort, KHÔNG raise).
+
+    Khác `emit_warning`: đây là tin TIẾN ĐỘ bình thường (video bắt đầu/xong),
+    không ghi warning log. Tắt bằng TELEGRAM_PROGRESS=false; thiếu token/lỗi
+    mạng chỉ bỏ qua — không bao giờ làm hỏng batch run.
+    """
+    from ..config.settings import settings
+
+    if not settings.telegram_progress:
+        return
+    try:
+        _cli().telegram.send_message(message)
+    except Exception:  # noqa: BLE001 — tiến độ là best-effort, lỗi gửi không được chặn batch
+        pass
+
+
 def current_running_slug() -> str | None:
     """Slug đang được pipeline xử lý ngay lúc này — None nếu không có batch run đang chạy.
 
