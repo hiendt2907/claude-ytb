@@ -10,6 +10,8 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+from ..config.settings import settings
+
 XFADE_SEC = 0.4
 SFX_DIR = Path("assets/sfx")
 WHOOSH = SFX_DIR / "whoosh.wav"
@@ -93,7 +95,8 @@ def concat_with_transitions(clips: list[Path], whoosh_before: list[bool],
     subprocess.run(
         ["ffmpeg", "-y", *inputs, "-filter_complex", ";".join(filt),
          "-map", f"[{vlabel}]", "-map", f"[{alabel}]",
-         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k",
+         "-c:v", "libx264", "-preset", settings.x264_preset_final,
+         "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k",
          str(out)],
         capture_output=True, check=True,
     )

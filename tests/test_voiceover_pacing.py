@@ -116,3 +116,27 @@ def test_to_mp3_applies_tempo_when_profile_needs_it(monkeypatch, tmp_path):
 
     assert "-filter:a" in calls[0]
     assert any("atempo=" in part for part in calls[0])
+
+
+def test_synth_all_edge_parallel_giu_thu_tu_voi_nhieu_worker(monkeypatch, tmp_path):
+    # Arrange — 6 segment, 4 worker song song, synth giả ghi file + đo giả
+    monkeypatch.setattr(tts, "AUDIO_DIR", tmp_path)
+    monkeypatch.setattr(tts.settings, "edge_tts_workers", 4)
+    monkeypatch.setattr(
+        tts, "_synth_segment",
+        lambda text, voice, path, profile: path.write_bytes(b"x"),
+    )
+    monkeypatch.setattr(tts, "_probe_duration", lambda p: 1.5)
+    script = Script(
+        topic="t", title="Thu Tu Song Song", description="d", tags=(),
+        segments=tuple(
+            Segment(caption=f"c{i}", narration=f"n{i}") for i in range(6)
+        ),
+    )
+
+    # Act
+    voiced = tts._synth_all_edge_parallel(script, "slug", tts.VOICE_NEUTRAL)
+
+    # Assert — thứ tự kết quả LUÔN khớp thứ tự segment gốc dù chạy đa luồng
+    assert [s.narration for s in voiced] == [f"n{i}" for i in range(6)]
+    assert all(s.duration_sec == 1.5 for s in voiced)

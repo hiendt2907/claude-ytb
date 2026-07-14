@@ -108,13 +108,13 @@ def synthesize(script: Script) -> Voiceover:
     )
 
 
-EDGE_MAX_WORKERS = 1
-
-
 def _synth_all_edge_parallel(script: Script, slug: str, profile: VoiceProfile) -> list[Segment]:
     """Sinh audio edge-tts cho mọi segment SONG SONG (mỗi segment đã tự cắt cụm
     nhỏ qua `_split_for_pacing`, độc lập file — an toàn chạy đa luồng vì mỗi
     segment ghi ra `seg_path` riêng, không tranh chấp).
+
+    Số worker qua `settings.edge_tts_workers` (đặt 1 nếu edge-tts rate-limit;
+    lỗi NoAudioReceived đã có retry riêng trong `_tts`).
 
     Segment đã có audio hợp lệ từ lần chạy trước (resume) được bỏ qua, không
     gọi lại edge-tts. Thứ tự kết quả trả về LUÔN khớp thứ tự segment gốc.
@@ -139,7 +139,8 @@ def _synth_all_edge_parallel(script: Script, slug: str, profile: VoiceProfile) -
         return i, replace(seg, audio_path=seg_path, duration_sec=dur)
 
     if pending:
-        with ThreadPoolExecutor(max_workers=EDGE_MAX_WORKERS) as pool:
+        workers = max(1, settings.edge_tts_workers)
+        with ThreadPoolExecutor(max_workers=workers) as pool:
             for i, done_seg in pool.map(_work, pending):
                 voiced[i] = done_seg
 

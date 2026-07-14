@@ -16,6 +16,7 @@ import json
 import urllib.error
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from ..config.settings import settings
@@ -84,15 +85,20 @@ def fetch_broll_variants(query: str, count: int, *, min_duration: float = 0.0,
     fresh = [l for l in links if l not in used]
     chosen = (fresh + [l for l in links if l in used])[:count]  # hết link mới mới tái dùng
 
-    out: list[Path] = []
-    for link in chosen:
-        cache_key = hashlib.sha256(link.encode()).hexdigest()[:16]
-        cached = CACHE_DIR / f"{cache_key}.mp4"
-        if not (cached.exists() and cached.stat().st_size > 0):
-            _download(link, cached)
-        out.append(cached)
+    # Chọn link xong mới tải: mỗi link → 1 file cache riêng (hash của link) nên
+    # tải SONG SONG an toàn, không tranh chấp file. Thứ tự output giữ theo `chosen`.
+    targets = [(link, CACHE_DIR / f"{hashlib.sha256(link.encode()).hexdigest()[:16]}.mp4")
+               for link in chosen]
+    missing = [(link, path) for link, path in targets
+               if not (path.exists() and path.stat().st_size > 0)]
+    if missing:
+        workers = max(1, min(settings.broll_download_workers, len(missing)))
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            list(pool.map(lambda t: _download(t[0], t[1]), missing))
+
+    for link, _ in targets:
         used.add(link)
-    return out
+    return [path for _, path in targets]
 
 
 def _search(query: str, key: str, *, min_duration: float, landscape: bool) -> str:

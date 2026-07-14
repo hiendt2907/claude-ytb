@@ -40,6 +40,15 @@ class Settings(BaseSettings):
     pause_sentence_ms: int = 400    # nghỉ sau . ! ? …
     pause_segment_ms: int = 500     # nghỉ giữa các segment
 
+    # Hiệu năng (tốc độ sản xuất) — chỉnh xuống 1 nếu gặp rate-limit/quá tải.
+    edge_tts_workers: int = 4        # số segment edge-tts tổng hợp SONG SONG
+    broll_download_workers: int = 4  # số file B-roll Pexels tải SONG SONG
+    # Preset x264: clip TRUNG GIAN (kenburns/bg/segment) bị re-encode lại ở bước
+    # ghép cuối nên encode nhanh không đổi chất lượng output; file CUỐI giữ
+    # "medium" (chất lượng như trước) — đổi sang "veryfast" nếu ưu tiên tốc độ.
+    x264_preset_work: str = "veryfast"
+    x264_preset_final: str = "medium"
+
     # YouTube
     # API key (chỉ đọc công khai: videos.list mostPopular cho research trending).
     # Upload vẫn dùng OAuth client_secrets dưới đây. Lấy key free ở Google Cloud Console.
@@ -76,6 +85,9 @@ class Settings(BaseSettings):
 
     # Behaviour
     dry_run: bool = True
+    # Bắn Telegram tiến độ TỪNG VIDEO khi chạy `ytb batch run` (bắt đầu + kết
+    # quả kèm URL) — best-effort, lỗi gửi không làm hỏng batch.
+    telegram_progress: bool = True
 
     # Listener — daemon nghe lệnh Telegram. Mỗi lệnh chạy 1 phiên `claude -p` MỚI
     # (không --continue/--resume) nên context luôn sạch = ý "/clear mỗi lệnh".
