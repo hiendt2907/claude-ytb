@@ -109,7 +109,7 @@ def render_video_ai(voiceover: Voiceover) -> RenderedVideo:
             _render_broll_segment(seg, index=i, total=len(voiceover.segments),
                                   query=query, work=work, prefix=prefix,
                                   out=clip, dims=(w, h), landscape=landscape,
-                                  used=used_broll)
+                                  used=used_broll, video_slug=slug)
         clips.append(clip)
         whoosh_before.append(seg.transition)
 
@@ -177,7 +177,7 @@ def _clip_dims(path: Path) -> tuple[int, int] | None:
 
 def _render_broll_segment(seg, index: int, total: int, query: str, work: Path,
                           prefix: str, out: Path, dims: tuple[int, int],
-                          landscape: bool, used: set[str]) -> None:
+                          landscape: bool, used: set[str], video_slug: str = "") -> None:
     """Dựng clip B-roll cho 1 segment.
 
     Nền là một chuỗi beat cắt cảnh (mỗi shot ≤ ~6s, có Ken Burns motion) xếp
@@ -193,7 +193,7 @@ def _render_broll_segment(seg, index: int, total: int, query: str, work: Path,
     duration = slide._audio_duration(seg.audio_path)
     bg = _moving_background(query, duration, index=index, segment=seg, dims=dims,
                             landscape=landscape, work=work, prefix=prefix,
-                            used=used)
+                            used=used, video_slug=video_slug)
 
     show_cap = settings.show_captions and bool(caption)
 
@@ -292,7 +292,7 @@ def _beat_durations(total: float, hook: bool) -> list[float]:
 
 def _moving_background(query: str, duration: float, *, index: int, segment=None,
                        dims: tuple[int, int], landscape: bool, work: Path,
-                       prefix: str, used: set[str]) -> Path:
+                       prefix: str, used: set[str], video_slug: str = "") -> Path:
     """Nền động: chuỗi beat (shot khác nhau + Ken Burns) dài đúng `duration`."""
     if settings.broll_strategy != "pexels":
         raise RuntimeError(
@@ -306,7 +306,9 @@ def _moving_background(query: str, duration: float, *, index: int, segment=None,
     min_dur = max(HOOK_BEAT_SEC if hook else BEAT_TARGET_SEC, 2.0)
     variants = stock.fetch_broll_variants(query, n_variants,
                                           min_duration=min_dur, landscape=landscape,
-                                          exclude=used)
+                                          exclude=used,
+                                          video_slug=video_slug or prefix,
+                                          role="hook" if hook else ("payoff" if getattr(segment, "payoff", "") else "body"))
 
     beats = [(variants[i % len(variants)], d, i) for i, d in enumerate(durs)]
     bg_out = work / f"{prefix}_bg.mp4"
@@ -373,7 +375,8 @@ def _hook_coldopen(voiceover, *, dims: tuple[int, int], landscape: bool,
     beats: list[tuple[Path, float, int]] = []
     for j, q in enumerate(queries):
         variant = stock.fetch_broll_variants(q, 1, min_duration=2.0,
-                                             landscape=landscape, exclude=used)
+                                             landscape=landscape, exclude=used,
+                                             video_slug=slug, role="hook")
         beats.append((variant[0], COLD_BEAT_SEC, j))
 
     bg = work / f"{slug}_cold_bg.mp4"

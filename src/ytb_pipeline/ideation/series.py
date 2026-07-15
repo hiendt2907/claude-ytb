@@ -13,11 +13,12 @@ Tất cả hàm thuần để test offline; `write_series` là tác dụng phụ
 
 from __future__ import annotations
 
-import json
 import re
 import unicodedata
 from datetime import date, timedelta
 from pathlib import Path
+
+from ..orchestrator.state_io import locked_json_update
 
 DAYS_TOTAL = 30
 PUBLISH_HOUR = 6           # giờ vàng brand "1 Cốc Café 6h"
@@ -202,13 +203,5 @@ def write_series(series_block: dict, state_path: str | Path,
     tạo dict MỚI gắn series -> ghi atomic qua file tạm.
     """
     path = Path(state_path)
-    existing: dict = {}
-    if path.exists():
-        existing = json.loads(path.read_text(encoding="utf-8"))
-
-    merged = {**existing, key: series_block}
-
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(merged, ensure_ascii=False, indent=2), encoding="utf-8")
-    tmp.replace(path)
+    with locked_json_update(path) as existing:
+        existing[key] = series_block

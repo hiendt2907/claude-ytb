@@ -121,6 +121,7 @@ def test_next_pending_none_when_all_done(auto_state_file):
         "BrokenPipeError: [Errno 32] Broken pipe",
         "socket.timeout: timed out",
         "urllib.error.HTTPError: HTTP Error 503: Service Unavailable",
+        "edge_tts.exceptions.NoAudioReceived: No audio was received",
     ],
 )
 def test_is_transient_error_true(output):
@@ -434,7 +435,7 @@ def test_process_next_happy_path(auto_state_file, ledger_file, monkeypatch, _cap
         cli, "verify_youtube_video",
         lambda video_id: {
             "exists": True, "title": "T", "privacy_status": "private",
-            "publish_at": "2026-06-23T23:00:00Z",
+            "publish_at": "2026-06-24T23:00:00Z",
         },
     )
 
@@ -456,6 +457,22 @@ def test_process_next_returns_false_when_queue_empty(auto_state_file, ledger_fil
         encoding="utf-8",
     )
     assert cli.process_next(queue_path=auto_state_file, ledger_path=ledger_file) is False
+
+
+def test_failed_slug_is_skipped_by_batch_loop_but_remains_retryable(auto_state_file, ledger_file):
+    ledger_file.write_text(
+        ledger_file.read_text(encoding="utf-8")
+        + "| 2026-06-22 | b-video | B | voiceover | error | bad audio |\n",
+        encoding="utf-8",
+    )
+
+    queue = cli.load_queue(auto_state_file)
+    done = cli.done_slugs(ledger_file)
+    failed = cli.failed_slugs(ledger_file)
+
+    assert "b-video" not in done
+    assert "b-video" in failed
+    assert cli.next_pending(queue, done | failed).slug == "c-video"
 
 
 def test_process_next_records_error_on_run_failure(auto_state_file, ledger_file, monkeypatch, _capture_telegram):
@@ -847,7 +864,7 @@ def test_cli_parses_run_schedule_loop_flags():
 
     assert args.schedule is True
     assert args.loop is True
-    assert args.schedule_slots == "11:30,20:30"
+    assert args.schedule_slots == "06:00,20:30"
     assert args.schedule_start_days == 1
 
 
@@ -1017,7 +1034,7 @@ def test_process_next_returns_false_without_error_ledger_when_stopped(
 def test_cmd_run_stops_loop_when_stop_requested(monkeypatch, capsys):
     calls = []
 
-    def fake_process_next():
+    def fake_process_next(**_kwargs):
         calls.append(1)
         cli._stop_requested = True
         return True
@@ -1080,6 +1097,33 @@ def test_schedule_pending_videos_assigns_publish_at_without_overwriting_done_or_
     assert "Đã schedule 3 video" in capsys.readouterr().out
 
 
+def test_default_schedule_keeps_shorts_off_sunday_and_long_on_sunday(tmp_path, monkeypatch):
+    auto_state = tmp_path / "auto_state.json"
+    ledger = tmp_path / "ledger.md"
+    auto_state.write_text(json.dumps({
+        "shorts_funnel_batch_2026-07-06": {
+            "long_videos": [{"day": 10, "slug": "long", "publish_at": ""}],
+            "short_videos": [
+                {"day": 1, "slug": "short-a", "publish_at": ""},
+                {"day": 2, "slug": "short-b", "publish_at": ""},
+            ],
+        }
+    }), encoding="utf-8")
+    ledger.write_text("# Ledger\n", encoding="utf-8")
+    monkeypatch.setattr(cli, "AUTO_STATE_PATH", auto_state)
+    monkeypatch.setattr(cli, "LEDGER_PATH", ledger)
+
+    cli.schedule_pending_videos(
+        argparse.Namespace(schedule_slots="06:00,20:30", schedule_start_days=0),
+        now=datetime(2026, 7, 12, 9, 0, tzinfo=cli.VN_TZ),  # Sunday
+    )
+
+    batch = json.loads(auto_state.read_text(encoding="utf-8"))["shorts_funnel_batch_2026-07-06"]
+    assert batch["long_videos"][0]["publish_at"] == "2026-07-12T20:30:00+07:00"
+    assert batch["short_videos"][0]["publish_at"] == "2026-07-13T06:00:00+07:00"
+    assert batch["short_videos"][1]["publish_at"] == "2026-07-13T20:30:00+07:00"
+
+
 def test_cmd_run_schedules_before_processing(tmp_path, monkeypatch):
     auto_state = tmp_path / "auto_state.json"
     ledger = tmp_path / "ledger.md"
@@ -1101,7 +1145,7 @@ def test_cmd_run_schedules_before_processing(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "LEDGER_PATH", ledger)
     calls = []
 
-    def fake_process_next():
+    def fake_process_next(**_kwargs):
         calls.append(1)
         return False
 
@@ -1271,7 +1315,7 @@ def test_process_next_sends_progress_start_and_done(
         cli, "verify_youtube_video",
         lambda video_id: {
             "exists": True, "title": "T", "privacy_status": "private",
-            "publish_at": "2026-06-23T23:00:00Z",
+            "publish_at": "2026-06-24T23:00:00Z",
         },
     )
 
@@ -1281,8 +1325,8 @@ def test_process_next_sends_progress_start_and_done(
     # Assert — 2 tin tiến độ: bắt đầu + xong (kèm URL và vị trí trong queue)
     assert handled is True
     assert len(_capture_telegram) == 2
-    assert "🎬 [2/3] Bắt đầu 'b-video'" in _capture_telegram[0]
-    assert "✅ [2/3] 'b-video'" in _capture_telegram[1]
+    assert "🎬 [3/3] Bắt đầu 'c-video'" in _capture_telegram[0]
+    assert "✅ [3/3] 'c-video'" in _capture_telegram[1]
     assert "https://youtu.be/NEWID12345" in _capture_telegram[1]
 
 

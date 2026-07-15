@@ -25,7 +25,8 @@ Các lệnh:
   benchmark-local  Benchmark local AI stack và ghi JSON report
 
 Quy trình thường dùng:
-  ytb batch start -n 5 --type-of-vid long   # Claude Haiku viết, fail QA thì Sonnet sửa
+  ytb batch start -n 5 --type-of-vid long   # Claude mặc định viết kịch bản
+  ytb batch start -n 5 --type-of-vid long --llm codex  # dùng Codex CLI
   ytb doctor                # kiểm tra môi trường trước (shortcut top-level)
   ytb batch status          # xem còn video nào pending
   ytb batch run             # chạy 1 video, lặp lại lệnh này cho video kế
@@ -70,12 +71,13 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
     p_start = _sub(
         sub, "start",
         help="Sinh phần SÁNG TẠO (ideation + viết N kịch bản)",
-        description="Mặc định dùng Claude khi LLM_PROVIDER=claude (Haiku trước, QA fail thì Sonnet), "
+        description="Mặc định dùng Claude khi LLM_PROVIDER=claude; có thể chọn Claude hoặc Codex "
+        "bằng --llm-provider/--llm, "
         "hoặc local LLM provider khi cấu hình local/Ollama, để chọn chủ đề "
         "(chống trùng data/ledger.md), viết kịch bản đầy đủ cho N video vào "
         "scripts/<slug>.json, và đăng ký từng video vào assets/auto_state.json. "
         "Dùng --cloud nếu muốn gọi Claude legacy không qua local QA loop.\n\n"
-        "Luồng legacy chạy 1 phiên `claude -p` (TỐN TOKEN, mất nhiều phút, không có "
+        "Luồng legacy chạy 1 phiên CLI (TỐN TOKEN, mất nhiều phút, không có "
         "output real-time) yêu cầu Claude: chọn chủ đề (chống trùng data/ledger.md), "
         "viết kịch bản đầy đủ cho N video vào scripts/<slug>.json, và đăng ký từng "
         "video vào assets/auto_state.json để `ytb batch run --loop` sản xuất tiếp — "
@@ -101,6 +103,11 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
         "chủ đề/định hướng cụ thể (mặc định auto)",
     )
     p_start.add_argument(
+        "--llm-provider", "--llm", dest="llm_provider",
+        choices=["claude", "codex"], default=None,
+        help="LLM viết kịch bản: claude hoặc codex (mặc định theo LLM_PROVIDER).",
+    )
+    p_start.add_argument(
         "--idea",
         dest="type_of_rules",
         help="Alias dễ nhớ của --type-of-rules: ý tưởng/chủ đề/định hướng muốn đưa cho LLM",
@@ -123,7 +130,7 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
     )
     p_start.add_argument(
         "--local", action="store_true", default=False,
-        help="Ép dùng local LLM provider cho ideation, bỏ qua Claude Haiku/Sonnet",
+        help="Đã deprecated: luồng Ollama sinh kịch bản đã bị xoá; dùng --llm claude/codex",
     )
     p_start.add_argument(
         "--cloud", action="store_true", default=False,
@@ -159,14 +166,21 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
     )
     p_run.add_argument("--loop", action="store_true", help="Chạy hết queue, không chỉ 1 video")
     p_run.add_argument(
+        "--workers",
+        type=int,
+        choices=[1, 2],
+        default=1,
+        help="Số video chạy song song khi dùng --loop (tối đa 2, mặc định 1)",
+    )
+    p_run.add_argument(
         "--schedule",
         action="store_true",
         help="Tự gán publish_at cho video pending chưa có lịch trước khi chạy",
     )
     p_run.add_argument(
         "--schedule-slots",
-        default="11:30,20:30",
-        help="Các giờ publish trong ngày, cách nhau bằng dấu phẩy (mặc định 11:30,20:30 giờ VN)",
+        default="06:00,20:30",
+        help="Các giờ publish trong ngày, cách nhau bằng dấu phẩy (mặc định 06:00,20:30 giờ VN)",
     )
     p_run.add_argument(
         "--schedule-start-days",

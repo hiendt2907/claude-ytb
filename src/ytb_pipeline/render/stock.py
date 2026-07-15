@@ -20,6 +20,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from ..config.settings import settings
+from .asset_catalog import AssetCatalog
 
 CACHE_DIR = Path("assets/broll")
 SEARCH_URL = "https://api.pexels.com/videos/search"
@@ -56,7 +57,9 @@ def fetch_broll(query: str, *, min_duration: float = 0.0,
 
 def fetch_broll_variants(query: str, count: int, *, min_duration: float = 0.0,
                          landscape: bool = False,
-                         exclude: set[str] | None = None) -> list[Path]:
+                         exclude: set[str] | None = None,
+                         video_slug: str = "",
+                         role: str = "body") -> list[Path]:
     """Trả về tối đa `count` cảnh B-roll KHÁC NHAU cho cùng `query`.
 
     Dùng cho render-ai cắt cảnh trong một segment: mỗi beat một shot khác nhau
@@ -82,8 +85,12 @@ def fetch_broll_variants(query: str, count: int, *, min_duration: float = 0.0,
                           min_duration=min_duration, landscape=landscape)
 
     used = exclude if exclude is not None else set()
-    fresh = [l for l in links if l not in used]
-    chosen = (fresh + [l for l in links if l in used])[:count]  # hết link mới mới tái dùng
+    catalog = AssetCatalog()
+    # Catalog ranks new/low-use footage first; the existing per-video set remains
+    # a hard preference so one render does not repeat a shot before exhausting pool.
+    fresh = catalog.select_urls(links, excluded=used, role=role)
+    reused = catalog.select_urls([l for l in links if l in used], role=role)
+    chosen = (fresh + reused)[:count]  # hết link mới mới tái dùng
 
     # Chọn link xong mới tải: mỗi link → 1 file cache riêng (hash của link) nên
     # tải SONG SONG an toàn, không tranh chấp file. Thứ tự output giữ theo `chosen`.
@@ -96,8 +103,18 @@ def fetch_broll_variants(query: str, count: int, *, min_duration: float = 0.0,
         with ThreadPoolExecutor(max_workers=workers) as pool:
             list(pool.map(lambda t: _download(t[0], t[1]), missing))
 
-    for link, _ in targets:
+    orientation = "landscape" if landscape else "portrait"
+    for link, path in targets:
         used.add(link)
+        catalog.record_usage(
+            source_url=link,
+            local_path=path,
+            query=query,
+            orientation=orientation,
+            video_slug=video_slug,
+            role=role,
+            duration_sec=min_duration,
+        )
     return [path for _, path in targets]
 
 

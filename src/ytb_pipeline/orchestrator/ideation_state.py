@@ -13,6 +13,7 @@ from datetime import datetime
 from pathlib import Path
 
 from ..ideation.series import slugify
+from .state_io import locked_json_update
 
 LEDGER_HEADER = "# Ledger\n| Ngày | Slug | Tiêu đề | Stage | Status | URL / ghi chú |\n"
 
@@ -105,29 +106,34 @@ def unique_slug(base_slug: str, used_slugs: set[str], scripts_dir: Path) -> str:
 def write_local_batch_item(script_path: Path, payload: dict, args: argparse.Namespace) -> None:
     """Đăng ký 1 script mới vào auto_state.json + ghi ledger — fail nếu trùng slug."""
     cli = _cli()
-    data = json.loads(cli.AUTO_STATE_PATH.read_text(encoding="utf-8")) if cli.AUTO_STATE_PATH.exists() else {}
-    batch_key = sorted([k for k in data if k.startswith("shorts_funnel_batch_")])[-1:] or ["shorts_funnel_batch_local"]
-    batch_key = batch_key[0]
-    batch = data.setdefault(batch_key, {"long_videos": [], "short_videos": []})
-    key = "long_videos" if args.type_of_vid == "long" else "short_videos"
-    videos = batch.setdefault(key, [])
-    if any(v.get("slug") == script_path.stem for v in videos if isinstance(v, dict)):
-        raise SystemExit(f"✗ Trùng slug trong queue: {script_path.stem}. Dừng để tránh overwrite/rerun sai.")
-    day = max([int(v.get("day", 0)) for v in videos] or [0]) + 1
-    videos.append({
-        "day": day,
-        "slug": script_path.stem,
-        "topic": payload.get("topic", payload.get("title", script_path.stem)),
-        "orientation": "landscape" if args.type_of_vid == "long" else "portrait",
-        "render_provider": "ai",
-        "dry_run": cli.settings.dry_run,
-        "publish_at": cli.settings.youtube_publish_at,
-        "stage": "ideation",
-        "status": "ok",
-        "shorts_status": "queued",
-    })
-    cli.AUTO_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    cli.AUTO_STATE_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    with locked_json_update(cli.AUTO_STATE_PATH) as data:
+        batch_key = sorted([k for k in data if k.startswith("shorts_funnel_batch_")])[-1:] or ["shorts_funnel_batch_local"]
+        batch_key = batch_key[0]
+        batch = data.setdefault(batch_key, {"long_videos": [], "short_videos": []})
+        key = "long_videos" if args.type_of_vid == "long" else "short_videos"
+        videos = batch.setdefault(key, [])
+        if any(v.get("slug") == script_path.stem for v in videos if isinstance(v, dict)):
+            raise SystemExit(f"✗ Trùng slug trong queue: {script_path.stem}. Dừng để tránh overwrite/rerun sai.")
+        day = max([int(v.get("day", 0)) for v in videos] or [0]) + 1
+        videos.append({
+            "day": day,
+            "slug": script_path.stem,
+            "topic": payload.get("topic", payload.get("title", script_path.stem)),
+            "orientation": "landscape" if args.type_of_vid == "long" else "portrait",
+            "render_provider": "ai",
+            "dry_run": cli.settings.dry_run,
+            "publish_at": cli.settings.youtube_publish_at,
+            "stage": "ideation",
+            "status": "ok",
+            "shorts_status": "queued",
+            "series": payload.get("series", ""),
+            "content_pillar": payload.get("content_pillar", ""),
+            "core_mechanism": payload.get("core_mechanism", ""),
+            "audience_problem": payload.get("audience_problem", ""),
+            "long_form_slug": payload.get("long_form_slug", ""),
+            "playlist": payload.get("playlist", ""),
+            "cta_target": payload.get("cta_target", ""),
+        })
     cli.update_ledger(
         script_path.stem,
         payload.get("title", ""),

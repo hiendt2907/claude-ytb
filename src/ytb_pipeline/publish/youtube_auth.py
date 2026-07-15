@@ -25,6 +25,7 @@ class ReauthRequiredError(RuntimeError):
 YOUTUBE_SCOPES = [
     "https://www.googleapis.com/auth/youtube.upload",
     "https://www.googleapis.com/auth/youtube",
+    "https://www.googleapis.com/auth/yt-analytics.readonly",
 ]
 DRIVE_SCOPES = [
     "https://www.googleapis.com/auth/drive.file",  # chỉ đụng file do app tạo
@@ -37,6 +38,14 @@ def get_youtube_client(*, allow_interactive: bool = False):
         settings.youtube_token_file, YOUTUBE_SCOPES, allow_interactive=allow_interactive
     )
     return build("youtube", "v3", credentials=creds)
+
+
+def get_youtube_analytics_client(*, allow_interactive: bool = False):
+    """Authenticated Analytics API client, using the same brand-channel token."""
+    creds = _load_or_authorize(
+        settings.youtube_token_file, YOUTUBE_SCOPES, allow_interactive=allow_interactive
+    )
+    return build("youtubeAnalytics", "v2", credentials=creds)
 
 
 def get_drive_client(*, allow_interactive: bool = False):

@@ -187,6 +187,7 @@ def test_valid_clip_rejects_cached_segment_with_wrong_dimensions(monkeypatch, tm
 
 def test_fetch_broll_variants_tra_nhieu_shot_khac_nhau(monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "pexels_api_key", "k")
+    monkeypatch.setattr(settings, "asset_catalog_path", tmp_path / "catalog.json")
     monkeypatch.setattr(stock, "CACHE_DIR", tmp_path)
     monkeypatch.setattr(stock, "_search_links",
                         lambda q, key, **k: ["a", "b", "c"])
@@ -265,6 +266,7 @@ def test_broll_caption_clip_ep_duration_theo_audio(monkeypatch, tmp_path):
 def test_fetch_broll_variants_dedup_xuyen_video(monkeypatch, tmp_path):
     # Bộ đếm `exclude` cấp-video: lần gọi sau ưu tiên link CHƯA dùng -> chống lặp clip
     monkeypatch.setattr(settings, "pexels_api_key", "k")
+    monkeypatch.setattr(settings, "asset_catalog_path", tmp_path / "catalog.json")
     monkeypatch.setattr(stock, "CACHE_DIR", tmp_path)
     monkeypatch.setattr(stock, "_search_links",
                         lambda q, key, **k: ["a", "b", "c", "d"])
@@ -282,6 +284,7 @@ def test_fetch_broll_variants_dedup_xuyen_video(monkeypatch, tmp_path):
 def test_fetch_broll_variants_tai_dung_khi_het_link_moi(monkeypatch, tmp_path):
     # Hết link mới -> mới quay lại tái dùng link cũ (không crash, vẫn đủ count)
     monkeypatch.setattr(settings, "pexels_api_key", "k")
+    monkeypatch.setattr(settings, "asset_catalog_path", tmp_path / "catalog.json")
     monkeypatch.setattr(stock, "CACHE_DIR", tmp_path)
     monkeypatch.setattr(stock, "_search_links", lambda q, key, **k: ["a", "b"])
     monkeypatch.setattr(stock, "_download",

@@ -345,8 +345,18 @@ def _silence_mp3(seconds: float, out: Path) -> None:
 
 def _to_mp3(src: Path, dst: Path, *, tempo: float = 1.0) -> None:
     cmd = ["ffmpeg", "-y", "-i", str(src)]
+    # TTS providers commonly add encoder/trailing silence to every short
+    # phrase.  Because `_synth_segment` concatenates many phrases, that
+    # provider padding can dominate short scripts and trip the audio QA gate.
+    # Trim only silence at each provider file boundary; intentional pauses are
+    # generated separately by `_silence_mp3` and therefore remain intact.
+    filters = [
+        "silenceremove=start_periods=1:start_duration=0.05:start_threshold=-50dB:"
+        "stop_periods=1:stop_duration=0.12:stop_threshold=-50dB"
+    ]
     if abs(tempo - 1.0) > 0.001:
-        cmd += ["-filter:a", f"atempo={tempo:.3f}"]
+        filters.append(f"atempo={tempo:.3f}")
+    cmd += ["-filter:a", ",".join(filters)]
     cmd += ["-ar", "44100", "-ac", "2", "-b:a", "192k", str(dst)]
     subprocess.run(cmd, capture_output=True, check=True)
 

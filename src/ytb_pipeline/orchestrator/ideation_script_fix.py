@@ -14,6 +14,7 @@ from pathlib import Path
 from ..agents.base import AgentStatus
 from ..agents.qa_agent import QAAgent
 from ..ideation.generator import load_script
+from .state_io import atomic_write_json
 from .ideation_prompts import (
     SHORT_MAX_CHARS,
     SHORT_MIN_CHARS,
@@ -34,9 +35,18 @@ def json_from_llm(text: str) -> dict:
         return json.loads(raw)
     except json.JSONDecodeError:
         start = raw.find("{")
-        end = raw.rfind("}")
-        if start >= 0 and end > start:
-            return json.loads(raw[start:end + 1])
+        if start >= 0:
+            decoder = json.JSONDecoder()
+            try:
+                value, end = decoder.raw_decode(raw[start:])
+            except json.JSONDecodeError:
+                raise
+            trailing = raw[start + end:].strip()
+            # Một số CLI response kết thúc object bằng thêm một dấu `}`.
+            # Chỉ bỏ qua closing brace dư, không nuốt text lỗi tùy ý.
+            if trailing and set(trailing) != {"}"}:
+                raise
+            return value
         raise
 
 
@@ -146,10 +156,11 @@ async def validate_or_repair_script(
     log_path: Path | None = None,
     console_prefix: str = "",
     strict: bool = True,
+    semantic_history: list[str] | None = None,
 ) -> dict:
     """Write, validate, QA, and repair a local LLM script JSON with bounded retries."""
     qa = QAAgent()
-    done_topics = ledger_topics(ledger_text)
+    done_topics = ledger_topics(ledger_text) + list(semantic_history or [])
     current = dict(payload)
     last_validation_error: str | None = None
     last_qa_output: dict | None = None
@@ -226,6 +237,14 @@ async def validate_or_repair_script(
             "FINAL_FAILURE",
             f"validation={last_validation_error!r}\nqa={last_qa_output!r}",
         )
+    # Keep the rejected artifact and its exact QA evidence.  This means a
+    # batch restart cannot silently turn a terminal quality failure into work.
+    current["quality_status"] = "needs_review"
+    current["quality_review"] = {
+        "validation_error": last_validation_error,
+        "qa": last_qa_output,
+    }
+    atomic_write_json(script_path, current)
     raise SystemExit(
         "✗ LLM tạo script không qua QA sau "
         f"{max_attempts} lần. validation={last_validation_error!r} qa={last_qa_output!r}"

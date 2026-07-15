@@ -268,7 +268,7 @@ async def run_project(project: Project, checkpoint: CheckpointManager) -> Projec
     async def publish_fn(current: Project):
         video = rendered_for(current)
         print("[4/4] Publish   ▶  đang upload...")
-        publish_results = await publish_to_platforms(video)
+        publish_results = await publish_to_platforms(video, project_id=current.project_id)
         result = _primary_publish_result(publish_results)
         print(f"[4/4] Publish   ✓  uploaded={result.uploaded}")
 

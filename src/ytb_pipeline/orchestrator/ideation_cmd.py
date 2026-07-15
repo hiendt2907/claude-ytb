@@ -56,9 +56,6 @@ from .ideation_state import (
 )
 from .queue_manager import PIPELINE_LOG_DIR
 
-CLAUDE_HAIKU_MODEL = "haiku"
-CLAUDE_SONNET_MODEL = "sonnet"
-
 # Re-export tên cũ — giữ backward compat cho test/caller ngoài.
 _build_resume_prompt = build_resume_prompt
 _build_start_prompt = build_start_prompt
@@ -158,17 +155,17 @@ def _local_start_log_path() -> Path:
 class _ClaudeStartProvider:
     name = "claude"
 
-    def __init__(self, model: str):
+    def __init__(self, model: str | None = None):
         self._model = model
 
     def is_available(self):
         return shutil.which(_cli().settings.claude_bin) is not None
 
     def model_name(self):
-        return self._model
+        return self._model or "default"
 
     async def complete(self, prompt: str, **_kwargs) -> str:
-        cmd = build_claude_cmd(prompt, model=self._model)
+        cmd = build_claude_cmd(prompt, **({"model": self._model} if self._model else {}))
         return await asyncio.to_thread(self._invoke, cmd)
 
     def _invoke(self, cmd: list[str]) -> str:
@@ -183,10 +180,58 @@ class _ClaudeStartProvider:
         return result.stdout
 
 
+class _CodexStartProvider:
+    """Codex CLI provider cho structured script generation."""
+
+    name = "codex"
+
+    def __init__(self, model: str | None = None):
+        self._model = model
+
+    def is_available(self):
+        return shutil.which(_cli().settings.codex_bin) is not None
+
+    def model_name(self):
+        return self._model or "default"
+
+    async def complete(self, prompt: str, **_kwargs) -> str:
+        cmd = [
+            _cli().settings.codex_bin,
+            "exec",
+            "--full-auto",
+        ]
+        if self._model:
+            cmd += ["--model", self._model]
+        cmd.append(prompt)
+        return await asyncio.to_thread(self._invoke, cmd)
+
+    def _invoke(self, cmd: list[str]) -> str:
+        result = subprocess.run(
+            cmd,
+            cwd=_cli().ROOT,
+            capture_output=True,
+            text=True,
+            timeout=300,
+            check=True,
+        )
+        return result.stdout
+
+
+def _configured_script_provider(name: str):
+    if name == "claude":
+        return _ClaudeStartProvider()
+    if name == "codex":
+        return _CodexStartProvider()
+    return get_llm_provider(name)
+
+
 async def _cmd_start_local(args: argparse.Namespace) -> None:
+    from ..analytics.feedback import AnalyticsStore
     cli = _cli()
     provider = getattr(args, "_provider", None) or get_llm_provider()
-    strict_qa = getattr(args, "_strict_qa", getattr(provider, "name", "") == "claude")
+    # Quality gates are provider-independent: a valid script must meet the
+    # same channel standard whether it was drafted by Claude or Codex.
+    strict_qa = getattr(args, "_strict_qa", True)
     if not provider.is_available():
         raise SystemExit(
             f"✗ LLM provider `{provider.name}` chưa sẵn sàng. "
@@ -206,6 +251,7 @@ async def _cmd_start_local(args: argparse.Namespace) -> None:
     log_path = _local_start_log_path()
     used_slugs = ledger_slugs(ledger_text) | existing_queue_slugs(cli.AUTO_STATE_PATH)
     generated_summaries: list[str] = []
+    analytics_feedback = AnalyticsStore().feedback_summary()
 
     written: list[str] = []
     print(f"▶ Ideation: {args.num_of_vid} video ({args.type_of_vid}) bằng {provider.name}/{provider.model_name()}", flush=True)
@@ -220,6 +266,7 @@ async def _cmd_start_local(args: argparse.Namespace) -> None:
             args.type_of_rules,
             ledger_text,
             generated_summaries,
+            analytics_feedback,
         )
         print(f"{prefix} prompt: preparing request", flush=True)
         append_local_start_log(log_path, f"PROMPT {i}", prompt)
@@ -252,6 +299,7 @@ async def _cmd_start_local(args: argparse.Namespace) -> None:
             log_path=log_path,
             console_prefix=prefix,
             strict=strict_qa,
+            semantic_history=generated_summaries,
         )
         write_local_batch_item(script_path, payload, args)
         ledger_text += f"\n| local | {slug} | {payload.get('title', '')} | ideation | ok | LLM |\n"
@@ -277,26 +325,36 @@ def cmd_start(args: argparse.Namespace) -> None:
             raise SystemExit("✗ --clear-ledger không dùng cùng --resume; resume cần ledger cũ để tránh chạy nhầm.")
 
     if getattr(args, "local", False):
-        asyncio.run(_cmd_start_local(args))
-        return
+        raise SystemExit(
+            "✗ Luồng Ollama sinh kịch bản đã bị xoá. Dùng `--llm claude` hoặc `--llm codex`."
+        )
 
     if not getattr(args, "cloud", False):
+        requested_provider = getattr(args, "llm_provider", None)
+        if requested_provider in {"claude", "codex"}:
+            setattr(args, "_provider", _configured_script_provider(requested_provider))
+            setattr(args, "_strict_qa", True)
+            asyncio.run(_cmd_start_local(args))
+            return
+        if _cli().settings.llm_provider == "codex":
+            setattr(args, "_provider", _CodexStartProvider())
+            setattr(args, "_strict_qa", True)
+            asyncio.run(_cmd_start_local(args))
+            return
+        if _cli().settings.llm_provider == "ollama":
+            raise SystemExit("✗ Chỉ hỗ trợ Claude hoặc Codex để sinh kịch bản; Ollama đã bị xoá.")
         configured_provider = get_llm_provider()
         if getattr(configured_provider, "name", "") != "claude":
             setattr(args, "_provider", configured_provider)
             asyncio.run(_cmd_start_local(args))
             return
-        try:
-            setattr(args, "_provider", _ClaudeStartProvider(CLAUDE_HAIKU_MODEL))
-            setattr(args, "_strict_qa", True)
-            asyncio.run(_cmd_start_local(args))
-            return
-        except SystemExit as exc:
-            print(f"⚠ Claude Haiku chưa qua QA: {exc}. Thử lại bằng Sonnet...", flush=True)
-            setattr(args, "_provider", _ClaudeStartProvider(CLAUDE_SONNET_MODEL))
-            setattr(args, "_strict_qa", True)
-            asyncio.run(_cmd_start_local(args))
-            return
+        # Không ép Haiku/Sonnet: để CLI dùng model mặc định đã cấu hình trong
+        # Claude Code. Lỗi QA phải được báo nguyên nhân thật, không bị che bởi
+        # một lần gọi model thứ hai với tiêu chí khác.
+        setattr(args, "_provider", _ClaudeStartProvider())
+        setattr(args, "_strict_qa", True)
+        asyncio.run(_cmd_start_local(args))
+        return
 
     if args.resume:
         existing_count, existing_slugs = cli._count_pending_ideation(args.type_of_vid)

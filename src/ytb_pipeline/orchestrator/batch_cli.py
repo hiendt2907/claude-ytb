@@ -23,12 +23,14 @@ state điều khiển dừng graceful, và `main()`/argparse.
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 import shutil
 import signal
 import subprocess
 import sys
+import threading
 from datetime import datetime, time, timedelta, timezone
 from pathlib import Path
 
@@ -71,6 +73,7 @@ from .queue_manager import (
     QueueItem,
     current_running_slug,
     done_slugs,
+    failed_slugs,
     emit_warning,
     last_stage_for_slug,
     load_queue,
@@ -79,19 +82,25 @@ from .queue_manager import (
     tail_text,
     update_ledger,
 )
+from .state_io import locked_json_update
 
 # Subcommand nào ghi pid file (để `stop` tìm đúng process cần SIGTERM) — chỉ
 # những lệnh chạy lâu, lồng subprocess pipeline con (run/retry). `start` (gọi
 # Claude) và các lệnh đọc-only khác không cần.
 PID_TRACKED_COMMANDS = {"run", "retry"}
 VN_TZ = timezone(timedelta(hours=7))
-DEFAULT_SCHEDULE_SLOTS = "11:30,20:30"
+DEFAULT_SCHEDULE_SLOTS = "06:00,20:30"
+MAX_BATCH_WORKERS = 2
+WORKER_STATE_PATH = ROOT / "assets" / "batch_workers.json"
 
 # Tiến trình `python -m ytb_pipeline <script>` đang chạy lồng bên trong (nếu
 # có) — signal handler forward SIGTERM xuống đây để không bỏ orphan, và cờ
 # báo cho run_with_retry/process_next/cmd_run biết là dừng CHỦ ĐỘNG (không
 # phải lỗi) để không retry/không ghi cảnh báo trùng.
 _current_proc: subprocess.Popen | None = None
+_current_procs: dict[str, subprocess.Popen] = {}
+_queue_claim_lock = threading.Lock()
+_claimed_slugs: set[str] = set()
 _stop_requested = False
 
 
@@ -105,14 +114,19 @@ def _handle_stop_signal(signum, frame) -> None:  # noqa: ANN001 — chữ ký b�
     """
     global _stop_requested
     _stop_requested = True
-    if _current_proc is not None and _current_proc.poll() is None:
+    processes = list(_current_procs.values())
+    if not processes and _current_proc is not None:
+        processes = [_current_proc]
+    for proc in processes:
+        if proc.poll() is not None:
+            continue
         # killpg (không phải .terminate()) — `_current_proc` được spawn với
         # start_new_session=True nên là leader của 1 process group riêng, gồm cả
         # cháu sâu hơn 1 cấp như worker F5-TTS (.venv-tts/bin/python
         # scripts/f5_batch_worker.py) và ffmpeg do compose_ai.py gọi. .terminate()
         # chỉ kill đúng PID này, để lại các tiến trình cháu chạy mồ côi.
         try:
-            os.killpg(_current_proc.pid, signal.SIGTERM)
+            os.killpg(proc.pid, signal.SIGTERM)
         except ProcessLookupError:
             pass
 
@@ -164,11 +178,66 @@ def remove_pid_file() -> None:
 
 
 def cmd_status(args: argparse.Namespace) -> None:
+    for worker_id, state in worker_states().items():
+        slug = state.get("slug") or "-"
+        stage = state.get("stage") or "idle"
+        elapsed = worker_elapsed(state)
+        error = state.get("last_error") or "-"
+        print(f"worker {worker_id}: {slug}  stage={stage}  elapsed={elapsed}  last_error={error}")
     queue = load_queue()
     done = done_slugs()
     for item in queue:
         mark = "✓ done" if item.slug in done else "… pending"
         print(f"day {item.day:>2}  {mark:<10}  {item.slug}  (publish_at={item.publish_at})")
+
+
+def worker_states() -> dict[str, dict]:
+    if not WORKER_STATE_PATH.exists():
+        return {}
+    data = json.loads(WORKER_STATE_PATH.read_text(encoding="utf-8"))
+    return data if isinstance(data, dict) else {}
+
+
+def update_worker_state(
+    worker_id: int, *, slug: str, stage: str, last_error: str = "", started_at: str | None = None
+) -> None:
+    with locked_json_update(WORKER_STATE_PATH) as data:
+        data[str(worker_id)] = {
+            "slug": slug,
+            "stage": stage,
+            "started_at": started_at or datetime.now().astimezone().isoformat(timespec="seconds"),
+            "last_error": last_error,
+        }
+
+
+def worker_elapsed(state: dict) -> str:
+    started_at = state.get("started_at")
+    if not started_at:
+        return "-"
+    try:
+        seconds = max(0, int((datetime.now().astimezone() - datetime.fromisoformat(started_at)).total_seconds()))
+    except ValueError:
+        return "?"
+    return f"{seconds // 60}m {seconds % 60}s"
+
+
+def select_pending_batch(
+    queue: list[QueueItem], blocked_slugs: set[str], *, worker_count: int
+) -> list[QueueItem]:
+    """Choose distinct pending items for one controlled worker wave.
+
+    The hard cap is intentional: rendering and local inference are expensive, and
+    P0 starts with at most two concurrent videos regardless of caller input.
+    """
+    limit = min(MAX_BATCH_WORKERS, max(1, worker_count))
+    selected: list[QueueItem] = []
+    for item in queue:
+        if item.slug in blocked_slugs:
+            continue
+        selected.append(item)
+        if len(selected) == limit:
+            break
+    return selected
 
 
 def _parse_schedule_slots(raw: str) -> list[time]:
@@ -202,9 +271,6 @@ def schedule_pending_videos(args: argparse.Namespace, *, now: datetime | None = 
     if not AUTO_STATE_PATH.exists():
         raise SystemExit(f"✗ Không tìm thấy queue: {AUTO_STATE_PATH}")
 
-    data = json.loads(AUTO_STATE_PATH.read_text(encoding="utf-8"))
-    batch_key = _latest_batch_key(data)
-    batch = data[batch_key]
     done = done_slugs()
     slots = _parse_schedule_slots(getattr(args, "schedule_slots", DEFAULT_SCHEDULE_SLOTS))
     start_days = getattr(args, "schedule_start_days", 1)
@@ -213,39 +279,68 @@ def schedule_pending_videos(args: argparse.Namespace, *, now: datetime | None = 
 
     base_now = now or datetime.now(VN_TZ)
     start_date = base_now.astimezone(VN_TZ).date() + timedelta(days=start_days)
-    videos = list(batch.get("long_videos", [])) + list(batch.get("short_videos", []))
-    pending = [
-        video
-        for video in sorted(videos, key=lambda v: int(v.get("day", 0)))
-        if video.get("slug") not in done and not str(video.get("publish_at", "")).strip()
-    ]
+    with locked_json_update(AUTO_STATE_PATH) as data:
+        batch_key = _latest_batch_key(data)
+        batch = data[batch_key]
+        def eligible(video: dict) -> bool:
+            return (
+                video.get("slug") not in done
+                and video.get("status", "ok") not in {"needs_review", "error"}
+                and video.get("quality_status") != "needs_review"
+                and video.get("assets_valid") is not False
+                and not str(video.get("publish_at", "")).strip()
+            )
 
-    for index, video in enumerate(pending):
-        slot = slots[index % len(slots)]
-        scheduled_date = start_date + timedelta(days=index // len(slots))
-        scheduled_at = datetime.combine(scheduled_date, slot, tzinfo=VN_TZ)
-        video["publish_at"] = scheduled_at.isoformat(timespec="seconds")
+        long_pending = [video for video in batch.get("long_videos", []) if eligible(video)]
+        short_pending = [
+            video
+            for video in sorted(batch.get("short_videos", []), key=lambda v: int(v.get("day", 0)))
+            if eligible(video)
+        ]
 
-    if pending:
-        AUTO_STATE_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        # Default channel policy: two Shorts Mon-Sat; one long-form every Sunday.
+        # An explicitly customised slot list retains the generic queue behaviour.
+        if getattr(args, "schedule_slots", DEFAULT_SCHEDULE_SLOTS) == DEFAULT_SCHEDULE_SLOTS:
+            sunday = start_date + timedelta(days=(6 - start_date.weekday()) % 7)
+            for video in long_pending:
+                video["publish_at"] = datetime.combine(sunday, slots[-1], tzinfo=VN_TZ).isoformat(timespec="seconds")
+                sunday += timedelta(days=7)
+            date_cursor = start_date
+            for index, video in enumerate(short_pending):
+                while date_cursor.weekday() == 6:
+                    date_cursor += timedelta(days=1)
+                slot = slots[index % len(slots)]
+                video["publish_at"] = datetime.combine(date_cursor, slot, tzinfo=VN_TZ).isoformat(timespec="seconds")
+                if index % len(slots) == len(slots) - 1:
+                    date_cursor += timedelta(days=1)
+        else:
+            pending = sorted(long_pending + short_pending, key=lambda v: int(v.get("day", 0)))
+            for index, video in enumerate(pending):
+                slot = slots[index % len(slots)]
+                scheduled_date = start_date + timedelta(days=index // len(slots))
+                video["publish_at"] = datetime.combine(scheduled_date, slot, tzinfo=VN_TZ).isoformat(timespec="seconds")
 
     slot_text = ",".join(f"{slot.hour:02d}:{slot.minute:02d}" for slot in slots)
-    print(f"✓ Đã schedule {len(pending)} video pending trong {batch_key} từ {start_date.isoformat()} (slots={slot_text}).")
-    return len(pending)
+    count = len(long_pending) + len(short_pending)
+    print(f"✓ Đã schedule {count} video pending trong {batch_key} từ {start_date.isoformat()} (slots={slot_text}).")
+    return count
 
 
 def cmd_run(args: argparse.Namespace) -> None:
     if getattr(args, "schedule", False):
         schedule_pending_videos(args)
+    worker_count = min(MAX_BATCH_WORKERS, max(1, getattr(args, "workers", 1)))
     while True:
-        processed = process_next()
+        slots = worker_count if args.loop else 1
+        with ThreadPoolExecutor(max_workers=slots, thread_name_prefix="ytb-batch") as executor:
+            processed = list(executor.map(lambda worker: process_next(worker_id=worker + 1), range(slots)))
         if _stop_requested:
             print(
                 "⏸ Đã dừng graceful theo yêu cầu (`ytb batch stop`) — chạy lại "
                 "`ytb batch run`/`run --loop` để tiếp tục đúng video đang dở."
             )
             break
-        if not processed or not args.loop:
+        if not any(processed) or not args.loop:
             break
 
 
@@ -336,23 +431,22 @@ def cmd_cancel(args: argparse.Namespace) -> None:
     if running == args.slug:
         print(f"✗ '{args.slug}' đang được xử lý. Dùng `ytb batch stop` trước rồi cancel.")
         return
-    data = json.loads(AUTO_STATE_PATH.read_text(encoding="utf-8"))
-    batch_keys = sorted(k for k in data if k.startswith("shorts_funnel_batch_"))
-    if not batch_keys:
-        print("✗ Không tìm thấy batch nào trong auto_state.json.")
-        return
-    bk = batch_keys[-1]
-    removed = False
-    for key in ("long_videos", "short_videos"):
-        videos = data[bk].get(key, [])
-        filtered = [v for v in videos if v["slug"] != args.slug]
-        if len(filtered) != len(videos):
-            data[bk][key] = filtered
-            removed = True
-    if not removed:
-        print(f"✗ Không tìm thấy slug '{args.slug}' trong queue (batch {bk}).")
-        return
-    AUTO_STATE_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    with locked_json_update(AUTO_STATE_PATH) as data:
+        batch_keys = sorted(k for k in data if k.startswith("shorts_funnel_batch_"))
+        if not batch_keys:
+            print("✗ Không tìm thấy batch nào trong auto_state.json.")
+            return
+        bk = batch_keys[-1]
+        removed = False
+        for key in ("long_videos", "short_videos"):
+            videos = data[bk].get(key, [])
+            filtered = [v for v in videos if v["slug"] != args.slug]
+            if len(filtered) != len(videos):
+                data[bk][key] = filtered
+                removed = True
+        if not removed:
+            print(f"✗ Không tìm thấy slug '{args.slug}' trong queue (batch {bk}).")
+            return
     update_ledger(args.slug, "", "cancel", "cancelled", "Huỷ thủ công qua `ytb batch cancel`")
     print(f"✓ Đã huỷ '{args.slug}' khỏi queue — ghi ledger (stage=cancel, status=cancelled).")
 

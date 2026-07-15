@@ -16,8 +16,8 @@ from ytb_pipeline.pkg.models import PublishResult, RenderedVideo
 
 def _valid_short_script() -> dict:
     chunk = (
-        "Não bộ không ra quyết định bằng khẩu hiệu. Nó so sánh chi phí, phần thưởng, "
-        "rủi ro mất mặt và tín hiệu xã hội trước khi ta kịp gọi đó là ý chí. "
+        "Vì sao ta trì hoãn? Ví dụ, khi Lan mở điện thoại ở bàn làm việc, cô chọn đọc "
+        "thông báo nên trễ việc. Lần tới bạn có thể đặt điện thoại ngoài bàn. "
     )
     sections = [
         {
@@ -25,9 +25,11 @@ def _valid_short_script() -> dict:
             "narration": (chunk * 2).strip(),
             "broll": "abstract decision making",
             "emphasis": ["cơ chế"],
+            "payoff": "Bạn nhìn ra tín hiệu nào đang kéo lựa chọn của mình.",
         }
         for i in range(4)
     ]
+    sections[-1]["narration"] += " Hãy đặt điện thoại ngoài bàn trong 10 phút tới."
     return {
         "slug": "co-che-test-local",
         "topic": "Cơ chế test local",
@@ -53,6 +55,7 @@ def test_settings_default_to_local_first_stack():
     assert settings.image_provider == "pillow"
     assert settings.video_provider == "pexels"
     assert settings.broll_strategy == "pexels"
+    assert settings.llm_provider == "claude"
 
 
 def test_ai_render_provider_requires_pexels_for_real_footage(monkeypatch):
@@ -178,7 +181,7 @@ def test_batch_start_local_prints_steps_and_writes_trace_log(tmp_path, monkeypat
         type_of_vid="short",
         type_of_rules="auto",
         resume=False,
-        local=True,
+        local=False,
         cloud=False,
     ))
 
@@ -241,7 +244,7 @@ def test_batch_start_local_can_clear_old_ledger_for_user_idea(tmp_path, monkeypa
         type_of_vid="short",
         type_of_rules="cơ chế xấu hổ",
         resume=False,
-        local=True,
+        local=False,
         cloud=False,
         clear_ledger=True,
     ))
@@ -270,7 +273,7 @@ def test_local_prompt_blocks_entertainment_for_current_channel_scope():
 
     assert "not entertainment" in prompt
     assert "Do NOT write comedy" in prompt
-    assert "stickman/người que" in prompt
+    assert "stickman/người que" not in prompt
     assert "real stock footage" in prompt
 
 
@@ -407,8 +410,9 @@ def test_batch_start_local_repairs_duplicate_title_without_overwrite(tmp_path, m
         type_of_vid="short",
         type_of_rules="làm về nội dung giải trí, người que",
         resume=False,
-        local=True,
+        local=False,
         cloud=False,
+        _strict_qa=False,  # This fixture tests slug repair for legacy entertainment data only.
     ))
 
     out = capsys.readouterr().out
@@ -580,7 +584,8 @@ def test_run_project_resume_publish_rehydrates_rendered_video(tmp_path, monkeypa
 
     seen: list[RenderedVideo] = []
 
-    async def fake_publish_to_platforms(video):
+    async def fake_publish_to_platforms(video, *, project_id=None):
+        assert project_id == "co-che-test-local"
         seen.append(video)
         return {"youtube_short": replace(PublishResult(**vars(video)), uploaded=False, url="manual://queued")}
 

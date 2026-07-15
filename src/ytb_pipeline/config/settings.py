@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     pause_segment_ms: int = 500     # nghỉ giữa các segment
 
     # Hiệu năng (tốc độ sản xuất) — chỉnh xuống 1 nếu gặp rate-limit/quá tải.
-    edge_tts_workers: int = 4        # số segment edge-tts tổng hợp SONG SONG
+    edge_tts_workers: int = 1        # tuần tự để tránh Edge TTS throttling; tăng có chủ đích
     broll_download_workers: int = 4  # số file B-roll Pexels tải SONG SONG
     # Preset x264: clip TRUNG GIAN (kenburns/bg/segment) bị re-encode lại ở bước
     # ghép cuối nên encode nhanh không đổi chất lượng output; file CUỐI giữ
@@ -58,6 +58,7 @@ class Settings(BaseSettings):
     drive_token_file: str = "secrets/drive_token.json"  # token Drive RIÊNG (tài khoản cá nhân)
     youtube_privacy: str = "private"   # private | unlisted | public
     youtube_category_id: str = "28"     # 28 = Science & Technology
+    youtube_playlist_id: str = ""       # playlist đích; rỗng = không tự gán
     # Lên lịch tự công khai: RFC3339 (vd 2026-06-17T06:00:00+0700). Khi đặt, video
     # giữ private tới mốc này rồi YouTube tự chuyển PUBLIC. Rỗng = không lên lịch.
     youtube_publish_at: str = ""
@@ -77,6 +78,8 @@ class Settings(BaseSettings):
     # Paths
     assets_dir: Path = Field(default=Path("assets"))
     output_dir: Path = Field(default=Path("assets/output"))
+    asset_catalog_path: Path = Field(default=Path("assets/asset_catalog.json"))
+    analytics_path: Path = Field(default=Path("assets/analytics.json"))
     # Checkpoint DAG: mỗi video 1 file <projects_dir>/<slug>/project.json —
     # resume skip node đã DONE (xem project/workflow.py).
     projects_dir: Path = Field(default=Path("assets/projects"))
@@ -95,6 +98,7 @@ class Settings(BaseSettings):
     # Listener — daemon nghe lệnh Telegram. Mỗi lệnh chạy 1 phiên `claude -p` MỚI
     # (không --continue/--resume) nên context luôn sạch = ý "/clear mỗi lệnh".
     claude_bin: str = "claude"
+    codex_bin: str = "codex"
     # Cờ thêm cho `claude -p`. Mặc định BYPASS quyền để daemon chạy tự trị không
     # bị chặn (user đã chủ động chọn). Để rỗng nếu muốn tự cấp quyền qua allowedTools.
     listener_claude_args: str = "--dangerously-skip-permissions"
@@ -104,7 +108,7 @@ class Settings(BaseSettings):
     listener_allow_shell: bool = True
 
     # LLM
-    llm_provider: str = "ollama"          # ollama | claude
+    llm_provider: str = "claude"          # claude | codex | ollama
     ollama_url: str = "http://127.0.0.1:11434"
     ollama_model: str = "qwen3:8b"
     ollama_coder_model: str = "qwen2.5-coder:7b"
@@ -123,14 +127,12 @@ class Settings(BaseSettings):
     def model_post_init(self, __context) -> None:  # noqa: ANN001
         """Make local-first the default even when legacy .env still names cloud providers.
 
-        Legacy LLM/TTS cloud providers still need ALLOW_CLOUD_PROVIDERS=true.
+        Legacy cloud TTS providers still need ALLOW_CLOUD_PROVIDERS=true.
         Pexels is the production video-footage path and is not downgraded to
         Pillow image-motion anymore.
         """
         if self.allow_cloud_providers:
             return
-        if self.llm_provider == "claude":
-            self.llm_provider = "ollama"
         if self.tts_provider in {"edge", "elevenlabs"}:
             self.tts_provider = "f5"
 

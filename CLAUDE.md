@@ -8,6 +8,14 @@
 
 ## Triết lý dự án (Repository Philosophy)
 
+## Tài liệu vận hành YouTube đã chốt
+
+- `docs/CHANNEL_GROWTH_PLAN.md` — kế hoạch phát triển kênh.
+- `docs/TOOL_UPGRADE_PLAN.md` — kế hoạch nâng cấp tool để thực hiện kế hoạch kênh.
+
+Codex và Claude phải đọc cả hai tài liệu trước khi tạo queue, viết kịch bản,
+thay đổi pipeline hoặc quyết định tăng sản lượng.
+
 `claude-ytb` đang chuyển từ **pipeline tự động hoá YouTube** thành
 **AI Native Creative Operating System** — một engine local-first chạy chủ
 yếu trên MacBook Pro M4, biến một creative intent (chủ đề, series, nhân vật

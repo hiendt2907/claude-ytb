@@ -38,6 +38,8 @@ TRANSIENT_ERROR_PATTERNS = [
     r"ConnectionError",
     r"timed out",
     r"Name or service not known",
+    r"NoAudioReceived",
+    r"No audio was received",
 ]
 
 # Marker print bởi pipeline.py khi BẮT ĐẦU mỗi khâu (khác marker "✓" khi xong) —
@@ -98,7 +100,10 @@ def log_path_for(slug: str, log_dir: Path = PIPELINE_LOG_DIR) -> Path:
 
 
 def run_pipeline_once(
-    item: QueueItem, script_path: Path | None = None, ledger_path: Path | None = None
+    item: QueueItem,
+    script_path: Path | None = None,
+    ledger_path: Path | None = None,
+    worker_id: int | None = None,
 ) -> subprocess.CompletedProcess:
     """Chạy `python -m ytb_pipeline scripts/<slug>.json` 1 lần, đồng bộ (blocking).
 
@@ -125,6 +130,8 @@ def run_pipeline_once(
     cli.update_ledger(
         item.slug, "", "running-ideation", "running", "Tự động: bắt đầu chạy pipeline", ledger_path=ledger_path
     )
+    if worker_id is not None:
+        cli.update_worker_state(worker_id, slug=item.slug, stage="running-ideation")
 
     proc = cli.subprocess.Popen(
         [sys.executable, "-m", "ytb_pipeline", str(script_path)],
@@ -137,6 +144,7 @@ def run_pipeline_once(
         start_new_session=True,  # leader process group riêng -> killpg dọn sạch cả cây con (F5 worker, ffmpeg)
     )
     cli._current_proc = proc
+    cli._current_procs[item.slug] = proc
     lines: list[str] = []
     last_stage = "running-ideation"
     try:
@@ -148,9 +156,12 @@ def run_pipeline_once(
                 stage = cli.detect_stage_marker(line)
                 if stage and stage != last_stage:
                     cli.update_ledger(item.slug, "", stage, "running", "Tự động: đang chạy", ledger_path=ledger_path)
+                    if worker_id is not None:
+                        cli.update_worker_state(worker_id, slug=item.slug, stage=stage)
                     last_stage = stage
         proc.wait()
     finally:
+        cli._current_procs.pop(item.slug, None)
         cli._current_proc = None
 
     if cli._stop_requested:
@@ -159,6 +170,8 @@ def run_pipeline_once(
             "Dừng graceful theo yêu cầu user (ytb batch stop) — chạy lại run/retry sẽ tự tiếp tục đúng video này.",
             ledger_path=ledger_path,
         )
+        if worker_id is not None:
+            cli.update_worker_state(worker_id, slug=item.slug, stage="stopped")
     return subprocess.CompletedProcess(args=proc.args, returncode=proc.returncode, stdout="".join(lines), stderr="")
 
 
@@ -168,6 +181,7 @@ def run_with_retry(
     sleep_fn=time.sleep,
     run_fn=None,
     ledger_path: Path | None = None,
+    worker_id: int | None = None,
 ) -> tuple[bool, str]:
     """Chạy pipeline cho 1 video; tự retry nếu lỗi tạm thời, tối đa len(backoff) lần.
 
@@ -184,7 +198,7 @@ def run_with_retry(
     attempt = 0
     last_output = ""
     while True:
-        result = run_fn(item, ledger_path=ledger_path)
+        result = run_fn(item, ledger_path=ledger_path, worker_id=worker_id)
         last_output = (result.stdout or "") + (result.stderr or "")
         if cli._stop_requested:
             return False, last_output
@@ -253,96 +267,117 @@ def check_schedule_drift(verified_publish_at: str | None, expected_publish_at: s
     return actual != expected
 
 
-def process_next(queue_path: Path | None = None, ledger_path: Path | None = None) -> bool:
+def process_next(
+    queue_path: Path | None = None, ledger_path: Path | None = None, *, worker_id: int | None = None
+) -> bool:
     """Chạy đúng 1 video kế tiếp trong queue: pipeline -> verify YouTube -> ledger.
 
     Trả True nếu đã xử lý 1 video (thành công hoặc thất bại đã ghi nhận),
     False nếu queue đã hết (không còn video pending) — caller dừng vòng lặp.
     """
     cli = _cli()
-    queue = cli.load_queue(queue_path)
-    done = cli.done_slugs(ledger_path)
-    item = cli.next_pending(queue, done)
-    if item is None:
-        print("✓ Queue đã hết — không còn video pending.")
-        return False
-
-    position = sum(1 for q in queue if q.slug in done) + 1
-    print(f"▶ Chạy video '{item.slug}' (day {item.day}, publish_at={item.publish_at})")
-    cli.notify_progress(
-        f"🎬 [{position}/{len(queue)}] Bắt đầu '{item.slug}' (publish_at={item.publish_at})"
-    )
-    ok, output = cli.run_with_retry(item, ledger_path=ledger_path)
-
-    if cli._stop_requested:
-        # run_pipeline_once đã ghi ledger status "stopped" cho slug này rồi —
-        # không ghi đè thành "error", chỉ báo caller (cmd_run) dừng vòng lặp.
-        return False
-
-    if not ok:
-        failed_stage = cli.last_stage_for_slug(item.slug, ledger_path).removeprefix("running-") or "ideation"
-        cli.update_ledger(
-            item.slug, "", failed_stage, "error",
-            "Tự động: thất bại, xem assets/batch_cli_warnings.log",
-            ledger_path=ledger_path,
-        )
-        return True
-
-    video_id = cli.extract_claimed_video_id(output)
-    if video_id is None:
-        cli.emit_warning(
-            f"Video '{item.slug}' chạy XONG (exit 0) nhưng không tìm thấy youtu.be/<id> "
-            f"trong stdout để xác minh — cần Claude kiểm tra log thủ công."
-        )
-        cli.update_ledger(
-            item.slug, "", "publish", "error",
-            "Pipeline exit 0 nhưng không có youtube_id trong stdout",
-            ledger_path=ledger_path,
-        )
-        return True
+    with cli._queue_claim_lock:
+        queue = cli.load_queue(queue_path)
+        done = cli.done_slugs(ledger_path)
+        failed = cli.failed_slugs(ledger_path)
+        item = cli.next_pending(queue, done | failed | cli._claimed_slugs)
+        if item is None:
+            print("✓ Queue đã hết — không còn video pending.")
+            return False
+        cli._claimed_slugs.add(item.slug)
 
     try:
-        verified = cli.verify_youtube_video(video_id)
-    except ReauthRequiredError as exc:
-        # youtube_auth đã tự bắn Telegram cảnh báo -- ở đây chỉ cần ghi ledger +
-        # dừng video này lại (không retry vô hạn), để batch tiếp tục slug khác.
+        if worker_id is not None:
+            cli.update_worker_state(worker_id, slug=item.slug, stage="running-ideation")
+        position = sum(1 for q in queue if q.slug in done or q.slug in failed) + 1
+        print(f"▶ Chạy video '{item.slug}' (day {item.day}, publish_at={item.publish_at})")
+        cli.notify_progress(
+            f"🎬 [{position}/{len(queue)}] Bắt đầu '{item.slug}' (publish_at={item.publish_at})"
+        )
+        ok, output = cli.run_with_retry(item, ledger_path=ledger_path, worker_id=worker_id)
+
+        if cli._stop_requested:
+            # run_pipeline_once đã ghi ledger status "stopped" cho slug này rồi —
+            # không ghi đè thành "error", chỉ báo caller (cmd_run) dừng vòng lặp.
+            return False
+
+        if not ok:
+            if worker_id is not None:
+                cli.update_worker_state(worker_id, slug=item.slug, stage="error", last_error=output[-500:])
+            failed_stage = cli.last_stage_for_slug(item.slug, ledger_path).removeprefix("running-") or "ideation"
+            cli.update_ledger(
+                item.slug, "", failed_stage, "error",
+                "Tự động: thất bại, xem assets/batch_cli_warnings.log",
+                ledger_path=ledger_path,
+            )
+            return True
+
+        video_id = cli.extract_claimed_video_id(output)
+        if video_id is None:
+            if worker_id is not None:
+                cli.update_worker_state(worker_id, slug=item.slug, stage="error", last_error="missing youtube_id")
+            cli.emit_warning(
+                f"Video '{item.slug}' chạy XONG (exit 0) nhưng không tìm thấy youtu.be/<id> "
+                f"trong stdout để xác minh — cần Claude kiểm tra log thủ công."
+            )
+            cli.update_ledger(
+                item.slug, "", "publish", "error",
+                "Pipeline exit 0 nhưng không có youtube_id trong stdout",
+                ledger_path=ledger_path,
+            )
+            return True
+
+        try:
+            verified = cli.verify_youtube_video(video_id)
+        except ReauthRequiredError as exc:
+            if worker_id is not None:
+                cli.update_worker_state(worker_id, slug=item.slug, stage="error", last_error=str(exc))
+            # youtube_auth đã tự bắn Telegram cảnh báo -- ở đây chỉ cần ghi ledger +
+            # dừng video này lại (không retry vô hạn), để batch tiếp tục slug khác.
+            cli.update_ledger(
+                item.slug, "", "publish", "error",
+                f"Không xác minh được qua API -- cần `ytb auth`: {exc}",
+                ledger_path=ledger_path,
+            )
+            return True
+        if not verified.get("exists"):
+            if worker_id is not None:
+                cli.update_worker_state(worker_id, slug=item.slug, stage="error", last_error="youtube_id not verified")
+            cli.emit_warning(
+                f"Video '{item.slug}' — pipeline tự báo ID {video_id} nhưng YouTube API "
+                f"KHÔNG xác nhận video này tồn tại. Cần Claude kiểm tra lại."
+            )
+            cli.update_ledger(
+                item.slug, "", "publish", "error",
+                f"youtube_id {video_id} không xác minh được qua API",
+                ledger_path=ledger_path,
+            )
+            return True
+
+        if cli.check_schedule_drift(verified.get("publish_at"), item.publish_at):
+            cli.emit_warning(
+                f"Video '{item.slug}' (https://youtu.be/{video_id}) lệch lịch publish: "
+                f"thật={verified.get('publish_at')} vs kế hoạch={item.publish_at} trong auto_state.json. "
+                f"KHÔNG tự sửa lịch — cần Claude xác nhận với user."
+            )
+
         cli.update_ledger(
-            item.slug, "", "publish", "error",
-            f"Không xác minh được qua API -- cần `ytb auth`: {exc}",
+            item.slug,
+            verified.get("title", ""),
+            "done",
+            "ok",
+            f"https://youtu.be/{video_id} — verified qua YouTube API "
+            f"(privacy={verified.get('privacy_status')}, publishAt={verified.get('publish_at')}).",
             ledger_path=ledger_path,
         )
+        print(f"✓ Video '{item.slug}' done — https://youtu.be/{video_id}")
+        cli.notify_progress(
+            f"✅ [{position}/{len(queue)}] '{item.slug}' đã lên YouTube: https://youtu.be/{video_id}\n"
+            f"privacy={verified.get('privacy_status')}, publishAt={verified.get('publish_at')}"
+        )
+        if worker_id is not None:
+            cli.update_worker_state(worker_id, slug=item.slug, stage="done")
         return True
-    if not verified.get("exists"):
-        cli.emit_warning(
-            f"Video '{item.slug}' — pipeline tự báo ID {video_id} nhưng YouTube API "
-            f"KHÔNG xác nhận video này tồn tại. Cần Claude kiểm tra lại."
-        )
-        cli.update_ledger(
-            item.slug, "", "publish", "error",
-            f"youtube_id {video_id} không xác minh được qua API",
-            ledger_path=ledger_path,
-        )
-        return True
-
-    if cli.check_schedule_drift(verified.get("publish_at"), item.publish_at):
-        cli.emit_warning(
-            f"Video '{item.slug}' (https://youtu.be/{video_id}) lệch lịch publish: "
-            f"thật={verified.get('publish_at')} vs kế hoạch={item.publish_at} trong auto_state.json. "
-            f"KHÔNG tự sửa lịch — cần Claude xác nhận với user."
-        )
-
-    cli.update_ledger(
-        item.slug,
-        verified.get("title", ""),
-        "done",
-        "ok",
-        f"https://youtu.be/{video_id} — verified qua YouTube API "
-        f"(privacy={verified.get('privacy_status')}, publishAt={verified.get('publish_at')}).",
-        ledger_path=ledger_path,
-    )
-    print(f"✓ Video '{item.slug}' done — https://youtu.be/{video_id}")
-    cli.notify_progress(
-        f"✅ [{position}/{len(queue)}] '{item.slug}' đã lên YouTube: https://youtu.be/{video_id}\n"
-        f"privacy={verified.get('privacy_status')}, publishAt={verified.get('publish_at')}"
-    )
-    return True
+    finally:
+        with cli._queue_claim_lock:
+            cli._claimed_slugs.discard(item.slug)

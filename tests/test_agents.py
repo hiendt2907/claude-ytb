@@ -477,7 +477,7 @@ async def test_qa_agent_studies_show_with_source_no_warning():
     assert not any(w["rule"] == "sourced_claims" for w in result.output["warnings"])
 
 
-async def test_qa_agent_rejects_stickman_news_reader_voice():
+async def test_qa_agent_does_not_apply_legacy_stickman_gate():
     agent = QAAgent()
     script = Script(
         topic="giải trí người que",
@@ -498,10 +498,9 @@ async def test_qa_agent_rejects_stickman_news_reader_voice():
 
     result = await agent.run({"script": script})
 
-    assert result.output["passed"] is False
+    assert result.output["passed"] is True
     rules = [v["rule"] for v in result.output["violations"]]
-    assert "entertainment_voice" in rules
-    assert "entertainment_visual_action" in rules
+    assert not any(rule.startswith("entertainment_") for rule in rules)
 
 
 async def test_qa_agent_accepts_stickman_visual_gag_structure():
@@ -563,6 +562,80 @@ async def test_qa_agent_series_dedup_flags_done_topic():
     assert result.output["passed"] is False
     rules = [v["rule"] for v in result.output["violations"]]
     assert "series_dedup" in rules
+
+
+async def test_strict_qa_requires_a_complete_concrete_example():
+    agent = QAAgent()
+    script = _make_script(
+        narration_segments=["Ví dụ, một người trì hoãn việc khó mỗi ngày. " + chars_for_minutes(1.0)],
+    )
+
+    result = await agent.run({"script": script, "strict": True})
+
+    rules = [v["rule"] for v in result.output["violations"]]
+    assert "concrete_example" in rules
+    violation = next(v for v in result.output["violations"] if v["rule"] == "concrete_example")
+    assert "suggestion" in violation
+
+
+async def test_strict_qa_rejects_missing_immediate_action_and_final_payoff():
+    agent = QAAgent()
+    script = _make_script(
+        narration_segments=[
+            "Ví dụ, khi Lan mở điện thoại ở bàn làm việc, cô chọn đọc thông báo nên bị trễ việc; "
+            "vì vậy lần tới bạn có thể đặt điện thoại ngoài bàn trước khi bắt đầu. " + chars_for_minutes(1.0),
+        ],
+    )
+
+    result = await agent.run({"script": script, "strict": True})
+
+    rules = [v["rule"] for v in result.output["violations"]]
+    assert "immediate_action" in rules
+    assert "final_payoff" in rules
+
+
+async def test_strict_qa_blocks_absolute_health_or_finance_claim():
+    agent = QAAgent()
+    script = _make_script(
+        narration_segments=["Cách này chắc chắn chữa khỏi lo âu cho mọi người. " + chars_for_minutes(1.0)],
+    )
+
+    result = await agent.run({"script": script, "strict": True})
+
+    rules = [v["rule"] for v in result.output["violations"]]
+    assert "health_finance_claim" in rules
+    assert result.output["passed"] is False
+
+
+async def test_qa_agent_semantic_dedup_flags_near_duplicate_topic():
+    agent = QAAgent()
+    script = _make_script(
+        topic="Mất 100 nghìn đau hơn nhặt được 100 nghìn",
+        title="Vì sao mất 100 nghìn đau hơn nhặt được 100 nghìn",
+    )
+
+    result = await agent.run({
+        "script": script,
+        "done_topics": ["Mất một trăm nghìn đau hơn có thêm một trăm nghìn"],
+    })
+
+    rules = [v["rule"] for v in result.output["violations"]]
+    assert "series_semantic_dedup" in rules
+
+
+async def test_strict_qa_rejects_multiple_competing_mechanisms():
+    agent = QAAgent()
+    script = _make_script(
+        narration_segments=[
+            "Vì sao bạn trì hoãn? Ví dụ, khi Lan mở điện thoại ở bàn làm việc, cô chọn đọc thông báo nên trễ việc; "
+            "lần tới bạn có thể đặt điện thoại ngoài bàn. Cơ chế né mơ hồ giải thích điều này, nhưng cơ chế so sánh xã hội "
+            "và cơ chế thiên kiến xác nhận cũng là trọng tâm. Hãy đặt điện thoại ngoài bàn ngay hôm nay. " + chars_for_minutes(1.0),
+        ],
+    )
+
+    result = await agent.run({"script": script, "strict": True})
+
+    assert "central_mechanism" in [v["rule"] for v in result.output["violations"]]
 
 
 async def test_qa_agent_handles_exception_gracefully():

@@ -27,33 +27,12 @@ from pathlib import Path
 from ..config.settings import settings
 from ..pkg.models import PublishResult, RenderedVideo
 from ..platform.metadata import MetadataAdapter
+from .validation import validate_monetization_ready
 
 # YouTube cho phép Short tới 3 phút (180s) từ 10/2024; short của pipeline nhắm 1–2 phút.
 SHORT_MAX_SEC = 180
 HASHTAG_LIMIT = 12
 YOUTUBE_TAG_LIMIT = 30
-DISCOVERY_TAGS = (
-    "giải trí",
-    "giai tri",
-    "hài hước",
-    "hai huoc",
-    "video hài",
-    "short hài",
-    "shorts hài",
-    "viral shorts",
-    "meme việt",
-    "meme viet",
-)
-STICKMAN_DISCOVERY_TAGS = (
-    "người que",
-    "nguoi que",
-    "stickman",
-    "hoạt hình",
-    "hoat hinh",
-    "hoạt hình vui",
-    "animation",
-    "funny stickman",
-)
 
 _metadata_adapter = MetadataAdapter()
 
@@ -80,6 +59,8 @@ def publish(video: RenderedVideo, platform: str = "youtube_short") -> PublishRes
 
     if settings.dry_run:
         return _dry_run(video)
+
+    validate_monetization_ready(video)
 
     if video.video_path is None or not video.video_path.exists():
         raise FileNotFoundError(f"Không tìm thấy file video: {video.video_path}")
@@ -132,6 +113,7 @@ def publish(video: RenderedVideo, platform: str = "youtube_short") -> PublishRes
     print(f"  ✓ Đã upload: https://youtu.be/{youtube_id}")
 
     _set_thumbnail(youtube, youtube_id, video)
+    _add_to_playlist(youtube, youtube_id)
 
     return replace(
         PublishResult(**vars(video)),
@@ -176,14 +158,10 @@ def _to_hashtag(tag: str) -> str:
 
 
 def _build_seo_tags(video: RenderedVideo, is_short: bool) -> list[str]:
-    """Tags gửi vào YouTube snippet: giữ tag script + bổ sung từ khóa khám phá an toàn."""
+    """Tags gửi vào YouTube snippet: chỉ giữ từ khóa được script xác nhận."""
     seeds: list[str] = list(video.tags)
-    haystack = " ".join([video.title, video.description, *video.tags]).lower()
     if is_short:
         seeds.extend(("shorts", "youtube shorts"))
-    seeds.extend(DISCOVERY_TAGS)
-    if any(word in haystack for word in ("người que", "nguoi que", "stickman")):
-        seeds.extend(STICKMAN_DISCOVERY_TAGS)
 
     tags: list[str] = []
     seen: set[str] = set()
@@ -234,6 +212,16 @@ def _set_thumbnail(youtube, youtube_id: str, video: RenderedVideo) -> None:
         print("  ✓ Đã đặt thumbnail")
     except Exception as exc:  # noqa: BLE001
         print(f"  ⚠ Không đặt được thumbnail (kênh cần verify?): {exc}")
+
+
+def _add_to_playlist(youtube, youtube_id: str) -> None:  # noqa: ANN001
+    if not settings.youtube_playlist_id:
+        return
+    youtube.playlistItems().insert(
+        part="snippet",
+        body={"snippet": {"playlistId": settings.youtube_playlist_id,
+                           "resourceId": {"kind": "youtube#video", "videoId": youtube_id}}},
+    ).execute()
 
 
 def _dry_run(video: RenderedVideo) -> PublishResult:

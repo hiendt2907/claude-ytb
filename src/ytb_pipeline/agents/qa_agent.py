@@ -6,7 +6,8 @@ compliance) trên dữ liệu script đã có trong context (không cần file),
 nguồn) + dedup theo `context["done_topics"]`.
 
 `passed=False` => downstream agent KHÔNG được chạy tiếp (enforced bởi caller,
-agent này chỉ báo cáo).
+agent này chỉ báo cáo). QA không phân loại hay áp luật riêng cho format hình
+ảnh/giải trí; các script được kiểm tra theo cùng một hợp đồng nội dung.
 """
 
 from __future__ import annotations
@@ -54,53 +55,15 @@ _CONCRETE_EXAMPLE_HINTS = (
     "một người",
     "khi bạn",
 )
-_ENTERTAINMENT_HINTS = (
-    "giải trí",
-    "giai tri",
-    "người que",
-    "nguoi que",
-    "stickman",
-    "hài",
-    "hai",
-    "comedy",
-)
-_NEWSY_EXPLAINER_PHRASES = (
-    "nghiên cứu cho thấy",
-    "cơ chế",
-    "phát triển bản thân",
-    "bài học",
-    "điều này cho thấy",
-    "chúng ta sẽ",
-    "hôm nay chúng ta",
-    "mục tiêu là",
-    "theo các chuyên gia",
-)
-_ACTION_VERBS = (
-    "chạy", "ngã", "rơi", "đập", "né", "đuổi", "lao", "trượt", "va",
-    "đẩy", "kéo", "ném", "bật", "giật", "đóng", "mở", "nhảy", "té",
-    "vấp", "hoảng", "đứng hình", "quay lại", "nổ", "vỡ",
-)
-_ESCALATION_HINTS = (
-    "nhưng",
-    "bỗng",
-    "bất ngờ",
-    "càng",
-    "tưởng",
-    "lần nữa",
-    "leo thang",
-    "chưa kịp",
-)
-_PAYOFF_HINTS = (
-    "punchline",
-    "cú chốt",
-    "chốt",
-    "hóa ra",
-    "cuối cùng",
-    "lật kèo",
-    "twist",
-    "quê",
-    "đứng hình",
-    "phản ứng quá lố",
+_EXAMPLE_CONTEXT_HINTS = ("khi ", "lúc ", "trong ", "ở ", "một người", "lan ")
+_EXAMPLE_ACTION_HINTS = ("mở ", "đặt ", "tắt ", "viết ", "chọn ", "làm ", "bỏ ")
+_EXAMPLE_CONSEQUENCE_HINTS = ("nên ", "vì vậy", "kết quả", "hậu quả", "khiến", "dẫn đến", "bị ")
+_EXAMPLE_APPLICATION_HINTS = ("bạn có thể", "hãy thử", "lần tới", "áp dụng", "ngay hôm nay")
+_IMMEDIATE_ACTION_HINTS = ("hãy ", "thử ngay", "ngay hôm nay", "ngay bây giờ", "làm ngay")
+_ABSOLUTE_CLAIM_HINTS = ("chắc chắn", "đảm bảo", "100%", "luôn luôn", "mọi người")
+_HEALTH_FINANCE_HINTS = (
+    "chữa khỏi", "điều trị", "lo âu", "trầm cảm", "bệnh", "thuốc",
+    "lợi nhuận", "đầu tư", "giàu", "kiếm tiền", "tài chính",
 )
 
 
@@ -126,12 +89,15 @@ class QAAgent:
             violations.extend(_check_intro(script))
             violations.extend(_check_self_help(script))
             violations.extend(_check_dedup(script, context.get("done_topics")))
+            violations.extend(_check_absolute_health_finance_claims(script))
             if context.get("strict", False):
                 violations.extend(_check_hook_strength(script))
+                violations.extend(_check_central_mechanism(script))
                 violations.extend(_check_stage_direction_leak(script))
                 violations.extend(_check_knowledge_examples(script))
+                violations.extend(_check_immediate_action(script))
+                violations.extend(_check_final_payoff(script))
                 violations.extend(_check_pexels_queries(script))
-            violations.extend(_check_entertainment_retention(script))
             warnings.extend(_check_sourced_claims(script))
 
             return AgentResult(
@@ -283,6 +249,19 @@ def _check_hook_strength(script: Any) -> list[dict[str, str]]:
     return []
 
 
+def _check_central_mechanism(script: Any) -> list[dict[str, str]]:
+    """Keep each episode focused when the script explicitly names mechanisms."""
+    names = re.findall(r"cơ chế\s+([\wà-ỹ\s]{2,40}?)(?:[,.;:]|\s+(?:và|nhưng|cũng)\s)", _script_text(script).lower())
+    unique = {" ".join(name.split()) for name in names if name.strip()}
+    if len(unique) <= 1:
+        return []
+    return [_repair(
+        "central_mechanism",
+        f"Script đang nêu nhiều cơ chế cạnh tranh: {', '.join(sorted(unique)[:3])}.",
+        "Chọn một cơ chế làm trục; các khái niệm còn lại chỉ được dùng làm bối cảnh hoặc loại bỏ.",
+    )]
+
+
 def _check_stage_direction_leak(script: Any) -> list[dict[str, str]]:
     violations: list[dict[str, str]] = []
     for index, segment in enumerate(_segments_of(script), start=1):
@@ -298,16 +277,58 @@ def _check_stage_direction_leak(script: Any) -> list[dict[str, str]]:
 
 
 def _check_knowledge_examples(script: Any) -> list[dict[str, str]]:
-    if _is_entertainment_script(script):
-        return []
     text = _script_text(script).lower()
-    if not any(hint in text for hint in _CONCRETE_EXAMPLE_HINTS):
+    has_example = any(hint in text for hint in _CONCRETE_EXAMPLE_HINTS)
+    parts_present = (
+        any(hint in text for hint in _EXAMPLE_CONTEXT_HINTS),
+        any(hint in text for hint in _EXAMPLE_ACTION_HINTS),
+        any(hint in text for hint in _EXAMPLE_CONSEQUENCE_HINTS),
+        any(hint in text for hint in _EXAMPLE_APPLICATION_HINTS),
+    )
+    if not has_example or not all(parts_present):
         return [_repair(
             "concrete_example",
-            "Video chia sẻ/kiến thức thiếu ví dụ cụ thể để người xem bám vào.",
+            "Video thiếu ví dụ hoàn chỉnh (bối cảnh, hành động, hậu quả, cách áp dụng).",
             "Thêm ít nhất một ví dụ đời thường cụ thể: bối cảnh, hành động, hậu quả, và cách áp dụng.",
         )]
     return []
+
+
+def _check_immediate_action(script: Any) -> list[dict[str, str]]:
+    final_text = _narration_of(_segments_of(script)[-1]).lower() if _segments_of(script) else ""
+    if any(hint in final_text for hint in _IMMEDIATE_ACTION_HINTS):
+        return []
+    return [_repair(
+        "immediate_action",
+        "Phần chốt chưa có một hành động có thể làm ngay sau khi xem.",
+        "Kết bằng một mệnh lệnh nhỏ, cụ thể và làm được ngay, ví dụ 'Hãy đặt điện thoại ngoài bàn trong 10 phút tới'.",
+    )]
+
+
+def _check_final_payoff(script: Any) -> list[dict[str, str]]:
+    segments = _segments_of(script)
+    if segments and str(_get(segments[-1], "payoff", "") or "").strip():
+        return []
+    return [_repair(
+        "final_payoff",
+        "Section cuối thiếu payoff nêu rõ người xem nhận được gì khi áp dụng.",
+        "Điền field payoff ở section cuối bằng kết quả cụ thể, thay vì chỉ dừng ở lời khuyên.",
+    )]
+
+
+def _check_absolute_health_finance_claims(script: Any) -> list[dict[str, str]]:
+    violations: list[dict[str, str]] = []
+    for segment in _segments_of(script):
+        text = _narration_of(segment).lower()
+        if any(hint in text for hint in _HEALTH_FINANCE_HINTS) and any(
+            hint in text for hint in _ABSOLUTE_CLAIM_HINTS
+        ):
+            violations.append(_repair(
+                "health_finance_claim",
+                "Phát hiện tuyên bố y tế/tài chính tuyệt đối hoặc áp dụng cho mọi người.",
+                "Bỏ cam kết chắc chắn; nêu giới hạn, nguồn đáng tin và khuyến khích hỏi chuyên gia phù hợp.",
+            ))
+    return violations
 
 
 def _segment_query(segment: Any) -> str:
@@ -342,69 +363,6 @@ def _check_sourced_claims(script: Any) -> list[dict[str, str]]:
                         "detail": f"Cụm '{phrase}' không kèm nguồn rõ ràng.",
                     })
     return warnings
-
-
-def _check_entertainment_retention(script: Any) -> list[dict[str, str]]:
-    """Gate riêng cho ý tưởng giải trí/người que: ưu tiên retention thay vì đọc báo."""
-    if not _is_entertainment_script(script):
-        return []
-
-    segments = _segments_of(script)
-    text = _script_text(script)
-    text_lower = text.lower()
-    violations: list[dict[str, str]] = []
-
-    newsy = [phrase for phrase in _NEWSY_EXPLAINER_PHRASES if phrase in text_lower]
-    if newsy:
-        violations.append({
-            "rule": "entertainment_voice",
-            "detail": (
-                "Ý tưởng giải trí/người que không được viết như đọc báo/giải thích. "
-                f"Loại các cụm: {', '.join(newsy[:4])}."
-            ),
-        })
-
-    weak_broll = []
-    for idx, segment in enumerate(segments, start=1):
-        broll = str(_get(segment, "broll", "") or "").lower()
-        if not ("người que" in broll or "nguoi que" in broll or "stickman" in broll):
-            weak_broll.append(str(idx))
-            continue
-        if not any(verb in broll for verb in _ACTION_VERBS):
-            weak_broll.append(str(idx))
-    if weak_broll:
-        violations.append({
-            "rule": "entertainment_visual_action",
-            "detail": (
-                "Mỗi broll phải là một cảnh người que đang làm hành động cụ thể "
-                f"(không phải mô tả chung). Segment yếu: {', '.join(weak_broll)}."
-            ),
-        })
-
-    if not any(hint in text_lower for hint in _ESCALATION_HINTS):
-        violations.append({
-            "rule": "entertainment_escalation",
-            "detail": "Thiếu leo thang bất ngờ: phải có sự cố thứ hai làm tình huống tệ/hài hơn.",
-        })
-
-    tail = " ".join(_narration_of(seg) for seg in segments[-2:]).lower()
-    if not any(hint in tail for hint in _PAYOFF_HINTS):
-        violations.append({
-            "rule": "entertainment_payoff",
-            "detail": "Thiếu punchline/payoff ở đoạn cuối: cần cú chốt hình ảnh hoặc twist rõ.",
-        })
-
-    return violations
-
-
-def _is_entertainment_script(script: Any) -> bool:
-    metadata_text = " ".join([
-        str(_get(script, "topic", "") or ""),
-        str(_get(script, "title", "") or ""),
-        str(_get(script, "description", "") or ""),
-        " ".join(str(tag) for tag in (_get(script, "tags", ()) or ())),
-    ]).lower()
-    return any(hint in metadata_text for hint in _ENTERTAINMENT_HINTS)
 
 
 def _script_text(script: Any) -> str:
@@ -445,7 +403,33 @@ def _check_dedup(script: Any, done_topics: Any) -> list[dict[str, str]]:
                 "rule": "series_dedup",
                 "detail": f"Chủ đề/title '{candidate}' (slug={slug}) đã có trong done_topics.",
             }]
+        for done_topic in done_topics:
+            similarity = _topic_similarity(candidate, str(done_topic))
+            if similarity >= 0.55:
+                return [_repair(
+                    "series_semantic_dedup",
+                    f"Chủ đề/title '{candidate}' gần trùng '{done_topic}' (similarity={similarity:.2f}).",
+                    "Đổi sang một cơ chế tâm lý khác, không chỉ thay ví dụ hoặc cách diễn đạt của tập đã có.",
+                )]
     return []
+
+
+def _topic_similarity(left: str, right: str) -> float:
+    """Conservative lexical similarity for queue/ledger entries without an LLM call."""
+    normalized_left = _normalise_topic_numbers(series_mod.slugify(left))
+    normalized_right = _normalise_topic_numbers(series_mod.slugify(right))
+    left_tokens = {token for token in normalized_left.split("-") if len(token) > 1}
+    right_tokens = {token for token in normalized_right.split("-") if len(token) > 1}
+    if not left_tokens or not right_tokens:
+        return 0.0
+    overlap = left_tokens & right_tokens
+    if len(overlap) < 4:
+        return 0.0
+    return len(overlap) / len(left_tokens | right_tokens)
+
+
+def _normalise_topic_numbers(value: str) -> str:
+    return value.replace("mot-tram-nghin", "100-000").replace("100-nghin", "100-000")
 
 
 def _elapsed_ms(start: float) -> int:

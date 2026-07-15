@@ -62,6 +62,11 @@ daemon, `make listen-install`). Cổng duyệt kịch bản chỉ qua Telegram
 
 ## Ngách & series (định hướng nội dung)
 
+Hai tài liệu vận hành đã chốt và phải được đọc trước các task YouTube tương ứng:
+
+- `docs/CHANNEL_GROWTH_PLAN.md` — chiến lược phát triển kênh, nội dung, lịch và KPI.
+- `docs/TOOL_UPGRADE_PLAN.md` — backlog nâng cấp tool, quality gates và acceptance criteria.
+
 Kênh chạy theo **series một ngách xuyên suốt**: "**phát triển bản thân THẬT, không
 self-help**" — giải thích *cơ chế* con người (tâm lý/hành vi học ứng dụng + mental models),
 tiếng Việt, giọng kể ẩn danh. Long-form 10–12 phút = mỗi tập **một cơ chế**, cấu trúc 5 phần

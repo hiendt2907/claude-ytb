@@ -118,6 +118,24 @@ def test_to_mp3_applies_tempo_when_profile_needs_it(monkeypatch, tmp_path):
     assert any("atempo=" in part for part in calls[0])
 
 
+def test_to_mp3_trims_provider_boundary_silence(monkeypatch, tmp_path):
+    calls = []
+    src = tmp_path / "in.wav"
+    dst = tmp_path / "out.mp3"
+    src.write_bytes(b"wav")
+
+    class Result:
+        returncode = 0
+
+    monkeypatch.setattr(tts.subprocess, "run", lambda cmd, **kwargs: calls.append(cmd) or Result())
+
+    tts._to_mp3(src, dst)
+
+    filter_args = [part for part in calls[0] if isinstance(part, str) and "silenceremove=" in part]
+    assert filter_args
+    assert "stop_periods=1" in filter_args[0]
+
+
 def test_synth_all_edge_parallel_giu_thu_tu_voi_nhieu_worker(monkeypatch, tmp_path):
     # Arrange — 6 segment, 4 worker song song, synth giả ghi file + đo giả
     monkeypatch.setattr(tts, "AUDIO_DIR", tmp_path)

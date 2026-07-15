@@ -18,6 +18,7 @@ from datetime import datetime
 from pathlib import Path
 
 from ..notify import telegram
+from .state_io import locked_append_text
 
 ROOT = Path(__file__).resolve().parents[3]
 AUTO_STATE_PATH = ROOT / "assets" / "auto_state.json"
@@ -42,6 +43,13 @@ class QueueItem:
     publish_at: str
     shorts_status: str
     orientation: str = "landscape"
+    series: str = ""
+    content_pillar: str = ""
+    core_mechanism: str = ""
+    audience_problem: str = ""
+    long_form_slug: str = ""
+    playlist: str = ""
+    cta_target: str = ""
 
 
 def load_queue(auto_state_path: Path | None = None, batch_key: str | None = None) -> list[QueueItem]:
@@ -62,6 +70,13 @@ def load_queue(auto_state_path: Path | None = None, batch_key: str | None = None
             v.get("publish_at", ""),
             v.get("shorts_status", v.get("status", "queued")),
             v.get("orientation", "landscape"),
+            v.get("series", ""),
+            v.get("content_pillar", ""),
+            v.get("core_mechanism", ""),
+            v.get("audience_problem", ""),
+            v.get("long_form_slug", ""),
+            v.get("playlist", ""),
+            v.get("cta_target", ""),
         )
         for v in videos
     ]
@@ -86,6 +101,26 @@ def done_slugs(ledger_path: Path | None = None) -> set[str]:
         slug, stage, status = cols[1], cols[3], cols[4]
         slug_last[slug] = (stage, status)
     return {s for s, (stage, status) in slug_last.items() if stage == "done" and status == "ok"}
+
+
+def failed_slugs(ledger_path: Path | None = None) -> set[str]:
+    """Lấy slug có dòng cuối là lỗi terminal để batch loop bỏ qua.
+
+    Lỗi vẫn có thể chạy lại có chủ đích qua `ytb batch retry <slug>` hoặc sau
+    `ytb batch reset <slug>`. Không để `--loop` lặp vô hạn cùng một script hỏng.
+    """
+    ledger_path = ledger_path if ledger_path is not None else _cli().LEDGER_PATH
+    text = Path(ledger_path).read_text(encoding="utf-8")
+    slug_last: dict[str, tuple[str, str]] = {}
+    for line in text.splitlines():
+        if not line.strip().startswith("|"):
+            continue
+        cols = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cols) < 5 or cols[0] in ("Ngày", "---") or cols[0].startswith("---"):
+            continue
+        slug, stage, status = cols[1], cols[3], cols[4]
+        slug_last[slug] = (stage, status)
+    return {s for s, (_stage, status) in slug_last.items() if status == "error"}
 
 
 def next_pending(queue: list[QueueItem], done: set[str]) -> QueueItem | None:
@@ -128,8 +163,22 @@ def update_ledger(
     ledger_path = ledger_path if ledger_path is not None else _cli().LEDGER_PATH
     today = datetime.now().strftime("%Y-%m-%d")
     line = f"| {today} | {slug} | {title} | {stage} | {status} | {note} |\n"
-    with Path(ledger_path).open("a", encoding="utf-8") as f:
-        f.write(line)
+    locked_append_text(Path(ledger_path), line)
+
+
+def mark_needs_review(slug: str, reason: str, auto_state_path: Path | None = None) -> None:
+    """Persist terminal review state so an unsafe publish is never retried blindly."""
+    from .state_io import locked_json_update
+
+    path = auto_state_path if auto_state_path is not None else _cli().AUTO_STATE_PATH
+    with locked_json_update(Path(path)) as data:
+        for batch in data.values():
+            if not isinstance(batch, dict):
+                continue
+            for key in ("short_videos", "long_videos"):
+                for item in batch.get(key, []) or []:
+                    if isinstance(item, dict) and item.get("slug") == slug:
+                        item.update({"status": "needs_review", "shorts_status": "needs_review", "review_reason": reason})
 
 
 def emit_warning(message: str, *, log_path: Path | None = None) -> None:
