@@ -277,6 +277,20 @@ def test_local_prompt_blocks_entertainment_for_current_channel_scope():
     assert "real stock footage" in prompt
 
 
+def test_script_generation_system_prompt_enforces_title_topic_and_length_contract():
+    from ytb_pipeline.orchestrator.ideation_prompts import (
+        SCRIPT_GENERATION_SYSTEM_PROMPT,
+        SHORT_MAX_CHARS,
+        SHORT_MIN_CHARS,
+    )
+
+    assert f"{SHORT_MIN_CHARS}-{SHORT_MAX_CHARS}" in SCRIPT_GENERATION_SYSTEM_PROMPT
+    assert "Every spoken sentence must directly serve the declared title and topic" in SCRIPT_GENERATION_SYSTEM_PROMPT
+    assert "never pad length with generic filler" in SCRIPT_GENERATION_SYSTEM_PROMPT
+    assert "one mechanism" in SCRIPT_GENERATION_SYSTEM_PROMPT
+    assert "verify every factual, numerical, medical, financial, legal, or research claim" in SCRIPT_GENERATION_SYSTEM_PROMPT
+
+
 def test_batch_start_local_repairs_script_before_queueing(tmp_path, monkeypatch):
     from ytb_pipeline.orchestrator import batch_cli as cli
     from ytb_pipeline.orchestrator import ideation_cmd
