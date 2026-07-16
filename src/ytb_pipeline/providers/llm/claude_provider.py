@@ -15,7 +15,9 @@ from ...claude_cli import build_claude_cmd
 from ...config.settings import settings
 from ..errors import ProviderUnavailableError
 
-_SUBPROCESS_TIMEOUT_SEC = 120
+# Editorial repair carries the complete system contract plus a full script JSON.
+# Claude CLI can legitimately take longer than the former two-minute ceiling.
+_SUBPROCESS_TIMEOUT_SEC = 360
 
 
 class ClaudeProvider:
