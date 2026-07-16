@@ -7,11 +7,11 @@ trong checkpoint (resume), và dừng + raise `WorkflowError` khi 1 node fail.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Awaitable, Callable
 
 from .checkpoint import CheckpointManager
-from .models import Project
+from .models import Project, ProjectStatus
 
 
 @dataclass(frozen=True)
@@ -104,6 +104,12 @@ class WorkflowGraph:
 
             output_ref, output_data = _normalize_node_output(output)
             current = self.checkpoint.mark_done(current, node_id, output_ref, output_data)
+            self.checkpoint.save(current)
+
+        if "publish" in self.nodes and all(
+            self.checkpoint.is_done(current, node_id) for node_id in self.nodes
+        ):
+            current = replace(current, status=ProjectStatus.PUBLISHED)
             self.checkpoint.save(current)
 
         return current
