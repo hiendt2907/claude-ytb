@@ -286,12 +286,17 @@ def test_local_prompt_blocks_entertainment_for_current_channel_scope():
 
 def test_script_generation_system_prompt_enforces_title_topic_and_length_contract():
     from ytb_pipeline.orchestrator.ideation_prompts import (
+        LONG_MAX_CHARS,
+        LONG_MIN_CHARS,
         SCRIPT_GENERATION_SYSTEM_PROMPT,
         SHORT_MAX_CHARS,
         SHORT_MIN_CHARS,
     )
 
     assert f"{SHORT_MIN_CHARS}-{SHORT_MAX_CHARS}" in SCRIPT_GENERATION_SYSTEM_PROMPT
+    assert f"{LONG_MIN_CHARS}-{LONG_MAX_CHARS}" in SCRIPT_GENERATION_SYSTEM_PROMPT
+    assert "1.0-1.5 minutes" in SCRIPT_GENERATION_SYSTEM_PROMPT
+    assert "12-15 minutes" in SCRIPT_GENERATION_SYSTEM_PROMPT
     assert "Every spoken sentence must directly serve the declared title and topic" in SCRIPT_GENERATION_SYSTEM_PROMPT
     assert "never pad length with generic filler" in SCRIPT_GENERATION_SYSTEM_PROMPT
     assert "one mechanism" in SCRIPT_GENERATION_SYSTEM_PROMPT

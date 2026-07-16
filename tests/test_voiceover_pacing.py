@@ -118,6 +118,25 @@ def test_to_mp3_applies_tempo_when_profile_needs_it(monkeypatch, tmp_path):
     assert any("atempo=" in part for part in calls[0])
 
 
+def test_f5_tempo_matches_each_edge_profile_speed():
+    for profile in (
+        tts.VOICE_NEUTRAL,
+        tts.VOICE_ENTERTAINMENT,
+        tts.VOICE_KNOWLEDGE,
+        tts.VOICE_INSPIRING,
+    ):
+        edge_multiplier = 1 + tts._edge_rate_pct(profile.edge_rate) / 100
+        assert profile.f5_tempo == edge_multiplier
+
+
+def test_f5_segment_cache_key_includes_tempo(monkeypatch):
+    monkeypatch.setattr(tts.settings, "tts_provider", "f5")
+
+    path = tts._segment_audio_path("demo", tts.VOICE_KNOWLEDGE, 0)
+
+    assert "f5x1.96" in path.name
+
+
 def test_to_mp3_trims_provider_boundary_silence(monkeypatch, tmp_path):
     calls = []
     src = tmp_path / "in.wav"

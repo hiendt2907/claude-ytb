@@ -29,14 +29,14 @@ def test_short_qua_ngan_bi_chan(write_script):
 
 
 def test_short_qua_dai_bi_chan(write_script):
-    # ~1.5 phút nội dung không khai báo target -> vượt khung Short (< 1.2 phút)
-    path = write_script(make_script(_section(chars_for_minutes(1.5))))
+    # >1.5 phút nội dung không khai báo target -> vượt khung Short.
+    path = write_script(make_script(_section(chars_for_minutes(1.51))))
     with pytest.raises(ValueError, match="quá dài"):
         load_script(path)
 
 
 def test_short_trong_khoang_thi_qua(write_script):
-    # ~1.0 phút -> nằm trong (0.8, 1.2) phút, không raise
+    # ~1.0 phút -> nằm trong [1.0, 1.5] phút, không raise.
     path = write_script(make_script(_section(chars_for_minutes(1.0))))
     assert load_script(path).segments
 
@@ -55,6 +55,14 @@ def test_video_dai_du_day_thi_qua(write_script):
     path = write_script(make_script(_section(full), target_minutes=12))
     script = load_script(path)
     assert estimate_minutes(script.segments) >= 12
+
+
+def test_video_dai_vuot_15_phut_bi_chan(write_script):
+    narration = "Mến chào các bạn, " + chars_for_minutes(15.1)
+    path = write_script(make_script(_section(narration), target_minutes=12))
+
+    with pytest.raises(ValueError, match="quá dài"):
+        load_script(path)
 
 
 def test_target_ngoai_khoang_bi_chan(write_script):
