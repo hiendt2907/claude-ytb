@@ -7,6 +7,35 @@ from ytb_pipeline.pkg.models import Segment, Voiceover
 from ytb_pipeline.render import compose_ai, stock
 
 
+def test_download_enforces_total_deadline_for_trickling_cdn_response(monkeypatch, tmp_path):
+    """A CDN that keeps sending tiny chunks must not hold a batch worker forever."""
+    dest = tmp_path / "broll.mp4"
+    ticks = iter((0.0, 0.0, 5.0))
+
+    class SlowResponse:
+        headers = {"Content-Length": "2"}
+
+        def read(self, size):  # pragma: no cover - exercised through _download
+            assert size > 0
+            return b"x"
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    monkeypatch.setattr(stock, "_DOWNLOAD_DEADLINE_SEC", 2)
+    monkeypatch.setattr(stock.time, "monotonic", lambda: next(ticks))
+    monkeypatch.setattr(stock.urllib.request, "urlopen", lambda *args, **kwargs: SlowResponse())
+
+    with pytest.raises(OSError, match="sau 1 lần thử"):
+        stock._download("https://cdn.example.test/video.mp4", dest, retries=1)
+
+    assert not dest.exists()
+    assert not dest.with_suffix(".mp4.part").exists()
+
+
 def test_best_file_uu_tien_video_doc_gan_muc_tieu():
     # Arrange — 1 file ngang nhỏ, 1 file dọc gần 1080x1920
     files = [
