@@ -16,7 +16,10 @@ import re
 import subprocess
 import tempfile
 from collections import deque
+from contextlib import contextmanager
+import fcntl
 from pathlib import Path
+from typing import Iterator
 
 ROOT = Path(__file__).resolve().parents[3]
 F5_BATCH_WORKER = ROOT / "scripts" / "f5_batch_worker.py"
@@ -30,6 +33,7 @@ F5_CKPT = ROOT / "models" / "vivoice" / "model_last.pt"
 F5_VOCAB = ROOT / "models" / "vivoice" / "config.json"
 F5_MODEL_ARCH = "F5TTS_Base"  # kiến trúc nền của bản fine-tune Việt
 F5_DEVICE = "mps"  # GPU Apple Silicon; đổi "cpu" nếu máy khác
+F5_MPS_LOCK = ROOT / "assets" / ".f5-mps.lock"
 
 F5_REF_AUDIO = ROOT / "assets" / "ref" / "narrator.wav"
 F5_REF_TEXT_FILE = ROOT / "assets" / "ref" / "narrator.txt"
@@ -142,6 +146,23 @@ def synthesize_f5(text: str, out_path: Path) -> None:
             p.unlink(missing_ok=True)
 
 
+@contextmanager
+def f5_device_lock(lock_path: Path = F5_MPS_LOCK) -> Iterator[None]:
+    """Reserve the one Apple MPS device while an F5 model is loaded.
+
+    Each F5 worker loads a 5.4 GB checkpoint. Concurrent processes on one MPS
+    device heavily contend and turn a batch into an apparent stall, so this is
+    deliberately a cross-process lock rather than an in-memory mutex.
+    """
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a+") as lock_file:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+
 def run_batch(jobs: list[dict]) -> None:
     """Sinh NHIỀU đoạn trong MỘT process F5 — nạp model 1 lần cho cả tập.
 
@@ -180,20 +201,21 @@ def run_batch(jobs: list[dict]) -> None:
     # PYTHONHASHSEED hợp lệ để tiến trình con của torch không "Fatal Python error".
     env = {**os.environ, "PYTHONHASHSEED": "0"}
     try:
-        proc = subprocess.Popen(
-            [str(F5_PYTHON), str(F5_BATCH_WORKER), str(manifest_path)],
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=env,
-        )
-        tail: deque[str] = deque(maxlen=80)
-        for line in proc.stdout:  # stream tiến độ từng job
-            line = line.rstrip()
-            tail.append(line)
-            if line.startswith("JOB ") or line.startswith("[f5-batch]"):
-                print(f"    {line}", flush=True)
-        code = proc.wait()
-        if code != 0:
-            details = "\n".join(tail)
-            raise RuntimeError(f"F5 batch worker lỗi (code {code}):\n{details}")
+        with f5_device_lock():
+            proc = subprocess.Popen(
+                [str(F5_PYTHON), str(F5_BATCH_WORKER), str(manifest_path)],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=env,
+            )
+            tail: deque[str] = deque(maxlen=80)
+            for line in proc.stdout:  # stream tiến độ từng job
+                line = line.rstrip()
+                tail.append(line)
+                if line.startswith("JOB ") or line.startswith("[f5-batch]"):
+                    print(f"    {line}", flush=True)
+            code = proc.wait()
+            if code != 0:
+                details = "\n".join(tail)
+                raise RuntimeError(f"F5 batch worker lỗi (code {code}):\n{details}")
     finally:
         manifest_path.unlink(missing_ok=True)
 
