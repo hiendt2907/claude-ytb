@@ -115,3 +115,11 @@ def test_json_parser_accepts_one_trailing_closing_brace():
     from ytb_pipeline.orchestrator.ideation_script_fix import json_from_llm
 
     assert json_from_llm('{"slug":"demo"}}') == {"slug": "demo"}
+
+
+def test_json_parser_accepts_prose_wrapped_fenced_json():
+    from ytb_pipeline.orchestrator.ideation_script_fix import json_from_llm
+
+    response = 'Đây là JSON đã sửa:\n\n```json\n{"slug":"demo"}\n```'
+
+    assert json_from_llm(response) == {"slug": "demo"}
