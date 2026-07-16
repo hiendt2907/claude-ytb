@@ -130,6 +130,15 @@ def test_repair_prompt_requires_a_concrete_narrated_example():
     assert "hậu quả" in prompt
 
 
+def test_repair_prompt_requires_an_immediate_action_in_final_narration():
+    from ytb_pipeline.orchestrator.ideation_prompts import repair_prompt
+
+    prompt = repair_prompt({}, {"passed": False}, None)
+
+    assert "final narration section" in prompt
+    assert '"Hãy "' in prompt
+
+
 def test_json_parser_accepts_one_trailing_closing_brace():
     from ytb_pipeline.orchestrator.ideation_script_fix import json_from_llm
 
