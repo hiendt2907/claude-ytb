@@ -44,6 +44,43 @@ def test_cmd_run_starts_at_most_two_controlled_workers(monkeypatch):
     assert len(calls) == 4
 
 
+def test_cmd_run_refills_finished_worker_without_waiting_for_slow_worker(monkeypatch):
+    """Worker rảnh phải nhận việc mới trước khi worker khác hoàn tất wave cũ."""
+    slow_started = threading.Event()
+    release_slow_worker = threading.Event()
+    fast_worker_refilled = threading.Event()
+    scheduler_finished = threading.Event()
+    calls_by_worker: dict[int, int] = {}
+
+    def fake_process_next(*, worker_id: int, **_kwargs) -> bool:
+        calls_by_worker[worker_id] = calls_by_worker.get(worker_id, 0) + 1
+        call_number = calls_by_worker[worker_id]
+        if worker_id == 1 and call_number == 1:
+            slow_started.set()
+            assert release_slow_worker.wait(timeout=1)
+            return True
+        if worker_id == 2 and call_number == 1:
+            return True
+        if worker_id == 2 and call_number == 2:
+            fast_worker_refilled.set()
+        return False
+
+    monkeypatch.setattr(cli, "process_next", fake_process_next)
+    cli._stop_requested = False
+    runner = threading.Thread(
+        target=lambda: (cli.cmd_run(argparse.Namespace(loop=True, workers=2, schedule=False)), scheduler_finished.set()),
+    )
+    runner.start()
+
+    try:
+        assert slow_started.wait(timeout=1)
+        assert fast_worker_refilled.wait(timeout=0.3)
+    finally:
+        release_slow_worker.set()
+        assert scheduler_finished.wait(timeout=1)
+        runner.join(timeout=1)
+
+
 def test_parallel_process_next_claims_each_slug_once(tmp_path, monkeypatch):
     queue_path = tmp_path / "auto_state.json"
     queue_path.write_text(json.dumps({
