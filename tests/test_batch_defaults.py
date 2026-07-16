@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -81,6 +82,25 @@ def test_codex_batch_provider_uses_exec_json_prompt(monkeypatch):
         "codex", "exec", "--full-auto", "editorial contract\n\nUser task:\nwrite JSON"
     ]
     assert provider.model_name() == "default"
+
+
+def test_codex_batch_provider_reads_only_last_message_file(monkeypatch):
+    """Codex startup logs must never be mixed into a JSON script response."""
+    from ytb_pipeline.orchestrator import ideation_cmd
+
+    monkeypatch.setattr(ideation_cmd, "_cli", lambda: type("CLI", (), {
+        "settings": type("Settings", (), {"codex_bin": "codex"})(),
+        "ROOT": ".",
+    })())
+
+    def fake_run(cmd, **_kwargs):
+        output_index = cmd.index("--output-last-message") + 1
+        Path(cmd[output_index]).write_text('{"slug":"clean"}', encoding="utf-8")
+        return type("Result", (), {"stdout": "noisy startup logs\n{wrong json}"})()
+
+    monkeypatch.setattr(ideation_cmd.subprocess, "run", fake_run)
+
+    assert ideation_cmd._CodexStartProvider()._invoke(["codex", "exec", "prompt"]) == '{"slug":"clean"}'
 
 
 def test_batch_start_rejects_ollama_script_provider(monkeypatch):
