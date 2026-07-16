@@ -492,6 +492,46 @@ def test_local_short_normalizer_never_pads_too_short_script_with_template_text()
 
 
 @pytest.mark.asyncio
+async def test_undersized_short_is_rewritten_by_llm_instead_of_padded(tmp_path):
+    from ytb_pipeline.orchestrator.ideation_script_fix import validate_or_repair_script
+
+    undersized = _valid_short_script()
+    undersized["sections"] = [
+        {
+            "caption": "Hook",
+            "narration": "Hà mở sổ để ghi lại quyết định vừa rồi.",
+            "broll": "person writing in notebook at desk",
+            "emphasis": ["quyết định"],
+            "payoff": "Nhìn lại quyết định rõ hơn.",
+        }
+    ]
+    rewritten = _valid_short_script()
+
+    class RepairingLLM:
+        calls = 0
+
+        async def complete(self, *_args, **_kwargs):
+            self.calls += 1
+            return json.dumps(rewritten, ensure_ascii=False)
+
+    provider = RepairingLLM()
+    script_path = tmp_path / "co-che-test-local.json"
+
+    result = await validate_or_repair_script(
+        provider,
+        undersized,
+        script_path,
+        ledger_text="",
+        max_attempts=2,
+        strict=False,
+    )
+
+    assert provider.calls == 1
+    assert result["sections"] == rewritten["sections"]
+    assert "mở laptop để làm việc" not in script_path.read_text(encoding="utf-8")
+
+
+@pytest.mark.asyncio
 async def test_manual_export_provider_creates_queue_package(tmp_path, monkeypatch):
     from ytb_pipeline.platform.profiles import Platform, get_profile
     from ytb_pipeline.providers.registry import get_publish_provider

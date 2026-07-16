@@ -121,25 +121,8 @@ def normalize_short_narration(payload: dict) -> tuple[dict, str | None]:
             section["narration"] = section["voiceover"]
             remaining -= len(section["voiceover"])
         changed = True
-    elif total < SHORT_MIN_CHARS:
-        needed = min(SHORT_TARGET_CHARS - total, SHORT_MAX_CHARS - total)
-        idx = 0
-        fillers = (
-            " Ví dụ cụ thể: bạn mở laptop để làm việc, nhưng chỉ cần nhìn thấy một nhiệm vụ hơi khó là tay tự động với sang điện thoại.",
-            " Cơ chế nằm ở chỗ não không né công việc, nó né cảm giác mơ hồ và nguy cơ làm sai trong vài giây đầu.",
-            " Cách áp dụng là thu nhỏ bước đầu tiên đến mức không còn đáng sợ: chỉ mở file, viết một dòng nháp, rồi mới quyết định làm tiếp.",
-        )
-        while needed > 0 and sections:
-            addition = fillers[idx % len(fillers)]
-            if len(addition) > needed:
-                addition = trim_to_sentence(addition, needed)
-            sections[idx % len(sections)]["voiceover"] = (
-                str(sections[idx % len(sections)].get("voiceover") or sections[idx % len(sections)].get("narration", "")).rstrip() + addition
-            ).strip()
-            sections[idx % len(sections)]["narration"] = sections[idx % len(sections)]["voiceover"]
-            needed -= len(addition)
-            idx += 1
-        changed = True
+    # Script thiếu độ dài phải đi qua vòng repair LLM bên dưới caller. Không được
+    # bơm câu mẫu: nó có thể đúng độ dài nhưng sai hoàn toàn title/topic.
 
     if not changed:
         return payload, None
