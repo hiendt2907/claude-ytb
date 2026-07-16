@@ -328,6 +328,34 @@ def test_verify_youtube_video_not_found(monkeypatch):
     assert result == {"exists": False}
 
 
+def test_verify_youtube_video_applies_short_transport_timeout(monkeypatch):
+    class _FakeVideosList:
+        def execute(self):
+            return {"items": []}
+
+    class _FakeHttp:
+        timeout = 60
+
+    class _FakeYoutube:
+        def __init__(self):
+            self._http = type("AuthorizedHttp", (), {"http": _FakeHttp()})()
+
+        def videos(self):
+            return self
+
+        def list(self, **kwargs):
+            return _FakeVideosList()
+
+    youtube = _FakeYoutube()
+    monkeypatch.setattr(
+        "ytb_pipeline.publish.youtube_auth.get_youtube_client", lambda: youtube
+    )
+
+    cli.verify_youtube_video("does-not-exist")
+
+    assert youtube._http.http.timeout == cli.YOUTUBE_VERIFY_TIMEOUT_SEC
+
+
 # ── check_schedule_drift ──────────────────────────────────────────────────────
 def test_check_schedule_drift_detects_mismatch():
     # Lệch 1 ngày — đúng tình huống thật đã gặp với video #2 batch này.
@@ -609,6 +637,28 @@ def test_process_next_records_error_when_reauth_required(auto_state_file, ledger
     content = ledger_file.read_text(encoding="utf-8")
     assert "b-video" in content and "publish | error" in content
     assert "ytb auth" in content
+
+
+def test_process_next_records_verify_network_error_without_stalling_worker(
+    auto_state_file, ledger_file, monkeypatch, _capture_telegram
+):
+    monkeypatch.setattr(
+        cli, "run_with_retry",
+        lambda item, **kw: (True, "✓ Đã upload: https://youtu.be/NEWID12345"),
+    )
+
+    def boom(video_id):
+        raise OSError("YouTube API timed out")
+
+    monkeypatch.setattr(cli, "verify_youtube_video", boom)
+
+    handled = cli.process_next(queue_path=auto_state_file, ledger_path=ledger_file)
+
+    assert handled is True
+    content = ledger_file.read_text(encoding="utf-8")
+    assert "b-video" in content and "publish | error" in content
+    assert "https://youtu.be/NEWID12345" in content
+    assert any("không xác minh được" in message for message in _capture_telegram)
 
 
 # ── cmd_doctor --notify ────────────────────────────────────────────────────────

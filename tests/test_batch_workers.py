@@ -81,6 +81,24 @@ def test_cmd_run_refills_finished_worker_without_waiting_for_slow_worker(monkeyp
         runner.join(timeout=1)
 
 
+def test_cmd_run_keeps_other_worker_running_when_one_future_crashes(monkeypatch):
+    calls_by_worker: dict[int, int] = {}
+
+    def fake_process_next(*, worker_id: int, **_kwargs) -> bool:
+        calls_by_worker[worker_id] = calls_by_worker.get(worker_id, 0) + 1
+        if worker_id == 1:
+            raise OSError("verify transport failed")
+        return calls_by_worker[worker_id] == 1
+
+    monkeypatch.setattr(cli, "process_next", fake_process_next)
+    cli._stop_requested = False
+
+    cli.cmd_run(argparse.Namespace(loop=True, workers=2, schedule=False))
+
+    assert calls_by_worker[1] == 1
+    assert calls_by_worker[2] == 2
+
+
 def test_parallel_process_next_claims_each_slug_once(tmp_path, monkeypatch):
     queue_path = tmp_path / "auto_state.json"
     queue_path.write_text(json.dumps({
