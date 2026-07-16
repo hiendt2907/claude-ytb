@@ -81,7 +81,7 @@ def test_cmd_run_refills_finished_worker_without_waiting_for_slow_worker(monkeyp
         runner.join(timeout=1)
 
 
-def test_cmd_run_keeps_other_worker_running_when_one_future_crashes(monkeypatch):
+def test_cmd_run_keeps_other_worker_running_when_one_future_crashes(tmp_path, monkeypatch):
     calls_by_worker: dict[int, int] = {}
 
     def fake_process_next(*, worker_id: int, **_kwargs) -> bool:
@@ -91,6 +91,7 @@ def test_cmd_run_keeps_other_worker_running_when_one_future_crashes(monkeypatch)
         return calls_by_worker[worker_id] == 1
 
     monkeypatch.setattr(cli, "process_next", fake_process_next)
+    monkeypatch.setattr(cli, "WORKER_STATE_PATH", tmp_path / "batch_workers.json")
     cli._stop_requested = False
 
     cli.cmd_run(argparse.Namespace(loop=True, workers=2, schedule=False))
