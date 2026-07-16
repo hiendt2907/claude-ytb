@@ -40,16 +40,20 @@ async def test_health_script_is_not_sent_to_legacy_entertainment_gate():
 def test_claude_batch_provider_uses_cli_default_model(monkeypatch):
     from ytb_pipeline.orchestrator import ideation_cmd
 
-    captured: list[list[str]] = []
-    monkeypatch.setattr(ideation_cmd, "build_claude_cmd", lambda prompt, **kwargs: captured.append(kwargs) or ["claude"])
+    captured: list[tuple[str, dict]] = []
+    monkeypatch.setattr(
+        ideation_cmd,
+        "build_claude_cmd",
+        lambda prompt, **kwargs: captured.append((prompt, kwargs)) or ["claude"],
+    )
 
     provider = ideation_cmd._ClaudeStartProvider()
     provider._invoke = lambda cmd: "{}"
     import asyncio
 
-    asyncio.run(provider.complete("write JSON"))
+    asyncio.run(provider.complete("write JSON", system="editorial contract"))
 
-    assert captured == [{}]
+    assert captured == [("editorial contract\n\nUser task:\nwrite JSON", {})]
     assert provider.model_name() == "default"
 
 
@@ -71,9 +75,11 @@ def test_codex_batch_provider_uses_exec_json_prompt(monkeypatch):
     monkeypatch.setattr(ideation_cmd.subprocess, "run", fake_run)
 
     import asyncio
-    asyncio.run(provider.complete("write JSON"))
+    asyncio.run(provider.complete("write JSON", system="editorial contract"))
 
-    assert captured["cmd"] == ["codex", "exec", "--full-auto", "write JSON"]
+    assert captured["cmd"] == [
+        "codex", "exec", "--full-auto", "editorial contract\n\nUser task:\nwrite JSON"
+    ]
     assert provider.model_name() == "default"
 
 
