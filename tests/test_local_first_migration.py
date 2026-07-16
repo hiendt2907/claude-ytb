@@ -457,7 +457,7 @@ def test_local_short_normalizer_shrinks_overlong_repair():
     assert "Chào mừng các bạn" not in fixed["sections"][0]["narration"]
 
 
-def test_local_short_normalizer_pads_too_short_script():
+def test_local_short_normalizer_never_pads_too_short_script_with_template_text():
     from ytb_pipeline.orchestrator.ideation_cmd import (
         SHORT_MAX_CHARS,
         SHORT_MIN_CHARS,
@@ -481,10 +481,14 @@ def test_local_short_normalizer_pads_too_short_script():
         },
     ]
 
+    original_narration = [section["narration"] for section in payload["sections"]]
+
     fixed, note = _normalize_short_narration(payload)
 
-    assert note is not None
-    assert SHORT_MIN_CHARS < _short_narration_chars(fixed) < SHORT_MAX_CHARS
+    assert note is None
+    assert _short_narration_chars(fixed) < SHORT_MIN_CHARS
+    assert [section["narration"] for section in fixed["sections"]] == original_narration
+    assert "mở laptop để làm việc" not in " ".join(original_narration)
 
 
 @pytest.mark.asyncio
