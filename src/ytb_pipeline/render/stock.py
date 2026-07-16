@@ -13,6 +13,7 @@ from __future__ import annotations
 import hashlib
 import http.client
 import json
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -25,6 +26,11 @@ from .asset_catalog import AssetCatalog
 CACHE_DIR = Path("assets/broll")
 SEARCH_URL = "https://api.pexels.com/videos/search"
 _HTTP_TIMEOUT = 60
+# Socket timeout alone does not cap a response that keeps trickling bytes.  A
+# total deadline releases the batch worker so pipeline_runner can use its
+# existing bounded retry/checkpoint path.
+_DOWNLOAD_DEADLINE_SEC = 180
+_DOWNLOAD_CHUNK_BYTES = 64 * 1024
 _POOL_SIZE = 80  # pool link/query để dedup xuyên video (per_page tối đa của Pexels)
 PORTRAIT_WH = (1080, 1920)
 LANDSCAPE_WH = (1920, 1080)
@@ -196,13 +202,28 @@ def _download(url: str, dest: Path, *, retries: int = 3) -> None:
         tmp = dest.with_suffix(dest.suffix + ".part")
         try:
             with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT) as resp:
-                data = resp.read()
                 expected = resp.headers.get("Content-Length")
-                if expected is not None and len(data) != int(expected):
+                downloaded = 0
+                started_at = time.monotonic()
+                with tmp.open("wb") as output:
+                    while True:
+                        if time.monotonic() - started_at > _DOWNLOAD_DEADLINE_SEC:
+                            raise TimeoutError(
+                                f"tải B-roll quá {_DOWNLOAD_DEADLINE_SEC}s"
+                            )
+                        chunk = resp.read(_DOWNLOAD_CHUNK_BYTES)
+                        if not chunk:
+                            break
+                        output.write(chunk)
+                        downloaded += len(chunk)
+                        if time.monotonic() - started_at > _DOWNLOAD_DEADLINE_SEC:
+                            raise TimeoutError(
+                                f"tải B-roll quá {_DOWNLOAD_DEADLINE_SEC}s"
+                            )
+                if expected is not None and downloaded != int(expected):
                     raise OSError(
-                        f"tải thiếu: {len(data)}/{expected} bytes"
+                        f"tải thiếu: {downloaded}/{expected} bytes"
                     )
-            tmp.write_bytes(data)
             tmp.replace(dest)
             return
         except (urllib.error.URLError, OSError, http.client.IncompleteRead) as exc:
