@@ -7,8 +7,10 @@ Không chạy provider thật — chỉ test load/create project, reset node sta
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 
 from ytb_pipeline import pipeline
+from ytb_pipeline.pkg.models import PublishResult
 from ytb_pipeline.project.checkpoint import CheckpointManager
 from ytb_pipeline.project.models import NodeStatus, Project
 
@@ -141,6 +143,30 @@ def test_publish_summary_empty_when_no_publish_node(tmp_path):
 
     assert uploaded is False
     assert url is None
+
+
+def test_cleanup_after_success_keeps_other_render_workspace(tmp_path, monkeypatch):
+    """Backup của một worker không được xoá frame đang dùng bởi worker khác."""
+    monkeypatch.chdir(tmp_path)
+    frames = tmp_path / "assets/output/_frames_ai"
+    own_workspace = frames / "uploaded-video"
+    other_workspace = frames / "still-rendering"
+    own_workspace.mkdir(parents=True)
+    other_workspace.mkdir()
+    (own_workspace / "own-frame.png").write_bytes(b"frame")
+    (other_workspace / "concat-input.txt").write_text("in use", encoding="utf-8")
+
+    audio = tmp_path / "assets/audio/uploaded-video.mp3"
+    audio.parent.mkdir(parents=True)
+    audio.write_bytes(b"audio")
+    result = PublishResult(
+        topic="t", title="T", description="d", audio_path=Path("assets/audio/uploaded-video.mp3"),
+    )
+
+    pipeline._cleanup_after_success(result)
+
+    assert not own_workspace.exists()
+    assert (other_workspace / "concat-input.txt").exists()
 
 
 # ── cmd_reset xoá checkpoint ──────────────────────────────────────────────────
