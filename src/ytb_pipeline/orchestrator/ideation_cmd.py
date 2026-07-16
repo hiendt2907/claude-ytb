@@ -20,6 +20,7 @@ import json
 import shutil
 import subprocess
 import sys
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -215,15 +216,22 @@ class _CodexStartProvider:
         return await asyncio.to_thread(self._invoke, cmd)
 
     def _invoke(self, cmd: list[str]) -> str:
-        result = subprocess.run(
-            cmd,
-            cwd=_cli().ROOT,
-            capture_output=True,
-            text=True,
-            timeout=300,
-            check=True,
-        )
-        return result.stdout
+        with tempfile.NamedTemporaryFile(prefix="ytb-codex-", suffix=".json", delete=False) as tmp:
+            output_path = Path(tmp.name)
+        command = [*cmd[:-1], "--output-last-message", str(output_path), cmd[-1]]
+        try:
+            result = subprocess.run(
+                command,
+                cwd=_cli().ROOT,
+                capture_output=True,
+                text=True,
+                timeout=300,
+                check=True,
+            )
+            response = output_path.read_text(encoding="utf-8").strip()
+            return response or result.stdout
+        finally:
+            output_path.unlink(missing_ok=True)
 
 
 def _configured_script_provider(name: str):

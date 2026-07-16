@@ -78,9 +78,8 @@ def test_codex_batch_provider_uses_exec_json_prompt(monkeypatch):
     import asyncio
     asyncio.run(provider.complete("write JSON", system="editorial contract"))
 
-    assert captured["cmd"] == [
-        "codex", "exec", "--full-auto", "editorial contract\n\nUser task:\nwrite JSON"
-    ]
+    assert captured["cmd"][:4] == ["codex", "exec", "--full-auto", "--output-last-message"]
+    assert captured["cmd"][-1] == "editorial contract\n\nUser task:\nwrite JSON"
     assert provider.model_name() == "default"
 
 
