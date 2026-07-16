@@ -52,6 +52,7 @@ from .pipeline_runner import (
     RETRY_BACKOFF_SEC,
     STAGE_START_MARKERS,
     TRANSIENT_ERROR_PATTERNS,
+    YOUTUBE_VERIFY_TIMEOUT_SEC,
     build_env,
     check_schedule_drift,
     detect_stage_marker,
@@ -340,7 +341,14 @@ def cmd_run(args: argparse.Namespace) -> None:
             completed, _ = wait(running, return_when=FIRST_COMPLETED)
             for future in completed:
                 worker_id = running.pop(future)
-                processed = future.result()
+                try:
+                    processed = future.result()
+                except Exception as exc:  # noqa: BLE001 — một worker hỏng không được khoá worker còn lại
+                    message = f"Worker {worker_id} dừng vì lỗi không bắt được: {exc}"
+                    print(f"⚠ {message}")
+                    emit_warning(message)
+                    update_worker_state(worker_id, slug="-", stage="error", last_error=str(exc))
+                    continue
                 if args.loop and processed and not _stop_requested:
                     running[executor.submit(process_next, worker_id=worker_id)] = worker_id
 

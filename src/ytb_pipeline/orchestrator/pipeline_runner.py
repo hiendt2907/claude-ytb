@@ -25,6 +25,10 @@ from .queue_manager import PIPELINE_LOG_DIR, QueueItem
 # backoff giữa các lần retry (giây) cho lỗi TẠM THỜI — sau khi hết list này mà vẫn
 # fail thì bỏ qua slug, KHÔNG chặn cả batch.
 RETRY_BACKOFF_SEC = [30, 60, 120]
+# `videos.list` chỉ đọc metadata, nên không được phép giữ một worker batch vô
+# hạn như upload/render. Hạ timeout transport xuống 20s cho riêng call verify;
+# upload vẫn dùng timeout mặc định dài hơn trong publish/uploader.py.
+YOUTUBE_VERIFY_TIMEOUT_SEC = 20
 
 # Các pattern lỗi coi là TẠM THỜI (đáng retry): 409 đụng Telegram listener, mạng,
 # broken pipe khi đẩy Drive... Lỗi khác (script sai, thiếu file, v.v.) không retry.
@@ -241,6 +245,13 @@ def verify_youtube_video(video_id: str) -> dict:
     from ..publish.youtube_auth import get_youtube_client
 
     youtube = get_youtube_client()
+    # googleapiclient bọc httplib2.Http trong AuthorizedHttp. Nếu một socket cũ
+    # rơi vào CLOSE_WAIT, timeout ngắn này biến nó thành lỗi có thể ghi nhận thay
+    # vì giữ worker batch mãi mãi. Fake client trong test/implementation khác
+    # không nhất thiết có cấu trúc nội bộ này, nên giữ call verify tương thích.
+    transport = getattr(getattr(youtube, "_http", None), "http", None)
+    if transport is not None and hasattr(transport, "timeout"):
+        transport.timeout = YOUTUBE_VERIFY_TIMEOUT_SEC
     resp = youtube.videos().list(part="snippet,status", id=video_id).execute()
     items = resp.get("items", [])
     if not items:
@@ -337,6 +348,24 @@ def process_next(
             cli.update_ledger(
                 item.slug, "", "publish", "error",
                 f"Không xác minh được qua API -- cần `ytb auth`: {exc}",
+                ledger_path=ledger_path,
+            )
+            return True
+        except Exception as exc:  # noqa: BLE001 — API/network verify phải không được làm chết worker
+            message = (
+                f"Video '{item.slug}' đã upload https://youtu.be/{video_id} nhưng "
+                f"không xác minh được qua YouTube API: {exc}. Bỏ qua để worker chạy video kế tiếp; "
+                "cần kiểm tra lại bằng `ytb batch verify` trước khi retry video này."
+            )
+            if worker_id is not None:
+                cli.update_worker_state(worker_id, slug=item.slug, stage="error", last_error=str(exc))
+            cli.emit_warning(message)
+            cli.update_ledger(
+                item.slug,
+                "",
+                "publish",
+                "error",
+                f"Đã upload https://youtu.be/{video_id} nhưng verify API lỗi: {exc}",
                 ledger_path=ledger_path,
             )
             return True
