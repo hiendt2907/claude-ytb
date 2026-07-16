@@ -93,6 +93,7 @@ def test_local_doctor_reports_local_ai_readiness(monkeypatch):
 def test_batch_start_local_uses_llm_provider_without_claude(tmp_path, monkeypatch):
     from ytb_pipeline.orchestrator import batch_cli as cli
     from ytb_pipeline.orchestrator import ideation_cmd
+    from ytb_pipeline.orchestrator.ideation_prompts import SCRIPT_GENERATION_SYSTEM_PROMPT
 
     scripts_dir = tmp_path / "scripts"
     scripts_dir.mkdir()
@@ -108,7 +109,11 @@ def test_batch_start_local_uses_llm_provider_without_claude(tmp_path, monkeypatc
         name = "ollama"
 
         async def complete(self, *args, **kwargs):
+            self.systems.append(kwargs["system"])
             return json.dumps(_valid_short_script(), ensure_ascii=False)
+
+        def __init__(self):
+            self.systems: list[str] = []
 
         def is_available(self):
             return True
@@ -122,7 +127,8 @@ def test_batch_start_local_uses_llm_provider_without_claude(tmp_path, monkeypatc
     monkeypatch.setattr(cli, "ROOT", tmp_path)
     monkeypatch.setattr(cli, "AUTO_STATE_PATH", auto_state)
     monkeypatch.setattr(cli, "LEDGER_PATH", ledger)
-    monkeypatch.setattr(ideation_cmd, "get_llm_provider", lambda: FakeLLM())
+    provider = FakeLLM()
+    monkeypatch.setattr(ideation_cmd, "get_llm_provider", lambda: provider)
     monkeypatch.setattr(cli.subprocess, "Popen", fail_popen)
 
     args = argparse.Namespace(
@@ -138,6 +144,7 @@ def test_batch_start_local_uses_llm_provider_without_claude(tmp_path, monkeypatc
     assert script_path.exists()
     assert "co-che-test-local" in auto_state.read_text(encoding="utf-8")
     assert "co-che-test-local" in ledger.read_text(encoding="utf-8")
+    assert provider.systems == [SCRIPT_GENERATION_SYSTEM_PROMPT]
 
 
 def test_batch_start_local_prints_steps_and_writes_trace_log(tmp_path, monkeypatch, capsys):
@@ -288,7 +295,7 @@ def test_script_generation_system_prompt_enforces_title_topic_and_length_contrac
     assert "Every spoken sentence must directly serve the declared title and topic" in SCRIPT_GENERATION_SYSTEM_PROMPT
     assert "never pad length with generic filler" in SCRIPT_GENERATION_SYSTEM_PROMPT
     assert "one mechanism" in SCRIPT_GENERATION_SYSTEM_PROMPT
-    assert "verify every factual, numerical, medical, financial, legal, or research claim" in SCRIPT_GENERATION_SYSTEM_PROMPT
+    assert "verify every factual, numerical, medical, financial, legal, or research claim" in SCRIPT_GENERATION_SYSTEM_PROMPT.lower()
 
 
 def test_batch_start_local_repairs_script_before_queueing(tmp_path, monkeypatch):
@@ -508,6 +515,7 @@ def test_local_short_normalizer_never_pads_too_short_script_with_template_text()
 @pytest.mark.asyncio
 async def test_undersized_short_is_rewritten_by_llm_instead_of_padded(tmp_path):
     from ytb_pipeline.orchestrator.ideation_script_fix import validate_or_repair_script
+    from ytb_pipeline.orchestrator.ideation_prompts import SCRIPT_GENERATION_SYSTEM_PROMPT
 
     undersized = _valid_short_script()
     undersized["sections"] = [
@@ -524,8 +532,12 @@ async def test_undersized_short_is_rewritten_by_llm_instead_of_padded(tmp_path):
     class RepairingLLM:
         calls = 0
 
+        def __init__(self):
+            self.systems: list[str] = []
+
         async def complete(self, *_args, **_kwargs):
             self.calls += 1
+            self.systems.append(_kwargs["system"])
             return json.dumps(rewritten, ensure_ascii=False)
 
     provider = RepairingLLM()
@@ -541,6 +553,7 @@ async def test_undersized_short_is_rewritten_by_llm_instead_of_padded(tmp_path):
     )
 
     assert provider.calls == 1
+    assert provider.systems == [SCRIPT_GENERATION_SYSTEM_PROMPT]
     assert result["sections"] == rewritten["sections"]
     assert "mở laptop để làm việc" not in script_path.read_text(encoding="utf-8")
 

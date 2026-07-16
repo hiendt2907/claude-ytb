@@ -16,6 +16,7 @@ from ..agents.qa_agent import QAAgent
 from ..ideation.generator import load_script
 from .state_io import atomic_write_json
 from .ideation_prompts import (
+    SCRIPT_GENERATION_SYSTEM_PROMPT,
     SHORT_MAX_CHARS,
     SHORT_MIN_CHARS,
     SHORT_TARGET_CHARS,
@@ -204,7 +205,7 @@ async def validate_or_repair_script(
             append_local_start_log(log_path, f"REPAIR_PROMPT {attempt}", repair)
         repaired = await provider.complete(
             repair,
-            system="Return strict JSON only. No markdown.",
+            system=SCRIPT_GENERATION_SYSTEM_PROMPT,
             max_tokens=8192,
             temperature=0.2,
             json_output=True,

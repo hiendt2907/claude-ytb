@@ -27,6 +27,7 @@ from ..claude_cli import build_claude_cmd
 from ..ideation.series import slugify
 from ..providers.registry import get_llm_provider
 from .ideation_prompts import (
+    SCRIPT_GENERATION_SYSTEM_PROMPT,
     SHORT_MAX_CHARS,
     SHORT_MIN_CHARS,
     SHORT_TARGET_CHARS,
@@ -152,6 +153,12 @@ def _local_start_log_path() -> Path:
     return PIPELINE_LOG_DIR / f"ideation_{stamp}.log"
 
 
+def _with_system_contract(prompt: str, system: str | None) -> str:
+    """Serialize a system contract into CLI-only providers' single prompt slot."""
+    contract = (system or "").strip()
+    return f"{contract}\n\nUser task:\n{prompt}" if contract else prompt
+
+
 class _ClaudeStartProvider:
     name = "claude"
 
@@ -164,8 +171,9 @@ class _ClaudeStartProvider:
     def model_name(self):
         return self._model or "default"
 
-    async def complete(self, prompt: str, **_kwargs) -> str:
-        cmd = build_claude_cmd(prompt, **({"model": self._model} if self._model else {}))
+    async def complete(self, prompt: str, **kwargs) -> str:
+        full_prompt = _with_system_contract(prompt, kwargs.get("system"))
+        cmd = build_claude_cmd(full_prompt, **({"model": self._model} if self._model else {}))
         return await asyncio.to_thread(self._invoke, cmd)
 
     def _invoke(self, cmd: list[str]) -> str:
@@ -194,7 +202,8 @@ class _CodexStartProvider:
     def model_name(self):
         return self._model or "default"
 
-    async def complete(self, prompt: str, **_kwargs) -> str:
+    async def complete(self, prompt: str, **kwargs) -> str:
+        full_prompt = _with_system_contract(prompt, kwargs.get("system"))
         cmd = [
             _cli().settings.codex_bin,
             "exec",
@@ -202,7 +211,7 @@ class _CodexStartProvider:
         ]
         if self._model:
             cmd += ["--model", self._model]
-        cmd.append(prompt)
+        cmd.append(full_prompt)
         return await asyncio.to_thread(self._invoke, cmd)
 
     def _invoke(self, cmd: list[str]) -> str:
@@ -273,7 +282,7 @@ async def _cmd_start_local(args: argparse.Namespace) -> None:
         print(f"{prefix} LLM: generating script JSON...", flush=True)
         text = await provider.complete(
             prompt,
-            system="Return strict JSON only. No markdown.",
+            system=SCRIPT_GENERATION_SYSTEM_PROMPT,
             max_tokens=8192,
             temperature=0.7,
             json_output=True,

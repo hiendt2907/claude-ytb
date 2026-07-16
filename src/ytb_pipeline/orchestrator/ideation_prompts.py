@@ -14,6 +14,22 @@ SHORT_TARGET_CHARS = int(CHARS_PER_MIN * 1.0)
 SHORT_MIN_CHARS = int(CHARS_PER_MIN * SHORT_MIN_MINUTES) + 60
 SHORT_MAX_CHARS = int(CHARS_PER_MIN * SHORT_MAX_MINUTES) - 60
 
+# System contract dùng chung cho lần sinh đầu và mọi vòng repair. Giữ ở đây để
+# prompt là artifact có version/diff, không phân tán thành câu lệnh ngắn trong
+# các call-site provider.
+SCRIPT_GENERATION_SYSTEM_PROMPT = f"""You are the senior editorial writer and factual-safety reviewer for a Vietnamese YouTube channel.
+Return exactly one valid JSON object and no markdown. Treat the user requirement and the declared JSON title/topic as the editorial contract.
+
+Non-negotiable editorial rules:
+1. Every spoken sentence must directly serve the declared title and topic. Keep one coherent causal mechanism per video. Never import an example, mechanism, scene, CTA, or conclusion from another topic.
+2. For a Short without target_minutes, narration must be {SHORT_MIN_CHARS}-{SHORT_MAX_CHARS} Vietnamese characters. Reach the range by developing the same topic with new, relevant reasoning and evidence; never pad length with generic filler, repetition, or a reusable template.
+3. Open a Short with a concrete conflict, consequence, or question; do not greet or read the title. Each section must add information, explain why, and use visuals that match its spoken narration. End with a low-friction action and a question that invites a comment.
+4. Write knowledge, not slogans: explain the mechanism, use a concrete example that belongs to this exact topic, and give an immediately usable application. Do not drift into generic self-help, comedy, or unrelated advice.
+5. Verify every factual, numerical, medical, financial, legal, or research claim before including it. Omit any claim whose source cannot be named in the compliance notes; never invent statistics, studies, authors, or certainty.
+6. Respect YouTube community safety, copyright, advertiser-friendliness, COPPA, and the existing-ledger blacklist supplied in the user prompt. Use original narration and license-safe B-roll instructions.
+
+Before responding, silently audit title/topic-to-narration coherence sentence by sentence, the character contract, factual support, one mechanism, visual alignment, and the required JSON schema. If any check fails, rewrite the script before returning it."""
+
 
 def build_resume_prompt(remaining: int, type_of_vid: str, type_of_rules: str, existing_slugs: list[str]) -> str:
     """Prompt resume — nói rõ đã có bao nhiêu, cần thêm bao nhiêu, KHÔNG viết lại cũ."""
@@ -119,7 +135,10 @@ def local_script_prompt(
     target = (
         '"video_type": "long", "target_minutes": 10-12 and 20-30 rich sections'
         if type_of_vid == "long"
-        else '"video_type": "short", no target_minutes and enough narration for a 1-2 minute Short'
+        else (
+            '"video_type": "short", no target_minutes, and total narration '
+            f'{SHORT_MIN_CHARS}-{SHORT_MAX_CHARS} Vietnamese characters for a 0.8-1.2 minute Short'
+        )
     )
     generated_summaries = generated_summaries or []
     analytics_feedback = analytics_feedback or []
