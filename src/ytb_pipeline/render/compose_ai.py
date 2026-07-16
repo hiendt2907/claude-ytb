@@ -85,9 +85,12 @@ def _dims() -> tuple[int, int, bool]:
 def render_video_ai(voiceover: Voiceover) -> RenderedVideo:
     """Ghép từng segment (B-roll nền + overlay + audio) thành .mp4, sinh thumbnail."""
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    work = OUTPUT_DIR / "_frames_ai"
-    work.mkdir(exist_ok=True)
     slug = slide._slug(voiceover)
+    # Mỗi video có workspace riêng. Publish/backup của một worker có thể dọn
+    # workspace của chính nó mà không làm mất concat/frame đang được worker khác
+    # dùng khi batch chạy song song.
+    work = OUTPUT_DIR / "_frames_ai" / slug
+    work.mkdir(parents=True, exist_ok=True)
     w, h, landscape = _dims()
     visual_suffix = _visual_cache_suffix()
     fallback_query = _fallback_query(voiceover.title)

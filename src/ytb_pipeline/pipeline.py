@@ -308,7 +308,14 @@ def _cleanup_after_success(result: PublishResult) -> None:
             paths.add(Path(segment.audio_path))
     for path in paths:
         path.unlink(missing_ok=True)
-    shutil.rmtree(Path("assets/output") / "_frames_ai", ignore_errors=True)
+    # Renderer AI tách workspace theo slug. Tuyệt đối không xoá cả `_frames_ai`:
+    # batch có hai worker, nên workspace còn lại có thể đang là input ffmpeg.
+    workspace_slug = (
+        result.audio_path.stem if result.audio_path else
+        result.video_path.stem if result.video_path else ""
+    )
+    if workspace_slug:
+        shutil.rmtree(Path("assets/output") / "_frames_ai" / workspace_slug, ignore_errors=True)
     print("  ✓ Đã clean up audio/render artifacts sau khi backup Drive.")
 
 
