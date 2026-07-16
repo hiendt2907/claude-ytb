@@ -28,6 +28,9 @@ from .ideation_prompts import (
 def json_from_llm(text: str) -> dict:
     """Parse structured LLM output, tolerating fenced JSON wrappers."""
     raw = text.strip()
+    fenced = re.search(r"```(?:json)?\s*(.*?)\s*```", raw, flags=re.IGNORECASE | re.DOTALL)
+    if fenced:
+        raw = fenced.group(1).strip()
     if raw.startswith("```"):
         raw = raw.strip("`").strip()
         if raw.lower().startswith("json"):
