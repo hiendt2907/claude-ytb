@@ -112,8 +112,8 @@ def _prompt_start_interactive(args: argparse.Namespace) -> argparse.Namespace:
 
     if ask_all:
         print(f"\nLoại video:")
-        print("  1) long  — video dài ngang, 10-30 phút")
-        print("  2) short — Short dọc, 1-2 phút")
+        print("  1) long  — video dài ngang, 12-15 phút")
+        print("  2) short — Short dọc, 1-1.5 phút")
         current = "2" if args.type_of_vid == "short" else "1"
         raw = input(f"Chọn [1/2, Enter = hiện tại {args.type_of_vid}]: ").strip()
         raw = raw or current

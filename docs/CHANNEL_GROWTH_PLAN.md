@@ -56,7 +56,7 @@ Không dùng lời mở đầu chung chung, danh sách mẹo không có cơ ch�
 
 ## 5. Tiêu chuẩn video dài
 
-Video dài 8–12 phút, một cơ chế mỗi tập:
+Video dài 12–15 phút, một cơ chế mỗi tập:
 
 1. Hook nghịch lý.
 2. Vấn đề người xem gặp.

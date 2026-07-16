@@ -20,7 +20,7 @@ def test_video_ngang_dai_khong_phai_short(monkeypatch):
 
 
 def test_video_doc_1_2_phut_van_la_short(monkeypatch):
-    # YouTube cho phép Short tới 3 phút; short pipeline nhắm 1–2 phút
+    # YouTube cho phép Short tới 3 phút; short pipeline nhắm 1–1.5 phút
     monkeypatch.setattr(uploader, "_dimensions", lambda p: (1080, 1920))
     assert uploader._is_short(_video(75.0)) is True
     assert uploader._is_short(_video(93.0)) is True

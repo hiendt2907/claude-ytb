@@ -30,7 +30,7 @@ def passing_compliance(**overrides) -> dict:
 def make_script(sections, *, target_minutes=None, compliance=None, **fields) -> dict:
     """Dựng dict kịch bản hợp lệ. `sections` là list dict segment.
 
-    - `target_minutes=None` -> Short (cổng độ dài 1–2 phút).
+    - `target_minutes=None` -> Short (cổng độ dài 1–1.5 phút).
     - `compliance=None` -> dùng khối PASS mặc định.
     - kwargs còn lại override title/topic/... ở cấp gốc.
     """

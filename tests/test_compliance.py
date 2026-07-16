@@ -9,8 +9,8 @@ from ytb_pipeline.pkg.models import ComplianceCheck, VideoIdea
 
 from conftest import make_script, passing_compliance
 
-# narration đủ dài để qua cổng độ dài Short (0.8–1.2 phút)
-_SECTIONS = [{"caption": "c", "narration": "x" * 1100}]
+# narration đủ dài để qua cổng độ dài Short (1–1.5 phút)
+_SECTIONS = [{"caption": "c", "narration": "x" * 1200}]
 
 
 def test_compliance_attaches_to_idea_immutably():
@@ -76,7 +76,7 @@ def test_load_script_accepts_structured_claude_schema(write_script):
         {
             "caption": "Hook",
             "voiceover": "Đừng cố kỷ luật hơn trước khi hiểu vì sao não né việc khó. "
-            * 18,
+            * 21,
             "visual_intent": "Một người trì hoãn trước laptop.",
             "pexels_query": "person procrastinating at laptop",
             "time_goal": 5,

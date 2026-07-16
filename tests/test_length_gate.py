@@ -50,8 +50,7 @@ def test_video_dai_mong_bi_chan(write_script):
 
 
 def test_video_dai_du_day_thi_qua(write_script):
-    full = ("Mến chào các bạn, hôm nay nói về chủ đề X. "
-            + "Chi tiết cụ thể có số liệu và ví dụ thực tế. " * 400)  # ~17k ký tự ~14 phút
+    full = "Mến chào các bạn, " + chars_for_minutes(13)
     path = write_script(make_script(_section(full), target_minutes=12))
     script = load_script(path)
     assert estimate_minutes(script.segments) >= 12

@@ -29,7 +29,7 @@ from ..pkg.models import PublishResult, RenderedVideo
 from ..platform.metadata import MetadataAdapter
 from .validation import validate_monetization_ready
 
-# YouTube cho phép Short tới 3 phút (180s) từ 10/2024; short của pipeline nhắm 1–2 phút.
+# YouTube cho phép Short tới 3 phút (180s) từ 10/2024; short của pipeline nhắm 1–1.5 phút.
 SHORT_MAX_SEC = 180
 HASHTAG_LIMIT = 12
 YOUTUBE_TAG_LIMIT = 30

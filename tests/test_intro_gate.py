@@ -51,14 +51,14 @@ def test_video_dai_loi_chao_da_dang_ve_sau_tu_do(write_script):
 
 
 def test_short_co_loi_chao_bi_chan(write_script):
-    # Short ~0.94 phút (trong khung 0.8-1.2) nhưng mở bằng lời chào -> phải bị chặn
-    body = f"{GREETING_PREFIX} " + "vào hook đi nào. " * 65
+    # Short trong khung 1-1.5 phút nhưng mở bằng lời chào -> phải bị chặn.
+    body = f"{GREETING_PREFIX} " + "vào hook đi nào. " * 75
     path = write_script(_short(body))
     with pytest.raises(ValueError, match="Short.*lời chào"):
         load_script(path)
 
 
 def test_short_khong_loi_chao_thi_qua(write_script):
-    body = "Dừng ngay việc này lại. " * 45  # ~0.9 phút, không chào
+    body = "Dừng ngay việc này lại. " * 52  # ~1.0 phút, không chào
     path = write_script(_short(body))
     assert load_script(path).segments

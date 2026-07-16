@@ -381,6 +381,7 @@ def test_batch_start_local_repairs_duplicate_title_without_overwrite(tmp_path, m
         "Người que bước vào thang máy với dáng rất tự tin, nhưng sàn bỗng tụt xuống nửa nhịp. "
         "Nó cố đứng nghiêm như không có gì xảy ra, càng giữ mặt lạnh thì tay vịn càng rung mạnh. "
         "Cuối cùng hóa ra thang máy không hỏng, nó chỉ đang đứng trên cái cân biết troll và punchline là con số hiện lên quá lố. "
+        "Cả hành lang im lặng vì không ai biết nên cứu hay nên giả vờ không thấy. "
     )
     fixed["sections"] = [
         {

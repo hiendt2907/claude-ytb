@@ -172,11 +172,16 @@ def _check_length(script: Any) -> list[dict[str, str]]:
                 "rule": "length",
                 "detail": f"Nội dung quá mỏng: ước lượng {est:.1f}p < target {target_minutes}p.",
             }]
+        if est > LONG_MAX_MINUTES:
+            return [{
+                "rule": "length",
+                "detail": f"Video dài quá dài: ước lượng {est:.1f}p > {LONG_MAX_MINUTES}p.",
+            }]
         return []
 
-    if est <= SHORT_MIN_MINUTES:
+    if est < SHORT_MIN_MINUTES:
         return [{"rule": "length", "detail": f"Short quá ngắn: ước lượng {est:.2f}p."}]
-    if est >= SHORT_MAX_MINUTES:
+    if est > SHORT_MAX_MINUTES:
         return [{"rule": "length", "detail": f"Short quá dài: ước lượng {est:.2f}p."}]
     return []
 

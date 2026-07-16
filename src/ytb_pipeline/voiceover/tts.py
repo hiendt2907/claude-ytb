@@ -35,7 +35,11 @@ class VoiceProfile:
     f5_tempo: float = 1.0
 
 
-VOICE_NEUTRAL = VoiceProfile("neutral", 0.20, 0.32, 0.28, edge_rate="+100%")
+# F5 post-processing must match Edge's effective rate.  The values below are
+# the Edge percentage converted to a tempo multiplier: +100% -> 2.00x, +96%
+# -> 1.96x, etc.  This keeps character-based timing consistent across TTS
+# providers.
+VOICE_NEUTRAL = VoiceProfile("neutral", 0.20, 0.32, 0.28, edge_rate="+100%", f5_tempo=2.00)
 VOICE_ENTERTAINMENT = VoiceProfile(
     "entertainment",
     comma_sec=0.06,
@@ -43,7 +47,7 @@ VOICE_ENTERTAINMENT = VoiceProfile(
     segment_sec=0.08,
     edge_rate="+116%",
     edge_pitch="+8Hz",
-    f5_tempo=1.12,
+    f5_tempo=2.16,
 )
 VOICE_KNOWLEDGE = VoiceProfile(
     "knowledge",
@@ -52,7 +56,7 @@ VOICE_KNOWLEDGE = VoiceProfile(
     segment_sec=0.34,
     edge_rate="+96%",
     edge_pitch="-2Hz",
-    f5_tempo=0.96,
+    f5_tempo=1.96,
 )
 VOICE_INSPIRING = VoiceProfile(
     "inspiring",
@@ -61,7 +65,7 @@ VOICE_INSPIRING = VoiceProfile(
     segment_sec=0.42,
     edge_rate="+88%",
     edge_pitch="-1Hz",
-    f5_tempo=0.94,
+    f5_tempo=1.88,
 )
 
 _ENTERTAINMENT_HINTS = (
@@ -214,7 +218,10 @@ def _synth_all_f5(script: Script, slug: str, profile: VoiceProfile) -> list[Segm
 
 
 def _segment_audio_path(slug: str, profile: VoiceProfile, index: int) -> Path:
-    return AUDIO_DIR / f"{slug}_{profile.name}_{index:02d}.mp3"
+    # Changing F5 tempo must not resume a segment rendered at an older speed.
+    # Edge has its own remote rate setting and keeps its existing cache key.
+    f5_cache_key = f"_f5x{profile.f5_tempo:.2f}" if settings.tts_provider == "f5" else ""
+    return AUDIO_DIR / f"{slug}_{profile.name}{f5_cache_key}_{index:02d}.mp3"
 
 
 def _edge_rate_pct(edge_rate: str) -> int:

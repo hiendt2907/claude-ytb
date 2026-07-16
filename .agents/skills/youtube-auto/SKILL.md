@@ -208,7 +208,7 @@ rồi áp dụng cho toàn bộ video trong lượt chạy (hoặc hỏi lại m
 
 Bộ câu hỏi chuẩn (thêm/bớt tùy ngữ cảnh):
 
-1. **Độ dài** — "Làm video ngắn hay dài?" → `["Short (dọc ≤60s)", "Video dài (ngang)"]`
+1. **Độ dài** — "Làm video ngắn hay dài?" → `["Short (dọc 60–90s)", "Video dài (ngang 12–15p)"]`
 2. **Kiểu hình** — "Render hình thế nào?" → `["Slide tĩnh (youtube-render)", "AI visual (youtube-render-ai)"]`
 3. **Xuất bản** — "Publish luôn sau render?" → `["Publish thật ngay", "Chỉ render (DRY_RUN)"]`
 4. **Số lượng** — "Làm mấy video lượt này?" → `["1", "3", "5", "Hết hàng đợi"]`
@@ -220,7 +220,7 @@ mặc định giữ DRY_RUN nếu user chọn "Chỉ render".
 
 ```python
 from ytb_pipeline.notify.telegram import ask_choice
-length = ask_choice("Làm video ngắn hay dài?", ["Short (dọc ≤60s)", "Video dài (ngang)"])
+length = ask_choice("Làm video ngắn hay dài?", ["Short (dọc 60–90s)", "Video dài (ngang 12–15p)"])
 visual = ask_choice("Render hình thế nào?", ["Slide tĩnh", "AI visual"])
 publish = ask_choice("Publish luôn sau render?", ["Publish thật ngay", "Chỉ render (DRY_RUN)"])
 ```
@@ -234,10 +234,10 @@ Truyền env inline cho lệnh `python -m ytb_pipeline <slug>` theo lựa chọn
   fail fast nếu thiếu); `visual == "Slide tĩnh"` → bỏ qua (mặc định `slide`).
 - `length == "Video dài (ngang)"` → `ORIENTATION=landscape` (render 1920x1080, B-roll
   ngang; khâu publish tự xếp loại **clip** chứ không gắn #Shorts).
-  **BẮT BUỘC:** khâu ideation phải sinh kịch bản **10–30 phút** (đặt `target_minutes`
+  **BẮT BUỘC:** khâu ideation phải sinh kịch bản **12–15 phút** (đặt `target_minutes`
   trong JSON), nội dung dày/chi tiết theo mục **2b** video-quality-rules.md — KHÔNG để
-  video dài < 10 phút (`load_script` fail-fast nếu mỏng).
-  `length == "Short (dọc ≤60s)"` → bỏ qua (mặc định `portrait` 1080x1920 → #Shorts).
+  video dài ngoài 12–15 phút (`load_script` fail-fast nếu mỏng hoặc quá dài).
+  `length == "Short (dọc 60–90s)"` → bỏ qua (mặc định `portrait` 1080x1920 → #Shorts).
   Lưu ý: hướng ngang chỉ áp dụng ở renderer AI; Short dọc dùng được cả slide lẫn AI.
 - `publish == "Publish thật ngay"` → `DRY_RUN=false`; `"Chỉ render"` → `DRY_RUN=true`.
 - **Lên lịch công khai**: nếu muốn video tự PUBLIC vào một mốc giờ → `YOUTUBE_PRIVACY=private`

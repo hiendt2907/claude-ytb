@@ -29,13 +29,13 @@ sang viết kịch bản. Đây là cổng chặn đặt trước tất cả rul
 Ghi kết quả verify (PASS/FAIL + ghi chú nguồn) vào metadata/ý tưởng và đính kèm khi gửi
 duyệt Telegram, để user thấy đã kiểm trước khi duyệt.
 
-## 0b. KHUNG SHORT — độ dài 0.8–1.2 phút + KHÔNG hiện số thứ tự (ÉP ở code)
+## 0b. KHUNG SHORT — độ dài 1–1.5 phút + KHÔNG hiện số thứ tự (ÉP ở code)
 
-- **Short BẮT BUỘC TRÊN 0.8 phút, DƯỚI 1.2 phút (~45–60s).** Short không khai báo
+- **Short BẮT BUỘC trong 1–1.5 phút (~60–90s).** Short không khai báo
   `target_minutes`; `generator.load_script` **fail-fast** nếu narration ước lượng
-  (~1.197 ký tự/phút) ≤ 0.8 phút (quá ngắn, sơ sài) hoặc ≥ 1.2 phút (lê thê, vượt
-  khung). Nhắm đích **~1.000–1.400 ký tự** narration để an toàn trong khung — ngắn,
-  đi thẳng vào trọng tâm, không nhồi câu đệm cho đủ phút.
+  (~1.197 ký tự/phút ở tốc độ TTS 2×) ngắn hơn 1 phút (quá ngắn, sơ sài) hoặc dài hơn
+  1.5 phút (lê thê, vượt khung). Narration phải trong **1.197–1.795 ký tự**, nhắm
+  khoảng 1.496 ký tự — đi thẳng vào trọng tâm, không nhồi câu đệm cho đủ phút.
 - **TUYỆT ĐỐI KHÔNG render badge số thứ tự** kiểu "1/5", "2/5" trên khung hình. Người
   xem không cần biết đang ở phần mấy; con số này làm rối và lộ "công thức". Renderer đã
   gỡ badge — kịch bản cũng không được yêu cầu hiển thị đếm phần/tổng.
@@ -64,7 +64,7 @@ chỉ HÔ KHẨU HIỆU?"* Khẩu hiệu → FAIL, viết lại thành cơ chế
 
 ### Gate 2 — MẬT ĐỘ Ý: không khoảng chết, nhất là vùng "phút 4–8 tử thần"
 
-Video 10–12 phút chết ở khúc giữa khi nội dung lặp/đệm chữ. Rà theo CHƯƠNG:
+Video 12–15 phút chết ở khúc giữa khi nội dung lặp/đệm chữ. Rà theo CHƯƠNG:
 
 - Mỗi chương phải mang **ít nhất một ý MỚI** (cơ chế mới, bằng chứng mới, hệ quả mới).
   Chương chỉ diễn giải lại ý chương trước → gộp hoặc cắt.
@@ -195,11 +195,11 @@ yếu tố sau (video dài thì đủ cả 4 — xem mục 2b):
 
 Khi lệnh yêu cầu **video dài / ngang**, kịch bản phải đạt:
 
-- **Độ dài narration 10–30 phút** (tuỳ chủ đề), **KHÔNG dưới 10 phút**. Đặt
-  `"target_minutes": <10..30>` ở cấp gốc JSON — `generator.load_script` **fail-fast** nếu
-  nội dung mỏng hơn target (ước lượng ~**1.200 ký tự narration/phút**). Quy đổi nhanh:
-  - 10 phút ≈ **12.000 ký tự** narration; 15 phút ≈ 18.000; 20 phút ≈ 24.000.
-  - Chia thành **20–40+ section** để renderer cắt cảnh đủ nhịp.
+- **Độ dài narration 12–15 phút.** Đặt `"target_minutes": <12..15>` ở cấp gốc JSON —
+  `generator.load_script` **fail-fast** nếu nội dung mỏng hơn target, dưới 12 phút, hoặc
+  vượt 15 phút (ước lượng ~**1.197 ký tự narration/phút** ở tốc độ TTS 2×). Quy đổi:
+  - 12 phút ≈ **14.364 ký tự** narration; 15 phút ≈ **17.955 ký tự**.
+  - Chia thành **24–36 section** để renderer cắt cảnh đủ nhịp.
 - **CẤM nói chung chung / mơ hồ.** Mỗi luận điểm phải đào sâu theo khuôn:
   1. **Khẳng định** rõ ràng (1 câu).
   2. **Cơ chế / tại sao** — giải thích tâm lý/khoa học/logic đằng sau (không chỉ "hãy làm X").
@@ -272,7 +272,7 @@ cảnh tĩnh dài) — 3 field trên chỉ thêm lớp biên tập chủ đích,
 - [ ] **Hook 2s đầu** có hành động/kết quả sốc/lệnh cấm + visual mạnh ngay khung đầu (mục tiêu Stayed-to-watch ≥60%)
 - [ ] Có "kẻ thù chung" + giải pháp tức thì ở câu đầu (khi hợp ngữ cảnh)
 - [ ] Trả lời được **"Khán giả nhận được gì?"** + góc giải-quyết-vấn-đề (làm được dù bận rộn)
-- [ ] **Short: narration trong 0.8–1.2 phút** (nhắm ~1.000–1.400 ký tự); KHÔNG có badge "n/total"
+- [ ] **Short: narration trong 1–1.5 phút** (1.197–1.795 ký tự, nhắm ~1.496); KHÔNG có badge "n/total"
 - [ ] **Không chung chung:** mỗi luận điểm có ≥3/4 (khẳng định + cơ chế + số/ví dụ cụ thể + bước áp dụng); đã thay từ mơ hồ bằng con số
 - [ ] Các ý sắp theo một trục logic nêu được thành lời
 - [ ] Mỗi luận điểm có 1 câu "tại sao" ngắn + cách áp dụng ít rào cản
@@ -281,8 +281,8 @@ cảnh tĩnh dài) — 3 field trên chỉ thêm lớp biên tập chủ đích,
 - [ ] 1–3 đoạn hành động đánh dấu `"hook": true`; bước ngoặt vấn đề→giải pháp `"transition": true`
 - [ ] Đoạn có khái niệm/con số cốt lõi gắn `"emphasis"` (1–2 từ khoá đắt)
 - [ ] **Mở đầu LONG-FORM (mục 1b):** segment mở đầu mở bằng đúng cụm **"Mến chào các bạn,"** (phần sau tự sinh đa dạng) → voice đọc tiêu đề → câu móc; gọn ~5–8s; KHÔNG mời đăng ký ở đầu; không trùng câu thân bài. (Short: KHÔNG chào/đọc tiêu đề)
-- [ ] **Nếu là video dài/ngang:** có `"target_minutes"` 10–30; narration đủ dày (~1.200 ký
-      tự/phút); mỗi luận điểm có cơ chế + bằng chứng có nguồn + ví dụ thực tế + bước áp dụng
+- [ ] **Nếu là video dài/ngang:** có `"target_minutes"` 12–15; narration 14.364–17.955 ký
+      tự (~1.197 ký tự/phút ở TTS 2×); mỗi luận điểm có cơ chế + bằng chứng có nguồn + ví dụ thực tế + bước áp dụng
       (KHÔNG chung chung); description có timestamps chương
 - [ ] CTA kết bằng CÂU HỎI mời comment, rồi mới mời đăng ký
 - [ ] Toàn bộ xưng "bạn", câu ngắn chủ động, có móc nối đoạn

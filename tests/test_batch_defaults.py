@@ -10,7 +10,7 @@ def _health_script() -> SimpleNamespace:
     narration = (
         "Bạn đi bộ sau bữa ăn và thấy cơ thể nhẹ hơn. Cơ chế nằm ở việc vận động nhẹ "
         "giúp cơ thể xử lý năng lượng ổn định hơn trong đời sống hàng ngày. "
-    ) * 8
+    ) * 10
     return SimpleNamespace(
         slug="di-bo-sau-bua-an",
         topic="thói quen đi bộ sau bữa ăn",

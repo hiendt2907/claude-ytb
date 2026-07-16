@@ -15,15 +15,16 @@ from ..pkg.models import ComplianceCheck, Script, Segment, VideoIdea
 # Các mục verify bắt buộc trong khối `compliance` của mỗi file kịch bản.
 _COMPLIANCE_FIELDS = ("community", "copyright", "accuracy", "advertiser", "coppa", "notes")
 
-# Tốc độ đọc narration (đo thực từ video đã render): ~1197 ký tự/phút giọng vi-VN.
+# Tốc độ đọc narration đo từ Edge-TTS vi-VN ở ~2x. F5 được post-process cùng
+# tốc độ hiệu dụng trong `voiceover/tts.py`, nên đây là một hợp đồng chung cho
+# mọi provider TTS và là cơ sở duy nhất để tính thời lượng từ số ký tự.
 CHARS_PER_MIN = 1197.0
-# Video dài (ngang) bắt buộc trong khoảng này — đủ sâu, không lan man.
-LONG_MIN_MINUTES = 10
-LONG_MAX_MINUTES = 30
-# Short (dọc) BẮT BUỘC trên 0.8 phút, dưới 1.2 phút (~1.000-1.400 ký tự, ~45-60s)
-# — ngắn, đánh mạnh vào 5-8s đầu để giữ Stayed-to-watch, không lê thê.
-SHORT_MIN_MINUTES = 0.8
-SHORT_MAX_MINUTES = 1.2
+# Video dài (ngang) 12–15 phút: đủ chiều sâu, nhưng không kéo dài lan man.
+LONG_MIN_MINUTES = 12
+LONG_MAX_MINUTES = 15
+# Short (dọc) 1–1.5 phút: đủ thời gian cho cơ chế + ví dụ + ứng dụng.
+SHORT_MIN_MINUTES = 1.0
+SHORT_MAX_MINUTES = 1.5
 
 # Mở đầu LONG-FORM (mục 1b video-quality-rules.md): phần CỐ ĐỊNH duy nhất của lời
 # chào. Phần sau cụm này do kịch bản tự sinh đa dạng (đọc tiêu đề + câu móc).
@@ -165,13 +166,12 @@ def _validate_length(segments, target_minutes, name: str) -> None:
     """Ép độ dài cho video dài (ngang).
 
     Kịch bản khai báo `target_minutes` (video ngang BẮT BUỘC có) -> fail-fast nếu
-    nội dung quá mỏng so với mục tiêu (tránh "video dài" chỉ 6 phút lan man) hoặc
-    target nằm ngoài khoảng [10, 30] phút.
+    nội dung quá mỏng so với mục tiêu, vượt 15 phút, hoặc target nằm ngoài khoảng
+    [12, 15] phút.
 
     Short (không khai báo `target_minutes`) -> ép thời lượng trong
-    (SHORT_MIN_MINUTES, SHORT_MAX_MINUTES) phút: fail-fast nếu narration ước
-    lượng ≤ SHORT_MIN_MINUTES (quá ngắn/sơ sài) hoặc ≥ SHORT_MAX_MINUTES
-    (lê thê, vượt khung Short).
+    [SHORT_MIN_MINUTES, SHORT_MAX_MINUTES] phút: fail-fast nếu narration ước
+    lượng ngắn hơn 1 phút hoặc dài hơn 1.5 phút.
     """
     if target_minutes is None:
         _validate_short_length(segments, name)
@@ -183,6 +183,12 @@ def _validate_length(segments, target_minutes, name: str) -> None:
             f"[{LONG_MIN_MINUTES}, {LONG_MAX_MINUTES}] phút cho video dài (ngang)."
         )
     est = estimate_minutes(segments)
+    if est < LONG_MIN_MINUTES:
+        chars_need = int(LONG_MIN_MINUTES * CHARS_PER_MIN)
+        raise ValueError(
+            f"Kịch bản {name}: nội dung quá mỏng — ước lượng ~{est:.1f} phút, "
+            f"phải đạt ít nhất {LONG_MIN_MINUTES} phút (~{chars_need:,} ký tự narration)."
+        )
     if est < target_minutes:
         chars_can = int(target_minutes * CHARS_PER_MIN)
         raise ValueError(
@@ -191,29 +197,36 @@ def _validate_length(segments, target_minutes, name: str) -> None:
             f"{chars_can:,} ký tự narration: thêm cơ chế/ví dụ cụ thể/số liệu có "
             "nguồn/bước áp dụng, KHÔNG nói chung chung)."
         )
+    if est > LONG_MAX_MINUTES:
+        chars_max = int(LONG_MAX_MINUTES * CHARS_PER_MIN)
+        raise ValueError(
+            f"Kịch bản {name}: video dài quá dài — ước lượng ~{est:.1f} phút, "
+            f"phải không quá {LONG_MAX_MINUTES} phút (~{chars_max:,} ký tự narration). "
+            "Cắt ý trùng/lặp, giữ một cơ chế và các bằng chứng cần thiết."
+        )
 
 
 def _validate_short_length(segments, name: str) -> None:
-    """Ép thời lượng Short: BẮT BUỘC trên SHORT_MIN_MINUTES, dưới SHORT_MAX_MINUTES.
+    """Ép thời lượng Short: BẮT BUỘC trong [SHORT_MIN_MINUTES, SHORT_MAX_MINUTES].
 
     Short không khai báo `target_minutes`. Narration ước lượng phải nằm trong
-    khoảng (SHORT_MIN_MINUTES, SHORT_MAX_MINUTES) phút — fail-fast nếu quá
-    ngắn (sơ sài) hoặc quá dài (vượt khung, lê thê).
+    khoảng 1–1.5 phút — fail-fast nếu quá ngắn (sơ sài) hoặc quá dài
+    (vượt khung, lê thê).
     """
     est = estimate_minutes(segments)
-    if est <= SHORT_MIN_MINUTES:
+    if est < SHORT_MIN_MINUTES:
         chars_need = int(SHORT_MIN_MINUTES * CHARS_PER_MIN)
         raise ValueError(
             f"Kịch bản {name}: Short quá ngắn — ước lượng ~{est:.2f} phút, phải "
-            f"TRÊN {SHORT_MIN_MINUTES:.1f} phút (cần > ~{chars_need:,} ký tự "
+            f"ÍT NHẤT {SHORT_MIN_MINUTES:.1f} phút (cần ~{chars_need:,} ký tự "
             "narration). Viết chi tiết hơn: mỗi ý thêm cơ chế 'tại sao' + ví dụ/"
             "con số cụ thể + bước áp dụng, KHÔNG nói chung chung."
         )
-    if est >= SHORT_MAX_MINUTES:
+    if est > SHORT_MAX_MINUTES:
         chars_max = int(SHORT_MAX_MINUTES * CHARS_PER_MIN)
         raise ValueError(
             f"Kịch bản {name}: Short quá dài — ước lượng ~{est:.2f} phút, phải "
-            f"DƯỚI {SHORT_MAX_MINUTES:.1f} phút (tối đa ~{chars_max:,} ký tự "
+            f"KHÔNG QUÁ {SHORT_MAX_MINUTES:.1f} phút (tối đa ~{chars_max:,} ký tự "
             "narration). Cắt bớt đoạn thừa/khoảng chết, giữ nội dung cô đọng."
         )
 
