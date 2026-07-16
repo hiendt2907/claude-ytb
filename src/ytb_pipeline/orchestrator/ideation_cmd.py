@@ -269,6 +269,11 @@ async def _cmd_start_local(args: argparse.Namespace) -> None:
     used_slugs = ledger_slugs(ledger_text) | existing_queue_slugs(cli.AUTO_STATE_PATH)
     generated_summaries: list[str] = []
     analytics_feedback = AnalyticsStore().feedback_summary()
+    funnel = {
+        "long_form_slug": str(getattr(args, "long_form_slug", "") or "").strip(),
+        "playlist": str(getattr(args, "playlist", "") or "").strip(),
+        "cta_target": str(getattr(args, "cta_target", "") or "").strip(),
+    }
 
     written: list[str] = []
     print(f"▶ Ideation: {args.num_of_vid} video ({args.type_of_vid}) bằng {provider.name}/{provider.model_name()}", flush=True)
@@ -284,6 +289,7 @@ async def _cmd_start_local(args: argparse.Namespace) -> None:
             ledger_text,
             generated_summaries,
             analytics_feedback,
+            funnel,
         )
         print(f"{prefix} prompt: preparing request", flush=True)
         append_local_start_log(log_path, f"PROMPT {i}", prompt)

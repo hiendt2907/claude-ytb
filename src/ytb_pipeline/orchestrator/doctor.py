@@ -85,6 +85,19 @@ def run_doctor_checks() -> list[tuple[str, bool, str]]:
         checks.append(("auto_state.json", False, str(exc)))
 
     try:
+        from ..analytics.funnel import audit_batch
+
+        state = cli.AUTO_STATE_PATH.read_text(encoding="utf-8")
+        import json
+
+        data = json.loads(state)
+        batch_keys = sorted(k for k in data if k.startswith("shorts_funnel_batch_"))
+        audit = audit_batch(data[batch_keys[-1]]) if batch_keys else audit_batch({})
+        checks.append(("Short → long funnel", audit.ok, audit.summary))
+    except Exception as exc:  # noqa: BLE001 — doctor must report, not crash
+        checks.append(("Short → long funnel", False, str(exc)))
+
+    try:
         done = cli.done_slugs()
         checks.append(("ledger.md", True, f"{len(done)} slug đã done"))
     except Exception as exc:  # noqa: BLE001

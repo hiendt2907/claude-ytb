@@ -141,6 +141,7 @@ def local_script_prompt(
     ledger_text: str,
     generated_summaries: list[str] | None = None,
     analytics_feedback: list[str] | None = None,
+    funnel: dict[str, str] | None = None,
 ) -> str:
     """Prompt sinh 1 script JSON qua local/structured LLM (khác luồng Claude skill)."""
     target = (
@@ -168,6 +169,16 @@ def local_script_prompt(
     blocked_titles = "\n".join(f"- {title}" for title in ledger_topics(ledger_text)[-40:])
     generated = "\n".join(f"- {item}" for item in generated_summaries) or "- none yet"
     feedback = "\n".join(f"- {item}" for item in analytics_feedback) or "- no mature data yet"
+    funnel = funnel or {}
+    funnel_instruction = ""
+    if type_of_vid == "short" and any(funnel.values()):
+        funnel_instruction = (
+            "\nFunnel contract for this Short: its CTA must lead to the specified long form. "
+            f"long_form_slug={funnel.get('long_form_slug', '')}; "
+            f"playlist={funnel.get('playlist', '')}; "
+            f"cta_target={funnel.get('cta_target', '')}. "
+            "Make the final spoken CTA point to that exact long-form topic.\n"
+        )
     custom_rules = "" if type_of_rules == "auto" else (
         "\nCustom idea rules:\n"
         "- The user's idea overrides the default channel niche and old ledger topics.\n"
@@ -181,6 +192,7 @@ def local_script_prompt(
         "You are writing a Vietnamese YouTube script JSON for a local-first pipeline.\n"
         f"Video {index}/{total}. Type: {type_of_vid}. Requirement: {topic}\n"
         f"Length contract: {target}.\n"
+        f"{funnel_instruction}"
         "This must be a NEW concept inside the current batch. Do not reuse any slug, title, "
         "topic, scene setup, or punchline already listed below.\n"
         f"{custom_rules}\n"

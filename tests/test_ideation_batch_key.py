@@ -8,7 +8,13 @@ def test_write_local_batch_item_honors_explicit_batch_key(tmp_path, monkeypatch)
     from ytb_pipeline.orchestrator import ideation_state
 
     state = tmp_path / "auto_state.json"
-    state.write_text("{}", encoding="utf-8")
+    state.write_text(json.dumps({
+        "shorts_funnel_batch_week1": {
+            "status": "active",
+            "long_videos": [{"slug": "week1-long"}],
+            "short_videos": [],
+        },
+    }), encoding="utf-8")
     ledger = tmp_path / "ledger.md"
     ledger.write_text("# Ledger\n", encoding="utf-8")
 
@@ -32,12 +38,16 @@ def test_write_local_batch_item_honors_explicit_batch_key(tmp_path, monkeypatch)
         argparse.Namespace(
             type_of_vid="short",
             batch_key="shorts_funnel_batch_week1",
+            long_form_slug="week1-long",
+            playlist="week1-playlist",
+            cta_target="week1-long",
         ),
     )
 
     data = json.loads(state.read_text(encoding="utf-8"))
     assert "shorts_funnel_batch_week1" in data
     assert data["shorts_funnel_batch_week1"]["short_videos"][0]["slug"] == "week1-short"
+    assert data["shorts_funnel_batch_week1"]["short_videos"][0]["cta_target"] == "week1-long"
 
 
 def test_short_batch_item_requires_a_complete_long_form_funnel(tmp_path, monkeypatch):

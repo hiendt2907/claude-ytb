@@ -104,16 +104,49 @@ def unique_slug(base_slug: str, used_slugs: set[str], scripts_dir: Path) -> str:
 
 
 def write_local_batch_item(script_path: Path, payload: dict, args: argparse.Namespace) -> None:
-    """Đăng ký 1 script mới vào auto_state.json + ghi ledger — fail nếu trùng slug."""
+    """Đăng ký 1 script mới vào batch được chọn + ghi ledger.
+
+    `batch_key` cho phép tạo batch mới độc lập thay vì vô tình trộn vào batch
+    legacy mới nhất. Không có key thì giữ nguyên hành vi tương thích cũ.
+    """
     cli = _cli()
     with locked_json_update(cli.AUTO_STATE_PATH) as data:
-        batch_key = sorted([k for k in data if k.startswith("shorts_funnel_batch_")])[-1:] or ["shorts_funnel_batch_local"]
-        batch_key = batch_key[0]
-        batch = data.setdefault(batch_key, {"long_videos": [], "short_videos": []})
+        explicit_key = str(getattr(args, "batch_key", "") or "").strip()
+        if explicit_key:
+            if not explicit_key.startswith("shorts_funnel_batch_"):
+                raise SystemExit("✗ --batch-key phải bắt đầu bằng 'shorts_funnel_batch_'.")
+            batch_key = explicit_key
+        else:
+            batch_key = sorted([k for k in data if k.startswith("shorts_funnel_batch_")])[-1:] or ["shorts_funnel_batch_local"]
+            batch_key = batch_key[0]
+        batch = data.setdefault(batch_key, {"status": "active", "long_videos": [], "short_videos": []})
         key = "long_videos" if args.type_of_vid == "long" else "short_videos"
         videos = batch.setdefault(key, [])
         if any(v.get("slug") == script_path.stem for v in videos if isinstance(v, dict)):
             raise SystemExit(f"✗ Trùng slug trong queue: {script_path.stem}. Dừng để tránh overwrite/rerun sai.")
+        funnel = {
+            field: str(getattr(args, field, "") or payload.get(field, "")).strip()
+            for field in ("long_form_slug", "playlist", "cta_target")
+        }
+        # Legacy one-off generation predates funnel batches.  The strict
+        # relationship contract is activated by the explicit batch boundary,
+        # so existing callers remain compatible while every new scheduled
+        # funnel batch is fail-fast.
+        if args.type_of_vid == "short" and explicit_key:
+            missing = [field for field, value in funnel.items() if not value]
+            if missing:
+                raise SystemExit(
+                    "✗ Short phải có long_form_slug, playlist, và cta_target trước khi được ghi vào batch."
+                )
+            long_slugs = {
+                str(item.get("slug", ""))
+                for item in batch.get("long_videos", [])
+                if isinstance(item, dict)
+            }
+            if funnel["long_form_slug"] not in long_slugs:
+                raise SystemExit("✗ long_form_slug của Short phải trỏ tới Long đã có trong cùng batch.")
+            if funnel["cta_target"] != funnel["long_form_slug"]:
+                raise SystemExit("✗ cta_target của Short phải khớp long_form_slug.")
         day = max([int(v.get("day", 0)) for v in videos] or [0]) + 1
         videos.append({
             "day": day,
@@ -130,9 +163,9 @@ def write_local_batch_item(script_path: Path, payload: dict, args: argparse.Name
             "content_pillar": payload.get("content_pillar", ""),
             "core_mechanism": payload.get("core_mechanism", ""),
             "audience_problem": payload.get("audience_problem", ""),
-            "long_form_slug": payload.get("long_form_slug", ""),
-            "playlist": payload.get("playlist", ""),
-            "cta_target": payload.get("cta_target", ""),
+            "long_form_slug": funnel["long_form_slug"],
+            "playlist": funnel["playlist"],
+            "cta_target": funnel["cta_target"],
         })
     cli.update_ledger(
         script_path.stem,

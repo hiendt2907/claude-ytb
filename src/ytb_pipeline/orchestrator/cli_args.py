@@ -136,6 +136,22 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
         "--cloud", action="store_true", default=False,
         help="Opt-in dùng Claude CLI legacy cho ideation; mặc định dùng local LLM provider",
     )
+    p_start.add_argument(
+        "--batch-key", default="",
+        help="Batch state riêng (bắt đầu bằng shorts_funnel_batch_) để không trộn vào queue legacy",
+    )
+    p_start.add_argument(
+        "--long-form-slug", default="",
+        help="Slug video dài đích cho Short (bắt buộc khi --type-of-vid short trong batch funnel)",
+    )
+    p_start.add_argument(
+        "--playlist", default="",
+        help="Playlist series đích cho Short (bắt buộc khi --type-of-vid short trong batch funnel)",
+    )
+    p_start.add_argument(
+        "--cta-target", default="",
+        help="CTA đích cho Short; phải khớp --long-form-slug trong batch funnel",
+    )
     p_start.set_defaults(func=cmd_funcs["start"])
 
     _sub(
