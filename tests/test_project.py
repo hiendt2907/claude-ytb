@@ -357,6 +357,26 @@ def test_execute_marks_node_done_with_output_ref(tmp_path):
     assert result.nodes["solo"].output_ref == "produced-output"
 
 
+def test_execute_marks_project_published_after_all_nodes_complete(tmp_path):
+    """A completed checkpoint must not remain indistinguishable from a draft."""
+    checkpoint = CheckpointManager(tmp_path)
+
+    async def fn(project):
+        return "published-url"
+
+    graph = WorkflowGraph(
+        [NodeDef(node_id="publish", stage="publish", fn=fn, deps=[])],
+        checkpoint,
+    )
+
+    result = asyncio.run(graph.execute(Project(project_id="completed-project")))
+
+    assert result.status == ProjectStatus.PUBLISHED
+    persisted = checkpoint.load("completed-project")
+    assert persisted is not None
+    assert persisted.status == ProjectStatus.PUBLISHED
+
+
 def test_execute_accepts_node_output_data_tuple(tmp_path):
     checkpoint = CheckpointManager(tmp_path)
 
