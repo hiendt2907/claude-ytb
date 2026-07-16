@@ -23,7 +23,7 @@ state điều khiển dừng graceful, và `main()`/argparse.
 from __future__ import annotations
 
 import argparse
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 import json
 import os
 import shutil
@@ -330,18 +330,25 @@ def cmd_run(args: argparse.Namespace) -> None:
     if getattr(args, "schedule", False):
         schedule_pending_videos(args)
     worker_count = min(MAX_BATCH_WORKERS, max(1, getattr(args, "workers", 1)))
-    while True:
-        slots = worker_count if args.loop else 1
-        with ThreadPoolExecutor(max_workers=slots, thread_name_prefix="ytb-batch") as executor:
-            processed = list(executor.map(lambda worker: process_next(worker_id=worker + 1), range(slots)))
-        if _stop_requested:
-            print(
-                "⏸ Đã dừng graceful theo yêu cầu (`ytb batch stop`) — chạy lại "
-                "`ytb batch run`/`run --loop` để tiếp tục đúng video đang dở."
-            )
-            break
-        if not any(processed) or not args.loop:
-            break
+    slots = worker_count if args.loop else 1
+    with ThreadPoolExecutor(max_workers=slots, thread_name_prefix="ytb-batch") as executor:
+        running = {
+            executor.submit(process_next, worker_id=worker_id): worker_id
+            for worker_id in range(1, slots + 1)
+        }
+        while running:
+            completed, _ = wait(running, return_when=FIRST_COMPLETED)
+            for future in completed:
+                worker_id = running.pop(future)
+                processed = future.result()
+                if args.loop and processed and not _stop_requested:
+                    running[executor.submit(process_next, worker_id=worker_id)] = worker_id
+
+    if _stop_requested:
+        print(
+            "⏸ Đã dừng graceful theo yêu cầu (`ytb batch stop`) — chạy lại "
+            "`ytb batch run`/`run --loop` để tiếp tục đúng video đang dở."
+        )
 
 
 def cmd_verify(args: argparse.Namespace) -> None:
