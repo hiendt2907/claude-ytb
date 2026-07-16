@@ -130,10 +130,10 @@ def test_repair_prompt_requires_a_concrete_narrated_example():
     assert "hậu quả" in prompt
 
 
-def test_repair_prompt_requires_an_immediate_action_in_final_narration():
-    from ytb_pipeline.orchestrator.ideation_prompts import repair_prompt
+def test_system_prompt_requires_an_immediate_action_in_final_narration():
+    from ytb_pipeline.orchestrator.ideation_prompts import SCRIPT_GENERATION_SYSTEM_PROMPT
 
-    prompt = repair_prompt({}, {"passed": False}, None)
+    prompt = SCRIPT_GENERATION_SYSTEM_PROMPT
 
     assert "final narration section" in prompt
     assert '"Hãy "' in prompt
