@@ -184,3 +184,17 @@ def test_claude_provider_name():
 def test_claude_model_name():
     p = ClaudeProvider()
     assert p.model_name() == "claude-via-cli"
+
+
+def test_claude_invoke_allows_editorial_repair_budget(monkeypatch):
+    """Large JSON script repairs must not die at the former 120-second limit."""
+    seen: dict[str, object] = {}
+
+    def fake_run(*args, **kwargs):
+        seen.update(kwargs)
+        return MagicMock(stdout="{}")
+
+    monkeypatch.setattr("ytb_pipeline.providers.llm.claude_provider.subprocess.run", fake_run)
+
+    assert ClaudeProvider()._invoke(["claude", "-p", "large editorial repair"]) == "{}"
+    assert seen["timeout"] >= 300
