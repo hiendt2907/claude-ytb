@@ -1,7 +1,8 @@
 """Orchestrator: chạy 1 project qua WorkflowGraph 4 node (DAG + checkpoint).
 
-Ideation = nạp kịch bản Claude viết sẵn (scripts/*.json). Mỗi khâu sau là hàm
-thuần nhận model trước, trả model làm giàu thêm qua replace().
+`ytb batch start` là cổng ideation + QA duy nhất. Khi chạy production từ một
+script đã được batch start chấp nhận, pipeline chỉ nạp input rồi thực thi TTS,
+render và publish; tuyệt đối không re-gate hay re-QA nội dung.
 
 Trạng thái từng node persist vào `<projects_dir>/<slug>/project.json`
 (CheckpointManager) — resume skip node DONE, node stale được reset qua
@@ -12,14 +13,10 @@ Voiceover/Render/Publish chọn provider qua `providers/registry.py` —
 KHÔNG còn `if tts_provider == ...` / `if render_provider == ...` ở đây.
 """
 
-import json
 from dataclasses import replace
 from pathlib import Path
 
 from .ideation.generator import load_script
-from .ideation.approval import gate
-from .agents.base import AgentStatus
-from .agents.qa_agent import QAAgent
 from .project.checkpoint import CheckpointManager
 from .project.models import NodeStatus, Project
 from .project.workflow import NodeDef, WorkflowGraph
@@ -29,6 +26,16 @@ from .pkg.models import PublishResult, RenderedVideo, Voiceover
 from .publish.multiplatform import publish_to_platforms
 from .render.validation import validate_final_video
 from .voiceover.validation import validate_audio
+
+STAGE_ORDER = ("input", "voiceover", "render", "publish")
+
+
+def stage_names(through: str = "publish") -> tuple[str, ...]:
+    """Stages needed to reach ``through`` from a batch-start-approved script."""
+    try:
+        return STAGE_ORDER[:STAGE_ORDER.index(through) + 1]
+    except ValueError as exc:
+        raise ValueError(f"Stage không hợp lệ: {through}") from exc
 
 
 def load_or_create_project(script_source: str, checkpoint: CheckpointManager) -> Project:
@@ -103,7 +110,7 @@ def _primary_publish_result(results: dict[str, PublishResult]) -> PublishResult:
 
 
 def _node_script_path(project: Project) -> str:
-    """script_path khai báo trên Project — dùng làm input cho node ideation."""
+    """script_path đã được batch start chấp nhận — dùng làm input production."""
     if not project.script_path:
         raise ValueError(f"Project '{project.project_id}' thiếu script_path")
     return project.script_path
@@ -155,8 +162,8 @@ def _publish_results_output_data(results: dict[str, PublishResult]) -> dict:
     }
 
 
-async def run_project(project: Project, checkpoint: CheckpointManager) -> Project:
-    """Chạy 1 Project qua WorkflowGraph 4 node (ideation→voiceover→render→publish).
+async def run_project(project: Project, checkpoint: CheckpointManager, through: str = "publish") -> Project:
+    """Chạy 1 Project qua input đã approved → voiceover → render → publish.
 
     Mỗi node skip nếu đã DONE trong checkpoint (resume). Object trung gian
     (Script/Voiceover/RenderedVideo) được giữ trong closure `state` — output_ref
@@ -232,11 +239,9 @@ async def run_project(project: Project, checkpoint: CheckpointManager) -> Projec
         state["video"] = rendered
         return rendered
 
-    async def ideation_fn(current: Project):
+    async def input_fn(current: Project):
         script = load_script(_node_script_path(current))
-        print(f"[1/4] Ideation  ✓  {script.title} ({len(script.segments)} đoạn)")
-        script = gate(script)
-        await _validate_script_qa_async(script)
+        print(f"[0/3] Input     ✓  {script.title} ({len(script.segments)} đoạn; approved by batch start)")
         state["script"] = script
         return _node_script_path(current), {"title": script.title, "segments": len(script.segments)}
 
@@ -244,12 +249,6 @@ async def run_project(project: Project, checkpoint: CheckpointManager) -> Projec
         script = state.get("script")
         if script is None:
             script = load_script(_node_script_path(current))
-            # Ideation is the single content-quality input gate. Once its
-            # checkpoint exists, downstream stages consume that approved
-            # script without re-running editorial QA.
-            if not checkpoint.is_done(current, "ideation"):
-                script = gate(script)
-                await _validate_script_qa_async(script)
         voice = get_voice_provider()
         print("[2/4] Voiceover ▶  đang tạo audio...")
         voiceover = await voice.synthesise(script, Path("assets/audio"))
@@ -286,12 +285,13 @@ async def run_project(project: Project, checkpoint: CheckpointManager) -> Projec
         state["result"] = result
         return result.url or str(result.video_path), _publish_results_output_data(publish_results)
 
-    nodes = [
-        NodeDef(node_id="ideation", stage="ideation", fn=ideation_fn, deps=[]),
-        NodeDef(node_id="voiceover", stage="voiceover", fn=voiceover_fn, deps=["ideation"]),
-        NodeDef(node_id="render", stage="render", fn=render_fn, deps=["voiceover"]),
-        NodeDef(node_id="publish", stage="publish", fn=publish_fn, deps=["render"]),
-    ]
+    node_map = {
+        "input": NodeDef(node_id="input", stage="input", fn=input_fn, deps=[]),
+        "voiceover": NodeDef(node_id="voiceover", stage="voiceover", fn=voiceover_fn, deps=["input"]),
+        "render": NodeDef(node_id="render", stage="render", fn=render_fn, deps=["voiceover"]),
+        "publish": NodeDef(node_id="publish", stage="publish", fn=publish_fn, deps=["render"]),
+    }
+    nodes = [node_map[name] for name in stage_names(through)]
 
     graph = WorkflowGraph(nodes, checkpoint)
     return await graph.execute(project)
@@ -320,19 +320,3 @@ def _cleanup_after_success(result: PublishResult) -> None:
     if workspace_slug:
         shutil.rmtree(Path("assets/output") / "_frames_ai" / workspace_slug, ignore_errors=True)
     print("  ✓ Đã clean up audio/render artifacts sau khi backup Drive.")
-
-
-async def _validate_script_qa_async(script) -> None:
-    result = await QAAgent().run({"script": script, "strict": True})
-    _raise_if_qa_failed(result)
-
-
-def _raise_if_qa_failed(result) -> None:
-    if result.status != AgentStatus.SUCCESS:
-        raise ValueError(f"Codex QA script lỗi: {result.error}")
-    output = result.output or {}
-    if not output.get("passed"):
-        raise ValueError(
-            "Codex QA script BLOCK/REPAIRABLE trước TTS:\n"
-            + json.dumps(output, ensure_ascii=False, indent=2)
-        )
