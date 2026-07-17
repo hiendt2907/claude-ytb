@@ -213,6 +213,15 @@ def test_expected_long_is_never_normalized_as_a_short_when_target_is_missing():
     assert note is None
 
 
+def test_long_repair_prompt_requires_target_minutes_and_preserves_valid_narration():
+    from ytb_pipeline.orchestrator.ideation_prompts import repair_prompt
+
+    prompt = repair_prompt({"video_type": "long"}, None, "nội dung quá mỏng")
+
+    assert '"target_minutes" is required for a Long' in prompt
+    assert "Do not shorten or delete valid existing narration" in prompt
+
+
 def test_expected_long_contract_rejects_a_short_payload():
     """A long queue slot must never accept a JSON document shaped as a Short."""
     from ytb_pipeline.orchestrator.ideation_script_fix import validate_expected_video_type
