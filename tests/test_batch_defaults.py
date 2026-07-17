@@ -256,6 +256,19 @@ def test_long_overflow_is_trimmed_without_touching_opening_or_final_cta():
     assert fixed["sections"][-1]["voiceover"] == final
 
 
+def test_short_normalizer_keeps_original_when_sentence_trim_would_undershoot(monkeypatch):
+    from ytb_pipeline.orchestrator import ideation_script_fix as fixer
+
+    payload = {"sections": [{"voiceover": "nội dung đủ dài. " * 300}]}
+    original = json.loads(json.dumps(payload))
+    monkeypatch.setattr(fixer, "trim_to_sentence", lambda _text, _limit: "quá ngắn.")
+
+    fixed, note = fixer.normalize_short_narration(payload)
+
+    assert fixed == original
+    assert note is None
+
+
 def test_expected_long_contract_rejects_a_short_payload():
     """A long queue slot must never accept a JSON document shaped as a Short."""
     from ytb_pipeline.orchestrator.ideation_script_fix import validate_expected_video_type

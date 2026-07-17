@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import re
+from copy import deepcopy
 from pathlib import Path
 
 from ..agents.base import AgentStatus
@@ -121,7 +122,8 @@ def normalize_short_narration(
     """Keep local Short scripts inside the hard length gate without another LLM hop."""
     if expected_video_type == "long" or payload.get("target_minutes") is not None:
         return payload, None
-    sections = [s for s in payload.get("sections", []) or [] if isinstance(s, dict)]
+    candidate = deepcopy(payload)
+    sections = [s for s in candidate.get("sections", []) or [] if isinstance(s, dict)]
     if not sections:
         return payload, None
 
@@ -135,7 +137,7 @@ def normalize_short_narration(
                 section["narration"] = cleaned
                 changed = True
 
-    total = short_narration_chars(payload)
+    total = short_narration_chars(candidate)
     if total > SHORT_MAX_CHARS:
         ratio = SHORT_TARGET_CHARS / total
         remaining = SHORT_TARGET_CHARS
@@ -149,13 +151,18 @@ def normalize_short_narration(
             section["narration"] = section["voiceover"]
             remaining -= len(section["voiceover"])
         changed = True
+        total = short_narration_chars(candidate)
+    # A boundary trim must be atomic: a sentence boundary can cut more than the
+    # numeric budget.  Never replace a merely-overlong script with an undersized
+    # one; let the editorial repair see the intact source instead.
+    if total < SHORT_MIN_CHARS:
+        return payload, None
     # Script thiếu độ dài phải đi qua vòng repair LLM bên dưới caller. Không được
     # bơm câu mẫu: nó có thể đúng độ dài nhưng sai hoàn toàn title/topic.
 
     if not changed:
         return payload, None
-    total = short_narration_chars(payload)
-    return payload, f"normalized short narration to {total} chars"
+    return candidate, f"normalized short narration to {total} chars"
 
 
 def normalize_long_overflow(payload: dict, expected_video_type: str | None = None) -> tuple[dict, str | None]:
