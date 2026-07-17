@@ -606,7 +606,7 @@ async def test_multiplatform_publish_validates_manual_export_manifest(tmp_path, 
     video = RenderedVideo(
         topic="topic",
         title="Title",
-        description="Desc",
+        description="Mô tả đủ dài để qua kiểm tra nội dung gốc trước khi test riêng lỗi manifest của manual export.",
         tags=("tag",),
         video_path=video_file,
         duration_sec=12,
@@ -667,7 +667,6 @@ def test_run_project_resume_publish_rehydrates_rendered_video(tmp_path, monkeypa
         return {"youtube_short": replace(PublishResult(**vars(video)), uploaded=False, url="manual://queued")}
 
     monkeypatch.setattr(pipeline, "publish_to_platforms", fake_publish_to_platforms)
-    monkeypatch.setattr(pipeline, "gate", lambda script: script)
 
     result = asyncio.run(pipeline.run_project(project, checkpoint))
 

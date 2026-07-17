@@ -51,7 +51,6 @@ TRANSIENT_ERROR_PATTERNS = [
 # suốt lúc đang chạy. Thứ tự quan trọng: marker "ai-render" phải khớp TRƯỚC marker
 # render chung vì cả 2 đều bắt đầu bằng "[3/4] Render".
 STAGE_START_MARKERS: list[tuple[re.Pattern, str]] = [
-    (re.compile(r"^\[1/4\] Ideation\s*▶"), "running-ideation"),
     (re.compile(r"^\[2/4\] Voiceover\s*▶"), "running-voiceover"),
     (re.compile(r"^\[3/4\] Render\s*▶.*\(ai/"), "running-ai-render"),
     (re.compile(r"^\[3/4\] Render\s*▶"), "running-render"),
@@ -109,7 +108,11 @@ def run_pipeline_once(
     item: QueueItem,
     script_path: Path | None = None,
     ledger_path: Path | None = None,
-    worker_id: int | None = None,
+    worker_id: int | str | None = None,
+    *,
+    through: str = "publish",
+    f5_daemon_socket: Path | None = None,
+    initial_stage: str = "starting-voiceover",
 ) -> subprocess.CompletedProcess:
     """Chạy `python -m ytb_pipeline scripts/<slug>.json` 1 lần, đồng bộ (blocking).
 
@@ -117,7 +120,7 @@ def run_pipeline_once(
     ghi vào assets/batch_logs/<slug>.log, để `ytb batch logs <slug> --follow`
     tail được từ terminal khác trong lúc lệnh này còn đang chạy.
 
-    Ghi ledger NGAY khi bắt đầu (stage "running-ideation") và mỗi lần stdout của
+    Ghi ledger NGAY khi bắt đầu (stage "starting-voiceover") và mỗi lần stdout của
     pipeline con báo sang khâu mới (running-voiceover/running-ai-render/
     running-publish) — để `ytb batch status`/`ledger` luôn phản ánh đúng video
     đang ở khâu nào, thay vì không có dòng nào (trông như "pending") suốt lúc
@@ -133,16 +136,18 @@ def run_pipeline_once(
     log_path = cli.log_path_for(item.slug)
     log_path.parent.mkdir(parents=True, exist_ok=True)
 
-    cli.update_ledger(
-        item.slug, "", "running-ideation", "running", "Tự động: bắt đầu chạy pipeline", ledger_path=ledger_path
-    )
+    cli.update_ledger(item.slug, "", initial_stage, "running", "Tự động: chuẩn bị pipeline", ledger_path=ledger_path)
     if worker_id is not None:
-        cli.update_worker_state(worker_id, slug=item.slug, stage="running-ideation")
+        cli.update_worker_state(worker_id, slug=item.slug, stage=initial_stage)
+
+    env = cli.build_env(item)
+    if f5_daemon_socket is not None:
+        env["F5_DAEMON_SOCKET"] = str(f5_daemon_socket)
 
     proc = cli.subprocess.Popen(
-        [sys.executable, "-m", "ytb_pipeline", str(script_path)],
+        [sys.executable, "-m", "ytb_pipeline", "--through", through, str(script_path)],
         cwd=cli.ROOT,
-        env=cli.build_env(item),
+        env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
@@ -152,7 +157,7 @@ def run_pipeline_once(
     cli._current_proc = proc
     cli._current_procs[item.slug] = proc
     lines: list[str] = []
-    last_stage = "running-ideation"
+    last_stage = initial_stage
     try:
         with log_path.open("w", encoding="utf-8", buffering=1) as f:
             for line in proc.stdout:  # type: ignore[union-attr]
@@ -187,7 +192,7 @@ def run_with_retry(
     sleep_fn=time.sleep,
     run_fn=None,
     ledger_path: Path | None = None,
-    worker_id: int | None = None,
+    worker_id: int | str | None = None,
 ) -> tuple[bool, str]:
     """Chạy pipeline cho 1 video; tự retry nếu lỗi tạm thời, tối đa len(backoff) lần.
 
@@ -280,6 +285,82 @@ def check_schedule_drift(verified_publish_at: str | None, expected_publish_at: s
     return actual != expected
 
 
+def finalize_published_item(
+    item: QueueItem,
+    output: str,
+    *,
+    ledger_path: Path | None = None,
+    worker_id: int | str | None = None,
+    position: int | None = None,
+    total: int | None = None,
+) -> bool:
+    """Verify a successful publish and persist its final ledger state.
+
+    Both the legacy full-pipeline worker and the render/upload consumer use this
+    single completion path.  A voiceover producer must never call it: audio is
+    not a published video yet.
+    """
+    cli = _cli()
+    queue = cli.load_queue()
+    done = cli.done_slugs(ledger_path)
+    failed = cli.failed_slugs(ledger_path)
+    position = position if position is not None else sum(1 for q in queue if q.slug in done or q.slug in failed) + 1
+    total = total if total is not None else len(queue)
+    video_id = cli.extract_claimed_video_id(output)
+    if video_id is None:
+        if worker_id is not None:
+            cli.update_worker_state(worker_id, slug=item.slug, stage="error", last_error="missing youtube_id")
+        cli.emit_warning(
+            f"Video '{item.slug}' chạy XONG (exit 0) nhưng không tìm thấy youtu.be/<id> "
+            "trong stdout để xác minh — cần Claude kiểm tra log thủ công."
+        )
+        cli.update_ledger(item.slug, "", "publish", "error", "Pipeline exit 0 nhưng không có youtube_id trong stdout", ledger_path=ledger_path)
+        return False
+
+    try:
+        verified = cli.verify_youtube_video(video_id)
+    except ReauthRequiredError as exc:
+        if worker_id is not None:
+            cli.update_worker_state(worker_id, slug=item.slug, stage="error", last_error=str(exc))
+        cli.update_ledger(item.slug, "", "publish", "error", f"Không xác minh được qua API -- cần `ytb auth`: {exc}", ledger_path=ledger_path)
+        return False
+    except Exception as exc:  # noqa: BLE001 -- API verify cannot kill a consumer
+        message = (
+            f"Video '{item.slug}' đã upload https://youtu.be/{video_id} nhưng không xác minh được qua YouTube API: {exc}. "
+            "Bỏ qua để worker chạy video kế tiếp; cần kiểm tra lại bằng `ytb batch verify` trước khi retry video này."
+        )
+        if worker_id is not None:
+            cli.update_worker_state(worker_id, slug=item.slug, stage="error", last_error=str(exc))
+        cli.emit_warning(message)
+        cli.update_ledger(item.slug, "", "publish", "error", f"Đã upload https://youtu.be/{video_id} nhưng verify API lỗi: {exc}", ledger_path=ledger_path)
+        return False
+    if not verified.get("exists"):
+        if worker_id is not None:
+            cli.update_worker_state(worker_id, slug=item.slug, stage="error", last_error="youtube_id not verified")
+        cli.emit_warning(f"Video '{item.slug}' — pipeline tự báo ID {video_id} nhưng YouTube API KHÔNG xác nhận video này tồn tại. Cần Claude kiểm tra lại.")
+        cli.update_ledger(item.slug, "", "publish", "error", f"youtube_id {video_id} không xác minh được qua API", ledger_path=ledger_path)
+        return False
+
+    if cli.check_schedule_drift(verified.get("publish_at"), item.publish_at):
+        cli.emit_warning(
+            f"Video '{item.slug}' (https://youtu.be/{video_id}) lệch lịch publish: thật={verified.get('publish_at')} "
+            f"vs kế hoạch={item.publish_at} trong auto_state.json. KHÔNG tự sửa lịch — cần Claude xác nhận với user."
+        )
+    cli.update_ledger(
+        item.slug, verified.get("title", ""), "done", "ok",
+        f"https://youtu.be/{video_id} — verified qua YouTube API (privacy={verified.get('privacy_status')}, publishAt={verified.get('publish_at')}).",
+        ledger_path=ledger_path,
+    )
+    print(f"✓ Video '{item.slug}' done — https://youtu.be/{video_id}")
+    cli.notify_progress(
+        f"✅ [{position}/{total}] '{item.slug}' đã lên YouTube: https://youtu.be/{video_id}\n"
+        f"privacy={verified.get('privacy_status')}, publishAt={verified.get('publish_at')}"
+    )
+    if worker_id is not None:
+        cli.update_worker_state(worker_id, slug=item.slug, stage="done")
+    return True
+
+
 def process_next(
     queue_path: Path | None = None, ledger_path: Path | None = None, *, worker_id: int | None = None
 ) -> bool:
@@ -301,7 +382,7 @@ def process_next(
 
     try:
         if worker_id is not None:
-            cli.update_worker_state(worker_id, slug=item.slug, stage="running-ideation")
+            cli.update_worker_state(worker_id, slug=item.slug, stage="starting-voiceover")
         position = sum(1 for q in queue if q.slug in done or q.slug in failed) + 1
         print(f"▶ Chạy video '{item.slug}' (day {item.day}, publish_at={item.publish_at})")
         cli.notify_progress(
@@ -317,7 +398,7 @@ def process_next(
         if not ok:
             if worker_id is not None:
                 cli.update_worker_state(worker_id, slug=item.slug, stage="error", last_error=output[-500:])
-            failed_stage = cli.last_stage_for_slug(item.slug, ledger_path).removeprefix("running-") or "ideation"
+            failed_stage = cli.last_stage_for_slug(item.slug, ledger_path).removeprefix("running-") or "voiceover"
             cli.update_ledger(
                 item.slug, "", failed_stage, "error",
                 "Tự động: thất bại, xem assets/batch_cli_warnings.log",
@@ -325,89 +406,10 @@ def process_next(
             )
             return True
 
-        video_id = cli.extract_claimed_video_id(output)
-        if video_id is None:
-            if worker_id is not None:
-                cli.update_worker_state(worker_id, slug=item.slug, stage="error", last_error="missing youtube_id")
-            cli.emit_warning(
-                f"Video '{item.slug}' chạy XONG (exit 0) nhưng không tìm thấy youtu.be/<id> "
-                f"trong stdout để xác minh — cần Claude kiểm tra log thủ công."
-            )
-            cli.update_ledger(
-                item.slug, "", "publish", "error",
-                "Pipeline exit 0 nhưng không có youtube_id trong stdout",
-                ledger_path=ledger_path,
-            )
-            return True
-
-        try:
-            verified = cli.verify_youtube_video(video_id)
-        except ReauthRequiredError as exc:
-            if worker_id is not None:
-                cli.update_worker_state(worker_id, slug=item.slug, stage="error", last_error=str(exc))
-            # youtube_auth đã tự bắn Telegram cảnh báo -- ở đây chỉ cần ghi ledger +
-            # dừng video này lại (không retry vô hạn), để batch tiếp tục slug khác.
-            cli.update_ledger(
-                item.slug, "", "publish", "error",
-                f"Không xác minh được qua API -- cần `ytb auth`: {exc}",
-                ledger_path=ledger_path,
-            )
-            return True
-        except Exception as exc:  # noqa: BLE001 — API/network verify phải không được làm chết worker
-            message = (
-                f"Video '{item.slug}' đã upload https://youtu.be/{video_id} nhưng "
-                f"không xác minh được qua YouTube API: {exc}. Bỏ qua để worker chạy video kế tiếp; "
-                "cần kiểm tra lại bằng `ytb batch verify` trước khi retry video này."
-            )
-            if worker_id is not None:
-                cli.update_worker_state(worker_id, slug=item.slug, stage="error", last_error=str(exc))
-            cli.emit_warning(message)
-            cli.update_ledger(
-                item.slug,
-                "",
-                "publish",
-                "error",
-                f"Đã upload https://youtu.be/{video_id} nhưng verify API lỗi: {exc}",
-                ledger_path=ledger_path,
-            )
-            return True
-        if not verified.get("exists"):
-            if worker_id is not None:
-                cli.update_worker_state(worker_id, slug=item.slug, stage="error", last_error="youtube_id not verified")
-            cli.emit_warning(
-                f"Video '{item.slug}' — pipeline tự báo ID {video_id} nhưng YouTube API "
-                f"KHÔNG xác nhận video này tồn tại. Cần Claude kiểm tra lại."
-            )
-            cli.update_ledger(
-                item.slug, "", "publish", "error",
-                f"youtube_id {video_id} không xác minh được qua API",
-                ledger_path=ledger_path,
-            )
-            return True
-
-        if cli.check_schedule_drift(verified.get("publish_at"), item.publish_at):
-            cli.emit_warning(
-                f"Video '{item.slug}' (https://youtu.be/{video_id}) lệch lịch publish: "
-                f"thật={verified.get('publish_at')} vs kế hoạch={item.publish_at} trong auto_state.json. "
-                f"KHÔNG tự sửa lịch — cần Claude xác nhận với user."
-            )
-
-        cli.update_ledger(
-            item.slug,
-            verified.get("title", ""),
-            "done",
-            "ok",
-            f"https://youtu.be/{video_id} — verified qua YouTube API "
-            f"(privacy={verified.get('privacy_status')}, publishAt={verified.get('publish_at')}).",
-            ledger_path=ledger_path,
+        finalize_published_item(
+            item, output, ledger_path=ledger_path, worker_id=worker_id,
+            position=position, total=len(queue),
         )
-        print(f"✓ Video '{item.slug}' done — https://youtu.be/{video_id}")
-        cli.notify_progress(
-            f"✅ [{position}/{len(queue)}] '{item.slug}' đã lên YouTube: https://youtu.be/{video_id}\n"
-            f"privacy={verified.get('privacy_status')}, publishAt={verified.get('publish_at')}"
-        )
-        if worker_id is not None:
-            cli.update_worker_state(worker_id, slug=item.slug, stage="done")
         return True
     finally:
         with cli._queue_claim_lock:

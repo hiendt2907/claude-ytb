@@ -11,6 +11,7 @@ from .f5_provider import (
     F5_BATCH_WORKER,
     F5_CKPT,
     F5_DEVICE,
+    F5_MAX_CHARS,
     F5_MODEL_ARCH,
     F5_PYTHON,
     F5_REF_AUDIO,
@@ -51,7 +52,7 @@ class F5DaemonPool:
                 "device": F5_DEVICE,
                 "ref_audio": str(F5_REF_AUDIO),
                 "ref_text": ref_text,
-                "max_chars": 300,
+                "max_chars": F5_MAX_CHARS,
             }, ensure_ascii=False), encoding="utf-8")
             self._processes[lane] = subprocess.Popen(
                 [str(F5_PYTHON), str(F5_BATCH_WORKER), "--serve", str(socket_path), str(manifest_path)],

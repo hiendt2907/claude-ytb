@@ -38,6 +38,7 @@ from ..claude_cli import build_claude_cmd
 from ..config.settings import settings
 from ..notify import telegram
 from ..publish.youtube_auth import DRIVE_SCOPES, YOUTUBE_SCOPES, ReauthRequiredError
+from ..voiceover.f5_daemon_pool import F5DaemonPool
 from .cli_args import build_parser
 from .doctor import _check_oauth_token, _check_recent_published, cmd_doctor, run_doctor_checks, run_local_doctor_checks
 from .ideation_cmd import (
@@ -57,6 +58,7 @@ from .pipeline_runner import (
     check_schedule_drift,
     detect_stage_marker,
     extract_claimed_video_id,
+    finalize_published_item,
     is_transient_error,
     log_path_for,
     process_next,
@@ -200,7 +202,7 @@ def worker_states() -> dict[str, dict]:
 
 
 def update_worker_state(
-    worker_id: int, *, slug: str, stage: str, last_error: str = "", started_at: str | None = None
+    worker_id: int | str, *, slug: str, stage: str, last_error: str = "", started_at: str | None = None
 ) -> None:
     with locked_json_update(WORKER_STATE_PATH) as data:
         data[str(worker_id)] = {
@@ -327,10 +329,152 @@ def schedule_pending_videos(args: argparse.Namespace, *, now: datetime | None = 
     return count
 
 
+def _claim_next_staged() -> QueueItem | None:
+    """Reserve one pending video until its render/upload consumer finalizes it."""
+    with _queue_claim_lock:
+        queue = load_queue()
+        done = done_slugs()
+        failed = failed_slugs()
+        item = next_pending(queue, done | failed | _claimed_slugs)
+        if item is not None:
+            _claimed_slugs.add(item.slug)
+        return item
+
+
+def _release_staged_claim(item: QueueItem) -> None:
+    with _queue_claim_lock:
+        _claimed_slugs.discard(item.slug)
+
+
+def _record_stage_failure(item: QueueItem, output: str, *, worker_id: str) -> None:
+    if _stop_requested:
+        return
+    update_worker_state(worker_id, slug=item.slug, stage="error", last_error=output[-500:])
+    failed_stage = last_stage_for_slug(item.slug).removeprefix("running-") or "voiceover"
+    update_ledger(item.slug, "", failed_stage, "error", "Tự động: thất bại, xem assets/batch_cli_warnings.log")
+
+
+def _run_f5_voiceover_lane(item: QueueItem, lane: int, socket_path: Path) -> tuple[QueueItem, bool, str]:
+    """Produce audio only; the daemon remains resident for the lane's next item."""
+    worker_id = f"tts-{lane}"
+    print(f"▶ TTS lane {lane}: '{item.slug}'")
+    result = run_with_retry(
+        item,
+        worker_id=worker_id,
+        run_fn=lambda queued, **_kwargs: run_pipeline_once(
+            queued,
+            worker_id=worker_id,
+            through="voiceover",
+            f5_daemon_socket=socket_path,
+            initial_stage="starting-voiceover",
+        ),
+    )
+    return item, *result
+
+
+def _run_render_publish_lane(item: QueueItem, lane: int) -> None:
+    """Consume one completed voiceover while its paired F5 lane moves on."""
+    worker_id = f"render-{lane}"
+    try:
+        print(f"▶ Render/upload lane {lane}: '{item.slug}'")
+        ok, output = run_with_retry(
+            item,
+            worker_id=worker_id,
+            run_fn=lambda queued, **_kwargs: run_pipeline_once(
+                queued,
+                worker_id=worker_id,
+                through="publish",
+                initial_stage="starting-render",
+            ),
+        )
+        if _stop_requested:
+            return
+        if not ok:
+            _record_stage_failure(item, output, worker_id=worker_id)
+            return
+        finalize_published_item(item, output, worker_id=worker_id)
+    finally:
+        _release_staged_claim(item)
+
+
+def cmd_run_f5_staged(args: argparse.Namespace) -> None:
+    """Run two persistent F5 producers and one render/upload consumer per lane.
+
+    A lane is intentionally not a full pipeline worker.  When its voiceover
+    finishes, the video enters that lane's render/upload queue and the same
+    resident F5 daemon immediately accepts the next script.
+    """
+    pool = F5DaemonPool(ROOT / "assets" / "f5-daemons")
+    voice_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="ytb-f5")
+    render_executors = {
+        lane: ThreadPoolExecutor(max_workers=1, thread_name_prefix=f"ytb-render-{lane}")
+        for lane in (1, 2)
+    }
+    voice_futures: dict[object, tuple[int, QueueItem]] = {}
+    render_futures: dict[object, int] = {}
+
+    def schedule_voice(lane: int) -> bool:
+        if _stop_requested:
+            return False
+        item = _claim_next_staged()
+        if item is None:
+            return False
+        future = voice_executor.submit(_run_f5_voiceover_lane, item, lane, pool.socket_for(lane))
+        voice_futures[future] = (lane, item)
+        return True
+
+    try:
+        pool.start(2)
+        active = sum(schedule_voice(lane) for lane in (1, 2))
+        if not active:
+            print("✓ Queue đã hết — không còn video pending.")
+
+        while voice_futures or render_futures:
+            completed, _ = wait(set(voice_futures) | set(render_futures), return_when=FIRST_COMPLETED)
+            for future in completed:
+                if future in voice_futures:
+                    lane, claimed_item = voice_futures.pop(future)
+                    try:
+                        item, ok, output = future.result()
+                    except Exception as exc:  # noqa: BLE001 -- preserve the other lane
+                        message = f"TTS lane {lane} dừng vì lỗi không bắt được: {exc}"
+                        print(f"⚠ {message}")
+                        emit_warning(message)
+                        update_worker_state(f"tts-{lane}", slug=claimed_item.slug, stage="error", last_error=str(exc))
+                        update_ledger(claimed_item.slug, "", "voiceover", "error", "Tự động: worker TTS lỗi không bắt được")
+                        _release_staged_claim(claimed_item)
+                    else:
+                        if _stop_requested:
+                            _release_staged_claim(item)
+                        elif ok:
+                            render = render_executors[lane].submit(_run_render_publish_lane, item, lane)
+                            render_futures[render] = lane
+                        else:
+                            _record_stage_failure(item, output, worker_id=f"tts-{lane}")
+                            _release_staged_claim(item)
+                    schedule_voice(lane)
+                else:
+                    lane = render_futures.pop(future)
+                    try:
+                        future.result()
+                    except Exception as exc:  # noqa: BLE001 -- render failure must not stop TTS lane
+                        message = f"Render/upload lane {lane} dừng vì lỗi không bắt được: {exc}"
+                        print(f"⚠ {message}")
+                        emit_warning(message)
+    finally:
+        pool.stop()
+        voice_executor.shutdown(wait=True)
+        for executor in render_executors.values():
+            executor.shutdown(wait=True)
+
+
 def cmd_run(args: argparse.Namespace) -> None:
     if getattr(args, "schedule", False):
         schedule_pending_videos(args)
     worker_count = min(MAX_BATCH_WORKERS, max(1, getattr(args, "workers", 1)))
+    if args.loop and worker_count == 2 and settings.tts_provider == "f5":
+        cmd_run_f5_staged(args)
+        return
     slots = worker_count if args.loop else 1
     with ThreadPoolExecutor(max_workers=slots, thread_name_prefix="ytb-batch") as executor:
         running = {

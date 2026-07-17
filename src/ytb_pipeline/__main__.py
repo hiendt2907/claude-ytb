@@ -6,8 +6,8 @@ voiceover -> render -> publish). Chạy lại cùng kịch bản = resume: node 
 DONE được skip, node stale (file mất, dry-run cũ) tự reset về pending.
 """
 
+import argparse
 import asyncio
-import sys
 
 from .config.settings import settings
 from .ideation.approval import ScriptRevisionRequested
@@ -17,20 +17,21 @@ from .project.workflow import WorkflowError
 
 
 def main() -> int:
-    if len(sys.argv) < 2:
-        print('Cách dùng: python -m ytb_pipeline "<đường dẫn/slug kịch bản>"', file=sys.stderr)
-        return 1
+    parser = argparse.ArgumentParser()
+    parser.add_argument("script_source", help="Đường dẫn/slug kịch bản đã được batch start approve")
+    parser.add_argument("--through", choices=("voiceover", "publish"), default="publish")
+    args = parser.parse_args()
     checkpoint = CheckpointManager(settings.projects_dir)
-    project = load_or_create_project(sys.argv[1], checkpoint)
+    project = load_or_create_project(args.script_source, checkpoint)
     try:
-        final = asyncio.run(run_project(project, checkpoint))
+        final = asyncio.run(run_project(project, checkpoint, through=args.through))
     except WorkflowError as exc:
         if isinstance(exc.__cause__, ScriptRevisionRequested):
             print(f"⏸  Dừng: user yêu cầu sửa kịch bản — {exc.__cause__.instruction}", file=sys.stderr)
             return 2
         raise
     uploaded, url = publish_summary(final, checkpoint)
-    print(f"Xong: uploaded={uploaded} url={url}")
+    print(f"Xong stage={args.through}: uploaded={uploaded} url={url}")
     return 0
 
 

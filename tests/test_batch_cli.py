@@ -169,7 +169,7 @@ def test_build_env_forces_telegram_approval_false():
     assert env["DRY_RUN"] == "false"
 
 
-def test_build_env_preserves_queue_dry_run_contract():
+def test_build_env_always_uses_real_publish_for_batch_runs():
     item = cli.QueueItem(
         day=1,
         slug="safe-preview",
@@ -180,7 +180,7 @@ def test_build_env_preserves_queue_dry_run_contract():
 
     env = cli.build_env(item)
 
-    assert env["DRY_RUN"] == "true"
+    assert env["DRY_RUN"] == "false"
 
 
 def test_build_env_uses_queue_orientation_for_shorts():
@@ -388,7 +388,7 @@ def test_check_schedule_drift_none_publish_at_is_not_drift():
 @pytest.mark.parametrize(
     "line,expected",
     [
-        ("[1/4] Ideation  ▶  ...\n", "running-ideation"),
+        ("[0/3] Input     ✓  approved script\n", None),
         ("[2/4] Voiceover ▶  đang tạo audio...\n", "running-voiceover"),
         ("[3/4] Render    ▶  đang dựng video (ai/landscape)...\n", "running-ai-render"),
         ("[3/4] Render    ▶  đang dựng video (moviepy/landscape)...\n", "running-render"),
@@ -434,7 +434,7 @@ def test_run_pipeline_once_writes_running_stages_as_it_streams(tmp_path, monkeyp
         def __init__(self):
             self.stdout = iter(
                 [
-                    "[1/4] Ideation  ✓  T (1 đoạn)\n",
+                    "[0/3] Input     ✓  T (1 đoạn; approved by batch start)\n",
                     "[2/4] Voiceover ▶  đang tạo audio...\n",
                     "[2/4] Voiceover ✓  a.mp3 (1.0s)\n",
                     "[3/4] Render    ▶  đang dựng video (ai/landscape)...\n",
@@ -451,9 +451,43 @@ def test_run_pipeline_once_writes_running_stages_as_it_streams(tmp_path, monkeyp
     cli.run_pipeline_once(item, script_path=script_path, ledger_path=ledger)
 
     content = ledger.read_text(encoding="utf-8")
-    assert "running-ideation" in content
+    assert "starting-voiceover" in content
+    assert "running-ideation" not in content
     assert "running-voiceover" in content
     assert "running-ai-render" in content
+
+
+def test_run_pipeline_once_can_target_resident_f5_voiceover_stage(tmp_path, monkeypatch):
+    item = cli.QueueItem(1, "x", "2026-06-23T06:00:00+0700", "queued")
+    script_path = tmp_path / "x.json"
+    script_path.write_text("{}", encoding="utf-8")
+    socket_path = tmp_path / "f5.sock"
+    captured = {}
+    monkeypatch.setattr(cli, "log_path_for", lambda slug: tmp_path / f"{slug}.log")
+
+    class FakeProc:
+        stdout = iter(())
+        args = ["fake"]
+        returncode = 0
+
+        def wait(self):
+            return None
+
+    def fake_popen(command, **kwargs):
+        captured["command"] = command
+        captured["env"] = kwargs["env"]
+        return FakeProc()
+
+    monkeypatch.setattr(cli.subprocess, "Popen", fake_popen)
+
+    cli.run_pipeline_once(
+        item, script_path=script_path, through="voiceover",
+        f5_daemon_socket=socket_path,
+    )
+
+    assert "--through" in captured["command"]
+    assert "voiceover" in captured["command"]
+    assert captured["env"]["F5_DAEMON_SOCKET"] == str(socket_path)
 
 
 # ── update_ledger ─────────────────────────────────────────────────────────────
@@ -1109,6 +1143,68 @@ def test_cmd_run_stops_loop_when_stop_requested(monkeypatch, capsys):
 
     assert len(calls) == 1  # dừng ngay sau lần đầu, không tiếp tục loop
     assert "dừng graceful" in capsys.readouterr().out
+
+
+def test_cmd_run_uses_decoupled_f5_lanes_for_two_worker_loop(monkeypatch):
+    """Two F5 producers must be selected instead of two full pipelines.
+
+    A full pipeline worker would keep its F5 model idle while render/upload
+    blocks. The staged runner is the contract that prevents that regression.
+    """
+    called = []
+    monkeypatch.setattr(cli.settings, "tts_provider", "f5")
+    monkeypatch.setattr(cli, "cmd_run_f5_staged", lambda args: called.append(args))
+
+    args = argparse.Namespace(loop=True, workers=2, schedule=False)
+    cli.cmd_run(args)
+
+    assert called == [args]
+
+
+def test_staged_f5_runner_hands_audio_to_render_consumer_and_keeps_lanes_distinct(monkeypatch, tmp_path):
+    items = [
+        cli.QueueItem(1, "one", "2026-06-23T06:00:00+0700", "queued"),
+        cli.QueueItem(2, "two", "2026-06-24T06:00:00+0700", "queued"),
+        cli.QueueItem(3, "three", "2026-06-25T06:00:00+0700", "queued"),
+    ]
+    produced = []
+    consumed = []
+
+    class FakePool:
+        def __init__(self, _root):
+            pass
+
+        def start(self, lanes):
+            assert lanes == 2
+
+        def socket_for(self, lane):
+            return tmp_path / f"lane-{lane}.sock"
+
+        def stop(self):
+            pass
+
+    def claim():
+        return items.pop(0) if items else None
+
+    def fake_voice(item, lane, socket_path):
+        produced.append((item.slug, lane, socket_path.name))
+        return item, True, "audio complete"
+
+    def fake_render(item, lane):
+        consumed.append((item.slug, lane))
+        cli._release_staged_claim(item)
+
+    monkeypatch.setattr(cli, "F5DaemonPool", FakePool)
+    monkeypatch.setattr(cli, "_claim_next_staged", claim)
+    monkeypatch.setattr(cli, "_release_staged_claim", lambda _item: None)
+    monkeypatch.setattr(cli, "_run_f5_voiceover_lane", fake_voice)
+    monkeypatch.setattr(cli, "_run_render_publish_lane", fake_render)
+
+    cli.cmd_run_f5_staged(argparse.Namespace())
+
+    assert {slug for slug, _lane, _socket in produced} == {"one", "two", "three"}
+    assert {slug for slug, _lane in consumed} == {"one", "two", "three"}
+    assert all(socket == f"lane-{lane}.sock" for _slug, lane, socket in produced)
 
 
 def test_schedule_pending_videos_assigns_publish_at_without_overwriting_done_or_existing(

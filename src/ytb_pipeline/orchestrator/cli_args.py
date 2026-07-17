@@ -165,7 +165,7 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
     p_run = _sub(
         sub, "run",
         help="Chạy video kế tiếp (--loop để chạy hết queue)",
-        description="Chạy pipeline cho video PENDING đầu tiên trong queue: ideation -> "
+        description="Chạy pipeline cho video PENDING đã được `batch start` approve: "
         "voiceover -> render -> publish, rồi xác minh video thật qua YouTube Data API "
         "(không tin stdout) và ghi 1 dòng mới vào ledger.\n\n"
         "Tự retry lỗi tạm thời (409 Conflict, mất mạng, timeout) với backoff 30/60/120s. "
@@ -186,7 +186,7 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
         type=int,
         choices=[1, 2],
         default=1,
-        help="Số video chạy song song khi dùng --loop (tối đa 2, mặc định 1)",
+        help="Số lane chạy song song khi dùng --loop (tối đa 2; F5 dùng daemon TTS + consumer render/upload riêng mỗi lane)",
     )
     p_run.add_argument(
         "--schedule",
