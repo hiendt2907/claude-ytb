@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import socket
 import subprocess
@@ -31,6 +32,11 @@ import sys
 import tempfile
 import wave
 from pathlib import Path
+
+# F5/Torch may create Python helper processes after this daemon has started.
+# Set the seed in the worker environment itself (not only in Popen's env) so
+# every helper inherits a value CPython accepts during pre-initialization.
+os.environ["PYTHONHASHSEED"] = "0"
 
 
 def _is_valid_wav(path: Path) -> bool:
