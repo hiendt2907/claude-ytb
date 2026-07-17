@@ -40,8 +40,8 @@ Non-negotiable editorial rules:
 1. Every spoken sentence must directly serve the declared title and topic. Keep one coherent causal mechanism per video. Never import an example, mechanism, scene, CTA, or conclusion from another topic. Refer to that single mechanism by ONE consistent full name. Whenever the narration uses the word "cơ chế", follow it only with that one mechanism's own name (e.g. "cơ chế lời nguyền tri thức"). NEVER write "cơ chế" followed by a varying generic word such as "cơ chế duy nhất", "cơ chế này", "cơ chế đó", "cơ chế tâm lý", "cơ chế chung": an automated scanner reads every distinct phrase after "cơ chế" as a separate competing mechanism and REJECTS the script. For generic mentions use "hiện tượng", "hiệu ứng", "nguyên lý", or "quá trình" instead.
 2. For a Short without target_minutes, narration must be {SHORT_MIN_CHARS}-{SHORT_MAX_CHARS} Vietnamese characters for 1.0-1.5 minutes. Reach the range by developing the same topic with new, relevant reasoning and evidence; never pad length with generic filler, repetition, or a reusable template.
 3. For a Long, set target_minutes to EXACTLY {LONG_MIN_MINUTES} and write {LONG_SAFE_MIN_CHARS}-{LONG_SAFE_MAX_CHARS} Vietnamese characters (~13-14.5 spoken minutes), within the validator's absolute {LONG_MIN_CHARS}-{LONG_MAX_CHARS} character range for a 12-15 minutes Long. The pipeline measures runtime as total_characters / {CHARS_PER_MIN:.0f} and REJECTS the script if measured minutes fall below the declared target_minutes or above {LONG_MAX_MINUTES}. So always overshoot the declared floor and never declare a number you do not exceed — declaring 14 while writing ~13.7 minutes FAILS. Build depth from the same mechanism: causal explanation, supported evidence, exact-topic example, application, and next-episode bridge; never stretch the runtime with repeated phrasing.
-4. Open a Short with a concrete conflict, consequence, or question; do not greet or read the title. Open a Long with "Mến chào các bạn," then its title and a topic-specific hook. Each section must add information, explain why, and use visuals that match its spoken narration. The final narration section must include one direct, specific action the viewer can do immediately: start that sentence with exactly "Hãy " and name the object, action, and a concrete time or scope. A question inviting a comment may follow, but never replace that action.
-5. Write knowledge, not slogans: explain the mechanism, use a concrete example that belongs to this exact topic, and give an immediately usable application. Do not drift into generic self-help, comedy, or unrelated advice.
+4. Open a Short with a concrete conflict, consequence, or question; do not greet or read the title. Open a Long with "Mến chào các bạn," then its title and a topic-specific hook. Each section must add information, explain why, and use visuals that match its spoken narration. For EVERY section, `time_goal` is required and MUST be a positive JSON number in minutes (never 0/null/string/timestamp/range); use values such as 0.5, 0.75, or 1.0. Section time_goal values must sum approximately to the declared target duration. The final narration section of BOTH Shorts and Longs must include: (a) one direct, specific action the viewer can do immediately, starting that sentence with exactly "Hãy " and naming the object, action, and a concrete time or scope; (b) a natural, brief invitation to like the video; and (c) a natural, brief invitation to subscribe to the channel for future videos. These like-and-subscribe invitations are a channel-growth requirement, not optional filler, and must fit the topic and tone without sounding repetitive or manipulative. For a Short with a funnel target, the long-form bridge CTA must remain present alongside the like and subscribe invitations. A question inviting a comment may follow, but never replace the action or the like-and-subscribe invitations.
+5. Write knowledge, not slogans: explain the mechanism, use a concrete example that belongs to this exact topic, and give an immediately usable application. Keep those elements explicit in the narration, but choose natural wording; do not rely on fixed labels or template phrases. Do not drift into generic self-help, comedy, or unrelated advice.
 6. Verify every factual, numerical, medical, financial, legal, or research claim before including it. Omit any claim whose source cannot be named in the compliance notes; never invent statistics, studies, authors, or certainty.
 7. Respect YouTube community safety, copyright, advertiser-friendliness, COPPA, and the existing-ledger blacklist supplied in the user prompt. Use original narration and license-safe B-roll instructions.
 
@@ -67,6 +67,7 @@ def build_resume_prompt(remaining: int, type_of_vid: str, type_of_rules: str, ex
         f"Cần viết THÊM {remaining} video loại \"{vid_label}\" — dùng skill youtube-ideation, "
         f"tuân thủ ĐẦY ĐỦ .claude/skills/youtube-ideation/video-quality-rules.md "
         f"(cổng verify mục 0, luật series mục 0d, độ dài mục 2a/2b). {topic_guidance}\n\n"
+        "Every section MUST include time_goal as a positive JSON number of minutes; never 0/null/string/timestamp/range (examples: 0.5, 0.75, 1.0). The sum of time_goal values must approximately match the target duration.\n\n"
         "Trước khi chọn chủ đề: đọc data/ledger.md, loại bỏ mọi chủ đề trùng/tương tự "
         "(mọi status, không chỉ done).\n\n"
         "QUY TRÌNH BẮT BUỘC — làm TUẦN TỰ từng video, KHÔNG làm batch:\n"
@@ -107,6 +108,7 @@ def build_start_prompt(num_of_vid: int, type_of_vid: str, type_of_rules: str) ->
         f"\"{vid_label}\" — dùng skill youtube-ideation, tuân thủ ĐẦY ĐỦ "
         f".claude/skills/youtube-ideation/video-quality-rules.md (cổng verify mục 0, "
         f"luật series mục 0d, độ dài mục 2a/2b). {topic_guidance}\n\n"
+        "Every section MUST include time_goal as a positive JSON number of minutes; never 0/null/string/timestamp/range (examples: 0.5, 0.75, 1.0). The sum of time_goal values must approximately match the target duration.\n\n"
         "Trước khi chọn chủ đề: đọc data/ledger.md, loại bỏ mọi chủ đề trùng/tương tự "
         "(mọi status, không chỉ done).\n\n"
         "QUY TRÌNH BẮT BUỘC — làm TUẦN TỰ từng video, KHÔNG làm batch:\n"
@@ -194,6 +196,7 @@ def local_script_prompt(
         "comedy, punchline structure, or gag narration for this channel.\n"
         "- Write a clear Vietnamese knowledge short: concrete everyday example, mechanism, "
         "application step, and grounded Pexels queries for real stock footage.\n"
+        "- The narration must contain a concrete everyday example and an actionable application in natural Vietnamese; do not use fixed labels or template phrases.\n"
     )
     return (
         "You are writing a Vietnamese YouTube script JSON for a local-first pipeline.\n"
@@ -212,7 +215,7 @@ def local_script_prompt(
         f"{blocked_titles or '- none'}\n\n"
         "Return ONLY one JSON object with keys: slug, topic, title, description, tags, "
         "video_type, voice_profile, sections, compliance. video_type is only long or short. "
-        "voice_profile is knowledge or inspiring. Each section needs time_goal, voiceover, "
+        "voice_profile is knowledge or inspiring. Each section needs time_goal as a positive JSON number of minutes (never 0/null/string/timestamp/range), voiceover, "
         "visual_intent, pexels_query, caption, hook, transition, payoff, emphasis. "
         "Keep legacy narration equal to voiceover and broll equal to pexels_query for compatibility.\n"
         "compliance.passed must be true and include community/copyright/accuracy/"
@@ -243,12 +246,10 @@ def repair_prompt(payload: dict, qa_output: dict | None, validation_error: str |
         "Current channel scope is sharing/knowledge, not entertainment. Remove comedy, "
         "punchline, and gag narration if present. Keep a concrete "
         "everyday example, mechanism, application step, and real-stock-footage Pexels queries.\n"
-        "If QA reports concrete_example, the repaired narration MUST contain one sentence "
-        "starting exactly with 'Ví dụ cụ thể:' and state all four parts: bối cảnh, "
-        "hành động, hậu quả, and cách áp dụng. Do not hide the example only in visual fields.\n"
+        "If review reports a missing example, repair the narration with a specific everyday context, observable action, consequence, and practical application in natural Vietnamese. Do not add fixed labels merely to satisfy a parser.\n"
         "Required schema: slug, topic, title, description, tags, video_type, voice_profile, "
         "sections, compliance. video_type is only short or long. voice_profile is knowledge "
-        "or inspiring. Each section needs time_goal, voiceover, visual_intent, pexels_query, "
+        "or inspiring. Each section needs time_goal as a positive JSON number of minutes (never 0/null/string/timestamp/range; examples 0.5, 0.75, 1.0), voiceover, visual_intent, pexels_query, "
         "caption, hook, transition, payoff, emphasis. Also include legacy narration=voiceover "
         "and broll=pexels_query. compliance.passed must be true.\n\n"
         f"Issues:\n{json.dumps(issues, ensure_ascii=False, indent=2)}\n\n"

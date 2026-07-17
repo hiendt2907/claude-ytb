@@ -31,6 +31,17 @@ def test_ideation_prompt_includes_mature_feedback():
     assert "drop_format" in prompt
 
 
+def test_script_system_prompt_requires_growth_cta_for_short_and_long():
+    from ytb_pipeline.orchestrator.ideation_prompts import SCRIPT_GENERATION_SYSTEM_PROMPT
+
+    prompt = SCRIPT_GENERATION_SYSTEM_PROMPT.lower()
+    assert "short" in prompt and "long" in prompt
+    assert "like" in prompt
+    assert "subscribe" in prompt
+    assert "channel" in prompt
+    assert "action" in prompt
+
+
 def test_collect_youtube_metrics_records_api_report_with_video_age(tmp_path):
     from ytb_pipeline.analytics.feedback import AnalyticsStore, collect_youtube_metrics
 
