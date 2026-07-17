@@ -102,6 +102,24 @@ def test_codex_batch_provider_reads_only_last_message_file(monkeypatch):
     assert ideation_cmd._CodexStartProvider()._invoke(["codex", "exec", "prompt"]) == '{"slug":"clean"}'
 
 
+def test_script_providers_allow_long_generation_budget(monkeypatch):
+    """Long-form generation must not be killed at the legacy five-minute ceiling."""
+    from ytb_pipeline.orchestrator import ideation_cmd
+
+    monkeypatch.setattr(ideation_cmd, "_cli", lambda: type("CLI", (), {"ROOT": "."})())
+    observed: list[int] = []
+
+    def fake_run(*_args, **kwargs):
+        observed.append(kwargs["timeout"])
+        return type("Result", (), {"stdout": "{}"})()
+
+    monkeypatch.setattr(ideation_cmd.subprocess, "run", fake_run)
+    ideation_cmd._ClaudeStartProvider()._invoke(["claude", "prompt"])
+    ideation_cmd._CodexStartProvider()._invoke(["codex", "exec", "prompt"])
+
+    assert observed == [900, 900]
+
+
 def test_batch_start_rejects_ollama_script_provider(monkeypatch):
     from ytb_pipeline.orchestrator import ideation_cmd
 
@@ -137,6 +155,15 @@ def test_system_prompt_requires_an_immediate_action_in_final_narration():
 
     assert "final narration section" in prompt
     assert '"Hãy "' in prompt
+
+
+def test_long_prompt_declares_a_safe_runtime_floor():
+    from ytb_pipeline.orchestrator.ideation_prompts import SCRIPT_GENERATION_SYSTEM_PROMPT, local_script_prompt
+
+    prompt = local_script_prompt(1, 1, "long", "auto", "")
+
+    assert '"target_minutes": 12 (declare EXACTLY 12)' in prompt
+    assert "measured minutes fall below the declared target_minutes" in SCRIPT_GENERATION_SYSTEM_PROMPT
 
 
 def test_json_parser_accepts_one_trailing_closing_brace():
