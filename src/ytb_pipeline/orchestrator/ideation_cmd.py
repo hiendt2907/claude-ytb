@@ -281,6 +281,9 @@ async def _cmd_start_local(args: argparse.Namespace) -> None:
         "cta_target": str(getattr(args, "cta_target", "") or "").strip(),
     }
 
+    replacement_slugs = [str(slug).strip() for slug in getattr(args, "replace_slug", []) or []]
+    if replacement_slugs and (len(replacement_slugs) != args.num_of_vid or not getattr(args, "batch_key", "")):
+        raise SystemExit("✗ --replace-slug cần đúng một slug cho mỗi video và bắt buộc có --batch-key.")
     written: list[str] = []
     print(f"▶ Ideation: {args.num_of_vid} video ({args.type_of_vid}) bằng {provider.name}/{provider.model_name()}", flush=True)
     print(f"  ý tưởng: {args.type_of_rules}", flush=True)
@@ -313,13 +316,23 @@ async def _cmd_start_local(args: argparse.Namespace) -> None:
             payload = json_from_llm(text)
         except json.JSONDecodeError as exc:
             raise SystemExit(f"✗ LLM không trả JSON hợp lệ: {exc}") from exc
+        replacement_slug = replacement_slugs[i - 1] if replacement_slugs else ""
         base_slug = slugify(payload.get("slug") or payload.get("title") or payload.get("topic") or f"video-{i}")
-        slug = unique_slug(base_slug, used_slugs, scripts_dir)
-        if slug != base_slug:
+        slug = replacement_slug or unique_slug(base_slug, used_slugs, scripts_dir)
+        if not replacement_slug and slug != base_slug:
             print(f"{prefix} slug: adjusted duplicate `{base_slug}` -> `{slug}`", flush=True)
             append_local_start_log(log_path, f"SLUG_ADJUSTED {i}", f"{base_slug} -> {slug}")
         payload["slug"] = slug
         script_path = scripts_dir / f"{slug}.json"
+        if replacement_slug and script_path.exists():
+            archive_dir = cli.ROOT / "assets" / "script_revisions" / slug
+            archive_dir.mkdir(parents=True, exist_ok=True)
+            archive_path = archive_dir / f"{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.json"
+            shutil.copy2(script_path, archive_path)
+            setattr(args, "_replacement_archive", str(archive_path))
+        else:
+            setattr(args, "_replacement_archive", "")
+        setattr(args, "replace_slug", replacement_slug)
         payload = await validate_or_repair_script(
             provider,
             payload,
@@ -329,6 +342,7 @@ async def _cmd_start_local(args: argparse.Namespace) -> None:
             console_prefix=prefix,
             strict=strict_qa,
             semantic_history=generated_summaries,
+            expected_video_type=args.type_of_vid,
         )
         write_local_batch_item(script_path, payload, args)
         ledger_text += f"\n| local | {slug} | {payload.get('title', '')} | ideation | ok | LLM |\n"

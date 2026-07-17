@@ -141,6 +141,10 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
         help="Batch state riêng (bắt đầu bằng shorts_funnel_batch_) để không trộn vào queue legacy",
     )
     p_start.add_argument(
+        "--replace-slug", action="append", default=[],
+        help="Thay script của slot đã có, giữ nguyên slug/day/provenance; dùng một lần cho mỗi video.",
+    )
+    p_start.add_argument(
         "--long-form-slug", default="",
         help="Slug video dài đích cho Short (bắt buộc khi --type-of-vid short trong batch funnel)",
     )
@@ -153,6 +157,14 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
         help="CTA đích cho Short; phải khớp --long-form-slug trong batch funnel",
     )
     p_start.set_defaults(func=cmd_funcs["start"])
+
+    p_reconcile = _sub(
+        sub, "reconcile",
+        help="Đồng bộ queue theo ledger + provenance script",
+        description="Đọc event mới nhất mỗi slug trong ledger, ghi lại trạng thái, YouTube ID đã verified và hash kịch bản vào auto_state.json.",
+    )
+    p_reconcile.add_argument("--batch-key", default="", help="Batch cần đồng bộ (mặc định batch mới nhất).")
+    p_reconcile.set_defaults(func=cmd_funcs.get("reconcile", lambda _args: None))
 
     _sub(
         sub, "status",

@@ -13,12 +13,14 @@ của riêng file này.
 from __future__ import annotations
 
 import json
+import hashlib
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
 from ..notify import telegram
-from .state_io import locked_append_text
+from .state_io import locked_append_text, locked_json_update
 
 ROOT = Path(__file__).resolve().parents[3]
 AUTO_STATE_PATH = ROOT / "assets" / "auto_state.json"
@@ -63,7 +65,10 @@ def load_queue(auto_state_path: Path | None = None, batch_key: str | None = None
             raise KeyError("Không tìm thấy key shorts_funnel_batch_* nào trong auto_state.json")
         batch_key = sorted(batch_keys)[-1]
     batch = data[batch_key]
-    videos = list(batch.get("long_videos", [])) + list(batch.get("short_videos", []))
+    grouped_videos = (
+        ("long", sorted(batch.get("long_videos", []), key=lambda video: int(video.get("day", 0))))
+        , ("short", sorted(batch.get("short_videos", []), key=lambda video: int(video.get("day", 0))))
+    )
     items = [
         QueueItem(
             int(v["day"]),
@@ -80,9 +85,10 @@ def load_queue(auto_state_path: Path | None = None, batch_key: str | None = None
             v.get("cta_target", ""),
             bool(v.get("dry_run", False)),
         )
+        for _kind, videos in grouped_videos
         for v in videos
     ]
-    return sorted(items, key=lambda i: i.day)
+    return items
 
 
 def done_slugs(ledger_path: Path | None = None) -> set[str]:
@@ -166,6 +172,71 @@ def update_ledger(
     today = datetime.now().strftime("%Y-%m-%d")
     line = f"| {today} | {slug} | {title} | {stage} | {status} | {note} |\n"
     locked_append_text(Path(ledger_path), line)
+
+
+def reconcile_batch_state(batch_key: str | None = None) -> dict[str, int]:
+    """Synchronize durable batch metadata from the append-only ledger.
+
+    The ledger remains the source of truth for terminal pipeline events.  Each
+    queue item receives a reproducible script hash and its latest ledger event,
+    so a later session can identify exactly what was uploaded or must be redone.
+    """
+    cli = _cli()
+    ledger_text = Path(cli.LEDGER_PATH).read_text(encoding="utf-8")
+    latest: dict[str, dict[str, str]] = {}
+    for line in ledger_text.splitlines():
+        if not line.strip().startswith("|"):
+            continue
+        columns = [column.strip() for column in line.strip().strip("|").split("|")]
+        if len(columns) < 6 or columns[0] in {"Ngày", "---"} or columns[0].startswith("---"):
+            continue
+        latest[columns[1]] = {
+            "date": columns[0], "title": columns[2], "stage": columns[3],
+            "status": columns[4], "note": columns[5],
+        }
+
+    summary = {"done": 0, "pending": 0, "error": 0}
+    now = datetime.now().astimezone().isoformat(timespec="seconds")
+    with locked_json_update(Path(cli.AUTO_STATE_PATH)) as data:
+        if batch_key is None:
+            keys = sorted(key for key in data if key.startswith("shorts_funnel_batch_"))
+            if not keys:
+                raise KeyError("Không tìm thấy batch để reconcile.")
+            batch_key = keys[-1]
+        batch = data[batch_key]
+        for video_kind, key in (("long", "long_videos"), ("short", "short_videos")):
+            for item in batch.get(key, []) or []:
+                slug = str(item.get("slug", ""))
+                script_path = Path(cli.ROOT) / "scripts" / f"{slug}.json"
+                event = latest.get(slug, {})
+                provenance = dict(item.get("provenance", {}))
+                provenance.update({
+                    "batch_key": batch_key,
+                    "video_type": video_kind,
+                    "script_path": str(script_path),
+                    "script_sha256": hashlib.sha256(script_path.read_bytes()).hexdigest() if script_path.exists() else "",
+                    "ledger": event,
+                    "reconciled_at": now,
+                })
+                item["provenance"] = provenance
+                if event.get("stage") == "done" and event.get("status") == "ok":
+                    video_id = re.search(r"youtu\.be/([\w-]{6,})", event.get("note", ""))
+                    item.update({
+                        "stage": "publish", "status": "done", "ledger_status": "done",
+                        "publish_verified": bool(video_id), "youtube_id": video_id.group(1) if video_id else "",
+                    })
+                    summary["done"] += 1
+                elif event.get("status") == "error":
+                    item.update({"stage": event.get("stage", ""), "status": "error", "ledger_status": "error"})
+                    summary["error"] += 1
+                else:
+                    summary["pending"] += 1
+        batch["reconciliation"] = {
+            "at": now,
+            "source": "data/ledger.md",
+            "summary": summary,
+        }
+    return summary
 
 
 def mark_needs_review(slug: str, reason: str, auto_state_path: Path | None = None) -> None:

@@ -93,6 +93,27 @@ def short_narration_chars(payload: dict) -> int:
                for section in payload.get("sections", []) or [])
 
 
+def validate_expected_video_type(
+    payload: dict, *, expected_video_type: str, script_name: str
+) -> None:
+    """Reject an LLM script that does not match its queue slot's media contract."""
+    actual = str(payload.get("video_type", "")).strip().lower()
+    # Historical short JSON omitted video_type; the canonical loader infers it
+    # from the absence of target_minutes.  Keep that compatible, but a long
+    # slot must be explicit because that is the failure mode that corrupted W2.
+    inferred_short = expected_video_type == "short" and not actual and payload.get("target_minutes") is None
+    if actual != expected_video_type and not inferred_short:
+        raise ValueError(
+            f"Kịch bản {script_name}: expected {expected_video_type} from batch slot, "
+            f"got video_type={actual or '<missing>'!r}."
+        )
+    has_target = payload.get("target_minutes") is not None
+    if expected_video_type == "long" and not has_target:
+        raise ValueError(f"Kịch bản {script_name}: expected long must declare target_minutes.")
+    if expected_video_type == "short" and has_target:
+        raise ValueError(f"Kịch bản {script_name}: expected short must not declare target_minutes.")
+
+
 def normalize_short_narration(payload: dict) -> tuple[dict, str | None]:
     """Keep local Short scripts inside the hard length gate without another LLM hop."""
     if payload.get("target_minutes") is not None:
@@ -144,6 +165,7 @@ async def validate_or_repair_script(
     console_prefix: str = "",
     strict: bool = True,
     semantic_history: list[str] | None = None,
+    expected_video_type: str | None = None,
 ) -> dict:
     """Write, validate, QA, and repair a local LLM script JSON with bounded retries."""
     qa = QAAgent()
@@ -167,8 +189,14 @@ async def validate_or_repair_script(
                 f"VALIDATION_ATTEMPT {attempt}",
                 json.dumps(current, ensure_ascii=False, indent=2),
             )
-        script_path.write_text(json.dumps(current, ensure_ascii=False, indent=2), encoding="utf-8")
         try:
+            if expected_video_type is not None:
+                validate_expected_video_type(
+                    current,
+                    expected_video_type=expected_video_type,
+                    script_name=script_path.name,
+                )
+            script_path.write_text(json.dumps(current, ensure_ascii=False, indent=2), encoding="utf-8")
             script = load_script(script_path)
             last_validation_error = None
         except Exception as exc:  # noqa: BLE001

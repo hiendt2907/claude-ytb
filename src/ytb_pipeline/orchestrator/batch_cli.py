@@ -82,6 +82,7 @@ from .queue_manager import (
     load_queue,
     next_pending,
     notify_progress,
+    reconcile_batch_state,
     tail_text,
     update_ledger,
 )
@@ -648,6 +649,11 @@ def cmd_queue(args: argparse.Namespace) -> None:
     print(json.dumps(rows, ensure_ascii=False, indent=2))
 
 
+def cmd_reconcile(args: argparse.Namespace) -> None:
+    summary = reconcile_batch_state(getattr(args, "batch_key", "") or None)
+    print(f"✓ Reconciled: done={summary['done']} pending={summary['pending']} error={summary['error']}")
+
+
 def cmd_auth(args: argparse.Namespace) -> None:
     """Đăng nhập lại tương tác (mở browser) cho cả YouTube + Drive — chạy TAY khi
     `ytb doctor` báo token hết hạn, hoặc sau khi đổi publishing status trên Cloud Console."""
@@ -678,6 +684,7 @@ def main(argv: list[str] | None = None) -> None:
         "logs": cmd_logs,
         "ledger": cmd_ledger,
         "queue": cmd_queue,
+        "reconcile": cmd_reconcile,
         "ps": cmd_ps,
         "reset": cmd_reset,
         "cancel": cmd_cancel,

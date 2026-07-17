@@ -108,6 +108,7 @@ def test_write_local_batch_item_replaces_the_declared_slot_without_appending(tmp
 
     monkeypatch.setattr(ideation_state, "_cli", lambda: CLI)
 
+    (tmp_path / "week2-long.json").write_text('{"slug":"week2-long"}', encoding="utf-8")
     ideation_state.write_local_batch_item(
         tmp_path / "week2-long.json",
         {"title": "Long mới", "topic": "cơ chế mới", "video_type": "long"},

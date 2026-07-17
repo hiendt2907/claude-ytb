@@ -8,6 +8,7 @@ qua `_cli()` tại thời điểm gọi để monkeypatch trên batch_cli vẫn 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from datetime import datetime
 from pathlib import Path
@@ -122,8 +123,17 @@ def write_local_batch_item(script_path: Path, payload: dict, args: argparse.Name
         batch = data.setdefault(batch_key, {"status": "active", "long_videos": [], "short_videos": []})
         key = "long_videos" if args.type_of_vid == "long" else "short_videos"
         videos = batch.setdefault(key, [])
-        if any(v.get("slug") == script_path.stem for v in videos if isinstance(v, dict)):
+        replacement_slug = str(getattr(args, "replace_slug", "") or "").strip()
+        if replacement_slug and script_path.stem != replacement_slug:
+            raise SystemExit("✗ --replace-slug phải khớp với slug kịch bản được ghi.")
+        existing = next(
+            (video for video in videos if isinstance(video, dict) and video.get("slug") == script_path.stem),
+            None,
+        )
+        if existing is not None and not replacement_slug:
             raise SystemExit(f"✗ Trùng slug trong queue: {script_path.stem}. Dừng để tránh overwrite/rerun sai.")
+        if replacement_slug and existing is None:
+            raise SystemExit(f"✗ Không có slot {args.type_of_vid} '{replacement_slug}' để thay thế trong batch.")
         funnel = {
             field: str(getattr(args, field, "") or payload.get(field, "")).strip()
             for field in ("long_form_slug", "playlist", "cta_target")
@@ -147,9 +157,9 @@ def write_local_batch_item(script_path: Path, payload: dict, args: argparse.Name
                 raise SystemExit("✗ long_form_slug của Short phải trỏ tới Long đã có trong cùng batch.")
             if funnel["cta_target"] != funnel["long_form_slug"]:
                 raise SystemExit("✗ cta_target của Short phải khớp long_form_slug.")
-        day = max([int(v.get("day", 0)) for v in videos] or [0]) + 1
-        videos.append({
-            "day": day,
+        revision = int((existing or {}).get("provenance", {}).get("revision", 0)) + 1
+        metadata = {
+            "day": int((existing or {}).get("day", 0)) or max([int(v.get("day", 0)) for v in videos] or [0]) + 1,
             "slug": script_path.stem,
             "topic": payload.get("topic", payload.get("title", script_path.stem)),
             "orientation": "landscape" if args.type_of_vid == "long" else "portrait",
@@ -166,11 +176,25 @@ def write_local_batch_item(script_path: Path, payload: dict, args: argparse.Name
             "long_form_slug": funnel["long_form_slug"],
             "playlist": funnel["playlist"],
             "cta_target": funnel["cta_target"],
-        })
+            "provenance": {
+                "batch_key": batch_key,
+                "video_type": args.type_of_vid,
+                "revision": revision,
+                "script_path": str(script_path),
+                "script_sha256": hashlib.sha256(script_path.read_bytes()).hexdigest() if script_path.exists() else "",
+                "regenerated_from": str(getattr(args, "_replacement_archive", "") or ""),
+                "recorded_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+            },
+        }
+        if existing is None:
+            videos.append(metadata)
+        else:
+            existing.clear()
+            existing.update(metadata)
     cli.update_ledger(
         script_path.stem,
         payload.get("title", ""),
         "ideation",
         "ok",
-        f"LLM script validated: {script_path}",
+        f"LLM script validated: {script_path}; revision={revision}",
     )
