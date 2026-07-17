@@ -191,6 +191,28 @@ def test_custom_long_prompt_does_not_describe_the_long_as_a_short():
     assert "knowledge long-form video" in prompt
 
 
+def test_long_prompt_makes_target_minutes_an_explicit_json_field():
+    from ytb_pipeline.orchestrator.ideation_prompts import local_script_prompt
+
+    prompt = local_script_prompt(1, 1, "long", "một cơ chế tâm lý", "")
+
+    assert '"target_minutes" is required for a Long' in prompt
+
+
+def test_expected_long_is_never_normalized_as_a_short_when_target_is_missing():
+    from ytb_pipeline.orchestrator.ideation_script_fix import normalize_short_narration
+
+    payload = {
+        "video_type": "long",
+        "sections": [{"voiceover": "Mến chào các bạn, " + "nội dung " * 500}],
+    }
+
+    fixed, note = normalize_short_narration(payload, expected_video_type="long")
+
+    assert fixed == payload
+    assert note is None
+
+
 def test_expected_long_contract_rejects_a_short_payload():
     """A long queue slot must never accept a JSON document shaped as a Short."""
     from ytb_pipeline.orchestrator.ideation_script_fix import validate_expected_video_type

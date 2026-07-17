@@ -114,9 +114,11 @@ def validate_expected_video_type(
         raise ValueError(f"Kịch bản {script_name}: expected short must not declare target_minutes.")
 
 
-def normalize_short_narration(payload: dict) -> tuple[dict, str | None]:
+def normalize_short_narration(
+    payload: dict, expected_video_type: str | None = None
+) -> tuple[dict, str | None]:
     """Keep local Short scripts inside the hard length gate without another LLM hop."""
-    if payload.get("target_minutes") is not None:
+    if expected_video_type == "long" or payload.get("target_minutes") is not None:
         return payload, None
     sections = [s for s in payload.get("sections", []) or [] if isinstance(s, dict)]
     if not sections:
@@ -175,7 +177,9 @@ async def validate_or_repair_script(
     last_qa_output: dict | None = None
 
     for attempt in range(1, max_attempts + 1):
-        current, normalized_note = normalize_short_narration(current)
+        current, normalized_note = normalize_short_narration(
+            current, expected_video_type=expected_video_type
+        )
         if normalized_note:
             if console_prefix:
                 print(f"{console_prefix} normalize: {normalized_note}", flush=True)

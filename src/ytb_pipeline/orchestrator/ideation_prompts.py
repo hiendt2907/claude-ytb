@@ -189,6 +189,11 @@ def local_script_prompt(
             "Make the final spoken CTA point to that exact long-form topic.\n"
         )
     format_name = "long-form video" if type_of_vid == "long" else "Short"
+    target_minutes_field = (
+        '"target_minutes" is required for a Long and must be the JSON number 12.'
+        if type_of_vid == "long"
+        else 'Do not include "target_minutes" for a Short.'
+    )
     custom_rules = "" if type_of_rules == "auto" else (
         "\nCustom idea rules:\n"
         "- The user's idea overrides the default channel niche and old ledger topics.\n"
@@ -215,7 +220,8 @@ def local_script_prompt(
         "Blocked historical titles/topics:\n"
         f"{blocked_titles or '- none'}\n\n"
         "Return ONLY one JSON object with keys: slug, topic, title, description, tags, "
-        "video_type, voice_profile, sections, compliance. video_type is only long or short. "
+        "video_type, target_minutes, voice_profile, sections, compliance. video_type is only long or short. "
+        f"{target_minutes_field} "
         "voice_profile is knowledge or inspiring. Each section needs time_goal as a positive JSON number of minutes (never 0/null/string/timestamp/range), voiceover, "
         "visual_intent, pexels_query, caption, hook, transition, payoff, emphasis. "
         "Keep legacy narration equal to voiceover and broll equal to pexels_query for compatibility.\n"
