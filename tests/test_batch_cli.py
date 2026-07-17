@@ -73,7 +73,7 @@ def test_load_queue_sorted_by_day(auto_state_file):
     assert [i.slug for i in queue] == ["a-video", "b-video", "c-video"]
 
 
-def test_load_queue_includes_short_videos_sorted_with_long(tmp_path):
+def test_load_queue_prioritizes_long_dependencies_before_shorts(tmp_path):
     path = tmp_path / "auto_state.json"
     path.write_text(json.dumps({
         "shorts_funnel_batch_2026-07-06": {
@@ -88,7 +88,7 @@ def test_load_queue_includes_short_videos_sorted_with_long(tmp_path):
 
     queue = cli.load_queue(path)
 
-    assert [i.slug for i in queue] == ["short-video", "long-video"]
+    assert [i.slug for i in queue] == ["long-video", "short-video"]
 
 
 # ── done_slugs ────────────────────────────────────────────────────────────────

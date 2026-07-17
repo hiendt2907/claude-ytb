@@ -182,6 +182,18 @@ def test_long_prompt_declares_a_safe_runtime_floor():
     assert "measured minutes fall below the declared target_minutes" in SCRIPT_GENERATION_SYSTEM_PROMPT
 
 
+def test_expected_long_contract_rejects_a_short_payload():
+    """A long queue slot must never accept a JSON document shaped as a Short."""
+    from ytb_pipeline.orchestrator.ideation_script_fix import validate_expected_video_type
+
+    with pytest.raises(ValueError, match="expected long"):
+        validate_expected_video_type(
+            {"video_type": "short", "sections": []},
+            expected_video_type="long",
+            script_name="week2-long.json",
+        )
+
+
 def test_json_parser_accepts_one_trailing_closing_brace():
     from ytb_pipeline.orchestrator.ideation_script_fix import json_from_llm
 
