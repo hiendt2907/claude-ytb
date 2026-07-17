@@ -622,7 +622,7 @@ async def test_multiplatform_publish_validates_manual_export_manifest(tmp_path, 
     monkeypatch.setattr(multiplatform, "get_publish_provider", lambda _name: BrokenProvider())
 
     with pytest.raises(FileNotFoundError):
-        await multiplatform.publish_to_platforms(video, ["tiktok"])
+        await multiplatform.publish_to_platforms(video, ["manual_export"])
 
 
 def test_run_project_resume_publish_rehydrates_rendered_video(tmp_path, monkeypatch):

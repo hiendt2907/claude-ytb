@@ -124,7 +124,6 @@ def test_publish_summary_prefers_primary_platform(tmp_path):
     project = checkpoint.mark_done(
         project, "publish", "ref",
         {"platforms": {
-            "tiktok": {"uploaded": True, "url": "https://tiktok/x"},
             "youtube_short": {"uploaded": True, "url": "https://youtu.be/X"},
         }},
     )

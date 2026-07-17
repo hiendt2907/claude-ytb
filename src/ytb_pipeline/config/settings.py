@@ -68,10 +68,9 @@ class Settings(BaseSettings):
     youtube_contains_synthetic_media: bool = True
 
     # Platform
-    default_platform: str = "youtube_short"  # youtube_short | youtube_long | tiktok | instagram_reel | facebook_reel
+    default_platform: str = "youtube_short"  # youtube_short | youtube_long | instagram_reel | facebook_reel
     target_platforms: str = "youtube_short"
     manual_publish_dir: Path = Field(default=Path("assets/manual_publish_queue"))
-    tiktok_access_token: str = ""
     instagram_access_token: str = ""
     facebook_access_token: str = ""
 

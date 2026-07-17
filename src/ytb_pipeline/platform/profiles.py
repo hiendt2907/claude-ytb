@@ -12,7 +12,6 @@ from enum import Enum
 class Platform(str, Enum):
     YOUTUBE_SHORT = "youtube_short"
     YOUTUBE_LONG = "youtube_long"
-    TIKTOK = "tiktok"
     INSTAGRAM_REEL = "instagram_reel"
     FACEBOOK_REEL = "facebook_reel"
     PODCAST = "podcast"
@@ -73,22 +72,6 @@ PROFILES: dict[Platform, PlatformProfile] = {
         supports_scheduled_publish=True,
         requires_aspect_ratio_disclosure=False,
         display_name="YouTube Long",
-    ),
-    Platform.TIKTOK: PlatformProfile(
-        platform=Platform.TIKTOK,
-        max_duration_sec=600,
-        min_duration_sec=3,
-        width=1080,
-        height=1920,
-        fps=30,
-        sample_rate=44100,
-        max_title_chars=150,
-        max_description_chars=2200,
-        max_tags=0,
-        max_hashtags=5,
-        supports_scheduled_publish=False,
-        requires_aspect_ratio_disclosure=False,
-        display_name="TikTok",
     ),
     Platform.INSTAGRAM_REEL: PlatformProfile(
         platform=Platform.INSTAGRAM_REEL,
@@ -158,7 +141,7 @@ PROFILES: dict[Platform, PlatformProfile] = {
 
 
 def get_profile(platform: "Platform | str") -> PlatformProfile:
-    """Tra cứu profile theo Platform enum hoặc tên chuỗi (vd "tiktok")."""
+    """Tra cứu profile theo Platform enum hoặc tên chuỗi."""
     if isinstance(platform, Platform):
         return PROFILES[platform]
     try:

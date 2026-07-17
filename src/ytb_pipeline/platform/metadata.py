@@ -63,7 +63,7 @@ class MetadataAdapter:
     ) -> list[str]:
         """Quy tắc hashtag riêng từng platform:
         - YouTube Short: luôn có #Shorts đứng đầu.
-        - TikTok/Instagram Reel: dùng tag thô (không thêm "#"), nền tảng tự gắn.
+        - Instagram/Facebook Reel: dùng tag thô (không thêm "#"), nền tảng tự gắn.
         - Podcast/Blog: max_hashtags=0 -> không có hashtag.
         - Còn lại: top N tag (đã thêm "#") theo max_hashtags.
         """
@@ -81,7 +81,7 @@ class MetadataAdapter:
                     break
             return hashtags
 
-        if platform in (Platform.TIKTOK, Platform.INSTAGRAM_REEL, Platform.FACEBOOK_REEL):
+        if platform in (Platform.INSTAGRAM_REEL, Platform.FACEBOOK_REEL):
             seen: list[str] = []
             for tag in tags:
                 cleaned = tag.strip().lstrip("#")

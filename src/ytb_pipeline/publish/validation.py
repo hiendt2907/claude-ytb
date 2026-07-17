@@ -40,7 +40,7 @@ def validate_publish_result(platform: str, result: PublishResult) -> None:
             raise ValueError(f"{platform}: YouTube upload thiếu youtube_id")
         return
 
-    if platform in {"tiktok", "instagram_reel", "facebook_reel", "manual_export"}:
+    if platform in {"instagram_reel", "facebook_reel", "manual_export"}:
         if not result.url:
             raise ValueError(f"{platform}: manual export thiếu manifest url")
         manifest = Path(result.url.split("#", 1)[0])
