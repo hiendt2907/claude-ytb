@@ -1408,6 +1408,23 @@ def test_cmd_stop_sends_sigterm_to_pid_in_file(tmp_path, monkeypatch, capsys):
     assert "dừng graceful" in capsys.readouterr().out
 
 
+def test_cmd_stop_terminates_staged_descendants_before_batch_parent(tmp_path, monkeypatch):
+    pid_path = tmp_path / "batch_cli.pid"
+    pid_path.write_text("100", encoding="utf-8")
+    monkeypatch.setattr(cli, "PID_PATH", pid_path)
+    monkeypatch.setattr(cli, "_descendant_pids", lambda _pid: [101, 102])
+    sent = []
+    monkeypatch.setattr(cli.os, "kill", lambda pid, sig: sent.append((pid, sig)))
+
+    cli.cmd_stop(argparse.Namespace())
+
+    assert sent == [
+        (101, cli.signal.SIGTERM),
+        (102, cli.signal.SIGTERM),
+        (100, cli.signal.SIGTERM),
+    ]
+
+
 def test_cmd_stop_cleans_up_stale_pid_file(tmp_path, monkeypatch, capsys):
     pid_path = tmp_path / "batch_cli.pid"
     pid_path.write_text("999999", encoding="utf-8")

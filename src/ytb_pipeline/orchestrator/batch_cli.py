@@ -150,6 +150,57 @@ def _pid_alive(pid: int) -> bool:
     return True
 
 
+def _descendant_pids(root_pid: int) -> list[int]:
+    """Return the current descendant process IDs of a tracked batch process.
+
+    Staged F5 lanes deliberately run in separate process groups, so signalling
+    only the batch parent cannot guarantee that its TTS daemons and pipeline
+    children stop.  Resolve the tree immediately before stopping it instead of
+    relying on process-group inheritance that the runner intentionally avoids.
+    """
+    try:
+        result = subprocess.run(
+            ["ps", "-axo", "pid=,ppid="],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return []
+
+    children: dict[int, list[int]] = {}
+    for line in result.stdout.splitlines():
+        columns = line.split()
+        if len(columns) != 2:
+            continue
+        try:
+            pid, parent_pid = map(int, columns)
+        except ValueError:
+            continue
+        children.setdefault(parent_pid, []).append(pid)
+
+    descendants: list[int] = []
+    pending = list(children.get(root_pid, []))
+    while pending:
+        pid = pending.pop()
+        descendants.append(pid)
+        pending.extend(children.get(pid, []))
+    return descendants
+
+
+def _terminate_tracked_batch_tree(pid: int) -> list[int]:
+    """Send SIGTERM to every currently owned process, children before parent."""
+    targets = [*_descendant_pids(pid), pid]
+    for target in targets:
+        try:
+            os.kill(target, signal.SIGTERM)
+        except ProcessLookupError:
+            if target == pid:
+                raise
+            continue
+    return targets
+
+
 def check_not_already_running() -> None:
     """Chặn `run`/`retry` chồng lên 1 tiến trình cũ chưa thoát -- 2 process đua nhau
     ghi cùng file audio/render gây hỏng dữ liệu (đã xảy ra thật, xem ledger 23/06)."""
@@ -559,14 +610,15 @@ def cmd_stop(args: argparse.Namespace) -> None:
         return
     pid = int(PID_PATH.read_text(encoding="utf-8").strip())
     try:
-        os.kill(pid, signal.SIGTERM)
+        targets = _terminate_tracked_batch_tree(pid)
     except ProcessLookupError:
         print(f"Process {pid} đã không còn chạy (pid file cũ) — dọn pid file.")
         PID_PATH.unlink(missing_ok=True)  # đã xác nhận chết hẳn -- xoá vô điều kiện
         return
     print(
-        f"✓ Đã gửi lệnh dừng graceful tới process {pid}. Tiến trình con (render/upload) sẽ bị "
-        "kill an toàn ngay, ledger ghi nhận stage hiện tại với status 'stopped'. Chạy lại "
+        f"✓ Đã gửi lệnh dừng graceful tới {len(targets)} process trong batch tree (root {pid}). "
+        "Tiến trình con (render/upload/TTS) được dừng cùng lúc, ledger ghi nhận stage hiện tại "
+        "với status 'stopped'. Chạy lại "
         "`ytb batch run --loop` (hoặc `ytb batch retry <slug>`) để tiếp tục ĐÚNG video này."
     )
 

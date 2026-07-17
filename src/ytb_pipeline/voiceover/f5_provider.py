@@ -32,6 +32,10 @@ F5_CKPT = ROOT / "models" / "vivoice" / "model_last.pt"
 F5_VOCAB = ROOT / "models" / "vivoice" / "config.json"
 F5_MODEL_ARCH = "F5TTS_Base"  # kiến trúc nền của bản fine-tune Việt
 F5_DEVICE = "mps"  # GPU Apple Silicon; đổi "cpu" nếu máy khác
+# F5-TTS defaults to a random 64-bit seed, but then exports it as
+# PYTHONHASHSEED (which CPython limits to 32 bits). Keep the inference seed in
+# the worker contract so all helper processes remain startable.
+F5_INFERENCE_SEED = 0
 
 F5_REF_AUDIO = ROOT / "assets" / "ref" / "narrator.wav"
 F5_REF_TEXT_FILE = ROOT / "assets" / "ref" / "narrator.txt"
@@ -178,6 +182,7 @@ def run_batch(jobs: list[dict]) -> None:
         "ref_audio": str(F5_REF_AUDIO),
         "ref_text": ref_text,
         "max_chars": F5_MAX_CHARS,
+        "inference_seed": F5_INFERENCE_SEED,
         "jobs": jobs,
     }
     with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False,

@@ -38,6 +38,26 @@ from pathlib import Path
 # every helper inherits a value CPython accepts during pre-initialization.
 os.environ["PYTHONHASHSEED"] = "0"
 
+# CPython only accepts values in [0, 2**32 - 1] for PYTHONHASHSEED.  F5-TTS
+# otherwise generates a random value up to sys.maxsize on every inference and
+# exports it to this process environment, which can make later Python helpers
+# abort during interpreter startup on 64-bit macOS.
+_PYTHON_HASH_SEED_MAX = (2**32) - 1
+
+
+def _inference_seed(manifest: dict) -> int:
+    """Return the validated deterministic seed used for every F5 inference."""
+    raw_seed = manifest.get("inference_seed", 0)
+    if isinstance(raw_seed, bool):
+        raise ValueError("inference_seed phải là số nguyên không âm")
+    try:
+        seed = int(raw_seed)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("inference_seed phải là số nguyên") from exc
+    if not 0 <= seed <= _PYTHON_HASH_SEED_MAX:
+        raise ValueError(f"inference_seed phải nằm trong 0..{_PYTHON_HASH_SEED_MAX}")
+    return seed
+
 
 def _is_valid_wav(path: Path) -> bool:
     """True nếu `path` là wav đọc được và có frame — chặn file dở dang do bị kill giữa lúc ghi."""
@@ -116,6 +136,7 @@ def _run_jobs(tts, manifest: dict, emit=print) -> int:
     max_chars = int(manifest.get("max_chars", 300))
     ref_audio = manifest["ref_audio"]
     ref_text = manifest["ref_text"]
+    inference_seed = _inference_seed(manifest)
 
     emit(f"[f5-batch] nhận {len(jobs)} job", flush=True)
 
@@ -136,7 +157,8 @@ def _run_jobs(tts, manifest: dict, emit=print) -> int:
         if len(chunks) <= 1:
             tts.infer(ref_file=ref_audio, ref_text=ref_text,
                       gen_text=chunks[0] if chunks else job["text"],
-                      file_wave=str(out), remove_silence=False)
+                      file_wave=str(out), remove_silence=False,
+                      seed=inference_seed)
         else:
             parts: list[Path] = []
             try:
@@ -144,7 +166,7 @@ def _run_jobs(tts, manifest: dict, emit=print) -> int:
                     part = out.with_name(f"{out.stem}.c{k:02d}.wav")
                     tts.infer(ref_file=ref_audio, ref_text=ref_text,
                               gen_text=chunk, file_wave=str(part),
-                              remove_silence=False)
+                              remove_silence=False, seed=inference_seed)
                     parts.append(part)
                 _concat_wavs(parts, out)
             finally:
