@@ -233,6 +233,29 @@ def test_script_prompt_uses_canonical_section_fields_without_alias_duplication()
     assert "Keep legacy narration equal to voiceover" not in prompt
 
 
+def test_long_overflow_is_trimmed_without_touching_opening_or_final_cta():
+    from ytb_pipeline.orchestrator.ideation_prompts import LONG_SAFE_MAX_CHARS
+    from ytb_pipeline.orchestrator.ideation_script_fix import (
+        normalize_long_overflow,
+        short_narration_chars,
+    )
+
+    opening = "Mến chào các bạn, " + "mở đầu có chủ đề. " * 60
+    final = "Hãy làm một việc trong mười phút. Hãy like và subscribe. " * 50
+    payload = {
+        "sections": [{"voiceover": opening}]
+        + [{"voiceover": "nội dung cụ thể. " * 500} for _ in range(4)]
+        + [{"voiceover": final}],
+    }
+
+    fixed, note = normalize_long_overflow(payload, expected_video_type="long")
+
+    assert note is not None
+    assert short_narration_chars(fixed) <= LONG_SAFE_MAX_CHARS
+    assert fixed["sections"][0]["voiceover"] == opening
+    assert fixed["sections"][-1]["voiceover"] == final
+
+
 def test_expected_long_contract_rejects_a_short_payload():
     """A long queue slot must never accept a JSON document shaped as a Short."""
     from ytb_pipeline.orchestrator.ideation_script_fix import validate_expected_video_type

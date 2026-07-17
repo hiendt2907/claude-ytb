@@ -17,6 +17,7 @@ from ..ideation.generator import load_script
 from .state_io import atomic_write_json
 from .ideation_prompts import (
     SCRIPT_GENERATION_SYSTEM_PROMPT,
+    LONG_SAFE_MAX_CHARS,
     SHORT_MAX_CHARS,
     SHORT_MIN_CHARS,
     SHORT_TARGET_CHARS,
@@ -157,6 +158,35 @@ def normalize_short_narration(
     return payload, f"normalized short narration to {total} chars"
 
 
+def normalize_long_overflow(payload: dict, expected_video_type: str | None = None) -> tuple[dict, str | None]:
+    """Trim only redundant middle narration when a valid Long narrowly exceeds its cap."""
+    if expected_video_type != "long":
+        return payload, None
+    sections = [s for s in payload.get("sections", []) or [] if isinstance(s, dict)]
+    total = short_narration_chars(payload)
+    if total <= LONG_SAFE_MAX_CHARS or len(sections) < 3:
+        return payload, None
+    excess = total - LONG_SAFE_MAX_CHARS
+    candidates = sections[1:-1]
+    for section in sorted(candidates, key=lambda item: len(str(item.get("voiceover") or item.get("narration") or "")), reverse=True):
+        if excess <= 0:
+            break
+        narration = str(section.get("voiceover") or section.get("narration") or "")
+        removable = min(excess, max(0, len(narration) - 180))
+        if removable <= 0:
+            continue
+        trimmed = trim_to_sentence(narration, len(narration) - removable)
+        removed = len(narration) - len(trimmed)
+        if removed > 0:
+            section["voiceover"] = trimmed
+            if "narration" in section:
+                section["narration"] = trimmed
+            excess -= removed
+    if excess > 0:
+        return payload, None
+    return payload, f"trimmed long narration to {short_narration_chars(payload)} chars"
+
+
 async def validate_or_repair_script(
     provider,
     payload: dict,
@@ -177,14 +207,16 @@ async def validate_or_repair_script(
     last_qa_output: dict | None = None
 
     for attempt in range(1, max_attempts + 1):
+        current, long_note = normalize_long_overflow(current, expected_video_type)
         current, normalized_note = normalize_short_narration(
             current, expected_video_type=expected_video_type
         )
-        if normalized_note:
+        if long_note or normalized_note:
+            note = long_note or normalized_note
             if console_prefix:
-                print(f"{console_prefix} normalize: {normalized_note}", flush=True)
+                print(f"{console_prefix} normalize: {note}", flush=True)
             if log_path:
-                append_local_start_log(log_path, f"NORMALIZE {attempt}", normalized_note)
+                append_local_start_log(log_path, f"NORMALIZE {attempt}", note)
         if console_prefix:
             print(f"{console_prefix} validate: attempt {attempt}/{max_attempts}", flush=True)
         if log_path:
