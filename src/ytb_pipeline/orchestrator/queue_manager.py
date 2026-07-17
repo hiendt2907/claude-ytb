@@ -50,6 +50,7 @@ class QueueItem:
     long_form_slug: str = ""
     playlist: str = ""
     cta_target: str = ""
+    dry_run: bool = False
 
 
 def load_queue(auto_state_path: Path | None = None, batch_key: str | None = None) -> list[QueueItem]:
@@ -77,6 +78,7 @@ def load_queue(auto_state_path: Path | None = None, batch_key: str | None = None
             v.get("long_form_slug", ""),
             v.get("playlist", ""),
             v.get("cta_target", ""),
+            bool(v.get("dry_run", False)),
         )
         for v in videos
     ]

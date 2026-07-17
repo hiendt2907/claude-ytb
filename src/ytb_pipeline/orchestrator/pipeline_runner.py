@@ -91,7 +91,7 @@ def build_env(item: QueueItem) -> dict:
             "BROLL_STRATEGY": "pexels",
             "VIDEO_PROVIDER": "pexels",
             "ORIENTATION": item.orientation,
-            "DRY_RUN": "false",
+            "DRY_RUN": "true" if item.dry_run else "false",
             "YOUTUBE_PUBLISH_AT": item.publish_at,
         }
     )
