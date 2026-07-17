@@ -13,13 +13,12 @@ Bản ViVoice train 1000h; `config.json` đóng vai file vocab. Chạy trên MPS
 import json
 import os
 import re
+import socket
 import subprocess
 import tempfile
+import time
 from collections import deque
-from contextlib import contextmanager
-import fcntl
 from pathlib import Path
-from typing import Iterator
 
 ROOT = Path(__file__).resolve().parents[3]
 F5_BATCH_WORKER = ROOT / "scripts" / "f5_batch_worker.py"
@@ -33,7 +32,6 @@ F5_CKPT = ROOT / "models" / "vivoice" / "model_last.pt"
 F5_VOCAB = ROOT / "models" / "vivoice" / "config.json"
 F5_MODEL_ARCH = "F5TTS_Base"  # kiến trúc nền của bản fine-tune Việt
 F5_DEVICE = "mps"  # GPU Apple Silicon; đổi "cpu" nếu máy khác
-F5_MPS_LOCK = ROOT / "assets" / ".f5-mps.lock"
 
 F5_REF_AUDIO = ROOT / "assets" / "ref" / "narrator.wav"
 F5_REF_TEXT_FILE = ROOT / "assets" / "ref" / "narrator.txt"
@@ -146,23 +144,6 @@ def synthesize_f5(text: str, out_path: Path) -> None:
             p.unlink(missing_ok=True)
 
 
-@contextmanager
-def f5_device_lock(lock_path: Path = F5_MPS_LOCK) -> Iterator[None]:
-    """Reserve the one Apple MPS device while an F5 model is loaded.
-
-    Each F5 worker loads a 5.4 GB checkpoint. Concurrent processes on one MPS
-    device heavily contend and turn a batch into an apparent stall, so this is
-    deliberately a cross-process lock rather than an in-memory mutex.
-    """
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-    with lock_path.open("a+") as lock_file:
-        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
-        try:
-            yield
-        finally:
-            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
-
-
 def run_batch(jobs: list[dict]) -> None:
     """Sinh NHIỀU đoạn trong MỘT process F5 — nạp model 1 lần cho cả tập.
 
@@ -170,7 +151,8 @@ def run_batch(jobs: list[dict]) -> None:
     trong `.venv-tts`; stream tiến độ ra stdout. Raise nếu worker lỗi.
 
     Đây là đường nhanh thay cho việc gọi `synthesize_f5` từng cụm (mỗi lần nạp
-    lại checkpoint 5.4GB). Giữ nguyên chunking 300 ký tự bên trong worker.
+    lại checkpoint 5.4GB). Không khoá MPS giữa các video: `ytb batch run
+    --workers 2` phải thực sự chạy hai voiceover F5 đồng thời.
     """
     _require(F5_PYTHON, "Python .venv-tts")
     _require(F5_BATCH_WORKER, "worker batch f5")
@@ -180,6 +162,11 @@ def run_batch(jobs: list[dict]) -> None:
     _require(F5_REF_TEXT_FILE, "transcript narrator.txt")
 
     if not jobs:
+        return
+
+    daemon_socket = os.environ.get("F5_DAEMON_SOCKET", "").strip()
+    if daemon_socket:
+        run_daemon_batch(Path(daemon_socket), jobs)
         return
 
     ref_text = F5_REF_TEXT_FILE.read_text(encoding="utf-8").strip()
@@ -201,23 +188,55 @@ def run_batch(jobs: list[dict]) -> None:
     # PYTHONHASHSEED hợp lệ để tiến trình con của torch không "Fatal Python error".
     env = {**os.environ, "PYTHONHASHSEED": "0"}
     try:
-        with f5_device_lock():
-            proc = subprocess.Popen(
-                [str(F5_PYTHON), str(F5_BATCH_WORKER), str(manifest_path)],
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=env,
-            )
-            tail: deque[str] = deque(maxlen=80)
-            for line in proc.stdout:  # stream tiến độ từng job
-                line = line.rstrip()
-                tail.append(line)
-                if line.startswith("JOB ") or line.startswith("[f5-batch]"):
-                    print(f"    {line}", flush=True)
-            code = proc.wait()
-            if code != 0:
-                details = "\n".join(tail)
-                raise RuntimeError(f"F5 batch worker lỗi (code {code}):\n{details}")
+        proc = subprocess.Popen(
+            [str(F5_PYTHON), str(F5_BATCH_WORKER), str(manifest_path)],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=env,
+        )
+        tail: deque[str] = deque(maxlen=80)
+        for line in proc.stdout:  # stream tiến độ từng job
+            line = line.rstrip()
+            tail.append(line)
+            if line.startswith("JOB ") or line.startswith("[f5-batch]"):
+                print(f"    {line}", flush=True)
+        code = proc.wait()
+        if code != 0:
+            details = "\n".join(tail)
+            raise RuntimeError(f"F5 batch worker lỗi (code {code}):\n{details}")
     finally:
         manifest_path.unlink(missing_ok=True)
+
+
+def run_daemon_batch(socket_path: Path, jobs: list[dict]) -> None:
+    """Send one video's jobs to a resident F5 daemon and stream its progress."""
+    deadline = time.monotonic() + 120
+    client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        while True:
+            try:
+                client.connect(str(socket_path))
+                break
+            except FileNotFoundError:
+                if time.monotonic() >= deadline:
+                    raise TimeoutError(f"F5 daemon chưa mở socket: {socket_path}")
+                time.sleep(0.1)
+            except ConnectionRefusedError:
+                if time.monotonic() >= deadline:
+                    raise TimeoutError(f"F5 daemon chưa sẵn sàng: {socket_path}")
+                time.sleep(0.1)
+        with client.makefile("rwb") as stream:
+            stream.write(json.dumps({"jobs": jobs}, ensure_ascii=False).encode("utf-8") + b"\n")
+            stream.flush()
+            for raw in stream:
+                event = json.loads(raw)
+                if event.get("event") == "progress":
+                    print(f"    {event['line']}", flush=True)
+                elif event.get("event") == "error":
+                    raise RuntimeError(f"F5 daemon lỗi: {event.get('detail', 'unknown error')}")
+                elif event.get("event") == "done":
+                    return
+            raise RuntimeError("F5 daemon đóng kết nối trước khi báo hoàn tất")
+    finally:
+        client.close()
 
 
 def _require(path: Path, what: str) -> None:

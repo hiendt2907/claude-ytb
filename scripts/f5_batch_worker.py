@@ -22,8 +22,10 @@ giữa batch), job được bỏ qua (`JOB i/n skip (đã có) <out>`) — cho p
 
 from __future__ import annotations
 
+import argparse
 import json
 import re
+import socket
 import subprocess
 import sys
 import tempfile
@@ -88,14 +90,8 @@ def _concat_wavs(parts: list[Path], out: Path) -> None:
         list_path.unlink(missing_ok=True)
 
 
-def main() -> int:
-    manifest = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-    jobs = manifest["jobs"]
-    max_chars = int(manifest.get("max_chars", 300))
-    ref_audio = manifest["ref_audio"]
-    ref_text = manifest["ref_text"]
-
-    # Nạp model MỘT LẦN cho cả tập.
+def _load_tts(manifest: dict):
+    """Load the model once; a daemon keeps this object resident across videos."""
     from f5_tts.api import F5TTS
 
     print(f"[f5-batch] nạp model {manifest['model']} ({manifest['device']})…", flush=True)
@@ -105,7 +101,17 @@ def main() -> int:
         vocab_file=manifest["vocab"],
         device=manifest["device"],
     )
-    print(f"[f5-batch] model sẵn sàng — {len(jobs)} job", flush=True)
+    print("[f5-batch] model sẵn sàng", flush=True)
+    return tts
+
+
+def _run_jobs(tts, manifest: dict, emit=print) -> int:
+    jobs = manifest["jobs"]
+    max_chars = int(manifest.get("max_chars", 300))
+    ref_audio = manifest["ref_audio"]
+    ref_text = manifest["ref_text"]
+
+    emit(f"[f5-batch] nhận {len(jobs)} job", flush=True)
 
     n = len(jobs)
     for i, job in enumerate(jobs, 1):
@@ -116,7 +122,7 @@ def main() -> int:
         # bỏ qua, không nạp lại model/render lại — đây là điểm mấu chốt để resume
         # đúng ngay job bị dừng (vd job 200/250) chứ không chạy lại từ job 1.
         if out.exists() and _is_valid_wav(out):
-            print(f"JOB {i}/{n} skip (đã có) {out}", flush=True)
+            emit(f"JOB {i}/{n} skip (đã có) {out}", flush=True)
             continue
 
         chunks = _split_text(job["text"], max_chars)
@@ -140,12 +146,60 @@ def main() -> int:
                     p.unlink(missing_ok=True)
 
         if not out.exists():
-            print(f"[f5-batch] LỖI job {i}/{n}: không tạo được {out}", flush=True)
+            emit(f"[f5-batch] LỖI job {i}/{n}: không tạo được {out}", flush=True)
             return 1
-        print(f"JOB {i}/{n} ok {out}", flush=True)
+        emit(f"JOB {i}/{n} ok {out}", flush=True)
 
-    print("[f5-batch] xong toàn bộ", flush=True)
+    emit("[f5-batch] xong toàn bộ", flush=True)
     return 0
+
+
+def _serve(socket_path: Path, manifest: dict) -> int:
+    """Serve one job list at a time while retaining the loaded model."""
+    socket_path.parent.mkdir(parents=True, exist_ok=True)
+    socket_path.unlink(missing_ok=True)
+    server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    server.bind(str(socket_path))
+    server.listen(4)
+    try:
+        tts = _load_tts(manifest)
+        while True:
+            conn, _ = server.accept()
+            with conn, conn.makefile("rwb") as stream:
+                request = json.loads(stream.readline())
+                if request.get("command") == "shutdown":
+                    stream.write(b'{"event":"done"}\n')
+                    stream.flush()
+                    return 0
+
+                def emit(line: str, **_ignored) -> None:
+                    stream.write(json.dumps({"event": "progress", "line": line}, ensure_ascii=False).encode("utf-8") + b"\n")
+                    stream.flush()
+
+                try:
+                    code = _run_jobs(tts, {**manifest, "jobs": request["jobs"]}, emit=emit)
+                    if code:
+                        stream.write(json.dumps({"event": "error", "detail": f"job worker exit {code}"}).encode("utf-8") + b"\n")
+                    else:
+                        stream.write(b'{"event":"done"}\n')
+                    stream.flush()
+                except Exception as exc:  # noqa: BLE001 -- return daemon errors to the requesting lane
+                    stream.write(json.dumps({"event": "error", "detail": str(exc)}, ensure_ascii=False).encode("utf-8") + b"\n")
+                    stream.flush()
+    finally:
+        server.close()
+        socket_path.unlink(missing_ok=True)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--serve", type=Path)
+    parser.add_argument("manifest", type=Path)
+    args = parser.parse_args()
+    manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
+    if args.serve:
+        return _serve(args.serve, manifest)
+    return _run_jobs(_load_tts(manifest), manifest)
 
 
 if __name__ == "__main__":
