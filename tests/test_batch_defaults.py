@@ -182,6 +182,15 @@ def test_long_prompt_declares_a_safe_runtime_floor():
     assert "measured minutes fall below the declared target_minutes" in SCRIPT_GENERATION_SYSTEM_PROMPT
 
 
+def test_custom_long_prompt_does_not_describe_the_long_as_a_short():
+    from ytb_pipeline.orchestrator.ideation_prompts import local_script_prompt
+
+    prompt = local_script_prompt(1, 1, "long", "một cơ chế tâm lý", "")
+
+    assert "knowledge short" not in prompt
+    assert "knowledge long-form video" in prompt
+
+
 def test_expected_long_contract_rejects_a_short_payload():
     """A long queue slot must never accept a JSON document shaped as a Short."""
     from ytb_pipeline.orchestrator.ideation_script_fix import validate_expected_video_type

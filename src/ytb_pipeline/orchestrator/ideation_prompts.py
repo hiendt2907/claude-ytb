@@ -188,13 +188,14 @@ def local_script_prompt(
             f"cta_target={funnel.get('cta_target', '')}. "
             "Make the final spoken CTA point to that exact long-form topic.\n"
         )
+    format_name = "long-form video" if type_of_vid == "long" else "Short"
     custom_rules = "" if type_of_rules == "auto" else (
         "\nCustom idea rules:\n"
         "- The user's idea overrides the default channel niche and old ledger topics.\n"
         "- Use the ledger ONLY as a blacklist of topics/titles to avoid, not as inspiration.\n"
         "- Current channel scope is sharing/knowledge, not entertainment. Do NOT write comedy, "
         "comedy, punchline structure, or gag narration for this channel.\n"
-        "- Write a clear Vietnamese knowledge short: concrete everyday example, mechanism, "
+        f"- Write a clear Vietnamese knowledge {format_name}: concrete everyday example, mechanism, "
         "application step, and grounded Pexels queries for real stock footage.\n"
         "- The narration must contain a concrete everyday example and an actionable application in natural Vietnamese; do not use fixed labels or template phrases.\n"
     )
