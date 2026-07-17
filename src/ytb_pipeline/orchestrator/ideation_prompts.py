@@ -224,7 +224,7 @@ def local_script_prompt(
         f"{target_minutes_field} "
         "voice_profile is knowledge or inspiring. Each section needs time_goal as a positive JSON number of minutes (never 0/null/string/timestamp/range), voiceover, "
         "visual_intent, pexels_query, caption, hook, transition, payoff, emphasis. "
-        "Keep legacy narration equal to voiceover and broll equal to pexels_query for compatibility.\n"
+        "Use these canonical fields only; the pipeline reads voiceover and pexels_query directly.\n"
         "compliance.passed must be true and include community/copyright/accuracy/"
         "advertiser/coppa/notes."
     )
@@ -259,8 +259,8 @@ def repair_prompt(payload: dict, qa_output: dict | None, validation_error: str |
         "sections, compliance. video_type is only short or long. \"target_minutes\" is required for a Long "
         f"and must be the JSON number {LONG_MIN_MINUTES}; omit it for a Short. voice_profile is knowledge "
         "or inspiring. Each section needs time_goal as a positive JSON number of minutes (never 0/null/string/timestamp/range; examples 0.5, 0.75, 1.0), voiceover, visual_intent, pexels_query, "
-        "caption, hook, transition, payoff, emphasis. Also include legacy narration=voiceover "
-        "and broll=pexels_query. compliance.passed must be true.\n\n"
+        "caption, hook, transition, payoff, emphasis. Use these canonical fields only. "
+        "compliance.passed must be true.\n\n"
         f"Issues:\n{json.dumps(issues, ensure_ascii=False, indent=2)}\n\n"
         f"Current JSON:\n{json.dumps(payload, ensure_ascii=False, indent=2)}"
     )

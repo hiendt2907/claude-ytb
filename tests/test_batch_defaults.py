@@ -220,6 +220,17 @@ def test_long_repair_prompt_requires_target_minutes_and_preserves_valid_narratio
 
     assert '"target_minutes" is required for a Long' in prompt
     assert "Do not shorten or delete valid existing narration" in prompt
+    assert "legacy narration=voiceover" not in prompt
+
+
+def test_script_prompt_uses_canonical_section_fields_without_alias_duplication():
+    from ytb_pipeline.orchestrator.ideation_prompts import local_script_prompt
+
+    prompt = local_script_prompt(1, 1, "long", "một cơ chế tâm lý", "")
+
+    assert "voiceover" in prompt
+    assert "pexels_query" in prompt
+    assert "Keep legacy narration equal to voiceover" not in prompt
 
 
 def test_expected_long_contract_rejects_a_short_payload():
