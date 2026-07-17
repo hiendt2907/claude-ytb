@@ -91,7 +91,9 @@ def build_env(item: QueueItem) -> dict:
             "BROLL_STRATEGY": "pexels",
             "VIDEO_PROVIDER": "pexels",
             "ORIENTATION": item.orientation,
-            "DRY_RUN": "true" if item.dry_run else "false",
+            # Batch publish is explicitly real; queue metadata must not silently
+            # downgrade an authorized upload to a dry run.
+            "DRY_RUN": "false",
             "YOUTUBE_PUBLISH_AT": item.publish_at,
         }
     )

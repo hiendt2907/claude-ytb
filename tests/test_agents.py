@@ -590,7 +590,7 @@ async def test_qa_agent_series_dedup_flags_done_topic():
     assert "series_dedup" in rules
 
 
-async def test_strict_qa_requires_a_complete_concrete_example():
+async def test_strict_qa_does_not_require_literal_example_labels():
     agent = QAAgent()
     script = _make_script(
         narration_segments=["Ví dụ, một người trì hoãn việc khó mỗi ngày. " + chars_for_minutes(1.0)],
@@ -599,9 +599,23 @@ async def test_strict_qa_requires_a_complete_concrete_example():
     result = await agent.run({"script": script, "strict": True})
 
     rules = [v["rule"] for v in result.output["violations"]]
-    assert "concrete_example" in rules
-    violation = next(v for v in result.output["violations"] if v["rule"] == "concrete_example")
-    assert "suggestion" in violation
+    assert "concrete_example" not in rules
+
+
+async def test_strict_qa_accepts_labeled_everyday_example_with_nonstandard_verbs():
+    agent = QAAgent()
+    script = _make_script(
+        narration_segments=[
+            "Ví dụ cụ thể: bối cảnh: bước vào văn phòng sau khi đổi kiểu tóc; "
+            "hành động: bạn thấy đồng nghiệp nhìn mình; hậu quả: bạn mất tự nhiên và né giao tiếp; "
+            "cách áp dụng: ghi ánh nhìn vào cột dữ kiện và suy nghĩ vào cột suy đoán. "
+            + chars_for_minutes(1.0),
+        ],
+    )
+
+    result = await agent.run({"script": script, "strict": True})
+
+    assert not any(v["rule"] == "concrete_example" for v in result.output["violations"])
 
 
 async def test_strict_qa_rejects_missing_immediate_action_and_final_payoff():

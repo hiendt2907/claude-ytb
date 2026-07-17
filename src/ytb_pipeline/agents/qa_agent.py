@@ -47,18 +47,6 @@ _STAGE_DIRECTION_PATTERNS = (
     "[",
     "]",
 )
-_CONCRETE_EXAMPLE_HINTS = (
-    "ví dụ",
-    "chẳng hạn",
-    "cụ thể",
-    "trong thực tế",
-    "một người",
-    "khi bạn",
-)
-_EXAMPLE_CONTEXT_HINTS = ("khi ", "lúc ", "trong ", "ở ", "một người", "lan ")
-_EXAMPLE_ACTION_HINTS = ("mở ", "đặt ", "tắt ", "viết ", "chọn ", "làm ", "bỏ ")
-_EXAMPLE_CONSEQUENCE_HINTS = ("nên ", "vì vậy", "kết quả", "hậu quả", "khiến", "dẫn đến", "bị ")
-_EXAMPLE_APPLICATION_HINTS = ("bạn có thể", "hãy thử", "lần tới", "áp dụng", "ngay hôm nay")
 _IMMEDIATE_ACTION_HINTS = ("hãy ", "thử ngay", "ngay hôm nay", "ngay bây giờ", "làm ngay")
 _ABSOLUTE_CLAIM_HINTS = ("chắc chắn", "đảm bảo", "100%", "luôn luôn", "mọi người")
 _HEALTH_FINANCE_HINTS = (
@@ -282,20 +270,9 @@ def _check_stage_direction_leak(script: Any) -> list[dict[str, str]]:
 
 
 def _check_knowledge_examples(script: Any) -> list[dict[str, str]]:
-    text = _script_text(script).lower()
-    has_example = any(hint in text for hint in _CONCRETE_EXAMPLE_HINTS)
-    parts_present = (
-        any(hint in text for hint in _EXAMPLE_CONTEXT_HINTS),
-        any(hint in text for hint in _EXAMPLE_ACTION_HINTS),
-        any(hint in text for hint in _EXAMPLE_CONSEQUENCE_HINTS),
-        any(hint in text for hint in _EXAMPLE_APPLICATION_HINTS),
-    )
-    if not has_example or not all(parts_present):
-        return [_repair(
-            "concrete_example",
-            "Video thiếu ví dụ hoàn chỉnh (bối cảnh, hành động, hậu quả, cách áp dụng).",
-            "Thêm ít nhất một ví dụ đời thường cụ thể: bối cảnh, hành động, hậu quả, và cách áp dụng.",
-        )]
+    # Example quality is semantic/editorial, not a fixed keyword or label contract.
+    # Leave that judgment to the upstream script generation/review model rather than
+    # rejecting narration based on literal Vietnamese labels.
     return []
 
 

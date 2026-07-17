@@ -1,0 +1,14 @@
+{
+  "1": {
+    "slug": "tin-nhan-da-xem-va-hieu-ung-den-san-khau",
+    "stage": "running-voiceover",
+    "started_at": "2026-07-17T13:57:52+07:00",
+    "last_error": ""
+  },
+  "2": {
+    "slug": "so-sanh-anh-dai-dien-va-hieu-ung-den-san-khau",
+    "stage": "running-ideation",
+    "started_at": "2026-07-17T14:00:50+07:00",
+    "last_error": ""
+  }
+}

@@ -244,6 +244,9 @@ async def run_project(project: Project, checkpoint: CheckpointManager) -> Projec
         script = state.get("script")
         if script is None:
             script = load_script(_node_script_path(current))
+            # Ideation is the single content-quality input gate. Once its
+            # checkpoint exists, downstream stages consume that approved
+            # script without re-running editorial QA.
             if not checkpoint.is_done(current, "ideation"):
                 script = gate(script)
                 await _validate_script_qa_async(script)

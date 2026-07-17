@@ -1,0 +1,15 @@
+{
+  "videos": {
+    "mechanism-control": {
+      "youtube_id": "QzwLJAP1eL8",
+      "views": 0,
+      "average_view_duration": 0.0,
+      "average_percentage_viewed": 0.0,
+      "subscribers_gained": 0,
+      "comments": 0,
+      "collected_at": "2026-07-15T15:42:55.893651+07:00",
+      "age_hours": 1.7,
+      "decision": "needs_more_data"
+    }
+  }
+}

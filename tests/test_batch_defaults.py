@@ -58,6 +58,22 @@ def test_claude_batch_provider_uses_cli_default_model(monkeypatch):
     assert provider.model_name() == "default"
 
 
+def test_script_prompts_define_numeric_positive_time_goal():
+    from ytb_pipeline.orchestrator.ideation_prompts import (
+        SCRIPT_GENERATION_SYSTEM_PROMPT,
+        build_start_prompt,
+        repair_prompt,
+    )
+
+    for prompt in (
+        SCRIPT_GENERATION_SYSTEM_PROMPT,
+        build_start_prompt(1, "long", "auto"),
+        repair_prompt({}, {}, "time_goal phải > 0"),
+    ):
+        assert "positive JSON number" in prompt
+        assert "never 0/null/string/timestamp/range" in prompt
+
+
 def test_codex_batch_provider_uses_exec_json_prompt(monkeypatch):
     from ytb_pipeline.orchestrator import ideation_cmd
 
@@ -138,14 +154,14 @@ def test_batch_start_rejects_ollama_script_provider(monkeypatch):
         })())
 
 
-def test_repair_prompt_requires_a_concrete_narrated_example():
+def test_repair_prompt_requires_a_natural_concrete_narrated_example():
     from ytb_pipeline.orchestrator.ideation_prompts import repair_prompt
 
     prompt = repair_prompt({}, {"passed": False}, None)
 
-    assert "Ví dụ cụ thể:" in prompt
-    assert "bối cảnh" in prompt
-    assert "hậu quả" in prompt
+    assert "specific everyday context" in prompt
+    assert "natural Vietnamese" in prompt
+    assert "fixed labels" in prompt
 
 
 def test_system_prompt_requires_an_immediate_action_in_final_narration():
