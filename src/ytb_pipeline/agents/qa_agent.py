@@ -246,6 +246,15 @@ def _check_central_mechanism(script: Any) -> list[dict[str, str]]:
     """Keep each episode focused when the script explicitly names mechanisms."""
     names = re.findall(r"cơ chế\s+([\wà-ỹ\s]{2,40}?)(?:[,.;:]|\s+(?:và|nhưng|cũng)\s)", _script_text(script).lower())
     unique = {" ".join(name.split()) for name in names if name.strip()}
+    # The regex has no semantic knowledge of Vietnamese mechanism names.  A
+    # later mention can therefore include a following verb/question and look
+    # like a second mechanism ("lời nguyền tri thức" vs "lời nguyền tri thức
+    # hỏi điểm bắt đầu").  Treat prefix extensions as the same named mechanism;
+    # genuinely different names remain independent candidates below.
+    unique = {
+        name for name in unique
+        if not any(name != other and name.startswith(other + " ") for other in unique)
+    }
     if len(unique) <= 1:
         return []
     return [_repair(

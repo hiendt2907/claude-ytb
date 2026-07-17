@@ -678,6 +678,17 @@ async def test_strict_qa_rejects_multiple_competing_mechanisms():
     assert "central_mechanism" in [v["rule"] for v in result.output["violations"]]
 
 
+def test_mechanism_gate_does_not_split_one_name_from_its_following_question():
+    from ytb_pipeline.agents.qa_agent import _check_central_mechanism
+
+    script = _make_script(narration_segments=[
+        "Cơ chế lời nguyền tri thức, khiến người biết nhiều bỏ qua điểm bắt đầu của người mới. "
+        "Sau đó cơ chế lời nguyền tri thức hỏi điểm bắt đầu nào đã bị bỏ qua."
+    ])
+
+    assert _check_central_mechanism(script) == []
+
+
 async def test_qa_agent_handles_exception_gracefully():
     agent = QAAgent()
 
