@@ -216,6 +216,16 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
         default=1,
         help="Bắt đầu schedule sau N ngày tính từ hôm nay giờ VN; 0=hôm nay, 1=ngày mai (mặc định)",
     )
+    p_run.add_argument(
+        "--schedule-start-date",
+        default="",
+        help="Ngày bắt đầu lịch Short YYYY-MM-DD; ưu tiên hơn --schedule-start-days.",
+    )
+    p_run.add_argument(
+        "--long-publish-at",
+        default="",
+        help="Các mốc RFC3339 riêng cho Long, cách nhau bằng dấu phẩy; tách khỏi slot Short.",
+    )
     p_run.set_defaults(func=cmd_funcs["run"])
 
     p_verify = _sub(

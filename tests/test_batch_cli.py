@@ -964,6 +964,35 @@ def test_cli_parses_run_schedule_loop_flags():
     assert args.loop is True
     assert args.schedule_slots == "06:00,20:30"
     assert args.schedule_start_days == 1
+    assert args.schedule_start_date == ""
+    assert args.long_publish_at == ""
+
+
+def test_schedule_separates_explicit_long_dates_from_four_shorts_per_day(tmp_path, monkeypatch):
+    auto_state = tmp_path / "auto_state.json"
+    ledger = tmp_path / "ledger.md"
+    auto_state.write_text(json.dumps({"shorts_funnel_batch_2026-07-17": {
+        "long_videos": [{"slug": "long-a"}, {"slug": "long-b"}],
+        "short_videos": [{"day": day, "slug": f"short-{day}"} for day in range(1, 9)],
+    }}), encoding="utf-8")
+    ledger.write_text("# Ledger\n", encoding="utf-8")
+    monkeypatch.setattr(cli, "AUTO_STATE_PATH", auto_state)
+    monkeypatch.setattr(cli, "LEDGER_PATH", ledger)
+
+    cli.schedule_pending_videos(argparse.Namespace(
+        schedule_slots="06:00,11:30,18:00,22:00", schedule_start_days=1,
+        schedule_start_date="2026-08-02",
+        long_publish_at="2026-08-04T20:30:00+07:00,2026-08-07T20:30:00+07:00",
+    ))
+
+    batch = json.loads(auto_state.read_text(encoding="utf-8"))["shorts_funnel_batch_2026-07-17"]
+    assert [video["publish_at"] for video in batch["long_videos"]] == [
+        "2026-08-04T20:30:00+07:00", "2026-08-07T20:30:00+07:00",
+    ]
+    assert [video["publish_at"] for video in batch["short_videos"][:4]] == [
+        "2026-08-02T06:00:00+07:00", "2026-08-02T11:30:00+07:00",
+        "2026-08-02T18:00:00+07:00", "2026-08-02T22:00:00+07:00",
+    ]
 
 
 def test_cmd_start_rejects_local_and_cloud_together():

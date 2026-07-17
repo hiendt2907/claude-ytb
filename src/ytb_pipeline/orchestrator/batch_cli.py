@@ -31,7 +31,7 @@ import signal
 import subprocess
 import sys
 import threading
-from datetime import datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 
 from ..claude_cli import build_claude_cmd
@@ -260,6 +260,20 @@ def _parse_schedule_slots(raw: str) -> list[time]:
     return slots
 
 
+def _parse_long_publish_at(raw: str) -> list[datetime]:
+    values = [value.strip() for value in raw.split(",") if value.strip()]
+    moments: list[datetime] = []
+    for value in values:
+        try:
+            moment = datetime.fromisoformat(value)
+        except ValueError as exc:
+            raise SystemExit("✗ --long-publish-at phải là RFC3339, vd 2026-08-04T20:30:00+07:00.") from exc
+        if moment.tzinfo is None:
+            raise SystemExit("✗ --long-publish-at phải có timezone, vd +07:00.")
+        moments.append(moment)
+    return moments
+
+
 def _latest_batch_key(data: dict) -> str:
     batch_keys = sorted(k for k in data if k.startswith("shorts_funnel_batch_"))
     if not batch_keys:
@@ -282,7 +296,12 @@ def schedule_pending_videos(args: argparse.Namespace, *, now: datetime | None = 
         raise SystemExit("✗ --schedule-start-days không được âm.")
 
     base_now = now or datetime.now(VN_TZ)
-    start_date = base_now.astimezone(VN_TZ).date() + timedelta(days=start_days)
+    start_date_value = str(getattr(args, "schedule_start_date", "")).strip()
+    try:
+        start_date = date.fromisoformat(start_date_value) if start_date_value else base_now.astimezone(VN_TZ).date() + timedelta(days=start_days)
+    except ValueError as exc:
+        raise SystemExit("✗ --schedule-start-date phải là YYYY-MM-DD.") from exc
+    long_moments = _parse_long_publish_at(str(getattr(args, "long_publish_at", "")))
     with locked_json_update(AUTO_STATE_PATH) as data:
         batch_key = _latest_batch_key(data)
         batch = data[batch_key]
@@ -302,9 +321,18 @@ def schedule_pending_videos(args: argparse.Namespace, *, now: datetime | None = 
             if eligible(video)
         ]
 
+        if long_moments:
+            if len(long_moments) < len(long_pending):
+                raise SystemExit("✗ Thiếu mốc --long-publish-at cho Long pending.")
+            for video, moment in zip(long_pending, long_moments):
+                video["publish_at"] = moment.isoformat(timespec="seconds")
+            for index, video in enumerate(short_pending):
+                slot = slots[index % len(slots)]
+                scheduled_date = start_date + timedelta(days=index // len(slots))
+                video["publish_at"] = datetime.combine(scheduled_date, slot, tzinfo=VN_TZ).isoformat(timespec="seconds")
         # Default channel policy: two Shorts Mon-Sat; one long-form every Sunday.
         # An explicitly customised slot list retains the generic queue behaviour.
-        if getattr(args, "schedule_slots", DEFAULT_SCHEDULE_SLOTS) == DEFAULT_SCHEDULE_SLOTS:
+        elif getattr(args, "schedule_slots", DEFAULT_SCHEDULE_SLOTS) == DEFAULT_SCHEDULE_SLOTS:
             sunday = start_date + timedelta(days=(6 - start_date.weekday()) % 7)
             for video in long_pending:
                 video["publish_at"] = datetime.combine(sunday, slots[-1], tzinfo=VN_TZ).isoformat(timespec="seconds")
