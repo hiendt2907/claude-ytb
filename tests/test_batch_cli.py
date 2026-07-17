@@ -169,6 +169,20 @@ def test_build_env_forces_telegram_approval_false():
     assert env["DRY_RUN"] == "false"
 
 
+def test_build_env_preserves_queue_dry_run_contract():
+    item = cli.QueueItem(
+        day=1,
+        slug="safe-preview",
+        publish_at="2026-06-23T06:00:00+0700",
+        shorts_status="queued",
+        dry_run=True,
+    )
+
+    env = cli.build_env(item)
+
+    assert env["DRY_RUN"] == "true"
+
+
 def test_build_env_uses_queue_orientation_for_shorts():
     item = cli.QueueItem(
         day=1,
