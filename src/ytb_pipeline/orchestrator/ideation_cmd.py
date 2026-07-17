@@ -17,12 +17,18 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import shutil
 import subprocess
 import sys
 import tempfile
 from datetime import datetime
 from pathlib import Path
+
+# Long-form scripts (~15-18k ký tự tiếng Việt + silent audit) thường vượt 5
+# phút; 300s cũ khiến mọi long-form timeout. Cho override qua env khi cần long
+# 15 phút lâu hơn nữa.
+SCRIPT_LLM_TIMEOUT_S = int(os.environ.get("IDEATION_LLM_TIMEOUT", "900"))
 
 from ..claude_cli import build_claude_cmd
 from ..ideation.series import slugify
@@ -183,7 +189,7 @@ class _ClaudeStartProvider:
             cwd=_cli().ROOT,
             capture_output=True,
             text=True,
-            timeout=300,
+            timeout=SCRIPT_LLM_TIMEOUT_S,
             check=True,
         )
         return result.stdout
@@ -225,7 +231,7 @@ class _CodexStartProvider:
                 cwd=_cli().ROOT,
                 capture_output=True,
                 text=True,
-                timeout=300,
+                timeout=SCRIPT_LLM_TIMEOUT_S,
                 check=True,
             )
             response = output_path.read_text(encoding="utf-8").strip()

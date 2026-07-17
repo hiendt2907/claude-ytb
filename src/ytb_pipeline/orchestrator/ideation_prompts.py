@@ -22,6 +22,12 @@ SHORT_MIN_CHARS = ceil(CHARS_PER_MIN * SHORT_MIN_MINUTES)
 SHORT_MAX_CHARS = floor(CHARS_PER_MIN * SHORT_MAX_MINUTES)
 LONG_MIN_CHARS = ceil(CHARS_PER_MIN * LONG_MIN_MINUTES)
 LONG_MAX_CHARS = floor(CHARS_PER_MIN * LONG_MAX_MINUTES)
+# Biên AN TOÀN để `_validate_length` không reject: LLM khai target_minutes =
+# LONG_MIN (12) rồi viết DƯ tới ~13-14.5 phút, nên số phút đo được
+# (chars / CHARS_PER_MIN) luôn ≥ target và ≤ LONG_MAX (15). Tránh khai 14 rồi
+# viết 13.7 phút (est < target => "quá mỏng").
+LONG_SAFE_MIN_CHARS = int(CHARS_PER_MIN * 13.0)
+LONG_SAFE_MAX_CHARS = int(CHARS_PER_MIN * 14.5)
 
 # System contract dùng chung cho lần sinh đầu và mọi vòng repair. Giữ ở đây để
 # prompt là artifact có version/diff, không phân tán thành câu lệnh ngắn trong
@@ -31,9 +37,9 @@ Return exactly one valid JSON object and no markdown. Treat the user requirement
 Timing estimates use the pipeline's calibrated ~2x Vietnamese narration rate, shared by Edge-TTS and F5-TTS.
 
 Non-negotiable editorial rules:
-1. Every spoken sentence must directly serve the declared title and topic. Keep one coherent causal mechanism per video. Never import an example, mechanism, scene, CTA, or conclusion from another topic.
+1. Every spoken sentence must directly serve the declared title and topic. Keep one coherent causal mechanism per video. Never import an example, mechanism, scene, CTA, or conclusion from another topic. Refer to that single mechanism by ONE consistent full name. Whenever the narration uses the word "cơ chế", follow it only with that one mechanism's own name (e.g. "cơ chế lời nguyền tri thức"). NEVER write "cơ chế" followed by a varying generic word such as "cơ chế duy nhất", "cơ chế này", "cơ chế đó", "cơ chế tâm lý", "cơ chế chung": an automated scanner reads every distinct phrase after "cơ chế" as a separate competing mechanism and REJECTS the script. For generic mentions use "hiện tượng", "hiệu ứng", "nguyên lý", or "quá trình" instead.
 2. For a Short without target_minutes, narration must be {SHORT_MIN_CHARS}-{SHORT_MAX_CHARS} Vietnamese characters for 1.0-1.5 minutes. Reach the range by developing the same topic with new, relevant reasoning and evidence; never pad length with generic filler, repetition, or a reusable template.
-3. For a Long, set target_minutes from {LONG_MIN_MINUTES}-{LONG_MAX_MINUTES} and write {LONG_MIN_CHARS}-{LONG_MAX_CHARS} Vietnamese characters for 12-15 minutes. Build depth from the same mechanism: causal explanation, supported evidence, exact-topic example, application, and next-episode bridge; never stretch the runtime with repeated phrasing.
+3. For a Long, set target_minutes to EXACTLY {LONG_MIN_MINUTES} and write {LONG_SAFE_MIN_CHARS}-{LONG_SAFE_MAX_CHARS} Vietnamese characters (~13-14.5 spoken minutes), within the validator's absolute {LONG_MIN_CHARS}-{LONG_MAX_CHARS} character range for a 12-15 minutes Long. The pipeline measures runtime as total_characters / {CHARS_PER_MIN:.0f} and REJECTS the script if measured minutes fall below the declared target_minutes or above {LONG_MAX_MINUTES}. So always overshoot the declared floor and never declare a number you do not exceed — declaring 14 while writing ~13.7 minutes FAILS. Build depth from the same mechanism: causal explanation, supported evidence, exact-topic example, application, and next-episode bridge; never stretch the runtime with repeated phrasing.
 4. Open a Short with a concrete conflict, consequence, or question; do not greet or read the title. Open a Long with "Mến chào các bạn," then its title and a topic-specific hook. Each section must add information, explain why, and use visuals that match its spoken narration. The final narration section must include one direct, specific action the viewer can do immediately: start that sentence with exactly "Hãy " and name the object, action, and a concrete time or scope. A question inviting a comment may follow, but never replace that action.
 5. Write knowledge, not slogans: explain the mechanism, use a concrete example that belongs to this exact topic, and give an immediately usable application. Do not drift into generic self-help, comedy, or unrelated advice.
 6. Verify every factual, numerical, medical, financial, legal, or research claim before including it. Omit any claim whose source cannot be named in the compliance notes; never invent statistics, studies, authors, or certainty.
@@ -146,9 +152,10 @@ def local_script_prompt(
     """Prompt sinh 1 script JSON qua local/structured LLM (khác luồng Claude skill)."""
     target = (
         (
-            '"video_type": "long", "target_minutes": 12-15, total narration '
-            f'{LONG_MIN_CHARS}-{LONG_MAX_CHARS} Vietnamese characters for a 12-15 minute Long, '
-            'and 24-36 rich sections'
+            '"video_type": "long", "target_minutes": 12 (declare EXACTLY 12), total narration '
+            f'{LONG_SAFE_MIN_CHARS}-{LONG_SAFE_MAX_CHARS} Vietnamese characters (~13-14.5 min so '
+            f'measured minutes = chars / {CHARS_PER_MIN:.0f} always exceed the declared 12 and stay '
+            f'under {LONG_MAX_MINUTES}), and 24-36 rich sections'
         )
         if type_of_vid == "long"
         else (
@@ -225,8 +232,11 @@ def repair_prompt(payload: dict, qa_output: dict | None, validation_error: str |
         "Preserve the topic and core story unless a listed violation requires a narrow fix.\n"
         f"For Shorts without target_minutes, total narration MUST be {SHORT_MIN_CHARS}-{SHORT_MAX_CHARS} "
         "Vietnamese characters for 1.0-1.5 minutes. Do not overshoot. Do not add greetings. "
-        f"For Longs, target_minutes MUST be {LONG_MIN_MINUTES}-{LONG_MAX_MINUTES} and total narration MUST be "
-        f"{LONG_MIN_CHARS}-{LONG_MAX_CHARS} Vietnamese characters for 12-15 minutes. "
+        f"For Longs, target_minutes MUST be EXACTLY {LONG_MIN_MINUTES} and total narration MUST be "
+        f"{LONG_SAFE_MIN_CHARS}-{LONG_SAFE_MAX_CHARS} Vietnamese characters (~13-14.5 minutes); measured "
+        f"minutes = total_chars / {CHARS_PER_MIN:.0f} must be >= target_minutes and <= {LONG_MAX_MINUTES}. "
+        "When the narration uses 'cơ chế', follow it only with the one mechanism's own name; never pair "
+        "'cơ chế' with varying generic words (duy nhất, này, đó, tâm lý) or QA rejects it as competing mechanisms. "
         "If the script is too short, "
         "write the missing narration from scratch so every added sentence remains specific to the declared "
         "title and topic; never reuse generic examples, mechanisms, or application steps from another video.\n"
