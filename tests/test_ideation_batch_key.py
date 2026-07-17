@@ -80,3 +80,47 @@ def test_short_batch_item_requires_a_complete_long_form_funnel(tmp_path, monkeyp
         )
 
     assert json.loads(state.read_text(encoding="utf-8")) == {}
+
+
+def test_write_local_batch_item_replaces_the_declared_slot_without_appending(tmp_path, monkeypatch):
+    """Regenerating a broken long must preserve its slug, day, and queue identity."""
+    from ytb_pipeline.orchestrator import ideation_state
+
+    state = tmp_path / "auto_state.json"
+    state.write_text(json.dumps({
+        "shorts_funnel_batch_week2": {
+            "status": "active",
+            "long_videos": [{"day": 2, "slug": "week2-long", "status": "needs_regeneration"}],
+            "short_videos": [],
+        },
+    }), encoding="utf-8")
+
+    class CLI:
+        AUTO_STATE_PATH = state
+
+        @staticmethod
+        def update_ledger(*_args, **_kwargs):
+            return None
+
+        class settings:
+            dry_run = False
+            youtube_publish_at = ""
+
+    monkeypatch.setattr(ideation_state, "_cli", lambda: CLI)
+
+    ideation_state.write_local_batch_item(
+        tmp_path / "week2-long.json",
+        {"title": "Long mới", "topic": "cơ chế mới", "video_type": "long"},
+        argparse.Namespace(
+            type_of_vid="long",
+            batch_key="shorts_funnel_batch_week2",
+            replace_slug="week2-long",
+        ),
+    )
+
+    videos = json.loads(state.read_text(encoding="utf-8"))["shorts_funnel_batch_week2"]["long_videos"]
+    assert len(videos) == 1
+    assert videos[0]["slug"] == "week2-long"
+    assert videos[0]["day"] == 2
+    assert videos[0]["status"] == "ok"
+    assert videos[0]["provenance"]["revision"] == 1
