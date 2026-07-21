@@ -200,7 +200,7 @@ async def test_qa_agent_rejects_duplicate_title_even_when_topic_differs():
     assert result.output["violations"][0]["rule"] == "series_dedup"
 
 
-async def test_qa_agent_rejects_long_over_fifteen_minutes():
+async def test_qa_agent_rejects_long_over_fourteen_minutes():
     script = Script(
         topic="cơ chế chú ý",
         title="Vì Sao Não Bám Vào Việc Dang Dở",
@@ -211,7 +211,7 @@ async def test_qa_agent_rejects_long_over_fifteen_minutes():
         segments=(
             Segment(
                 caption="Mở đầu",
-                narration=GREETING + " " + chars_for_minutes(15.1),
+                narration=GREETING + " " + chars_for_minutes(14.1),
             ),
         ),
     )
@@ -221,7 +221,7 @@ async def test_qa_agent_rejects_long_over_fifteen_minutes():
     assert result.output["passed"] is False
     assert result.output["violations"] == [{
         "rule": "length",
-        "detail": "Video dài quá dài: ước lượng 15.1p > 15p.",
+        "detail": "Video dài quá dài: ước lượng 14.1p > 14p.",
     }]
 
 

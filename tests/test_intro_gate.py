@@ -13,11 +13,15 @@ from conftest import make_script
 
 def _long_body(text: str) -> str:
     """Nối thêm cho đủ độ dày ~12 phút để không vướng cổng độ dài."""
-    return text + " Chi tiết cụ thể có cơ chế và ví dụ thực tế. " * 380
+    return text + " Chi tiết cụ thể có cơ chế và ví dụ thực tế. " * 340
 
 
 def _long(narration):
-    return make_script([{"caption": "c", "narration": narration}], target_minutes=12)
+    chunk_size = -(-len(narration) // 24)
+    return make_script([
+        {"caption": f"c-{index}", "narration": narration[index * chunk_size:(index + 1) * chunk_size]}
+        for index in range(24)
+    ], target_minutes=12)
 
 
 def _short(narration):

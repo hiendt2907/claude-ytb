@@ -38,6 +38,7 @@ def test_cmd_run_starts_at_most_two_controlled_workers(monkeypatch):
         return next(results)
 
     monkeypatch.setattr(cli, "process_next", fake_process_next)
+    monkeypatch.setattr(cli.settings, "tts_provider", "edge")
 
     cli.cmd_run(argparse.Namespace(loop=True, workers=99, schedule=False))
 
@@ -66,6 +67,7 @@ def test_cmd_run_refills_finished_worker_without_waiting_for_slow_worker(monkeyp
         return False
 
     monkeypatch.setattr(cli, "process_next", fake_process_next)
+    monkeypatch.setattr(cli.settings, "tts_provider", "edge")
     cli._stop_requested = False
     runner = threading.Thread(
         target=lambda: (cli.cmd_run(argparse.Namespace(loop=True, workers=2, schedule=False)), scheduler_finished.set()),
@@ -91,6 +93,7 @@ def test_cmd_run_keeps_other_worker_running_when_one_future_crashes(tmp_path, mo
         return calls_by_worker[worker_id] == 1
 
     monkeypatch.setattr(cli, "process_next", fake_process_next)
+    monkeypatch.setattr(cli.settings, "tts_provider", "edge")
     monkeypatch.setattr(cli, "WORKER_STATE_PATH", tmp_path / "batch_workers.json")
     cli._stop_requested = False
 
