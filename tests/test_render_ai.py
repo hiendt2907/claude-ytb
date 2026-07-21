@@ -71,6 +71,18 @@ def test_fetch_broll_fail_fast_khi_thieu_key(monkeypatch):
         stock.fetch_broll("anything")
 
 
+def test_fetch_broll_uses_exact_local_cache_without_pexels_key(monkeypatch, tmp_path):
+    import hashlib
+
+    query = "person writing at laptop"
+    cached = tmp_path / f"{hashlib.sha256(f'{query}|1080x1920'.encode()).hexdigest()[:16]}.mp4"
+    cached.write_bytes(b"video")
+    monkeypatch.setattr(settings, "pexels_api_key", "")
+    monkeypatch.setattr(stock, "CACHE_DIR", tmp_path)
+
+    assert stock.fetch_broll(query) == cached
+
+
 def test_static_overlay_code_la_rgba_dung_kich_thuoc_doc():
     seg = Segment(caption="Xem lại thao tác", narration="...", code="git reflog")
     img = compose_ai._static_overlay(seg, index=1, total=7, dims=(1080, 1920))
@@ -228,6 +240,34 @@ def test_fetch_broll_variants_tra_nhieu_shot_khac_nhau(monkeypatch, tmp_path):
     assert len(paths) == 3
     assert len(set(paths)) == 3  # mỗi shot một file cache riêng
     assert downloaded == ["a", "b", "c"]
+
+
+def test_fetch_broll_variants_reuses_local_catalog_before_pexels(monkeypatch, tmp_path):
+    from ytb_pipeline.render.asset_catalog import AssetCatalog
+
+    local_clip = tmp_path / "existing.mp4"
+    local_clip.write_bytes(b"video")
+    catalog_path = tmp_path / "catalog.json"
+    AssetCatalog(catalog_path).record_usage(
+        source_url="https://videos.pexels.com/existing.mp4",
+        local_path=local_clip,
+        query="person focusing at laptop desk",
+        orientation="portrait",
+        video_slug="older-video",
+        role="body",
+    )
+    monkeypatch.setattr(settings, "asset_catalog_path", catalog_path)
+    monkeypatch.setattr(settings, "pexels_api_key", "")
+    monkeypatch.setattr(stock, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(
+        stock,
+        "_search_links",
+        lambda *args, **kwargs: pytest.fail("không được gọi Pexels khi local cache còn cảnh"),
+    )
+
+    paths = stock.fetch_broll_variants("focused person using laptop", 3)
+
+    assert paths == [local_clip]
 
 
 def test_emphasis_windows_chia_deu_va_trong_thoi_luong():

@@ -49,3 +49,35 @@ def test_catalog_does_not_repeat_an_asset_inside_one_video(tmp_path: Path):
     links = ["https://videos.pexels.com/a.mp4", "https://videos.pexels.com/b.mp4"]
 
     assert catalog.select_urls(links, excluded={links[0]}, role="payoff") == [links[1]]
+
+
+def test_catalog_prefers_relevant_existing_local_asset(tmp_path: Path):
+    from ytb_pipeline.render.asset_catalog import AssetCatalog
+
+    catalog = AssetCatalog(tmp_path / "catalog.json")
+    relevant = tmp_path / "laptop.mp4"
+    unrelated = tmp_path / "city.mp4"
+    relevant.write_bytes(b"video")
+    unrelated.write_bytes(b"video")
+    catalog.record_usage(
+        source_url="https://videos.pexels.com/laptop.mp4",
+        local_path=relevant,
+        query="person working at laptop desk",
+        orientation="portrait",
+        video_slug="older-video",
+        role="body",
+    )
+    catalog.record_usage(
+        source_url="https://videos.pexels.com/city.mp4",
+        local_path=unrelated,
+        query="city traffic at night",
+        orientation="portrait",
+        video_slug="older-video",
+        role="body",
+    )
+
+    selected = catalog.select_local_assets(
+        "focused person using laptop", orientation="portrait", role="body"
+    )
+
+    assert [path for _, path in selected] == [relevant, unrelated]
