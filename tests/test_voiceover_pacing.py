@@ -119,14 +119,24 @@ def test_to_mp3_applies_tempo_when_profile_needs_it(monkeypatch, tmp_path):
 
 
 def test_f5_tempo_matches_each_edge_profile_speed():
-    for profile in (
-        tts.VOICE_NEUTRAL,
-        tts.VOICE_ENTERTAINMENT,
-        tts.VOICE_KNOWLEDGE,
-        tts.VOICE_INSPIRING,
-    ):
+    for profile in tts.VOICE_PROFILES.values():
         edge_multiplier = 1 + tts._edge_rate_pct(profile.edge_rate) / 100
         assert profile.f5_tempo == edge_multiplier
+
+
+def test_legacy_hook_copy_does_not_route_every_section_as_hook():
+    from ytb_pipeline.ideation.generator import _segment_from_raw
+
+    segment = _segment_from_raw({
+        "narration": "Một đoạn giải thích bình thường.",
+        "hook": "Mô tả câu hook để dựng hình.",
+        "transition": "Mô tả chuyển cảnh.",
+    }, "legacy.json")
+
+    assert segment.hook is False
+    assert segment.hook_text == "Mô tả câu hook để dựng hình."
+    assert segment.transition is False
+    assert segment.transition_text == "Mô tả chuyển cảnh."
 
 
 def test_f5_segment_cache_key_includes_tempo(monkeypatch):
