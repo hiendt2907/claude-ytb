@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     render_provider: str = "ai"  # slide | ai
     image_provider: str = "pillow"  # dùng cho thumbnail/overlay; không dùng làm video chính
     broll_strategy: str = "pexels"  # pexels = footage thật; local_image_motion đã bỏ khỏi production
+    broll_allow_downloads: bool = False  # local-first: chỉ tải Pexels khi opt-in rõ ràng
     comfyui_url: str = "http://127.0.0.1:8188"  # ComfyUI local API (Flux)
     flux_checkpoint_name: str = "flux1-dev-fp8.safetensors"
     orientation: str = "portrait"   # portrait (1080x1920 Short) | landscape (1920x1080 clip)

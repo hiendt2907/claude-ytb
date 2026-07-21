@@ -38,23 +38,26 @@ LANDSCAPE_WH = (1920, 1080)
 
 def fetch_broll(query: str, *, min_duration: float = 0.0,
                 landscape: bool = False) -> Path:
-    """Trả về đường dẫn file B-roll cho `query` (tải nếu chưa có trong cache).
+    """Trả về B-roll local cho `query`; chỉ tải Pexels khi đã opt-in.
 
     landscape=False -> video dọc (Short); landscape=True -> video ngang (clip dài).
-    Raise RuntimeError nếu thiếu key hoặc Pexels không trả kết quả nào.
+    Raise RuntimeError nếu thư viện local thiếu cảnh và Pexels chưa được opt-in.
     """
-    key = settings.pexels_api_key
-    if not key:
-        raise RuntimeError(
-            "Thiếu PEXELS_API_KEY trong .env — không thể tải B-roll cho render-ai. "
-            "Lấy key free tại https://www.pexels.com/api/"
-        )
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     tw, th = LANDSCAPE_WH if landscape else PORTRAIT_WH
     cache_key = hashlib.sha256(f"{query}|{tw}x{th}".encode()).hexdigest()[:16]
     cached = CACHE_DIR / f"{cache_key}.mp4"
     if cached.exists() and cached.stat().st_size > 0:
         return cached
+
+    orientation = "landscape" if landscape else "portrait"
+    local_assets = AssetCatalog().select_local_assets(
+        query, orientation=orientation,
+    )
+    if local_assets:
+        return local_assets[0][1]
+
+    key = _pexels_download_key()
 
     video_url = _search(query, key, min_duration=min_duration, landscape=landscape)
     _download(video_url, cached)
@@ -79,24 +82,31 @@ def fetch_broll_variants(query: str, count: int, *, min_duration: float = 0.0,
     Cache theo hash của LINK: link giống nhau -> cùng file (không tải lại),
     link khác nhau -> file khác (đủ đa dạng).
     """
-    key = settings.pexels_api_key
-    if not key:
-        raise RuntimeError(
-            "Thiếu PEXELS_API_KEY trong .env — không thể tải B-roll cho render-ai. "
-            "Lấy key free tại https://www.pexels.com/api/"
-        )
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    used = exclude if exclude is not None else set()
+    catalog = AssetCatalog()
+    orientation = "landscape" if landscape else "portrait"
+    local = catalog.select_local_assets(
+        query, orientation=orientation, excluded=used, role=role,
+    )[:count]
+    if local:
+        _record_local_usage(
+            catalog, local, used=used, query=query, orientation=orientation,
+            video_slug=video_slug, role=role, duration_sec=min_duration,
+        )
+        if len(local) == count or not settings.broll_allow_downloads:
+            return [path for _, path in local]
+
+    key = _pexels_download_key()
     # Đào pool sâu (per_page tối đa Pexels = 80) để có đủ link KHÁC NHAU mà dedup.
     links = _search_links(query, key, count=_POOL_SIZE,
                           min_duration=min_duration, landscape=landscape)
 
-    used = exclude if exclude is not None else set()
-    catalog = AssetCatalog()
     # Catalog ranks new/low-use footage first; the existing per-video set remains
     # a hard preference so one render does not repeat a shot before exhausting pool.
     fresh = catalog.select_urls(links, excluded=used, role=role)
     reused = catalog.select_urls([l for l in links if l in used], role=role)
-    chosen = (fresh + reused)[:count]  # hết link mới mới tái dùng
+    chosen = (fresh + reused)[:count - len(local)]  # hết link mới mới tái dùng
 
     # Chọn link xong mới tải: mỗi link → 1 file cache riêng (hash của link) nên
     # tải SONG SONG an toàn, không tranh chấp file. Thứ tự output giữ theo `chosen`.
@@ -109,7 +119,6 @@ def fetch_broll_variants(query: str, count: int, *, min_duration: float = 0.0,
         with ThreadPoolExecutor(max_workers=workers) as pool:
             list(pool.map(lambda t: _download(t[0], t[1]), missing))
 
-    orientation = "landscape" if landscape else "portrait"
     for link, path in targets:
         used.add(link)
         catalog.record_usage(
@@ -121,7 +130,45 @@ def fetch_broll_variants(query: str, count: int, *, min_duration: float = 0.0,
             role=role,
             duration_sec=min_duration,
         )
-    return [path for _, path in targets]
+    return [path for _, path in local] + [path for _, path in targets]
+
+
+def _pexels_download_key() -> str:
+    if not settings.broll_allow_downloads:
+        raise RuntimeError(
+            "Không có B-roll local phù hợp và BROLL_ALLOW_DOWNLOADS=false. "
+            "Chỉ bật biến này khi muốn tải thêm từ Pexels."
+        )
+    if not settings.pexels_api_key:
+        raise RuntimeError(
+            "Thiếu PEXELS_API_KEY trong .env — không thể tải B-roll cho render-ai. "
+            "Lấy key free tại https://www.pexels.com/api/"
+        )
+    return settings.pexels_api_key
+
+
+def _record_local_usage(
+    catalog: AssetCatalog,
+    assets: list[tuple[str, Path]],
+    *,
+    used: set[str],
+    query: str,
+    orientation: str,
+    video_slug: str,
+    role: str,
+    duration_sec: float,
+) -> None:
+    for source_url, path in assets:
+        used.add(source_url)
+        catalog.record_usage(
+            source_url=source_url,
+            local_path=path,
+            query=query,
+            orientation=orientation,
+            video_slug=video_slug,
+            role=role,
+            duration_sec=duration_sec,
+        )
 
 
 def _search(query: str, key: str, *, min_duration: float, landscape: bool) -> str:

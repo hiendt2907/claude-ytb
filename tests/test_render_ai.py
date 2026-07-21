@@ -63,9 +63,12 @@ def test_best_file_tra_none_khi_khong_co_mp4():
     ) is None
 
 
-def test_fetch_broll_fail_fast_khi_thieu_key(monkeypatch):
+def test_fetch_broll_fail_fast_khi_thieu_key(monkeypatch, tmp_path):
     # Arrange — ép key rỗng
+    monkeypatch.setattr(settings, "broll_allow_downloads", True)
     monkeypatch.setattr(settings, "pexels_api_key", "")
+    monkeypatch.setattr(stock, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(settings, "asset_catalog_path", tmp_path / "catalog.json")
     # Act / Assert
     with pytest.raises(RuntimeError, match="PEXELS_API_KEY"):
         stock.fetch_broll("anything")
@@ -227,6 +230,7 @@ def test_valid_clip_rejects_cached_segment_with_wrong_dimensions(monkeypatch, tm
 
 
 def test_fetch_broll_variants_tra_nhieu_shot_khac_nhau(monkeypatch, tmp_path):
+    monkeypatch.setattr(settings, "broll_allow_downloads", True)
     monkeypatch.setattr(settings, "pexels_api_key", "k")
     monkeypatch.setattr(settings, "asset_catalog_path", tmp_path / "catalog.json")
     monkeypatch.setattr(stock, "CACHE_DIR", tmp_path)
@@ -268,6 +272,21 @@ def test_fetch_broll_variants_reuses_local_catalog_before_pexels(monkeypatch, tm
     paths = stock.fetch_broll_variants("focused person using laptop", 3)
 
     assert paths == [local_clip]
+
+
+def test_fetch_broll_variants_blocks_new_pexels_downloads_by_default(monkeypatch, tmp_path):
+    monkeypatch.setattr(settings, "asset_catalog_path", tmp_path / "catalog.json")
+    monkeypatch.setattr(settings, "broll_allow_downloads", False)
+    monkeypatch.setattr(settings, "pexels_api_key", "key-is-ignored")
+    monkeypatch.setattr(stock, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(
+        stock,
+        "_search_links",
+        lambda *args, **kwargs: pytest.fail("Pexels phải bị chặn mặc định"),
+    )
+
+    with pytest.raises(RuntimeError, match="BROLL_ALLOW_DOWNLOADS=false"):
+        stock.fetch_broll_variants("anything", 1)
 
 
 def test_emphasis_windows_chia_deu_va_trong_thoi_luong():
@@ -334,6 +353,7 @@ def test_broll_caption_clip_ep_duration_theo_audio(monkeypatch, tmp_path):
 
 def test_fetch_broll_variants_dedup_xuyen_video(monkeypatch, tmp_path):
     # Bộ đếm `exclude` cấp-video: lần gọi sau ưu tiên link CHƯA dùng -> chống lặp clip
+    monkeypatch.setattr(settings, "broll_allow_downloads", True)
     monkeypatch.setattr(settings, "pexels_api_key", "k")
     monkeypatch.setattr(settings, "asset_catalog_path", tmp_path / "catalog.json")
     monkeypatch.setattr(stock, "CACHE_DIR", tmp_path)
@@ -352,6 +372,7 @@ def test_fetch_broll_variants_dedup_xuyen_video(monkeypatch, tmp_path):
 
 def test_fetch_broll_variants_tai_dung_khi_het_link_moi(monkeypatch, tmp_path):
     # Hết link mới -> mới quay lại tái dùng link cũ (không crash, vẫn đủ count)
+    monkeypatch.setattr(settings, "broll_allow_downloads", True)
     monkeypatch.setattr(settings, "pexels_api_key", "k")
     monkeypatch.setattr(settings, "asset_catalog_path", tmp_path / "catalog.json")
     monkeypatch.setattr(stock, "CACHE_DIR", tmp_path)

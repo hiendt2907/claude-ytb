@@ -3,12 +3,20 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from ..config.settings import settings
 from ..orchestrator.state_io import locked_json_update
+
+
+_QUERY_TOKEN = re.compile(r"[a-z0-9]+")
+_GENERIC_QUERY_TOKENS = frozenset({
+    "and", "at", "for", "from", "into", "of", "on", "or", "person",
+    "the", "then", "using", "with",
+})
 
 
 class AssetCatalog:
@@ -44,6 +52,54 @@ class AssetCatalog:
             return (0 if asset else -1, same_role, len(recent), len(uses))
 
         return sorted(candidates, key=rank)
+
+    def select_local_assets(
+        self,
+        query: str,
+        *,
+        orientation: str,
+        excluded: set[str] | None = None,
+        role: str = "body",
+    ) -> list[tuple[str, Path]]:
+        """Return usable local footage, ranked by relevance then least recent reuse.
+
+        The catalog is the source of provenance, so untracked files are never
+        selected blindly. This keeps local reuse license-traceable and lets the
+        renderer avoid a Pexels request whenever its known library has footage.
+        """
+        excluded = excluded or set()
+        query_tokens = _meaningful_tokens(query)
+        candidates: list[tuple[dict[str, Any], Path, int]] = []
+        for asset in self.assets():
+            source_url = asset.get("source_url")
+            local_path = asset.get("local_path")
+            if (
+                not isinstance(source_url, str)
+                or source_url in excluded
+                or asset.get("orientation") != orientation
+                or not isinstance(local_path, str)
+            ):
+                continue
+            path = Path(local_path)
+            if not path.is_file() or path.stat().st_size <= 0:
+                continue
+            topics = asset.get("topics", [])
+            topic_tokens = set().union(
+                *(_meaningful_tokens(topic) for topic in topics if isinstance(topic, str))
+            ) if topics else set()
+            candidates.append((asset, path, len(query_tokens & topic_tokens)))
+
+        def rank(item: tuple[dict[str, Any], Path, int]) -> tuple[int, int, int, int, str]:
+            asset, _, relevance = item
+            uses = asset.get("uses", []) if isinstance(asset.get("uses"), list) else []
+            recent = uses[-20:]
+            same_role = sum(1 for usage in recent if usage.get("role") == role)
+            return (-relevance, same_role, len(recent), len(uses), asset["asset_id"])
+
+        return [
+            (asset["source_url"], path)
+            for asset, path, _ in sorted(candidates, key=rank)
+        ]
 
     def record_usage(
         self,
@@ -86,3 +142,10 @@ class AssetCatalog:
                 for usage in uses
             ):
                 uses.append({"video_slug": video_slug, "role": role, "used_at": used_at})
+
+
+def _meaningful_tokens(text: str) -> set[str]:
+    return {
+        token for token in _QUERY_TOKEN.findall(text.lower())
+        if len(token) > 2 and token not in _GENERIC_QUERY_TOKENS
+    }
