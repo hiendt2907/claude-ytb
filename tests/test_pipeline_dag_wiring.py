@@ -7,6 +7,7 @@ Không chạy provider thật — chỉ test load/create project, reset node sta
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 from ytb_pipeline import pipeline
@@ -17,7 +18,7 @@ from ytb_pipeline.project.models import NodeStatus, Project
 
 def _script_file(tmp_path, slug="vid-x"):
     path = tmp_path / f"{slug}.json"
-    path.write_text("{}", encoding="utf-8")
+    path.write_text(json.dumps({"ruleset_id": pipeline.CONTRACT_VERSION}), encoding="utf-8")
     return path
 
 
@@ -36,13 +37,33 @@ def test_load_or_create_project_creates_and_persists(tmp_path):
 def test_load_or_create_project_resumes_existing_done_nodes(tmp_path):
     checkpoint = CheckpointManager(tmp_path / "projects")
     script = _script_file(tmp_path)
-    existing = Project(project_id="vid-x", script_path=str(script))
+    script_sha = pipeline._script_sha256(script)
+    existing = Project(
+        project_id="vid-x",
+        script_path=str(script),
+        metadata={"script_sha256": script_sha, "ruleset_id": pipeline.CONTRACT_VERSION},
+    )
     existing = checkpoint.mark_done(existing, "ideation", str(script))
     checkpoint.save(existing)
 
     project = pipeline.load_or_create_project(str(script), checkpoint)
 
     assert checkpoint.is_done(project, "ideation")  # resume: node done giữ nguyên
+
+
+def test_script_change_invalidates_all_downstream_artifacts(tmp_path):
+    checkpoint = CheckpointManager(tmp_path / "projects")
+    script = _script_file(tmp_path)
+    project = pipeline.load_or_create_project(str(script), checkpoint)
+    project = checkpoint.mark_done(project, "voiceover", str(tmp_path / "old.mp3"))
+    project = checkpoint.mark_done(project, "render", str(tmp_path / "old.mp4"))
+    checkpoint.save(project)
+
+    script.write_text('{"changed": true}', encoding="utf-8")
+    refreshed = pipeline.load_or_create_project(str(script), checkpoint)
+
+    assert refreshed.nodes == {}
+    assert refreshed.metadata["script_sha256"] == pipeline._script_sha256(script)
 
 
 # ── _reset_stale_nodes ────────────────────────────────────────────────────────
