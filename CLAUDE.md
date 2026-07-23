@@ -92,11 +92,23 @@ buộc:
   (`"voiceover.segment.synthesized"`), correlation ID (`project_id`)
   bind 1 lần qua contextvars. Không `print()`/`logging.info(f"...")` trong
   `src/ytb_pipeline/`.
-- **File size.** Tối đa 400 dòng/file. `batch_cli.py` đã split — ĐẠT.
-  `ideation_cmd.py` đã split 2026-07-14 (367 dòng + ideation_prompts/
-  ideation_script_fix/ideation_state) — ĐẠT. Còn VI PHẠM:
-  `render/compose_ai.py` (~577 dòng) — cần tách trước khi thêm logic mới
-  vào file này (xem Refactoring Rules bên dưới).
+- **File size.** Tối đa 400 dòng/file. `batch_cli.py` (883 dòng) đã tách
+  2026-07-23 thành package `orchestrator/batch_cli/` — ĐẠT, mọi file <
+  400 dòng: `__init__.py` (re-export + global state + `main()`,
+  ~200 dòng), `process_control.py` (PID file + signal handling, ~150
+  dòng), `scheduler.py` (`schedule_pending_videos`, ~185 dòng),
+  `workers.py` (worker state + staged F5 lanes + `cmd_run`, ~270 dòng),
+  `commands.py` (14 subcommand đơn giản còn lại, ~240 dòng),
+  `__main__.py` (entrypoint `python -m ...batch_cli`, ~10 dòng). Tên
+  module `ytb_pipeline.orchestrator.batch_cli` giữ nguyên (giờ là
+  package thay vì file phẳng) — `bin/ytb`, `listener.py`, và các module
+  dùng pattern `_cli()` lazy-import (`queue_manager.py`,
+  `pipeline_runner.py`, `doctor.py`, `ideation_cmd.py`,
+  `ideation_state.py`) không cần sửa gì. `ideation_cmd.py` đã split
+  2026-07-14 (367 dòng + ideation_prompts/ideation_script_fix/
+  ideation_state) — ĐẠT. Còn VI PHẠM: `render/compose_ai.py` (~577
+  dòng) — cần tách trước khi thêm logic mới vào file này (xem
+  Refactoring Rules bên dưới).
 - **No hardcoded path.** Mọi path qua `settings.<field>`.
 - **Naming.** `snake_case` hàm/biến, `PascalCase` class/Protocol/enum,
   `UPPER_SNAKE_CASE` constant.
@@ -179,8 +191,9 @@ buộc:
 Chi tiết: `docs/constitution/28-TESTING.md`. Tóm tắt:
 
 - Test pyramid: unit 70% / integration 20% / e2e 10%.
-- Coverage target 90% (đang nâng dần từ 80% hiện tại, sau khi
-  `batch_cli.py` được split — xem Migration Plan Phase 0).
+- Coverage target 90% (đang nâng dần từ 80% hiện tại; `batch_cli.py` đã
+  được split 2026-07-23 — điều kiện chặn trước đó của Migration Plan
+  Phase 0 đã ĐẠT).
 - **Không gọi real TTS/LLM/YouTube API trong unit test.** Fixture audio
   ngắn cho TTS, mock `googleapiclient` cho YouTube, fake `Provider` cho
   LLM/Image/Video.
