@@ -13,7 +13,17 @@ from datetime import datetime
 
 import pytest
 
+from ytb_pipeline.content_contract import CONTRACT_VERSION
 from ytb_pipeline.orchestrator import batch_cli as cli
+
+# Fields `schedule_pending_videos.eligible()` requires before it will assign a
+# publish_at slot — merge into any fixture video dict meant to be schedulable.
+ELIGIBLE_FIELDS = {
+    "quality_status": "pass",
+    "qa_status": "pass",
+    "ruleset_id": CONTRACT_VERSION,
+    "assets_valid": True,
+}
 
 
 # ── fixtures ────────────────────────────────────────────────────────────────
@@ -279,6 +289,21 @@ def test_run_with_retry_warns_immediately_for_non_transient_error(_capture_teleg
     assert "KHÔNG retry" in _capture_telegram[0]
 
 
+def test_run_with_retry_writes_a_sanitized_recovery_report_for_terminal_failure(monkeypatch):
+    item = cli.QueueItem(1, "x", "2026-06-23T06:00:00+0700", "queued")
+    reports = []
+    monkeypatch.setattr(cli, "write_failure_recovery_report", lambda *_args: reports.append(True) or None)
+
+    cli.run_with_retry(
+        item,
+        backoff=[1],
+        sleep_fn=lambda _s: None,
+        run_fn=lambda _item, **_kwargs: _completed(1, stderr="FileNotFoundError: scripts/x.json"),
+    )
+
+    assert reports == [True]
+
+
 # ── extract_claimed_video_id ──────────────────────────────────────────────────
 def test_extract_claimed_video_id_found():
     output = "...\n  ✓ Đã upload: https://youtu.be/b917RPp2o7o\n[4/4] Publish   ✓  uploaded=True"
@@ -533,6 +558,32 @@ def test_process_next_returns_false_when_queue_empty(auto_state_file, ledger_fil
         encoding="utf-8",
     )
     assert cli.process_next(queue_path=auto_state_file, ledger_path=ledger_file) is False
+
+
+def test_render_only_loop_skips_a_slug_rendered_earlier_in_the_same_invocation(tmp_path, monkeypatch):
+    state = tmp_path / "auto_state.json"
+    ledger = tmp_path / "ledger.md"
+    state.write_text(json.dumps({
+        "shorts_funnel_batch_render": {
+            "long_videos": [
+                {"day": 1, "slug": "long-a", "publish_at": ""},
+                {"day": 2, "slug": "long-b", "publish_at": ""},
+            ],
+        }
+    }), encoding="utf-8")
+    ledger.write_text("# Ledger\n", encoding="utf-8")
+    monkeypatch.setattr(cli, "run_with_retry", lambda *_args, **_kwargs: (True, ""))
+
+    rendered = {"long-a"}
+    handled = cli.process_next(
+        queue_path=state,
+        ledger_path=ledger,
+        through="render",
+        completed_render_slugs=rendered,
+    )
+
+    assert handled is True
+    assert rendered == {"long-a", "long-b"}
 
 
 def test_failed_slug_is_skipped_by_batch_loop_but_remains_retryable(auto_state_file, ledger_file):
@@ -840,31 +891,23 @@ def test_build_start_prompt_custom_rules_used_as_topic():
     assert "chủ đề về trì hoãn" in prompt
 
 
-def test_cmd_start_runs_claude_and_reports_success(monkeypatch, capsys):
-    import io
-    captured_cmd = {}
+def test_cmd_start_rejects_the_removed_legacy_cloud_generation_path(monkeypatch):
+    monkeypatch.setattr(
+        cli.subprocess,
+        "Popen",
+        lambda *_args, **_kwargs: pytest.fail("legacy cloud path must not start a process"),
+    )
 
-    class FakePopen:
-        def __init__(self, cmd, **kw):
-            captured_cmd["cmd"] = cmd
-            result_line = json.dumps({"type": "result", "result": "✓ Đã viết 2 kịch bản."})
-            self.stdout = io.StringIO(result_line + "\n")
-            self.stderr = io.StringIO("")
-            self.returncode = 0
-            self.args = cmd
-
-        def wait(self):
-            pass
-
-    monkeypatch.setattr(cli.subprocess, "Popen", FakePopen)
-    monkeypatch.setattr(cli, "build_claude_cmd", lambda prompt: ["claude", "-p", prompt])
-
-    cli.cmd_start(argparse.Namespace(num_of_vid=2, type_of_vid="short", type_of_rules="auto", resume=False, cloud=True))
-
-    out = capsys.readouterr().out
-    assert "Đã viết 2 kịch bản" in out
-    assert "ytb batch status" in out
-    assert captured_cmd["cmd"][:2] == ["claude", "-p"]
+    with pytest.raises(SystemExit, match="--cloud.*đã bị gỡ"):
+        cli.cmd_start(
+            argparse.Namespace(
+                num_of_vid=2,
+                type_of_vid="short",
+                type_of_rules="auto",
+                resume=False,
+                cloud=True,
+            )
+        )
 
 
 def test_start_parser_accepts_explicit_local_flag():
@@ -958,22 +1001,77 @@ def test_cli_parses_run_schedule_loop_flags():
         },
     )
 
-    args = parser.parse_args(["run", "--schedule", "--loop"])
+    args = parser.parse_args(["run", "--schedule", "--loop", "--batch-key", "shorts_funnel_batch_week5"])
 
     assert args.schedule is True
     assert args.loop is True
-    assert args.schedule_slots == "06:00,20:30"
+    assert args.schedule_slots == "06:00,12:30,20:30"
     assert args.schedule_start_days == 1
     assert args.schedule_start_date == ""
     assert args.long_publish_at == ""
+    assert args.batch_key == "shorts_funnel_batch_week5"
+
+
+def test_schedule_targets_the_requested_batch_not_lexicographically_latest(tmp_path, monkeypatch):
+    auto_state = tmp_path / "auto_state.json"
+    ledger = tmp_path / "ledger.md"
+    auto_state.write_text(json.dumps({
+        "shorts_funnel_batch_2026-08-06": {
+            "long_videos": [{"slug": "other", "publish_at": "", **ELIGIBLE_FIELDS}], "short_videos": [],
+        },
+        "shorts_funnel_batch_week5": {
+            "long_videos": [{"slug": "target", "publish_at": "", **ELIGIBLE_FIELDS}], "short_videos": [],
+        },
+    }), encoding="utf-8")
+    ledger.write_text("# Ledger\n", encoding="utf-8")
+    monkeypatch.setattr(cli, "AUTO_STATE_PATH", auto_state)
+    monkeypatch.setattr(cli, "LEDGER_PATH", ledger)
+
+    cli.schedule_pending_videos(argparse.Namespace(
+        batch_key="shorts_funnel_batch_week5", schedule_slots="20:30", schedule_start_days=1,
+        schedule_start_date="2026-07-24", long_publish_at="2026-07-24T20:30:00+07:00",
+    ))
+
+    data = json.loads(auto_state.read_text(encoding="utf-8"))
+    assert data["shorts_funnel_batch_week5"]["long_videos"][0]["publish_at"]
+    assert data["shorts_funnel_batch_2026-08-06"]["long_videos"][0]["publish_at"] == ""
+
+
+def test_schedule_daily_bundle_places_two_shorts_and_its_long_on_one_day(tmp_path, monkeypatch):
+    auto_state = tmp_path / "auto_state.json"
+    ledger = tmp_path / "ledger.md"
+    auto_state.write_text(json.dumps({"shorts_funnel_batch_daily": {
+        "daily_cadence": {"longs": 1, "shorts": 2},
+        "long_videos": [{"day": 1, "slug": "long-a", **ELIGIBLE_FIELDS}],
+        "short_videos": [
+            {"day": 1, "slug": "short-a1", "long_form_slug": "long-a", **ELIGIBLE_FIELDS},
+            {"day": 1, "slug": "short-a2", "long_form_slug": "long-a", **ELIGIBLE_FIELDS},
+        ],
+    }}), encoding="utf-8")
+    ledger.write_text("# Ledger\n", encoding="utf-8")
+    monkeypatch.setattr(cli, "AUTO_STATE_PATH", auto_state)
+    monkeypatch.setattr(cli, "LEDGER_PATH", ledger)
+
+    cli.schedule_pending_videos(argparse.Namespace(
+        batch_key="shorts_funnel_batch_daily", schedule_slots="06:00,12:30,20:30",
+        schedule_start_days=1, schedule_start_date="2026-07-24", long_publish_at="",
+    ))
+
+    batch = json.loads(auto_state.read_text(encoding="utf-8"))["shorts_funnel_batch_daily"]
+    assert [item["publish_at"] for item in batch["short_videos"]] == [
+        "2026-07-24T06:00:00+07:00", "2026-07-24T12:30:00+07:00",
+    ]
+    assert batch["long_videos"][0]["publish_at"] == "2026-07-24T20:30:00+07:00"
 
 
 def test_schedule_separates_explicit_long_dates_from_four_shorts_per_day(tmp_path, monkeypatch):
     auto_state = tmp_path / "auto_state.json"
     ledger = tmp_path / "ledger.md"
     auto_state.write_text(json.dumps({"shorts_funnel_batch_2026-07-17": {
-        "long_videos": [{"slug": "long-a"}, {"slug": "long-b"}],
-        "short_videos": [{"day": day, "slug": f"short-{day}"} for day in range(1, 9)],
+        "long_videos": [{"slug": "long-a", **ELIGIBLE_FIELDS}, {"slug": "long-b", **ELIGIBLE_FIELDS}],
+        "short_videos": [
+            {"day": day, "slug": f"short-{day}", **ELIGIBLE_FIELDS} for day in range(1, 9)
+        ],
     }}), encoding="utf-8")
     ledger.write_text("# Ledger\n", encoding="utf-8")
     monkeypatch.setattr(cli, "AUTO_STATE_PATH", auto_state)
@@ -1024,26 +1122,17 @@ def test_cmd_start_rejects_clear_ledger_with_resume():
         )
 
 
-def test_cmd_start_warns_and_exits_on_nonzero_return(monkeypatch, _capture_telegram):
-    import io
+def test_cmd_start_does_not_run_legacy_cloud_even_when_it_would_fail(monkeypatch, _capture_telegram):
+    monkeypatch.setattr(
+        cli.subprocess,
+        "Popen",
+        lambda *_args, **_kwargs: pytest.fail("removed cloud path must not execute"),
+    )
 
-    class FakePopen:
-        def __init__(self, cmd, **kw):
-            self.stdout = io.StringIO("")
-            self.stderr = io.StringIO("lỗi API rồi")
-            self.returncode = 1
-            self.args = cmd
-
-        def wait(self):
-            pass
-
-    monkeypatch.setattr(cli.subprocess, "Popen", FakePopen)
-
-    with pytest.raises(SystemExit) as exc_info:
+    with pytest.raises(SystemExit, match="--cloud.*đã bị gỡ"):
         cli.cmd_start(argparse.Namespace(num_of_vid=1, type_of_vid="long", type_of_rules="auto", resume=False, cloud=True))
 
-    assert exc_info.value.code == 1
-    assert any("lỗi API rồi" in m for m in _capture_telegram)
+    assert not _capture_telegram
 
 
 # ── graceful stop (ytb batch stop) ───────────────────────────────────────────
@@ -1244,13 +1333,16 @@ def test_schedule_pending_videos_assigns_publish_at_without_overwriting_done_or_
     auto_state.write_text(json.dumps({
         "shorts_funnel_batch_2026-07-06": {
             "long_videos": [
-                {"day": 3, "slug": "already-scheduled", "publish_at": "2026-07-20T09:00:00+07:00"},
+                {
+                    "day": 3, "slug": "already-scheduled", "publish_at": "2026-07-20T09:00:00+07:00",
+                    **ELIGIBLE_FIELDS,
+                },
             ],
             "short_videos": [
-                {"day": 1, "slug": "first-short", "publish_at": "", "shorts_status": "queued"},
-                {"day": 2, "slug": "done-short", "publish_at": "", "shorts_status": "queued"},
-                {"day": 4, "slug": "second-short", "publish_at": "", "shorts_status": "queued"},
-                {"day": 5, "slug": "third-short", "publish_at": "", "shorts_status": "queued"},
+                {"day": 1, "slug": "first-short", "publish_at": "", "shorts_status": "queued", **ELIGIBLE_FIELDS},
+                {"day": 2, "slug": "done-short", "publish_at": "", "shorts_status": "queued", **ELIGIBLE_FIELDS},
+                {"day": 4, "slug": "second-short", "publish_at": "", "shorts_status": "queued", **ELIGIBLE_FIELDS},
+                {"day": 5, "slug": "third-short", "publish_at": "", "shorts_status": "queued", **ELIGIBLE_FIELDS},
             ],
         }
     }), encoding="utf-8")
@@ -1291,10 +1383,10 @@ def test_default_schedule_keeps_shorts_off_sunday_and_long_on_sunday(tmp_path, m
     ledger = tmp_path / "ledger.md"
     auto_state.write_text(json.dumps({
         "shorts_funnel_batch_2026-07-06": {
-            "long_videos": [{"day": 10, "slug": "long", "publish_at": ""}],
+            "long_videos": [{"day": 10, "slug": "long", "publish_at": "", **ELIGIBLE_FIELDS}],
             "short_videos": [
-                {"day": 1, "slug": "short-a", "publish_at": ""},
-                {"day": 2, "slug": "short-b", "publish_at": ""},
+                {"day": 1, "slug": "short-a", "publish_at": "", **ELIGIBLE_FIELDS},
+                {"day": 2, "slug": "short-b", "publish_at": "", **ELIGIBLE_FIELDS},
             ],
         }
     }), encoding="utf-8")
@@ -1320,7 +1412,7 @@ def test_cmd_run_schedules_before_processing(tmp_path, monkeypatch):
         "shorts_funnel_batch_2026-07-06": {
             "long_videos": [],
             "short_videos": [
-                {"day": 1, "slug": "short-video", "publish_at": "", "shorts_status": "queued"},
+                {"day": 1, "slug": "short-video", "publish_at": "", "shorts_status": "queued", **ELIGIBLE_FIELDS},
             ],
         }
     }), encoding="utf-8")
@@ -1495,16 +1587,14 @@ def test_check_not_already_running_noop_without_pid_file(tmp_path, monkeypatch):
     cli.check_not_already_running()  # không raise, không tạo file
 
 
-def test_cmd_start_missing_claude_binary_exits(monkeypatch):
+def test_cmd_start_missing_claude_binary_is_irrelevant_after_cloud_path_removal(monkeypatch):
     def fake_popen(cmd, **kw):
         raise FileNotFoundError
 
     monkeypatch.setattr(cli.subprocess, "Popen", fake_popen)
 
-    with pytest.raises(SystemExit) as exc_info:
+    with pytest.raises(SystemExit, match="--cloud.*đã bị gỡ"):
         cli.cmd_start(argparse.Namespace(num_of_vid=1, type_of_vid="long", type_of_rules="auto", resume=False, cloud=True))
-
-    assert exc_info.value.code == 1
 
 
 # ── notify_progress (Telegram tiến độ từng video) ─────────────────────────────

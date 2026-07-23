@@ -134,7 +134,7 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
     )
     p_start.add_argument(
         "--cloud", action="store_true", default=False,
-        help="Opt-in dùng Claude CLI legacy cho ideation; mặc định dùng local LLM provider",
+        help="Đã gỡ: legacy cloud ideation không mang system prompt/strategy-v1 và sẽ báo lỗi.",
     )
     p_start.add_argument(
         "--batch-key", default="",
@@ -194,6 +194,15 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
     )
     p_run.add_argument("--loop", action="store_true", help="Chạy hết queue, không chỉ 1 video")
     p_run.add_argument(
+        "--batch-key",
+        default="",
+        help="Chạy đúng batch chỉ định, không suy đoán theo tên batch mới nhất.",
+    )
+    p_run.add_argument(
+        "--through", choices=("publish", "render"), default="publish",
+        help="Chạy đến publish (mặc định) hoặc dừng sau render để test an toàn, không upload YouTube.",
+    )
+    p_run.add_argument(
         "--workers",
         type=int,
         choices=[1, 2],
@@ -207,8 +216,8 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
     )
     p_run.add_argument(
         "--schedule-slots",
-        default="06:00,20:30",
-        help="Các giờ publish trong ngày, cách nhau bằng dấu phẩy (mặc định 06:00,20:30 giờ VN)",
+        default="06:00,12:30,20:30",
+        help="Các giờ publish trong ngày, cách nhau bằng dấu phẩy (mặc định 06:00,12:30,20:30 giờ VN)",
     )
     p_run.add_argument(
         "--schedule-start-days",
@@ -298,6 +307,34 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
         epilog="Ví dụ:\n"
         "  ytb batch queue | jq '.[] | select(.status==\"pending\")'\n",
     ).set_defaults(func=cmd_funcs["queue"])
+
+    p_analytics = _sub(
+        sub, "analytics",
+        help="Lưu baseline/Short metrics và xem quyết định format",
+        description="Nhập các chỉ số Shorts mà YouTube Studio hiển thị nhưng API không trả về, "
+        "sau ít nhất 48 giờ. Tool gom tối thiểu 4 Shorts cùng format trước khi trả "
+        "scale, revise_hook hoặc revise_value cho batch ideation kế tiếp.",
+        epilog="Ví dụ:\n"
+        "  ytb batch analytics baseline --stayed-to-watch 0.22\n"
+        "  ytb batch analytics snapshot --slug mo-laptop --format-id core_answer_first_v1 "
+        "--age-hours 72 --stayed-to-watch 0.31 --short-to-long-clicks 2 --subscribers-gained 1\n"
+        "  ytb batch analytics summary\n",
+    )
+    analytics_func = cmd_funcs.get("analytics", lambda _args: None)
+    analytics_sub = p_analytics.add_subparsers(dest="action", required=True)
+    p_baseline = analytics_sub.add_parser("baseline", help="Lưu mốc Viewed/Stayed to watch hiện tại")
+    p_baseline.add_argument("--stayed-to-watch", type=float, required=True, help="Tỷ lệ 0–1, ví dụ 0.22")
+    p_baseline.set_defaults(func=analytics_func)
+    p_snapshot = analytics_sub.add_parser("snapshot", help="Lưu một Short đã đủ 48–72 giờ")
+    p_snapshot.add_argument("--slug", required=True, help="Slug Short")
+    p_snapshot.add_argument("--format-id", required=True, help="Ví dụ core_answer_first_v1")
+    p_snapshot.add_argument("--age-hours", type=float, required=True, help="Số giờ kể từ lúc public")
+    p_snapshot.add_argument("--stayed-to-watch", type=float, required=True, help="Tỷ lệ 0–1")
+    p_snapshot.add_argument("--short-to-long-clicks", type=int, default=0, help="Lượt sang long, nếu Studio có")
+    p_snapshot.add_argument("--subscribers-gained", type=int, default=0, help="Subscriber từ Short")
+    p_snapshot.set_defaults(func=analytics_func)
+    p_summary = analytics_sub.add_parser("summary", help="Xem nhãn format cho batch tiếp")
+    p_summary.set_defaults(func=analytics_func)
 
     _sub(
         sub, "ps",

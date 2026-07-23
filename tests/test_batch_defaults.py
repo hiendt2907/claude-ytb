@@ -11,7 +11,7 @@ def _health_script() -> SimpleNamespace:
     narration = (
         "Bạn đi bộ sau bữa ăn và thấy cơ thể nhẹ hơn. Cơ chế nằm ở việc vận động nhẹ "
         "giúp cơ thể xử lý năng lượng ổn định hơn trong đời sống hàng ngày. "
-    ) * 10
+    ) * 20
     return SimpleNamespace(
         slug="di-bo-sau-bua-an",
         topic="thói quen đi bộ sau bữa ăn",
@@ -58,6 +58,21 @@ def test_claude_batch_provider_uses_cli_default_model(monkeypatch):
     assert provider.model_name() == "default"
 
 
+def test_resume_counts_the_requested_batch_only(tmp_path, monkeypatch):
+    from ytb_pipeline.orchestrator import ideation_state
+
+    state = tmp_path / "state.json"
+    state.write_text(json.dumps({
+        "shorts_funnel_batch_older": {"long_videos": [{"slug": "older"}]},
+        "shorts_funnel_batch_week3": {"long_videos": [{"slug": "week3"}]},
+    }), encoding="utf-8")
+    monkeypatch.setattr(ideation_state, "_cli", lambda: SimpleNamespace(done_slugs=lambda: set()))
+
+    assert ideation_state.count_pending_ideation(
+        "long", state, batch_key="shorts_funnel_batch_week3"
+    ) == (1, ["week3"])
+
+
 def test_script_prompts_define_numeric_positive_time_goal():
     from ytb_pipeline.orchestrator.ideation_prompts import (
         SCRIPT_GENERATION_SYSTEM_PROMPT,
@@ -72,6 +87,54 @@ def test_script_prompts_define_numeric_positive_time_goal():
     ):
         assert "positive JSON number" in prompt
         assert "never 0/null/string/timestamp/range" in prompt
+
+
+def test_personal_finance_psychology_prompt_requires_a_claim_level_evidence_register():
+    from ytb_pipeline.orchestrator.ideation_prompts import local_script_prompt
+
+    prompt = local_script_prompt(
+        1,
+        1,
+        "long",
+        "tâm lý tài chính cá nhân; mọi quan điểm phải có nguồn kiểm chứng",
+        "",
+    )
+
+    assert "editorial_profile" in prompt
+    assert "personal_finance_psychology" in prompt
+    assert "evidence_register" in prompt
+    assert "primary, peer-reviewed, or official source" in prompt
+
+
+def test_financial_evidence_gate_rejects_an_unverifiable_register():
+    from ytb_pipeline.orchestrator.ideation_script_fix import validate_financial_evidence_register
+
+    with pytest.raises(ValueError, match="evidence_register"):
+        validate_financial_evidence_register(
+            {
+                "editorial_profile": "personal_finance_psychology",
+                "compliance": {"accuracy": "PASS"},
+                "evidence_register": [{"claim": "Tiêu tiền theo cảm xúc"}],
+            },
+            required=True,
+        )
+
+
+def test_financial_repair_prompt_preserves_evidence_contract():
+    from ytb_pipeline.orchestrator.ideation_prompts import repair_prompt
+
+    prompt = repair_prompt(
+        {
+            "editorial_profile": "personal_finance_psychology",
+            "evidence_register": [{"claim": "A sourced claim"}],
+        },
+        None,
+        "Financial script phải khai editorial_profile=personal_finance_psychology.",
+    )
+
+    assert "Preserve editorial_profile=personal_finance_psychology" in prompt
+    assert "Preserve the complete evidence_register" in prompt
+    assert "source_long_slug, source_section_index, source_excerpt" in prompt
 
 
 def test_codex_batch_provider_uses_exec_json_prompt(monkeypatch):
@@ -133,7 +196,7 @@ def test_script_providers_allow_long_generation_budget(monkeypatch):
     ideation_cmd._ClaudeStartProvider()._invoke(["claude", "prompt"])
     ideation_cmd._CodexStartProvider()._invoke(["codex", "exec", "prompt"])
 
-    assert observed == [900, 900]
+    assert observed == [3600, 3600]
 
 
 def test_batch_start_rejects_ollama_script_provider(monkeypatch):
@@ -146,7 +209,7 @@ def test_batch_start_rejects_ollama_script_provider(monkeypatch):
     with pytest.raises(SystemExit, match="Chỉ hỗ trợ Claude hoặc Codex"):
         ideation_cmd.cmd_start(type("Args", (), {
             "num_of_vid": 1,
-            "type_of_vid": "short",
+            "type_of_vid": "long",
             "type_of_rules": "auto",
             "resume": False,
             "cloud": False,
@@ -173,13 +236,133 @@ def test_system_prompt_requires_an_immediate_action_in_final_narration():
     assert '"Hãy "' in prompt
 
 
+def test_system_prompt_makes_strategy_v1_non_negotiable_for_every_new_short():
+    from ytb_pipeline.orchestrator.ideation_prompts import SCRIPT_GENERATION_SYSTEM_PROMPT
+
+    assert "core_answer_first_v1" in SCRIPT_GENERATION_SYSTEM_PROMPT
+    assert "answer_by_sec" in SCRIPT_GENERATION_SYSTEM_PROMPT
+    assert "core_answer" in SCRIPT_GENERATION_SYSTEM_PROMPT
+
+
+def test_short_prompt_uses_a_safe_length_buffer_and_immediate_answer_contract():
+    from ytb_pipeline.orchestrator.ideation_prompts import local_script_prompt
+
+    prompt = local_script_prompt(
+        1, 1, "short", "một cơ chế hành vi", "", funnel={
+            "long_form_slug": "long-a", "playlist": "playlist-a", "cta_target": "long-a",
+        }
+    )
+
+    assert "2,200-2,800" in prompt
+    assert "120 characters" in prompt
+    assert "concrete tension marker" in prompt
+    assert "exactly six sections" in prompt
+    assert "immediate answer contract" in prompt
+
+
+def test_short_prompt_requires_one_valueful_curiosity_source_from_its_long():
+    from ytb_pipeline.orchestrator.ideation_prompts import local_script_prompt
+
+    prompt = local_script_prompt(
+        1, 1, "short", "một cơ chế hành vi", "", funnel={
+            "long_form_slug": "long-a", "playlist": "playlist-a", "cta_target": "long-a",
+        }, source_long_context={
+            "slug": "long-a",
+            "title": "Long A",
+            "candidates": [{
+                "section_index": 4,
+                "purpose": "giải thích điều bất ngờ",
+                "excerpt": "Đây là một insight có giá trị và còn một câu hỏi cần mở rộng.",
+            }],
+        },
+    )
+
+    assert "Long-derived Short contract" in prompt
+    assert "source_long_slug" in prompt
+    assert "source_section_index" in prompt
+    assert "Đây là một insight có giá trị" in prompt
+    assert "Do not add a new factual claim" in prompt
+
+
+def test_short_strategy_rejects_a_source_not_present_in_its_long_context():
+    from ytb_pipeline.orchestrator.ideation_script_fix import validate_short_strategy_v1
+
+    payload = {
+        "strategy": {
+            "format_id": "core_answer_first_v1", "core_mechanism": "bất hòa nhận thức",
+            "audience_problem": "một lựa chọn lệch giá trị", "angle": "câu ngoại lệ",
+            "long_form_slug": "long-a", "playlist": "series", "cta_target": "long-a",
+            "source_long_slug": "long-a", "source_section_index": 9,
+            "source_excerpt": "Đoạn không thuộc Long nguồn.",
+            "hook": {
+                "situation": "Mua đồ uống", "core_answer": "Đó là bất hòa nhận thức",
+                "open_loop": "Vì sao?", "answer_by_sec": 5,
+            },
+        },
+        "sections": [
+            {"purpose": "situation", "voiceover": "Mua đồ uống sau giờ làm."},
+            {"purpose": "core_answer", "voiceover": "Đó là bất hòa nhận thức."},
+        ],
+    }
+
+    with pytest.raises(ValueError, match="source_excerpt"):
+        validate_short_strategy_v1(payload, source_long_context={
+            "slug": "long-a",
+            "candidates": [{"section_index": 4, "excerpt": "Đoạn nguồn đã được chọn."}],
+        })
+
+
+def test_short_strategy_rejects_a_core_answer_that_is_not_immediately_after_situation():
+    from ytb_pipeline.orchestrator.ideation_script_fix import validate_short_strategy_v1
+
+    payload = {
+        "strategy": {
+            "format_id": "core_answer_first_v1", "core_mechanism": "bất hòa nhận thức",
+            "audience_problem": "một lựa chọn lệch giá trị", "angle": "câu ngoại lệ",
+            "long_form_slug": "long-a", "playlist": "playlist-a", "cta_target": "long-a",
+            "hook": {
+                "situation": "Mua đồ uống", "core_answer": "Đó là bất hòa nhận thức",
+                "open_loop": "Vì sao?", "answer_by_sec": 5,
+            },
+        },
+        "sections": [
+            {"purpose": "situation", "voiceover": "Mua đồ uống sau giờ làm."},
+            {"purpose": "evidence", "voiceover": "Một câu giải thích xuất hiện."},
+            {"purpose": "core_answer", "voiceover": "Đó là bất hòa nhận thức."},
+        ],
+    }
+
+    with pytest.raises(ValueError, match="immediately after situation"):
+        validate_short_strategy_v1(payload)
+
+
+def test_cmd_start_rejects_a_short_without_a_v1_batch_funnel_before_calling_an_llm(monkeypatch):
+    from ytb_pipeline.orchestrator import ideation_cmd
+
+    monkeypatch.setattr(
+        ideation_cmd.asyncio,
+        "run",
+        lambda _coroutine: pytest.fail("a Short without a v1 funnel must fail before starting the LLM"),
+    )
+    with pytest.raises(SystemExit, match="batch-key.*long-form-slug.*playlist.*cta-target"):
+        ideation_cmd.cmd_start(type("Args", (), {
+            "num_of_vid": 1,
+            "type_of_vid": "short",
+            "type_of_rules": "auto",
+            "resume": False,
+            "cloud": False,
+            "local": False,
+        })())
+
+
 def test_long_prompt_declares_a_safe_runtime_floor():
     from ytb_pipeline.orchestrator.ideation_prompts import SCRIPT_GENERATION_SYSTEM_PROMPT, local_script_prompt
 
     prompt = local_script_prompt(1, 1, "long", "auto", "")
 
     assert '"target_minutes": 12 (declare EXACTLY 12)' in prompt
-    assert "measured minutes fall below the declared target_minutes" in SCRIPT_GENERATION_SYSTEM_PROMPT
+    assert "actual audio stays 12-15 minutes" in SCRIPT_GENERATION_SYSTEM_PROMPT
+    assert "first 28 spoken words after the greeting" in SCRIPT_GENERATION_SYSTEM_PROMPT
 
 
 def test_custom_long_prompt_does_not_describe_the_long_as_a_short():
@@ -220,7 +403,78 @@ def test_long_repair_prompt_requires_target_minutes_and_preserves_valid_narratio
 
     assert '"target_minutes" is required for a Long' in prompt
     assert "Do not shorten or delete valid existing narration" in prompt
+    assert "Rewrite the first narration section" in prompt
     assert "legacy narration=voiceover" not in prompt
+
+
+def test_long_extension_prompt_requests_only_new_sections_for_the_missing_runtime():
+    from ytb_pipeline.orchestrator.ideation_prompts import long_extension_prompt
+
+    prompt = long_extension_prompt(
+        {"slug": "thien-kien-nhin-lai", "title": "Biết ngay mà", "sections": []},
+        missing_chars=10_000,
+    )
+
+    assert "Return ONLY one JSON object with a `sections` array" in prompt
+    assert "Do not rewrite, repeat, or summarize the existing sections" in prompt
+    assert "10,000" in prompt
+    assert "voiceover" in prompt
+
+
+def test_append_long_extension_inserts_before_conclusion_without_mutating_source():
+    from ytb_pipeline.orchestrator.ideation_script_fix import append_long_extension
+
+    source = {
+        "sections": [
+            {"purpose": "hook", "voiceover": "Mở đầu."},
+            {"purpose": "conclusion", "voiceover": "Kết thúc."},
+        ]
+    }
+    result = append_long_extension(
+        source,
+        {"sections": [{"purpose": "evidence", "voiceover": "Phần bổ sung."}]},
+    )
+
+    assert [section["voiceover"] for section in result["sections"]] == [
+        "Mở đầu.", "Phần bổ sung.", "Kết thúc."
+    ]
+    assert len(source["sections"]) == 2
+
+
+def test_short_expansion_delta_only_changes_named_middle_sections_without_mutating_source():
+    from ytb_pipeline.orchestrator.ideation_script_fix import apply_short_expansion
+
+    source = {
+        "sections": [
+            {"purpose": "situation", "voiceover": "Tình huống."},
+            {"purpose": "core_answer", "voiceover": "Đáp án."},
+            {"purpose": "evidence", "voiceover": "Bằng chứng."},
+            {"purpose": "application", "voiceover": "Áp dụng."},
+            {"purpose": "payoff", "voiceover": "Kết."},
+        ]
+    }
+
+    result = apply_short_expansion(
+        source,
+        {"section_updates": [{"index": 2, "append_voiceover": " Chi tiết đúng chủ đề."}]},
+    )
+
+    assert result["sections"][2]["voiceover"] == "Bằng chứng. Chi tiết đúng chủ đề."
+    assert result["sections"][0]["voiceover"] == "Tình huống."
+    assert source["sections"][2]["voiceover"] == "Bằng chứng."
+
+
+def test_short_expansion_prompt_forbids_full_script_regeneration():
+    from ytb_pipeline.orchestrator.ideation_prompts import short_expansion_prompt
+
+    prompt = short_expansion_prompt(
+        {"slug": "co-che-test", "sections": [{"purpose": "evidence", "voiceover": "Nội dung."}]},
+        missing_chars=900,
+    )
+
+    assert "`section_updates` array" in prompt
+    assert "Do not return the full script" in prompt
+    assert "900" in prompt
 
 
 def test_script_prompt_uses_canonical_section_fields_without_alias_duplication():
@@ -244,7 +498,7 @@ def test_long_overflow_is_trimmed_without_touching_opening_or_final_cta():
     final = "Hãy làm một việc trong mười phút. Hãy like và subscribe. " * 50
     payload = {
         "sections": [{"voiceover": opening}]
-        + [{"voiceover": "nội dung cụ thể. " * 500} for _ in range(4)]
+        + [{"voiceover": "nội dung cụ thể. " * 1000} for _ in range(4)]
         + [{"voiceover": final}],
     }
 
@@ -259,7 +513,7 @@ def test_long_overflow_is_trimmed_without_touching_opening_or_final_cta():
 def test_short_normalizer_keeps_original_when_sentence_trim_would_undershoot(monkeypatch):
     from ytb_pipeline.orchestrator import ideation_script_fix as fixer
 
-    payload = {"sections": [{"voiceover": "nội dung đủ dài. " * 300}]}
+    payload = {"sections": [{"voiceover": "nội dung đủ dài. " * 400}]}
     original = json.loads(json.dumps(payload))
     monkeypatch.setattr(fixer, "trim_to_sentence", lambda _text, _limit: "quá ngắn.")
 

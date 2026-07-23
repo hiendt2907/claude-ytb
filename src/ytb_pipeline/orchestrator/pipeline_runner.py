@@ -21,6 +21,8 @@ from pathlib import Path
 
 from ..publish.youtube_auth import ReauthRequiredError
 from .queue_manager import PIPELINE_LOG_DIR, QueueItem
+from .recovery_contract import RecoveryPlan, recovery_for_failure
+from .recovery_report import write_recovery_report
 
 # backoff giữa các lần retry (giây) cho lỗi TẠM THỜI — sau khi hết list này mà vẫn
 # fail thì bỏ qua slug, KHÔNG chặn cả batch.
@@ -75,7 +77,35 @@ def detect_stage_marker(line: str) -> str | None:
 
 def is_transient_error(output: str) -> bool:
     """True nếu output chứa dấu hiệu lỗi tạm thời (đáng retry)."""
-    return any(re.search(pattern, output) for pattern in TRANSIENT_ERROR_PATTERNS)
+    return recovery_for_output(output).retryable
+
+
+def recovery_for_output(output: str) -> RecoveryPlan:
+    """Infer the latest stage from pipeline output and return the recovery plan."""
+    stage = "unknown"
+    for line in output.splitlines():
+        marker = detect_stage_marker(line)
+        if marker:
+            stage = marker
+    return recovery_for_failure(stage, output)
+
+
+def write_failure_recovery_report(item: QueueItem, output: str) -> Path | None:
+    """Persist a sanitized recovery observation without changing batch state.
+
+    Reporting itself must never mask the pipeline failure: monitor evidence is
+    useful, but a read/write error in its JSON directory cannot grant a retry.
+    """
+    cli = _cli()
+    try:
+        return write_recovery_report(
+            cli.ROOT / "assets" / "quality_reports" / "recovery",
+            slug=item.slug,
+            failure_output=output,
+            log_path=cli.log_path_for(item.slug),
+        )
+    except OSError:
+        return None
 
 
 def build_env(item: QueueItem) -> dict:
@@ -216,22 +246,27 @@ def run_with_retry(
         if result.returncode == 0:
             return True, last_output
 
-        if not cli.is_transient_error(last_output):
+        plan = cli.recovery_for_output(last_output)
+        if not plan.retryable:
+            report = cli.write_failure_recovery_report(item, last_output)
             cli.emit_warning(
-                f"Video '{item.slug}' lỗi KHÔNG retry (không phải lỗi tạm thời) — "
-                f"bỏ qua, chuyển video kế tiếp. Đuôi log:\n{last_output[-1500:]}"
+                f"Video '{item.slug}' dừng an toàn [{plan.code}]: {plan.action}. "
+                f"KHÔNG retry tự động; report={report or 'không ghi được'}. "
+                f"Xem log trước khi can thiệp. Đuôi log:\n{last_output[-1500:]}"
             )
             return False, last_output
 
-        if attempt >= len(backoff):
+        allowed_retries = min(len(backoff), plan.max_attempts)
+        if attempt >= allowed_retries:
+            report = cli.write_failure_recovery_report(item, last_output)
             cli.emit_warning(
-                f"Video '{item.slug}' lỗi tạm thời nhưng đã retry hết {len(backoff)} lần vẫn fail — "
-                f"bỏ qua, chuyển video kế tiếp. Đuôi log:\n{last_output[-1500:]}"
+                f"Video '{item.slug}' [{plan.code}] đã retry hết {allowed_retries} lần — "
+                f"{plan.action}. report={report or 'không ghi được'}. Đuôi log:\n{last_output[-1500:]}"
             )
             return False, last_output
 
         wait = backoff[attempt]
-        print(f"  ⏳ Lỗi tạm thời (lần {attempt + 1}/{len(backoff)}), retry sau {wait}s...")
+        print(f"  ⏳ [{plan.code}] retry an toàn (lần {attempt + 1}/{allowed_retries}) sau {wait}s...")
         sleep_fn(wait)
         attempt += 1
 
@@ -293,6 +328,7 @@ def finalize_published_item(
     worker_id: int | str | None = None,
     position: int | None = None,
     total: int | None = None,
+    batch_key: str | None = None,
 ) -> bool:
     """Verify a successful publish and persist its final ledger state.
 
@@ -301,7 +337,7 @@ def finalize_published_item(
     not a published video yet.
     """
     cli = _cli()
-    queue = cli.load_queue()
+    queue = cli.load_queue(batch_key=batch_key)
     done = cli.done_slugs(ledger_path)
     failed = cli.failed_slugs(ledger_path)
     position = position if position is not None else sum(1 for q in queue if q.slug in done or q.slug in failed) + 1
@@ -362,7 +398,9 @@ def finalize_published_item(
 
 
 def process_next(
-    queue_path: Path | None = None, ledger_path: Path | None = None, *, worker_id: int | None = None
+    queue_path: Path | None = None, ledger_path: Path | None = None, *,
+    worker_id: int | None = None, through: str = "publish", batch_key: str | None = None,
+    completed_render_slugs: set[str] | None = None,
 ) -> bool:
     """Chạy đúng 1 video kế tiếp trong queue: pipeline -> verify YouTube -> ledger.
 
@@ -371,10 +409,10 @@ def process_next(
     """
     cli = _cli()
     with cli._queue_claim_lock:
-        queue = cli.load_queue(queue_path)
+        queue = cli.load_queue(queue_path, batch_key=batch_key)
         done = cli.done_slugs(ledger_path)
         failed = cli.failed_slugs(ledger_path)
-        item = cli.next_pending(queue, done | failed | cli._claimed_slugs)
+        item = cli.next_pending(queue, done | failed | cli._claimed_slugs | (completed_render_slugs or set()))
         if item is None:
             print("✓ Queue đã hết — không còn video pending.")
             return False
@@ -388,7 +426,12 @@ def process_next(
         cli.notify_progress(
             f"🎬 [{position}/{len(queue)}] Bắt đầu '{item.slug}' (publish_at={item.publish_at})"
         )
-        ok, output = cli.run_with_retry(item, ledger_path=ledger_path, worker_id=worker_id)
+        ok, output = cli.run_with_retry(
+            item, ledger_path=ledger_path, worker_id=worker_id,
+            run_fn=lambda queued, **kwargs: cli.run_pipeline_once(
+                queued, through=through, **kwargs
+            ),
+        )
 
         if cli._stop_requested:
             # run_pipeline_once đã ghi ledger status "stopped" cho slug này rồi —
@@ -406,9 +449,21 @@ def process_next(
             )
             return True
 
+        if through == "render":
+            if completed_render_slugs is not None:
+                completed_render_slugs.add(item.slug)
+            cli.update_ledger(
+                item.slug, "", "render", "ok",
+                "Batch smoke test: pipeline dừng sau render (--through render).",
+                ledger_path=ledger_path,
+            )
+            if worker_id is not None:
+                cli.update_worker_state(worker_id, slug=item.slug, stage="done")
+            return True
+
         finalize_published_item(
             item, output, ledger_path=ledger_path, worker_id=worker_id,
-            position=position, total=len(queue),
+            position=position, total=len(queue), batch_key=batch_key,
         )
         return True
     finally:

@@ -52,6 +52,8 @@ class QueueItem:
     long_form_slug: str = ""
     playlist: str = ""
     cta_target: str = ""
+    format_id: str = ""
+    angle: str = ""
     dry_run: bool = False
 
 
@@ -83,6 +85,8 @@ def load_queue(auto_state_path: Path | None = None, batch_key: str | None = None
             v.get("long_form_slug", ""),
             v.get("playlist", ""),
             v.get("cta_target", ""),
+            v.get("format_id", ""),
+            v.get("angle", ""),
             bool(v.get("dry_run", False)),
         )
         for _kind, videos in grouped_videos

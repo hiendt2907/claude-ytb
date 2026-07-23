@@ -35,6 +35,8 @@ from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 
 from ..claude_cli import build_claude_cmd
+from ..analytics.feedback import AnalyticsStore
+from ..content_contract import CONTRACT_VERSION
 from ..config.settings import settings
 from ..notify import telegram
 from ..publish.youtube_auth import DRIVE_SCOPES, YOUTUBE_SCOPES, ReauthRequiredError
@@ -62,8 +64,10 @@ from .pipeline_runner import (
     is_transient_error,
     log_path_for,
     process_next,
+    recovery_for_output,
     run_pipeline_once,
     run_with_retry,
+    write_failure_recovery_report,
     verify_youtube_video,
 )
 from .queue_manager import (
@@ -93,7 +97,7 @@ from .state_io import locked_json_update
 # Claude) và các lệnh đọc-only khác không cần.
 PID_TRACKED_COMMANDS = {"run", "retry"}
 VN_TZ = timezone(timedelta(hours=7))
-DEFAULT_SCHEDULE_SLOTS = "06:00,20:30"
+DEFAULT_SCHEDULE_SLOTS = "06:00,12:30,20:30"
 MAX_BATCH_WORKERS = 2
 WORKER_STATE_PATH = ROOT / "assets" / "batch_workers.json"
 
@@ -354,13 +358,19 @@ def schedule_pending_videos(args: argparse.Namespace, *, now: datetime | None = 
         raise SystemExit("✗ --schedule-start-date phải là YYYY-MM-DD.") from exc
     long_moments = _parse_long_publish_at(str(getattr(args, "long_publish_at", "")))
     with locked_json_update(AUTO_STATE_PATH) as data:
-        batch_key = _latest_batch_key(data)
+        requested_batch_key = str(getattr(args, "batch_key", "") or "").strip()
+        batch_key = requested_batch_key or _latest_batch_key(data)
+        if batch_key not in data:
+            raise SystemExit(f"✗ Không tìm thấy batch '{batch_key}' trong assets/auto_state.json.")
         batch = data[batch_key]
+        daily_bundle = batch.get("daily_cadence") == {"longs": 1, "shorts": 2}
         def eligible(video: dict) -> bool:
             return (
                 video.get("slug") not in done
                 and video.get("status", "ok") not in {"needs_review", "error"}
-                and video.get("quality_status") != "needs_review"
+                and video.get("quality_status") == "pass"
+                and video.get("qa_status") == "pass"
+                and video.get("ruleset_id") == CONTRACT_VERSION
                 and video.get("assets_valid") is not False
                 and not str(video.get("publish_at", "")).strip()
             )
@@ -372,7 +382,36 @@ def schedule_pending_videos(args: argparse.Namespace, *, now: datetime | None = 
             if eligible(video)
         ]
 
-        if long_moments:
+        if daily_bundle:
+            if len(slots) < 3:
+                raise SystemExit("✗ Daily bundle cần 3 slots: Short 1, Short 2, rồi Long.")
+            shorts_by_long: dict[str, list[dict]] = {}
+            for short in short_pending:
+                shorts_by_long.setdefault(str(short.get("long_form_slug", "")).strip(), []).append(short)
+            for long_video in long_pending:
+                target = str(long_video.get("slug", "")).strip()
+                if len(shorts_by_long.get(target, [])) != 2:
+                    raise SystemExit(
+                        f"✗ Daily bundle yêu cầu Long '{target}' có đúng 2 Shorts cùng Long trước khi schedule."
+                    )
+            if len(short_pending) != len(long_pending) * 2:
+                raise SystemExit("✗ Daily bundle chỉ schedule khi mọi Short thuộc đúng một Long pending.")
+            if long_moments and len(long_moments) < len(long_pending):
+                raise SystemExit("✗ Thiếu mốc --long-publish-at cho Long pending.")
+            for index, long_video in enumerate(long_pending):
+                moment = (
+                    long_moments[index]
+                    if long_moments else datetime.combine(start_date + timedelta(days=index), slots[-1], tzinfo=VN_TZ)
+                )
+                linked = sorted(
+                    shorts_by_long[str(long_video["slug"])], key=lambda item: int(item.get("day", 0))
+                )
+                for short_index, short in enumerate(linked):
+                    short["publish_at"] = datetime.combine(
+                        moment.astimezone(VN_TZ).date(), slots[short_index], tzinfo=VN_TZ
+                    ).isoformat(timespec="seconds")
+                long_video["publish_at"] = moment.isoformat(timespec="seconds")
+        elif long_moments:
             if len(long_moments) < len(long_pending):
                 raise SystemExit("✗ Thiếu mốc --long-publish-at cho Long pending.")
             for video, moment in zip(long_pending, long_moments):
@@ -381,9 +420,11 @@ def schedule_pending_videos(args: argparse.Namespace, *, now: datetime | None = 
                 slot = slots[index % len(slots)]
                 scheduled_date = start_date + timedelta(days=index // len(slots))
                 video["publish_at"] = datetime.combine(scheduled_date, slot, tzinfo=VN_TZ).isoformat(timespec="seconds")
-        # Default channel policy: two Shorts Mon-Sat; one long-form every Sunday.
-        # An explicitly customised slot list retains the generic queue behaviour.
-        elif getattr(args, "schedule_slots", DEFAULT_SCHEDULE_SLOTS) == DEFAULT_SCHEDULE_SLOTS:
+        # Legacy batches retain their prior weekly policy. New batches use the
+        # daily_bundle branch above and never reach this compatibility path.
+        elif getattr(args, "schedule_slots", DEFAULT_SCHEDULE_SLOTS) in {
+            DEFAULT_SCHEDULE_SLOTS, "06:00,20:30"
+        }:
             sunday = start_date + timedelta(days=(6 - start_date.weekday()) % 7)
             for video in long_pending:
                 video["publish_at"] = datetime.combine(sunday, slots[-1], tzinfo=VN_TZ).isoformat(timespec="seconds")
@@ -549,16 +590,32 @@ def cmd_run_f5_staged(args: argparse.Namespace) -> None:
 
 
 def cmd_run(args: argparse.Namespace) -> None:
+    through = getattr(args, "through", "publish")
+    batch_key = str(getattr(args, "batch_key", "") or "").strip() or None
+    if batch_key is not None:
+        try:
+            known_batches = json.loads(AUTO_STATE_PATH.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise SystemExit(f"✗ Không đọc được queue batch: {exc}") from exc
+        if batch_key not in known_batches:
+            raise SystemExit(f"✗ Không tìm thấy batch '{batch_key}' trong assets/auto_state.json.")
     if getattr(args, "schedule", False):
         schedule_pending_videos(args)
     worker_count = min(MAX_BATCH_WORKERS, max(1, getattr(args, "workers", 1)))
-    if args.loop and worker_count == 2 and settings.tts_provider == "f5":
+    if args.loop and worker_count == 2 and settings.tts_provider == "f5" and batch_key is None:
         cmd_run_f5_staged(args)
         return
+    # Render-only runs are smoke tests, not terminal queue completion.  Keep a
+    # per-invocation set so --loop reaches every item once without marking any
+    # video published/done or rerendering the first item forever.
+    completed_render_slugs: set[str] | None = set() if through == "render" else None
     slots = worker_count if args.loop else 1
     with ThreadPoolExecutor(max_workers=slots, thread_name_prefix="ytb-batch") as executor:
         running = {
-            executor.submit(process_next, worker_id=worker_id): worker_id
+                    executor.submit(
+                        process_next, worker_id=worker_id, through=through, batch_key=batch_key,
+                        completed_render_slugs=completed_render_slugs,
+                    ): worker_id
             for worker_id in range(1, slots + 1)
         }
         while running:
@@ -574,7 +631,10 @@ def cmd_run(args: argparse.Namespace) -> None:
                     update_worker_state(worker_id, slug="-", stage="error", last_error=str(exc))
                     continue
                 if args.loop and processed and not _stop_requested:
-                    running[executor.submit(process_next, worker_id=worker_id)] = worker_id
+                    running[executor.submit(
+                        process_next, worker_id=worker_id, through=through, batch_key=batch_key,
+                        completed_render_slugs=completed_render_slugs,
+                    )] = worker_id
 
     if _stop_requested:
         print(
@@ -729,6 +789,30 @@ def cmd_queue(args: argparse.Namespace) -> None:
     print(json.dumps(rows, ensure_ascii=False, indent=2))
 
 
+def cmd_analytics(args: argparse.Namespace) -> None:
+    """Lưu chỉ số Shorts nhập từ Studio và in quyết định cohort cho ideation."""
+    store = AnalyticsStore()
+    if args.action == "baseline":
+        store.record_channel_baseline(stayed_to_watch=args.stayed_to_watch)
+        print(f"✓ Đã lưu baseline Stayed to watch: {args.stayed_to_watch:.1%}")
+        return
+    if args.action == "snapshot":
+        store.record_snapshot(
+            args.slug,
+            {
+                "format_id": args.format_id,
+                "age_hours": args.age_hours,
+                "stayed_to_watch": args.stayed_to_watch,
+                "short_to_long_clicks": args.short_to_long_clicks,
+                "subscribers_gained": args.subscribers_gained,
+            },
+        )
+        print(f"✓ Đã lưu snapshot Short: {args.slug}")
+        return
+    summaries = store.feedback_summary()
+    print("\n".join(summaries) if summaries else "Chưa có dữ liệu đủ 48 giờ để kết luận.")
+
+
 def cmd_reconcile(args: argparse.Namespace) -> None:
     summary = reconcile_batch_state(getattr(args, "batch_key", "") or None)
     print(f"✓ Reconciled: done={summary['done']} pending={summary['pending']} error={summary['error']}")
@@ -764,6 +848,7 @@ def main(argv: list[str] | None = None) -> None:
         "logs": cmd_logs,
         "ledger": cmd_ledger,
         "queue": cmd_queue,
+        "analytics": cmd_analytics,
         "reconcile": cmd_reconcile,
         "ps": cmd_ps,
         "reset": cmd_reset,
