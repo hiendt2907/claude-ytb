@@ -1,5 +1,7 @@
 """Test nhịp ngắt nghỉ giọng đọc — chia narration thành cụm + khoảng lặng sau cụm."""
 
+import pytest
+
 from ytb_pipeline.voiceover import tts
 from ytb_pipeline.pkg.models import Script, Segment
 
@@ -83,6 +85,72 @@ def test_prepare_narration_removes_leaked_stage_directions():
     assert "người que nhìn camera" in cleaned
 
 
+def test_segment_performance_defaults_are_backward_compatible():
+    seg = Segment(caption="c", narration="Một câu.")
+    assert seg.voice_style == ""
+    assert seg.voice_tempo is None
+    assert seg.voice_pitch is None
+
+
+def test_segment_profile_overrides_are_applied_to_profile():
+    seg = Segment(
+        caption="c", narration="Một câu.", voice_style="serious",
+        voice_tempo=0.9, voice_pitch=-1.0, voice_gain=1.0,
+        voice_pause_before=0.25, voice_pause_after=0.5,
+    )
+    profile = tts._segment_profile(seg, tts.VOICE_KNOWLEDGE)
+    assert profile.name == "serious"
+    assert profile.f5_tempo == 0.9
+    assert profile.pitch_semitones == -1.0
+    assert profile.gain_db == 1.0
+    assert profile.pause_before == 0.25
+    assert profile.pause_after == 0.5
+
+
+def test_segment_profile_rejects_unsafe_overrides():
+    seg = Segment(caption="c", narration="Một câu.", voice_tempo=2.0, voice_pitch=9.0)
+    try:
+        tts._segment_profile(seg, tts.VOICE_KNOWLEDGE)
+    except ValueError as exc:
+        assert "voice_tempo" in str(exc) or "voice_pitch" in str(exc)
+    else:
+        raise AssertionError("unsafe prosody override must fail fast")
+
+
+def test_script_loader_reads_per_segment_voice_controls(tmp_path):
+    from ytb_pipeline.ideation.generator import _segment_from_raw
+
+    seg = _segment_from_raw({
+        "narration": "Câu nói nghiêm túc.",
+        "voice_style": "serious",
+        "voice_tempo": 0.92,
+        "voice_pitch": -1,
+        "voice_gain": 1.0,
+        "voice_pause_before": 0.3,
+        "voice_pause_after": 0.4,
+    }, "demo.json")
+    assert seg.voice_style == "serious"
+    assert seg.voice_tempo == 0.92
+    assert seg.voice_pitch == -1.0
+    assert seg.voice_pause_after == 0.4
+
+
+def test_auto_profile_routes_segment_by_narrative_role():
+    segments = (
+        Segment(caption="c", narration="Bạn tưởng mọi người đều đang nhìn mình.", hook=True),
+        Segment(caption="c", narration="Nhưng đây mới là phần đáng sợ.", danger=True),
+        Segment(caption="c", narration="Trong tập tiếp theo, chúng ta sẽ xem cơ chế này.") ,
+    )
+    assert tts._segment_profile(segments[0], tts.VOICE_KNOWLEDGE, 0, 3).name == "hook"
+    assert tts._segment_profile(segments[1], tts.VOICE_KNOWLEDGE, 1, 3).name == "serious"
+    assert tts._segment_profile(segments[2], tts.VOICE_KNOWLEDGE, 2, 3).name == "conclusion"
+
+
+def test_explicit_profile_wins_over_auto_routing():
+    seg = Segment(caption="c", narration="Câu bình thường.", hook=True, voice_style="curious")
+    assert tts._segment_profile(seg, tts.VOICE_KNOWLEDGE, 0, 1).name == "curious"
+
+
 async def test_edge_tts_receives_profile_rate_and_pitch(monkeypatch, tmp_path):
     calls = []
 
@@ -121,7 +189,7 @@ def test_to_mp3_applies_tempo_when_profile_needs_it(monkeypatch, tmp_path):
 def test_f5_tempo_matches_each_edge_profile_speed():
     for profile in tts.VOICE_PROFILES.values():
         edge_multiplier = 1 + tts._edge_rate_pct(profile.edge_rate) / 100
-        assert profile.f5_tempo == edge_multiplier
+        assert profile.f5_tempo == pytest.approx(edge_multiplier)
 
 
 def test_legacy_hook_copy_does_not_route_every_section_as_hook():

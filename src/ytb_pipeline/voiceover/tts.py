@@ -19,6 +19,7 @@ from ..config.settings import settings
 from ..pkg.models import Script, Segment, Voiceover
 
 AUDIO_DIR = Path("assets/audio")
+VOICE_CONFIG_PATH = Path(__file__).resolve().parents[1] / "config" / "voice_profiles.json"
 
 SENTENCE_PUNCT = ".!?…"
 CLAUSE_PUNCT = ",;:"
@@ -33,50 +34,30 @@ class VoiceProfile:
     edge_rate: str = "+0%"
     edge_pitch: str = "+0Hz"
     f5_tempo: float = 1.0
+    pitch_semitones: float = 0.0
+    gain_db: float = 0.0
+    pause_before: float = 0.0
+    pause_after: float = 0.0
 
 
-# F5 post-processing must match Edge's effective rate.  The values below are
-# the Edge percentage converted to a tempo multiplier: +100% -> 2.00x, +96%
-# -> 1.96x, etc.  This keeps character-based timing consistent across TTS
-# providers.
-VOICE_NEUTRAL = VoiceProfile("neutral", 0.20, 0.32, 0.28, edge_rate="+100%", f5_tempo=2.00)
-VOICE_ENTERTAINMENT = VoiceProfile(
-    "entertainment",
-    comma_sec=0.06,
-    sentence_sec=0.14,
-    segment_sec=0.08,
-    edge_rate="+116%",
-    edge_pitch="+8Hz",
-    f5_tempo=2.16,
-)
-VOICE_KNOWLEDGE = VoiceProfile(
-    "knowledge",
-    comma_sec=0.24,
-    sentence_sec=0.46,
-    segment_sec=0.34,
-    edge_rate="+96%",
-    edge_pitch="-2Hz",
-    f5_tempo=1.96,
-)
-VOICE_INSPIRING = VoiceProfile(
-    "inspiring",
-    comma_sec=0.28,
-    sentence_sec=0.52,
-    segment_sec=0.42,
-    edge_rate="+88%",
-    edge_pitch="-1Hz",
-    f5_tempo=1.88,
-)
+def _load_voice_config() -> dict:
+    return json.loads(VOICE_CONFIG_PATH.read_text(encoding="utf-8"))
 
-_ENTERTAINMENT_HINTS = (
-    "giải trí", "giai tri", "người que", "nguoi que", "stickman", "hài",
-    "hai", "meme", "viral", "kéo view", "keo view", "vui nhộn", "vui nhon",
-)
-_KNOWLEDGE_HINTS = (
-    "kiến thức", "kien thuc", "giáo dục", "giao duc", "tâm lý", "tam ly",
-    "phát triển bản thân", "phat trien ban than", "khoa học", "khoa hoc",
-    "lịch sử", "lich su", "tài chính", "tai chinh", "sức khỏe", "suc khoe",
-)
+
+_VOICE_CONFIG = _load_voice_config()
+VOICE_PROFILES = {
+    name: VoiceProfile(name=name, **values)
+    for name, values in _VOICE_CONFIG["profiles"].items()
+}
+VOICE_NEUTRAL = VOICE_PROFILES["neutral"]
+VOICE_ENTERTAINMENT = VOICE_PROFILES["entertainment"]
+VOICE_KNOWLEDGE = VOICE_PROFILES["knowledge"]
+VOICE_INSPIRING = VOICE_PROFILES["inspiring"]
+VOICE_SERIOUS = VOICE_PROFILES["serious"]
+VOICE_HOOK = VOICE_PROFILES["hook"]
+VOICE_CURIOUS = VOICE_PROFILES["curious"]
+VOICE_CONCLUSION = VOICE_PROFILES["conclusion"]
+_ROUTING = _VOICE_CONFIG["routing"]
 _STAGE_DIRECTION_PATTERNS = (
     r"\bCú hình tiếp theo\s*:\s*",
     r"\bBeat sau\s*:\s*",
@@ -129,7 +110,8 @@ def _synth_all_edge_parallel(script: Script, slug: str, profile: VoiceProfile) -
     voiced: list[Segment | None] = [None] * len(script.segments)
 
     for i, seg in enumerate(script.segments):
-        seg_path = _segment_audio_path(slug, profile, i)
+        segment_profile = _segment_profile(seg, profile, i, len(script.segments))
+        seg_path = _segment_audio_path(slug, segment_profile, i)
         dur = _probe_duration_or_zero(seg_path) if seg_path.exists() else 0.0
         if dur > 0:
             voiced[i] = replace(seg, audio_path=seg_path, duration_sec=dur)
@@ -138,7 +120,7 @@ def _synth_all_edge_parallel(script: Script, slug: str, profile: VoiceProfile) -
 
     def _work(item: tuple[int, Segment, Path]) -> tuple[int, Segment]:
         i, seg, seg_path = item
-        _synth_segment(_prepare_narration(seg.narration), script.voice, seg_path, profile)
+        _synth_segment(_prepare_narration(seg.narration), script.voice, seg_path, segment_profile)
         dur = _probe_duration(seg_path)
         return i, replace(seg, audio_path=seg_path, duration_sec=dur)
 
@@ -159,7 +141,8 @@ def _synth_all_f5(script: Script, slug: str, profile: VoiceProfile) -> list[Segm
     """
     cached: list[Segment] = []
     for i, seg in enumerate(script.segments):
-        seg_path = _segment_audio_path(slug, profile, i)
+        segment_profile = _segment_profile(seg, profile, i, len(script.segments))
+        seg_path = _segment_audio_path(slug, segment_profile, i)
         dur = _probe_duration_or_zero(seg_path) if seg_path.exists() else 0.0
         if dur <= 0:
             cached = []
@@ -172,10 +155,13 @@ def _synth_all_f5(script: Script, slug: str, profile: VoiceProfile) -> list[Segm
 
     # Pha 1 — dựng danh sách cụm/segment + job toàn tập (mỗi cụm 1 wav).
     seg_pieces: list[list[tuple[str, float, Path]]] = []
+    segment_profiles: list[VoiceProfile] = []
     jobs: list[dict] = []
     for i, seg in enumerate(script.segments):
+        segment_profile = _segment_profile(seg, profile, i, len(script.segments))
+        segment_profiles.append(segment_profile)
         narration = _prepare_narration(seg.narration)
-        pieces = _split_for_pacing(narration, profile.comma_sec, profile.sentence_sec) \
+        pieces = _split_for_pacing(narration, segment_profile.comma_sec, segment_profile.sentence_sec) \
             or [(narration, 0.0)]
         items: list[tuple[str, float, Path]] = []
         for j, (piece, pause) in enumerate(pieces):
@@ -190,12 +176,13 @@ def _synth_all_f5(script: Script, slug: str, profile: VoiceProfile) -> list[Segm
     # Pha 3 — ghép từng segment: wav→mp3 + chèn im lặng + nối.
     voiced: list[Segment] = []
     for i, seg in enumerate(script.segments):
-        seg_path = _segment_audio_path(slug, profile, i)
+        segment_profile = segment_profiles[i]
+        seg_path = _segment_audio_path(slug, segment_profile, i)
         parts: list[Path] = []
         tmp: list[Path] = []
         for j, (_piece, pause, wav) in enumerate(seg_pieces[i]):
             raw = seg_path.with_name(f"{seg_path.stem}.p{j:02d}.mp3")
-            _to_mp3(wav, raw, tempo=profile.f5_tempo)
+            _to_mp3(wav, raw, profile=segment_profiles[i])
             wav.unlink(missing_ok=True)
             parts.append(raw)
             tmp.append(raw)
@@ -204,9 +191,19 @@ def _synth_all_f5(script: Script, slug: str, profile: VoiceProfile) -> list[Segm
                 _silence_mp3(pause, sil)
                 parts.append(sil)
                 tmp.append(sil)
-        if profile.segment_sec > 0:
+        if segment_profile.pause_before > 0:
+            sil = seg_path.with_name(f"{seg_path.stem}.s-before.mp3")
+            _silence_mp3(segment_profile.pause_before, sil)
+            parts.insert(0, sil)
+            tmp.append(sil)
+        if segment_profile.pause_after > 0:
+            sil = seg_path.with_name(f"{seg_path.stem}.s-after.mp3")
+            _silence_mp3(segment_profile.pause_after, sil)
+            parts.append(sil)
+            tmp.append(sil)
+        if segment_profile.segment_sec > 0:
             sil = seg_path.with_name(f"{seg_path.stem}.send.mp3")
-            _silence_mp3(profile.segment_sec, sil)
+            _silence_mp3(segment_profile.segment_sec, sil)
             parts.append(sil)
             tmp.append(sil)
         _concat_audio(parts, seg_path)
@@ -220,7 +217,11 @@ def _synth_all_f5(script: Script, slug: str, profile: VoiceProfile) -> list[Segm
 def _segment_audio_path(slug: str, profile: VoiceProfile, index: int) -> Path:
     # Changing F5 tempo must not resume a segment rendered at an older speed.
     # Edge has its own remote rate setting and keeps its existing cache key.
-    f5_cache_key = f"_f5x{profile.f5_tempo:.2f}" if settings.tts_provider == "f5" else ""
+    f5_cache_key = (
+        f"_f5x{profile.f5_tempo:.2f}p{profile.pitch_semitones:+.1f}"
+        f"g{profile.gain_db:+.1f}b{profile.pause_before:.2f}a{profile.pause_after:.2f}"
+        if settings.tts_provider == "f5" else ""
+    )
     return AUDIO_DIR / f"{slug}_{profile.name}{f5_cache_key}_{index:02d}.mp3"
 
 
@@ -245,11 +246,54 @@ def _voice_profile(script: Script) -> VoiceProfile:
         " ".join(seg.narration for seg in script.segments),
         " ".join(seg.broll for seg in script.segments),
     ]).lower()
-    if any(hint in haystack for hint in _ENTERTAINMENT_HINTS):
+    if any(hint in haystack for hint in _ROUTING["entertainment_hints"]):
         return VOICE_ENTERTAINMENT
-    if any(hint in haystack for hint in _KNOWLEDGE_HINTS):
+    if any(hint in haystack for hint in _ROUTING["knowledge_hints"]):
         return VOICE_KNOWLEDGE
     return VOICE_NEUTRAL
+
+
+def _auto_voice_style(segment: Segment, index: int, total: int) -> str:
+    """Choose a restrained performance style from script semantics."""
+    text = f"{segment.narration} {segment.caption}".lower()
+    for rule in _ROUTING["rules"]:
+        condition = rule["when"]
+        hints = _ROUTING.get(rule.get("hints_key", ""), [])
+        if condition == "hook_or_first" and (segment.hook or index == 0):
+            return rule["profile"]
+        if condition == "danger_or_hint" and (segment.danger or any(k in text for k in hints)):
+            return rule["profile"]
+        if condition == "last_or_hint" and (index == total - 1 or any(k in text for k in hints)):
+            return rule["profile"]
+        if condition == "question_or_hint" and ("?" in text or any(k in text for k in hints)):
+            return rule["profile"]
+    return ""
+
+
+def _segment_profile(segment: Segment, default: VoiceProfile,
+                     index: int = 0, total: int = 1) -> VoiceProfile:
+    """Resolve and validate per-segment performance without mutating segment."""
+    explicit = segment.voice_style.strip().lower() if segment.voice_style else ""
+    name = explicit or _auto_voice_style(segment, index, total) or default.name
+    try:
+        base = VOICE_PROFILES[name]
+    except KeyError as exc:
+        raise ValueError(f"voice_style không hợp lệ: {segment.voice_style!r}") from exc
+    tempo = base.f5_tempo if segment.voice_tempo is None else float(segment.voice_tempo)
+    pitch = base.pitch_semitones if segment.voice_pitch is None else float(segment.voice_pitch)
+    gain = base.gain_db if segment.voice_gain is None else float(segment.voice_gain)
+    if segment.voice_tempo is not None and not 0.88 <= tempo <= 1.12:
+        raise ValueError("voice_tempo phải nằm trong khoảng 0.88–1.12")
+    if segment.voice_pitch is not None and not -2.0 <= pitch <= 2.0:
+        raise ValueError("voice_pitch phải nằm trong khoảng -2–2 semitone")
+    if segment.voice_gain is not None and not -3.0 <= gain <= 3.0:
+        raise ValueError("voice_gain phải nằm trong khoảng -3–3 dB")
+    before = base.pause_before if segment.voice_pause_before is None else float(segment.voice_pause_before)
+    after = base.pause_after if segment.voice_pause_after is None else float(segment.voice_pause_after)
+    if before < 0 or after < 0 or before > 2 or after > 2:
+        raise ValueError("voice_pause phải nằm trong khoảng 0–2 giây")
+    return replace(base, f5_tempo=tempo, pitch_semitones=pitch, gain_db=gain,
+                   pause_before=before, pause_after=after)
 
 
 def _prepare_narration(text: str) -> str:
@@ -314,6 +358,16 @@ def _synth_segment(text: str, voice: str, out_mp3: Path, profile: VoiceProfile |
             parts.append(sil)
             tmp.append(sil)
 
+    if profile.pause_before > 0:
+        sil = out_mp3.with_name(f"{out_mp3.stem}.s-before.mp3")
+        _silence_mp3(profile.pause_before, sil)
+        parts.insert(0, sil)
+        tmp.append(sil)
+    if profile.pause_after > 0:
+        sil = out_mp3.with_name(f"{out_mp3.stem}.s-after.mp3")
+        _silence_mp3(profile.pause_after, sil)
+        parts.append(sil)
+        tmp.append(sil)
     if profile.segment_sec > 0:
         sil = out_mp3.with_name(f"{out_mp3.stem}.send.mp3")
         _silence_mp3(profile.segment_sec, sil)
@@ -350,7 +404,10 @@ def _silence_mp3(seconds: float, out: Path) -> None:
     )
 
 
-def _to_mp3(src: Path, dst: Path, *, tempo: float = 1.0) -> None:
+def _to_mp3(src: Path, dst: Path, *, tempo: float = 1.0,
+            profile: VoiceProfile | None = None) -> None:
+    if profile is not None:
+        tempo = profile.f5_tempo
     cmd = ["ffmpeg", "-y", "-i", str(src)]
     # TTS providers commonly add encoder/trailing silence to every short
     # phrase.  Because `_synth_segment` concatenates many phrases, that
@@ -361,6 +418,17 @@ def _to_mp3(src: Path, dst: Path, *, tempo: float = 1.0) -> None:
         "silenceremove=start_periods=1:start_duration=0.05:start_threshold=-50dB:"
         "stop_periods=1:stop_duration=0.12:stop_threshold=-50dB"
     ]
+    if profile is not None and abs(profile.pitch_semitones) > 0.001:
+        # Homebrew's ffmpeg often lacks rubberband.  Resample + inverse atempo
+        # changes pitch while preserving duration and works with stock ffmpeg.
+        ratio = 2 ** (profile.pitch_semitones / 12)
+        filters.extend([
+            f"asetrate=44100*{ratio:.6f}",
+            "aresample=44100",
+            f"atempo={1 / ratio:.6f}",
+        ])
+    if profile is not None and abs(profile.gain_db) > 0.001:
+        filters.append(f"volume={profile.gain_db:.3f}dB")
     if abs(tempo - 1.0) > 0.001:
         filters.append(f"atempo={tempo:.3f}")
     cmd += ["-filter:a", ",".join(filters)]
