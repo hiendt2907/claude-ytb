@@ -148,7 +148,7 @@ def _prepare_run(monkeypatch, tmp_path, audio_result):
 
 def test_report_mode_runs_audio_gate_and_writes_local_post_render_reports(monkeypatch, tmp_path):
     audio_result = SimpleNamespace(
-        passed=False, issues=(), cache_key="audio-key", cached=False, metrics={}, repair_payload={},
+        passed=True, issues=(), cache_key="audio-key", cached=False, metrics={}, repair_payload={},
     )
     project, checkpoint, rendered_calls = _prepare_run(monkeypatch, tmp_path, audio_result)
     monkeypatch.setattr(pipeline.settings, "quality_gate_mode", "report")
@@ -163,7 +163,15 @@ def test_report_mode_runs_audio_gate_and_writes_local_post_render_reports(monkey
     assert result.nodes["audio_quality"].output_data["cache_key"] == "audio-key"
 
 
-def test_strict_mode_blocks_failed_audio_gate_before_renderer(monkeypatch, tmp_path):
+@pytest.mark.parametrize("mode", ["report", "strict"])
+def test_failed_audio_gate_blocks_render_in_every_mode(monkeypatch, tmp_path, mode):
+    """A real audio-content defect always blocks render — not just in strict.
+
+    Rendering AI B-roll is the most expensive step in the pipeline; audio
+    already known-bad would be rejected at publish anyway (render_quality
+    folds audio findings into its own gate), so failing here only saves
+    compute and never changes which videos end up published.
+    """
     audio_result = SimpleNamespace(
         passed=False,
         issues=(SimpleNamespace(code="LOW_VOLUME", message="Âm lượng quá nhỏ."),),
@@ -173,7 +181,7 @@ def test_strict_mode_blocks_failed_audio_gate_before_renderer(monkeypatch, tmp_p
         repair_payload={},
     )
     project, checkpoint, rendered_calls = _prepare_run(monkeypatch, tmp_path, audio_result)
-    monkeypatch.setattr(pipeline.settings, "quality_gate_mode", "strict")
+    monkeypatch.setattr(pipeline.settings, "quality_gate_mode", mode)
 
     with pytest.raises(Exception, match="Audio quality gate chặn render"):
         asyncio.run(pipeline.run_project(project, checkpoint, through="render"))

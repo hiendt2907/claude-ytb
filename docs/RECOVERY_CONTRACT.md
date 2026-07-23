@@ -10,7 +10,7 @@ và artefact bị từ chối được giữ lại để resume đúng chỗ.
 | Ideation | LLM trả JSON lỗi/cutoff | Lưu raw response + parse error; sinh lại một response hoàn chỉnh | 1 lần, không repair hội thoại | Dùng candidate đã lưu để chỉnh system prompt hoặc chủ đề rồi start lại |
 | Ideation | Hook muộn, sai độ dài, thiếu metadata/source, trùng cơ chế | Ghi QA report, đánh `needs_review`, không đưa vào queue | 0 cloud retry | Sửa brief/prompt rồi sinh candidate mới; không tái dùng script lỗi |
 | Voiceover | `NoAudioReceived`, timeout/mạng | Giữ cache segment đã tốt, resume và retry | tối đa 3 lần với backoff | Kiểm tra provider/mạng nếu hết retry |
-| Voiceover QA | STT lệch script, lặp câu, silence/volume/duration sai | Giữ audio report + không render tiếp ở strict gate | 0 retry tự động | Chỉnh voice profile/pacing hoặc kịch bản; synth lại phần cần thiết |
+| Voiceover QA | STT lệch script, lặp câu, silence/volume/duration sai | Giữ audio report + không render tiếp (mọi `quality_gate_mode`, kể cả `report` — chặn sớm vì render tốn compute nhất, chỉnh 2026-07-23) | 0 retry tự động | Chỉnh voice profile/pacing hoặc kịch bản; synth lại phần cần thiết |
 | Voiceover QA | Local STT chưa có | Ghi warning, không gọi cloud STT, không làm hỏng batch | 0 | Cài model STT local khi cần đối chứng sâu hơn |
 | Render | Pexels/HTTP 5xx/mạng/ffmpeg bị gián đoạn | Giữ checkpoint, asset tải qua `.part`, resume + retry | tối đa 3 lần | Xem log renderer; không lấy artefact nửa chừng làm output |
 | Render QA | sai orientation, duration, thiếu thumbnail/video stream | Invalidate node stale và chặn publish | 0 retry tự động | Sửa contract/render input rồi run lại từ checkpoint |

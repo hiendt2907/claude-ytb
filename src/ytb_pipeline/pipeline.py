@@ -380,11 +380,25 @@ async def run_project(project: Project, checkpoint: CheckpointManager, through: 
     state: dict[str, object] = {}
 
     def enforce_checkpointed_audio_quality(current: Project) -> None:
-        """Fail closed before render while keeping the completed audio node."""
-        if settings.quality_gate_mode != "strict":
-            return
+        """Fail closed before render while keeping the completed audio node.
+
+        A real audio-content defect (`quality_status="failed"`, e.g. transcript
+        mismatch, silence, low volume) always blocks render, in every
+        `quality_gate_mode` — not just "strict". Rendering AI B-roll for a video
+        whose audio is already known-bad wastes the most expensive compute step
+        in the pipeline for no benefit: the render_quality gate would reject it
+        at publish anyway (see `write_post_render_quality_report`'s upstream
+        findings), so failing earlier only saves compute, it never changes which
+        videos end up published.
+
+        A local QA *tooling* crash (`quality_status="error"`, e.g. STT cache
+        directory unwritable) is a different failure mode — the audio itself may
+        be fine — so it only blocks in "strict"; `audio_quality_fn` already
+        downgrades a crash to `"warning"` outside strict mode, which this
+        function does not block on.
+        """
         data = checkpoint.get_output_data(current, "audio_quality")
-        if data.get("quality_status") == "pass":
+        if data.get("quality_status") not in {"failed", "error"}:
             return
         details = data.get("quality_warning")
         if not details:

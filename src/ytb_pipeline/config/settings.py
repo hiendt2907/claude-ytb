@@ -84,9 +84,12 @@ class Settings(BaseSettings):
     # Checkpoint DAG: mỗi video 1 file <projects_dir>/<slug>/project.json —
     # resume skip node đã DONE (xem project/workflow.py).
     projects_dir: Path = Field(default=Path("assets/projects"))
-    # Local-only post-TTS and post-render evidence.  ``report`` is deliberately
-    # the default while the existing production batch is audited; ``strict``
-    # only stops a failed audio gate before expensive rendering begins.
+    # Local-only post-TTS and post-render evidence.  ``report`` is the default.
+    # A real audio-content defect (quality_status="failed") always blocks
+    # render in every mode — pipeline.py::enforce_checkpointed_audio_quality —
+    # since render is the most expensive step and render_quality would reject
+    # bad audio at publish anyway. ``strict`` additionally blocks on a local QA
+    # *tooling* crash (STT/cache failure); ``report`` only warns on that case.
     quality_gate_mode: Literal["off", "report", "strict"] = "report"
     quality_reports_dir: Path = Field(default=Path("assets/quality_reports"))
     # Optional local Faster-Whisper model directory for post-TTS transcript QA.
