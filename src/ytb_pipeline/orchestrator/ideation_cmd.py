@@ -26,9 +26,15 @@ from datetime import datetime
 from pathlib import Path
 
 # Long-form scripts (~15-18k ký tự tiếng Việt + silent audit) thường vượt 5
-# phút; 300s cũ khiến mọi long-form timeout. Cho override qua env khi cần long
-# 15 phút lâu hơn nữa.
-SCRIPT_LLM_TIMEOUT_S = int(os.environ.get("IDEATION_LLM_TIMEOUT", "900"))
+# Một long-form có thể cần nhiều phút để sinh đủ 15–17k ký tự và qua vòng
+# validate/repair. Timeout áp dụng cho từng script, không phải cả batch.
+# Cho override qua IDEATION_LLM_TIMEOUT; mặc định 1 giờ để không cắt ngang
+# generation hợp lệ.
+SCRIPT_LLM_TIMEOUT_S = int(os.environ.get("IDEATION_LLM_TIMEOUT", "3600"))
+# A 12-minute Vietnamese Long needs materially more than 8k output tokens.
+# One sufficiently-sized first response is cheaper and more reliable than a
+# truncated draft followed by repair calls. Operators may lower this in tests.
+SCRIPT_LLM_MAX_TOKENS = int(os.environ.get("IDEATION_LLM_MAX_TOKENS", "14000"))
 
 from ..claude_cli import build_claude_cmd
 from ..ideation.series import slugify
@@ -41,10 +47,12 @@ from .ideation_prompts import (
     build_resume_prompt,
     build_start_prompt,
     ledger_topics,
+    is_personal_finance_psychology_request,
     local_script_prompt,
     repair_prompt,
 )
 from .ideation_script_fix import (
+    IdeationQualityFailure,
     append_local_start_log,
     json_from_llm,
     normalize_short_narration,
@@ -53,6 +61,7 @@ from .ideation_script_fix import (
     trim_to_sentence,
     validate_or_repair_script,
 )
+from .ideation_error_engine import record_ideation_failure
 from .ideation_state import (
     LEDGER_HEADER,
     clear_ledger_for_fresh_ideas,
@@ -63,6 +72,68 @@ from .ideation_state import (
     write_local_batch_item,
 )
 from .queue_manager import PIPELINE_LOG_DIR
+
+
+def load_short_source_long_context(script_path: Path, long_slug: str) -> dict:
+    """Build a compact, traceable bank of useful open-loop segments from a Long."""
+    try:
+        payload = json.loads(script_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"Không đọc được kịch bản Long nguồn {long_slug}: {exc}") from exc
+    sections = payload.get("sections")
+    if not isinstance(sections, list):
+        raise ValueError(f"Kịch bản Long nguồn {long_slug} không có sections hợp lệ.")
+
+    candidates: list[dict] = []
+    for index, section in enumerate(sections):
+        if not isinstance(section, dict):
+            continue
+        excerpt = str(section.get("voiceover") or section.get("narration") or "").strip()
+        if not excerpt:
+            continue
+        purpose = str(section.get("purpose", "")).strip()
+        normalized_purpose = purpose.casefold()
+        if any(word in normalized_purpose for word in ("mở đầu", "hook", "retention", "kết thúc", "cầu nối")):
+            continue
+        score = sum(weight for word, weight in (
+            ("giải thích", 3), ("explanation", 3), ("dấu hiệu", 3), ("cạm bẫy", 3),
+            ("khác biệt", 2), ("bằng chứng", 2), ("evidence", 2), ("nguồn gốc", 2),
+            ("thực hành", 2), ("application", 2), ("ví dụ", 1), ("example", 1),
+        ) if word in normalized_purpose)
+        candidates.append({"section_index": index, "purpose": purpose, "excerpt": excerpt, "score": score})
+    candidates.sort(key=lambda item: (-item["score"], item["section_index"]))
+    selected = [{key: item[key] for key in ("section_index", "purpose", "excerpt")} for item in candidates[:3]]
+    if not selected:
+        raise ValueError(f"Kịch bản Long nguồn {long_slug} không có đoạn phù hợp để làm Short.")
+    evidence_register = payload.get("evidence_register")
+    return {
+        "slug": long_slug,
+        "title": str(payload.get("title", "")).strip(),
+        "candidates": selected,
+        "evidence_register": evidence_register if isinstance(evidence_register, list) else [],
+    }
+
+
+def available_short_source_context(source_long_context: dict, used_section_indexes: set[int]) -> dict:
+    """Return only source segments not already assigned to another Short."""
+    candidates = [
+        item for item in source_long_context.get("candidates", [])
+        if item.get("section_index") not in used_section_indexes
+    ]
+    if not candidates:
+        raise ValueError(
+            f"Long nguồn {source_long_context.get('slug', '')} không còn phân đoạn khác cho Short tiếp theo."
+        )
+    return {**source_long_context, "candidates": candidates}
+
+
+def reserve_invalid_json_regeneration(attempts: dict[int, int], candidate_index: int) -> bool:
+    """Spend the one allowed fresh generation for this candidate, if unused."""
+    used = attempts.get(candidate_index, 0)
+    if used >= 1:
+        return False
+    attempts[candidate_index] = used + 1
+    return True
 
 # Re-export tên cũ — giữ backward compat cho test/caller ngoài.
 _build_resume_prompt = build_resume_prompt
@@ -166,6 +237,39 @@ def _with_system_contract(prompt: str, system: str | None) -> str:
     return f"{contract}\n\nUser task:\n{prompt}" if contract else prompt
 
 
+def _validate_short_generation_request(args: argparse.Namespace) -> None:
+    """Fail before an LLM call when a new Short cannot enter the v1 funnel."""
+    if getattr(args, "type_of_vid", "") != "short":
+        return
+    required = {
+        "batch-key": str(getattr(args, "batch_key", "") or "").strip(),
+        "long-form-slug": str(getattr(args, "long_form_slug", "") or "").strip(),
+        "playlist": str(getattr(args, "playlist", "") or "").strip(),
+        "cta-target": str(getattr(args, "cta_target", "") or "").strip(),
+    }
+    if any(not value for value in required.values()):
+        raise SystemExit(
+            "✗ Short strategy-v1 cần --batch-key, --long-form-slug, --playlist và --cta-target "
+            "trước khi gọi LLM."
+        )
+    if not required["batch-key"].startswith("shorts_funnel_batch_"):
+        raise SystemExit("✗ --batch-key của Short phải bắt đầu bằng 'shorts_funnel_batch_'.")
+    if required["cta-target"] != required["long-form-slug"]:
+        raise SystemExit("✗ --cta-target của Short phải khớp --long-form-slug.")
+    state_path = _cli().AUTO_STATE_PATH
+    try:
+        batch = json.loads(state_path.read_text(encoding="utf-8")).get(required["batch-key"], {})
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"✗ Không đọc được batch Short strategy-v1: {exc}") from exc
+    long_slugs = {
+        str(item.get("slug", ""))
+        for item in batch.get("long_videos", [])
+        if isinstance(item, dict)
+    }
+    if required["long-form-slug"] not in long_slugs:
+        raise SystemExit("✗ --long-form-slug phải trỏ tới Long đã có trong cùng --batch-key.")
+
+
 class _ClaudeStartProvider:
     name = "claude"
 
@@ -184,14 +288,24 @@ class _ClaudeStartProvider:
         return await asyncio.to_thread(self._invoke, cmd)
 
     def _invoke(self, cmd: list[str]) -> str:
-        result = subprocess.run(
-            cmd,
-            cwd=_cli().ROOT,
-            capture_output=True,
-            text=True,
-            timeout=SCRIPT_LLM_TIMEOUT_S,
-            check=True,
-        )
+        try:
+            result = subprocess.run(
+                cmd,
+                cwd=_cli().ROOT,
+                capture_output=True,
+                text=True,
+                stdin=subprocess.DEVNULL,
+                timeout=SCRIPT_LLM_TIMEOUT_S,
+                check=True,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise RuntimeError(
+                f"Claude sinh script quá thời hạn {SCRIPT_LLM_TIMEOUT_S}s; "
+                "chưa ghi script/batch. Tăng IDEATION_LLM_TIMEOUT hoặc dùng --resume."
+            ) from exc
+        except subprocess.CalledProcessError as exc:
+            detail = (exc.stderr or exc.stdout or "").strip()[-1000:]
+            raise RuntimeError(f"Claude CLI lỗi (code {exc.returncode}): {detail}") from exc
         return result.stdout
 
 
@@ -226,14 +340,24 @@ class _CodexStartProvider:
             output_path = Path(tmp.name)
         command = [*cmd[:-1], "--output-last-message", str(output_path), cmd[-1]]
         try:
-            result = subprocess.run(
-                command,
-                cwd=_cli().ROOT,
-                capture_output=True,
-                text=True,
-                timeout=SCRIPT_LLM_TIMEOUT_S,
-                check=True,
-            )
+            try:
+                result = subprocess.run(
+                    command,
+                    cwd=_cli().ROOT,
+                    capture_output=True,
+                    text=True,
+                    stdin=subprocess.DEVNULL,
+                    timeout=SCRIPT_LLM_TIMEOUT_S,
+                    check=True,
+                )
+            except subprocess.TimeoutExpired as exc:
+                raise RuntimeError(
+                    f"Codex sinh script quá thời hạn {SCRIPT_LLM_TIMEOUT_S}s; "
+                    "chưa ghi script/batch. Tăng IDEATION_LLM_TIMEOUT hoặc dùng --resume."
+                ) from exc
+            except subprocess.CalledProcessError as exc:
+                detail = (exc.stderr or exc.stdout or "").strip()[-1000:]
+                raise RuntimeError(f"Codex CLI lỗi (code {exc.returncode}): {detail}") from exc
             response = output_path.read_text(encoding="utf-8").strip()
             return response or result.stdout
         finally:
@@ -280,25 +404,65 @@ async def _cmd_start_local(args: argparse.Namespace) -> None:
         "playlist": str(getattr(args, "playlist", "") or "").strip(),
         "cta_target": str(getattr(args, "cta_target", "") or "").strip(),
     }
+    source_long_context = None
+    used_source_section_indexes: set[int] = set()
+    if args.type_of_vid == "short":
+        source_long_context = load_short_source_long_context(
+            scripts_dir / f"{funnel['long_form_slug']}.json", funnel["long_form_slug"]
+        )
+        state = json.loads(cli.AUTO_STATE_PATH.read_text(encoding="utf-8"))
+        batch = state.get(str(getattr(args, "batch_key", "")), {})
+        used_source_section_indexes = {
+            item["source_section_index"]
+            for item in batch.get("short_videos", [])
+            if isinstance(item, dict)
+            and item.get("long_form_slug") == funnel["long_form_slug"]
+            and isinstance(item.get("source_section_index"), int)
+        }
 
     replacement_slugs = [str(slug).strip() for slug in getattr(args, "replace_slug", []) or []]
     if replacement_slugs and (len(replacement_slugs) != args.num_of_vid or not getattr(args, "batch_key", "")):
         raise SystemExit("✗ --replace-slug cần đúng một slug cho mỗi video và bắt buộc có --batch-key.")
+    requested_count = args.num_of_vid
+    if getattr(args, "resume", False):
+        existing_count, existing_slugs = count_pending_ideation(
+            args.type_of_vid,
+            cli.AUTO_STATE_PATH,
+            batch_key=str(getattr(args, "batch_key", "") or ""),
+        )
+        requested_count = max(0, args.num_of_vid - existing_count)
+        if requested_count == 0:
+            print(f"✓ Batch đã có {existing_count}/{args.num_of_vid} script {args.type_of_vid}; không cần sinh thêm.")
+            return
+        print(f"▶ Resume: đã có {existing_count}/{args.num_of_vid}, sinh thêm {requested_count}.", flush=True)
+        generated_summaries.extend(existing_slugs)
     written: list[str] = []
-    print(f"▶ Ideation: {args.num_of_vid} video ({args.type_of_vid}) bằng {provider.name}/{provider.model_name()}", flush=True)
+    print(f"▶ Ideation: {requested_count} video ({args.type_of_vid}) bằng {provider.name}/{provider.model_name()}", flush=True)
     print(f"  ý tưởng: {args.type_of_rules}", flush=True)
     print(f"  log chi tiết: {log_path}", flush=True)
-    for i in range(1, args.num_of_vid + 1):
-        prefix = f"[{i}/{args.num_of_vid}]"
+    rejected_candidates = 0
+    invalid_json_regenerations: dict[int, int] = {}
+    # The generator must satisfy deterministic contracts in its first response.
+    # Do not spend cloud tokens in automatic repair/candidate loops; preserve
+    # the rejection evidence for an intentional editorial retry instead.
+    max_rejected_candidates = 1
+    i = 1
+    while i <= requested_count:
+        prefix = f"[{i}/{requested_count}]"
+        available_source_long_context = (
+            available_short_source_context(source_long_context, used_source_section_indexes)
+            if source_long_context is not None else None
+        )
         prompt = local_script_prompt(
             i,
-            args.num_of_vid,
+            requested_count,
             args.type_of_vid,
             args.type_of_rules,
             ledger_text,
             generated_summaries,
             analytics_feedback,
             funnel,
+            available_source_long_context,
         )
         print(f"{prefix} prompt: preparing request", flush=True)
         append_local_start_log(log_path, f"PROMPT {i}", prompt)
@@ -306,7 +470,7 @@ async def _cmd_start_local(args: argparse.Namespace) -> None:
         text = await provider.complete(
             prompt,
             system=SCRIPT_GENERATION_SYSTEM_PROMPT,
-            max_tokens=8192,
+            max_tokens=SCRIPT_LLM_MAX_TOKENS,
             temperature=0.7,
             json_output=True,
         )
@@ -315,7 +479,32 @@ async def _cmd_start_local(args: argparse.Namespace) -> None:
         try:
             payload = json_from_llm(text)
         except json.JSONDecodeError as exc:
-            raise SystemExit(f"✗ LLM không trả JSON hợp lệ: {exc}") from exc
+            # A truncated/malformed object cannot be repaired deterministically.
+            # Preserve the exact response and allow one full fresh generation;
+            # this is cheaper than a repair conversation and never promotes a
+            # partial narration into the queue.
+            archive_dir = cli.ROOT / "assets" / "script_revisions" / "failed_ideation"
+            archive_dir.mkdir(parents=True, exist_ok=True)
+            archive_path = archive_dir / f"candidate_{i}_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.raw.txt"
+            archive_path.write_text(text, encoding="utf-8")
+            error_text = f"LLM không trả JSON hợp lệ: {exc}"
+            record_ideation_failure(
+                cli.ROOT / "assets" / "quality_reports" / "ideation_errors.jsonl",
+                script_name=f"candidate_{i}.json",
+                attempt=invalid_json_regenerations.get(i, 0) + 1,
+                validation_error=error_text,
+                qa=None,
+            )
+            append_local_start_log(
+                log_path, "INVALID_JSON_ARCHIVED",
+                f"archive={archive_path}; error={error_text}",
+            )
+            if not reserve_invalid_json_regeneration(invalid_json_regenerations, i):
+                raise SystemExit(
+                    f"✗ LLM không trả JSON hợp lệ sau 1 lần sinh lại. Bản lỗi: {archive_path}"
+                ) from exc
+            print(f"{prefix} JSON lỗi; đã lưu bản lỗi và sinh lại đúng 1 lần.", flush=True)
+            continue
         replacement_slug = replacement_slugs[i - 1] if replacement_slugs else ""
         base_slug = slugify(payload.get("slug") or payload.get("title") or payload.get("topic") or f"video-{i}")
         slug = replacement_slug or unique_slug(base_slug, used_slugs, scripts_dir)
@@ -333,23 +522,50 @@ async def _cmd_start_local(args: argparse.Namespace) -> None:
         else:
             setattr(args, "_replacement_archive", "")
         setattr(args, "replace_slug", replacement_slug)
-        payload = await validate_or_repair_script(
-            provider,
-            payload,
-            script_path,
-            ledger_text,
-            log_path=log_path,
-            console_prefix=prefix,
-            strict=strict_qa,
+        try:
+            payload = await validate_or_repair_script(
+                provider,
+                payload,
+                script_path,
+                ledger_text,
+                log_path=log_path,
+                console_prefix=prefix,
+                strict=strict_qa,
             semantic_history=generated_summaries,
             expected_video_type=args.type_of_vid,
+            requires_financial_evidence=is_personal_finance_psychology_request(
+                args.type_of_rules
+            ),
+            source_long_context=available_source_long_context,
         )
+        except IdeationQualityFailure as exc:
+            rejected_candidates += 1
+            archive_dir = cli.ROOT / "assets" / "script_revisions" / "failed_ideation"
+            archive_dir.mkdir(parents=True, exist_ok=True)
+            archive_path = archive_dir / f"{slug}_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.json"
+            if script_path.exists():
+                shutil.move(str(script_path), archive_path)
+            rejected_title = str(exc.payload.get("title", "")).strip()
+            rejected_topic = str(exc.payload.get("topic", "")).strip()
+            generated_summaries.append(f"REJECTED — do not reuse | {slug} | {rejected_title} | {rejected_topic}")
+            used_slugs.add(slug)
+            detail = f"candidate={slug}; archive={archive_path}; reason={exc}"
+            append_local_start_log(log_path, "CANDIDATE_REJECTED", detail)
+            if rejected_candidates >= max_rejected_candidates:
+                raise SystemExit(
+                    f"✗ Không thể tạo đủ {requested_count} script sau {rejected_candidates} candidate bị QA từ chối."
+                ) from exc
+            print(f"{prefix} rejected: QA terminal failure; generating a replacement candidate", flush=True)
+            continue
         write_local_batch_item(script_path, payload, args)
+        if args.type_of_vid == "short":
+            used_source_section_indexes.add(payload["strategy"]["source_section_index"])
         ledger_text += f"\n| local | {slug} | {payload.get('title', '')} | ideation | ok | LLM |\n"
         used_slugs.add(slug)
         generated_summaries.append(f"{slug} | {payload.get('title', '')} | {payload.get('topic', '')}")
         written.append(slug)
         print(f"{prefix} queued: {slug}", flush=True)
+        i += 1
 
     print("✓ Ideation xong:")
     for slug in written:
@@ -372,97 +588,35 @@ def cmd_start(args: argparse.Namespace) -> None:
             "✗ Luồng Ollama sinh kịch bản đã bị xoá. Dùng `--llm claude` hoặc `--llm codex`."
         )
 
-    if not getattr(args, "cloud", False):
-        requested_provider = getattr(args, "llm_provider", None)
-        if requested_provider in {"claude", "codex"}:
-            setattr(args, "_provider", _configured_script_provider(requested_provider))
-            setattr(args, "_strict_qa", True)
-            asyncio.run(_cmd_start_local(args))
-            return
-        if _cli().settings.llm_provider == "codex":
-            setattr(args, "_provider", _CodexStartProvider())
-            setattr(args, "_strict_qa", True)
-            asyncio.run(_cmd_start_local(args))
-            return
-        if _cli().settings.llm_provider == "ollama":
-            raise SystemExit("✗ Chỉ hỗ trợ Claude hoặc Codex để sinh kịch bản; Ollama đã bị xoá.")
-        configured_provider = get_llm_provider()
-        if getattr(configured_provider, "name", "") != "claude":
-            setattr(args, "_provider", configured_provider)
-            asyncio.run(_cmd_start_local(args))
-            return
-        # Không ép Haiku/Sonnet: để CLI dùng model mặc định đã cấu hình trong
-        # Claude Code. Lỗi QA phải được báo nguyên nhân thật, không bị che bởi
-        # một lần gọi model thứ hai với tiêu chí khác.
-        setattr(args, "_provider", _ClaudeStartProvider())
+    if getattr(args, "cloud", False):
+        raise SystemExit(
+            "✗ --cloud đã bị gỡ vì bỏ qua system prompt và strategy-v1. "
+            "Dùng `--llm claude` hoặc `--llm codex`."
+        )
+
+    _validate_short_generation_request(args)
+
+    requested_provider = getattr(args, "llm_provider", None)
+    if requested_provider in {"claude", "codex"}:
+        setattr(args, "_provider", _configured_script_provider(requested_provider))
         setattr(args, "_strict_qa", True)
         asyncio.run(_cmd_start_local(args))
         return
-
-    if args.resume:
-        existing_count, existing_slugs = cli._count_pending_ideation(args.type_of_vid)
-        remaining = args.num_of_vid - existing_count
-        if remaining <= 0:
-            print(
-                f"✓ Đã có {existing_count} script pending ({args.type_of_vid}) trong queue — "
-                f"không cần viết thêm. Chạy `ytb batch run --loop` để sản xuất."
-            )
-            return
-        print(
-            f"▶ Resume: đã có {existing_count} script, cần thêm {remaining} "
-            f"(tổng mục tiêu {args.num_of_vid})."
-        )
-        prompt = cli._build_resume_prompt(remaining, args.type_of_vid, args.type_of_rules, existing_slugs)
-        action_label = f"viết thêm {remaining} video ({args.type_of_vid})"
-    else:
-        prompt = cli._build_start_prompt(args.num_of_vid, args.type_of_vid, args.type_of_rules)
-        action_label = f"sáng tạo {args.num_of_vid} video ({args.type_of_vid})"
-
-    cmd = cli.build_claude_cmd(prompt) + ["--output-format", "stream-json", "--verbose"]
-    print(f"▶️  Gọi Claude {action_label}...")
-    if getattr(args, "clear_ledger", False):
-        backup = clear_ledger_for_fresh_ideas(cli.LEDGER_PATH)
-        if backup:
-            print(f"✓ Đã clear ledger cũ. Backup: {backup}", flush=True)
-        else:
-            print(f"✓ Đã tạo ledger sạch: {cli.LEDGER_PATH}", flush=True)
-    try:
-        proc = cli.subprocess.Popen(cmd, cwd=cli.ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    except FileNotFoundError:
-        print(f"✗ Không tìm thấy `{cli.settings.claude_bin}`. Đặt CLAUDE_BIN trong .env.")
-        sys.exit(1)
-
-    output_lines: list[str] = []
-    assert proc.stdout is not None
-    for raw in proc.stdout:
-        raw = raw.strip()
-        if not raw:
-            continue
-        try:
-            obj = json.loads(raw)
-        except json.JSONDecodeError:
-            print(raw, flush=True)
-            output_lines.append(raw)
-            continue
-        # stream-json: assistant text delta
-        if obj.get("type") == "assistant":
-            for block in obj.get("message", {}).get("content", []):
-                if block.get("type") == "text":
-                    text = block["text"]
-                    print(text, end="", flush=True)
-                    output_lines.append(text)
-        # kết quả cuối
-        elif obj.get("type") == "result":
-            result_text = obj.get("result", "")
-            if result_text:
-                print(result_text, flush=True)
-                output_lines.append(result_text)
-
-    proc.wait()
-    output = "\n".join(output_lines)
-    if proc.returncode != 0:
-        stderr = (proc.stderr.read() if proc.stderr else "")[-500:]
-        cli.emit_warning(f"ytb batch start lỗi (code {proc.returncode}): {stderr}")
-        sys.exit(1)
-    print("\n✓ Xong phần sáng tạo — chạy `ytb batch status` để xem queue, rồi "
-          "`ytb batch run --loop` để sản xuất.")
+    if _cli().settings.llm_provider == "codex":
+        setattr(args, "_provider", _CodexStartProvider())
+        setattr(args, "_strict_qa", True)
+        asyncio.run(_cmd_start_local(args))
+        return
+    if _cli().settings.llm_provider == "ollama":
+        raise SystemExit("✗ Chỉ hỗ trợ Claude hoặc Codex để sinh kịch bản; Ollama đã bị xoá.")
+    configured_provider = get_llm_provider()
+    if getattr(configured_provider, "name", "") != "claude":
+        setattr(args, "_provider", configured_provider)
+        asyncio.run(_cmd_start_local(args))
+        return
+    # Không ép Haiku/Sonnet: để CLI dùng model mặc định đã cấu hình trong
+    # Claude Code. Lỗi QA phải được báo nguyên nhân thật, không bị che bởi
+    # một lần gọi model thứ hai với tiêu chí khác.
+    setattr(args, "_provider", _ClaudeStartProvider())
+    setattr(args, "_strict_qa", True)
+    asyncio.run(_cmd_start_local(args))
