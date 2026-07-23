@@ -17,14 +17,8 @@ import time
 from typing import Any
 
 from ..ideation import series as series_mod
-from ..ideation.generator import (
-    GREETING_PREFIX,
-    LONG_MAX_MINUTES,
-    LONG_MIN_MINUTES,
-    SHORT_MAX_MINUTES,
-    SHORT_MIN_MINUTES,
-    estimate_minutes,
-)
+from ..content_contract import contract_for, estimate_duration_sec
+from ..ideation.generator import GREETING_PREFIX, chars_per_min_for_provider
 from .base import AgentResult, AgentStatus
 
 _SELF_HELP_MANTRAS = (
@@ -80,6 +74,9 @@ class QAAgent:
             violations.extend(_check_absolute_health_finance_claims(script))
             if context.get("strict", False):
                 violations.extend(_check_hook_strength(script))
+                violations.extend(_check_hook_contract(script))
+                if _get(script, "ruleset_id", ""):
+                    violations.extend(_check_release_schema(script))
                 violations.extend(_check_central_mechanism(script))
                 violations.extend(_check_stage_direction_leak(script))
                 violations.extend(_check_knowledge_examples(script))
@@ -144,33 +141,35 @@ def _check_length(script: Any) -> list[dict[str, str]]:
         return [{"rule": "length", "detail": "Script không có segment narration."}]
 
     target_minutes = _get(script, "target_minutes")
-    est = estimate_minutes(segments)
+    video_type = "long" if target_minutes is not None else "short"
+    contract = contract_for(video_type)
+    est_sec = estimate_duration_sec(
+        sum(len(_narration_of(segment)) for segment in segments),
+        chars_per_minute=chars_per_min_for_provider(),
+    )
 
     if target_minutes is not None:
-        if not (LONG_MIN_MINUTES <= target_minutes <= LONG_MAX_MINUTES):
+        min_minutes = contract.viewer_runtime_bounds_sec[0] / 60
+        max_minutes = contract.viewer_runtime_bounds_sec[1] / 60
+        if not (min_minutes <= target_minutes <= max_minutes):
             return [{
                 "rule": "length",
                 "detail": (
                     f"target_minutes={target_minutes} ngoài khoảng "
-                    f"[{LONG_MIN_MINUTES}, {LONG_MAX_MINUTES}]."
+                    f"[{min_minutes:.0f}, {max_minutes:.0f}]."
                 ),
             }]
-        if est < target_minutes:
+        if est_sec < float(target_minutes) * 60 + contract.transition_loss_sec(len(segments)):
             return [{
                 "rule": "length",
-                "detail": f"Nội dung quá mỏng: ước lượng {est:.1f}p < target {target_minutes}p.",
+                "detail": f"Nội dung quá mỏng: audio ước lượng {est_sec / 60:.1f}p < target {target_minutes}p.",
             }]
-        if est > LONG_MAX_MINUTES:
-            return [{
-                "rule": "length",
-                "detail": f"Video dài quá dài: ước lượng {est:.1f}p > {LONG_MAX_MINUTES}p.",
-            }]
-        return []
-
-    if est < SHORT_MIN_MINUTES:
-        return [{"rule": "length", "detail": f"Short quá ngắn: ước lượng {est:.2f}p."}]
-    if est > SHORT_MAX_MINUTES:
-        return [{"rule": "length", "detail": f"Short quá dài: ước lượng {est:.2f}p."}]
+    try:
+        contract.validate_audio_runtime(
+            est_sec, segment_count=len(segments) if _get(script, "ruleset_id", "") else 1
+        )
+    except ValueError as exc:
+        return [{"rule": "length", "detail": str(exc)}]
     return []
 
 
@@ -230,7 +229,7 @@ def _check_hook_strength(script: Any) -> list[dict[str, str]]:
         first_text = first_text.replace(GREETING_PREFIX.lower(), "", 1).strip()
     strong_markers = (
         "vì sao", "thật ra", "nghịch lý", "sai lầm", "bí mật", "đừng", "không phải",
-        "nhưng", "bỗng", "ngay trước mặt", "hóa ra", "mở laptop", "cầm điện thoại",
+        "nhưng", "bỗng", "ngay trước mặt", "hóa ra",
     )
     has_question_hook = "?" in first
     if len(first_words) < 8 or not (has_question_hook or any(marker in first_text for marker in strong_markers)):
@@ -242,10 +241,92 @@ def _check_hook_strength(script: Any) -> list[dict[str, str]]:
     return []
 
 
+def _check_hook_contract(script: Any) -> list[dict[str, str]]:
+    """Validate strategy-v1 structure before the audio timing gate runs.
+
+    Legacy scripts intentionally have no strategy and remain eligible for audit;
+    newly generated strategy scripts must expose the exact beat that earns the
+    first five seconds of attention.
+    """
+    strategy = _get(script, "strategy")
+    if strategy is None or _script_video_type(script) != "short":
+        return []
+    hook = _get(strategy, "hook")
+    required = (
+        _get(strategy, "format_id", ""),
+        _get(strategy, "core_mechanism", ""),
+        _get(strategy, "audience_problem", ""),
+        _get(strategy, "angle", ""),
+        _get(strategy, "long_form_slug", ""),
+        _get(strategy, "playlist", ""),
+        _get(strategy, "cta_target", ""),
+        _get(hook, "situation", ""),
+        _get(hook, "core_answer", ""),
+        _get(hook, "open_loop", ""),
+    )
+    segments = _segments_of(script)
+    purposes = [_get(segment, "purpose", "") for segment in segments]
+    contract = contract_for("short")
+    deadline = _get(hook, "answer_by_sec", 0)
+    if (
+        not all(str(value).strip() for value in required)
+        or purposes[:2] != ["situation", "core_answer"]
+        or deadline != contract.answer_start_deadline_sec
+    ):
+        return [_repair(
+            "hook_contract",
+            "Strategy Short phải có hook đầy đủ, funnel đích và segment purpose='core_answer'.",
+            "Khai báo format/cơ chế/góc, long_form_slug/playlist/cta_target, rồi đặt câu trả lời lõi vào một segment core_answer.",
+        )]
+    return []
+
+
+def _check_release_schema(script: Any) -> list[dict[str, str]]:
+    """Schema required for every newly produced, publishable script."""
+    thumbnail = _get(script, "thumbnail_brief")
+    if thumbnail is None:
+        return [_repair(
+            "thumbnail_brief",
+            "Kịch bản chưa có thumbnail_brief trước khi TTS/render.",
+            "Bổ sung visual_contradiction, subject, emotion và headline (≤4 từ).",
+        )]
+    if _script_video_type(script) != "short":
+        return []
+    strategy = _get(script, "strategy")
+    if strategy is None:
+        return []
+    source = (
+        _get(strategy, "source_long_slug", ""),
+        _get(strategy, "source_section_index", None),
+        _get(strategy, "source_excerpt", ""),
+    )
+    if not source[0] or source[1] is None or not source[2]:
+        return [_repair(
+            "short_source_trace",
+            "Short thiếu dấu vết section Long làm nguồn.",
+            "Khai báo source_long_slug, source_section_index và source_excerpt trùng Long đích.",
+        )]
+    if source[0] != _get(strategy, "long_form_slug", ""):
+        return [_repair(
+            "short_source_trace",
+            "source_long_slug không khớp long_form_slug.",
+            "Dùng đúng Long đích cho source trace và CTA.",
+        )]
+    return []
+
+
 def _check_central_mechanism(script: Any) -> list[dict[str, str]]:
     """Keep each episode focused when the script explicitly names mechanisms."""
     names = re.findall(r"cơ chế\s+([\wà-ỹ\s]{2,40}?)(?:[,.;:]|\s+(?:và|nhưng|cũng)\s)", _script_text(script).lower())
-    unique = {" ".join(name.split()) for name in names if name.strip()}
+    # "các cơ chế khiến ta trì hoãn" is a generic CTA/effect phrase, not a
+    # second named mechanism.  Only named mechanisms participate in the
+    # one-mechanism gate.
+    generic_starts = {"khiến", "gây", "giúp", "dẫn", "làm", "để", "trong", "về"}
+    unique = {
+        " ".join(name.split())
+        for name in names
+        if name.strip() and name.split(maxsplit=1)[0] not in generic_starts
+    }
     # The regex has no semantic knowledge of Vietnamese mechanism names.  A
     # later mention can therefore include a following verb/question and look
     # like a second mechanism ("lời nguyền tri thức" vs "lời nguyền tri thức
@@ -311,9 +392,20 @@ def _check_absolute_health_finance_claims(script: Any) -> list[dict[str, str]]:
     violations: list[dict[str, str]] = []
     for segment in _segments_of(script):
         text = _narration_of(segment).lower()
-        if any(hint in text for hint in _HEALTH_FINANCE_HINTS) and any(
-            hint in text for hint in _ABSOLUTE_CLAIM_HINTS
-        ):
+        absolute_claims = []
+        for hint in _ABSOLUTE_CLAIM_HINTS:
+            if hint not in text:
+                continue
+            if hint == "mọi người":
+                if re.search(r"mọi người\s+(?:đều|sẽ|phải|luôn|chắc chắn|không thể)", text):
+                    absolute_claims.append(hint)
+                continue
+            for match in re.finditer(re.escape(hint), text):
+                prefix = text[max(0, match.start() - 48):match.start()]
+                if not re.search(r"(không|chẳng|chưa|tránh)[^.?!]{0,40}$", prefix):
+                    absolute_claims.append(hint)
+                    break
+        if any(hint in text for hint in _HEALTH_FINANCE_HINTS) and absolute_claims:
             violations.append(_repair(
                 "health_finance_claim",
                 "Phát hiện tuyên bố y tế/tài chính tuyệt đối hoặc áp dụng cho mọi người.",

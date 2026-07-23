@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+from ytb_pipeline.ideation.generator import CHARS_PER_MIN
+
 
 def _script_payload(video_type: str = "ai_video") -> dict:
     return {
@@ -20,7 +22,7 @@ def _script_payload(video_type: str = "ai_video") -> dict:
                 "narration": (
                     "Một cơ chế nhỏ có thể đổi cách ta nhìn hành vi. "
                     "Nó không phải lời khuyên chung chung mà là cách não xử lý tín hiệu. "
-                ) * 11,
+                ) * 20,
                 "broll": "abstract brain mechanism",
                 "video_type": video_type,
                 "hook": True,

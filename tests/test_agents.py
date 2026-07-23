@@ -200,7 +200,7 @@ async def test_qa_agent_rejects_duplicate_title_even_when_topic_differs():
     assert result.output["violations"][0]["rule"] == "series_dedup"
 
 
-async def test_qa_agent_rejects_long_over_fourteen_minutes():
+async def test_qa_agent_rejects_long_over_fifteen_minutes():
     script = Script(
         topic="cơ chế chú ý",
         title="Vì Sao Não Bám Vào Việc Dang Dở",
@@ -211,7 +211,7 @@ async def test_qa_agent_rejects_long_over_fourteen_minutes():
         segments=(
             Segment(
                 caption="Mở đầu",
-                narration=GREETING + " " + chars_for_minutes(14.1),
+                narration=GREETING + " " + chars_for_minutes(15.1),
             ),
         ),
     )
@@ -221,7 +221,7 @@ async def test_qa_agent_rejects_long_over_fourteen_minutes():
     assert result.output["passed"] is False
     assert result.output["violations"] == [{
         "rule": "length",
-        "detail": "Video dài quá dài: ước lượng 14.1p > 14p.",
+        "detail": "Long quá dài 900s: audio 906.5s.",
     }]
 
 
@@ -542,29 +542,29 @@ async def test_qa_agent_accepts_stickman_visual_gag_structure():
         description="Short giải trí.",
         tags=("người que", "giải trí"),
         compliance=ComplianceCheck(passed=True),
-        body=unit * 4,
+        body=unit * 12,
         segments=(
             Segment(
                 caption="Cửa chạy",
-                narration=unit,
+                narration=unit * 2,
                 broll="người que mở cửa rồi trượt tay nắm rơi xuống",
                 emphasis=("hook",),
             ),
             Segment(
                 caption="Đuổi cửa",
-                narration=unit,
+                narration=unit * 2,
                 broll="người que chạy đuổi theo cánh cửa trên hành lang",
                 emphasis=("bất ngờ",),
             ),
             Segment(
                 caption="Càng rối",
-                narration=unit,
+                narration=unit * 2,
                 broll="người que vấp ngã khi cánh cửa bật ngược lại",
                 emphasis=("leo thang",),
             ),
             Segment(
                 caption="Punchline",
-                narration=unit,
+                narration=unit * 2,
                 broll="người que đứng hình khi cánh cửa khóa nó bên ngoài",
                 emphasis=("punchline",),
             ),
@@ -647,6 +647,21 @@ async def test_strict_qa_blocks_absolute_health_or_finance_claim():
     assert result.output["passed"] is False
 
 
+async def test_strict_qa_allows_a_finance_evidence_limit_that_rejects_certainty():
+    agent = QAAgent()
+    script = _make_script(
+        narration_segments=[
+            "Nguồn về tâm lý tài chính không cho phép kết luận chắc chắn động cơ của một cá nhân. "
+            + chars_for_minutes(1.0)
+        ],
+    )
+
+    result = await agent.run({"script": script, "strict": True})
+
+    rules = [violation["rule"] for violation in result.output["violations"]]
+    assert "health_finance_claim" not in rules
+
+
 async def test_qa_agent_semantic_dedup_flags_near_duplicate_topic():
     agent = QAAgent()
     script = _make_script(
@@ -685,6 +700,21 @@ def test_mechanism_gate_does_not_split_one_name_from_its_following_question():
         "Cơ chế lời nguyền tri thức, khiến người biết nhiều bỏ qua điểm bắt đầu của người mới. "
         "Sau đó cơ chế lời nguyền tri thức hỏi điểm bắt đầu nào đã bị bỏ qua."
     ])
+
+    assert _check_central_mechanism(script) == []
+
+
+def test_mechanism_gate_ignores_generic_effect_phrase():
+    from ytb_pipeline.agents.qa_agent import _check_central_mechanism
+
+    script = _make_script(
+        topic="Cơ chế né tránh bất định khiến bạn trì hoãn",
+        narration_segments=[
+        "Cơ chế né tránh bất định khiến ta trì hoãn khi điểm bắt đầu chưa rõ. "
+        "Cơ chế né tránh bất định, nhưng không phải lười biếng, mới là trục của câu chuyện. "
+        "Hãy đăng ký kênh để xem thêm các cơ chế khiến ta trì hoãn."
+        ],
+    )
 
     assert _check_central_mechanism(script) == []
 

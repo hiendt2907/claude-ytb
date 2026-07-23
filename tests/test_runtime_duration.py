@@ -24,14 +24,17 @@ def _voiceover(tmp_path: Path, *, video_type: str, duration_sec: float) -> Voice
 def _rendered(tmp_path: Path, *, video_type: str) -> RenderedVideo:
     video = tmp_path / "video.mp4"
     video.write_bytes(b"video")
+    thumbnail = tmp_path / "thumb.jpg"
+    thumbnail.write_bytes(b"thumb")
     return RenderedVideo(
         topic="t", title="T", description="d", tags=("a", "b", "c"),
         video_type=video_type, audio_path=tmp_path / "audio.mp3", video_path=video,
+        thumbnail_path=thumbnail,
     )
 
 
 def test_f5_planning_rate_reflects_requested_two_times_speed():
-    assert chars_per_min_for_provider("f5") == 3500.0
+    assert chars_per_min_for_provider("f5") == 2000.0
     assert chars_per_min_for_provider("edge") == 1197.0
 
 
@@ -44,16 +47,30 @@ def test_audio_gate_rejects_short_that_f5_spoke_too_fast(monkeypatch, tmp_path):
         voice_validation.validate_audio(voiceover)
 
 
-def test_final_gate_rejects_long_over_fourteen_minutes(monkeypatch, tmp_path):
+def test_final_gate_accepts_f5_long_runtime_within_fifteen_minutes(monkeypatch, tmp_path):
     video = _rendered(tmp_path, video_type="long")
     monkeypatch.setattr(render_validation, "_check_not_blank", lambda _path: None)
     monkeypatch.setattr(render_validation, "_ffprobe", lambda _path: {
-        "format": {"duration": "900"},
+        "format": {"duration": "840.0"},
         "streams": [
             {"codec_type": "video", "width": 1920, "height": 1080},
             {"codec_type": "audio"},
         ],
     })
 
-    with pytest.raises(ValueError, match="Long dài quá 840s"):
+    render_validation.validate_final_video(video)
+
+
+def test_final_gate_rejects_long_over_fifteen_minutes(monkeypatch, tmp_path):
+    video = _rendered(tmp_path, video_type="long")
+    monkeypatch.setattr(render_validation, "_check_not_blank", lambda _path: None)
+    monkeypatch.setattr(render_validation, "_ffprobe", lambda _path: {
+        "format": {"duration": "900.1"},
+        "streams": [
+            {"codec_type": "video", "width": 1920, "height": 1080},
+            {"codec_type": "audio"},
+        ],
+    })
+
+    with pytest.raises(ValueError, match="Long quá dài 900s"):
         render_validation.validate_final_video(video)

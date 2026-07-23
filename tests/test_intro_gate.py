@@ -6,14 +6,22 @@ tự sinh đa dạng. Short vào hook thẳng, cấm mở bằng lời chào.
 
 import pytest
 
-from ytb_pipeline.ideation.generator import GREETING_PREFIX, load_script
+from ytb_pipeline.ideation.generator import CHARS_PER_MIN, GREETING_PREFIX, load_script
 
 from conftest import make_script
 
 
 def _long_body(text: str) -> str:
     """Nối thêm cho đủ độ dày ~12 phút để không vướng cổng độ dài."""
-    return text + " Chi tiết cụ thể có cơ chế và ví dụ thực tế. " * 340
+    filler = " Chi tiết cụ thể có cơ chế và ví dụ thực tế. "
+    needed = int(CHARS_PER_MIN * 12.1) - len(text)
+    return text + (filler * (-(-needed // len(filler))))[:needed]
+
+
+def _short_body(text: str) -> str:
+    filler = " Chi tiết cụ thể có cơ chế và ví dụ thực tế. "
+    needed = int(CHARS_PER_MIN * 1.1) - len(text)
+    return text + (filler * (-(-needed // len(filler))))[:needed]
 
 
 def _long(narration):
@@ -56,13 +64,13 @@ def test_video_dai_loi_chao_da_dang_ve_sau_tu_do(write_script):
 
 def test_short_co_loi_chao_bi_chan(write_script):
     # Short trong khung 1-1.5 phút nhưng mở bằng lời chào -> phải bị chặn.
-    body = f"{GREETING_PREFIX} " + "vào hook đi nào. " * 75
+    body = _short_body(f"{GREETING_PREFIX} vào hook đi nào.")
     path = write_script(_short(body))
     with pytest.raises(ValueError, match="Short.*lời chào"):
         load_script(path)
 
 
 def test_short_khong_loi_chao_thi_qua(write_script):
-    body = "Dừng ngay việc này lại. " * 52  # ~1.0 phút, không chào
+    body = _short_body("Dừng ngay việc này lại.")
     path = write_script(_short(body))
     assert load_script(path).segments
