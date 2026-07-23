@@ -216,6 +216,45 @@ def run_pipeline_once(
     return subprocess.CompletedProcess(args=proc.args, returncode=proc.returncode, stdout="".join(lines), stderr="")
 
 
+# Số lần liên tiếp CÙNG recovery code (không tính reset bởi 1 lần thành công)
+# trước khi gửi thêm 1 cảnh báo escalation riêng biệt, khác với emit_warning
+# thường mỗi lần fail. Mục đích: --loop chạy vô tiếp qua nhiều video lỗi cùng
+# 1 nguyên nhân hệ thống (vd calibration sai) trong nhiều giờ không ai để ý —
+# xem data/ledger.md 2026-07-22 (6 lỗi voiceover liên tiếp cùng lớp nguyên nhân).
+RECOVERY_ESCALATION_THRESHOLD = 3
+
+
+def _track_recovery_failure(plan: RecoveryPlan) -> int:
+    """Tăng streak của `plan.code`, trả về streak hiện tại sau khi tăng."""
+    cli = _cli()
+    streak = cli._recovery_code_streak
+    streak[plan.code] = streak.get(plan.code, 0) + 1
+    return streak[plan.code]
+
+
+def _reset_recovery_streaks() -> None:
+    """Gọi khi 1 video chạy thành công — escalation chỉ đếm lỗi LIÊN TIẾP."""
+    _cli()._recovery_code_streak.clear()
+
+
+def _maybe_escalate_recovery_streak(plan: RecoveryPlan, streak: int, item: QueueItem) -> None:
+    """Gửi 1 cảnh báo escalation RIÊNG khi cùng mã lỗi lặp liên tiếp đủ ngưỡng.
+
+    Khác `emit_warning` thường (gửi mỗi lần fail) — đây là tín hiệu "đây gần như
+    chắc chắn là lỗi hệ thống, không phải lỗi 1 video", để Sếp biết cần dừng
+    `--loop` kiểm tra thay vì để nó tự chạy hết queue lỗi.
+    """
+    if streak < RECOVERY_ESCALATION_THRESHOLD:
+        return
+    cli = _cli()
+    cli.emit_warning(
+        f"🚨 ESCALATION: mã lỗi [{plan.code}] đã lặp lại {streak} lần liên tiếp trong phiên "
+        f"--loop này (lần gần nhất: '{item.slug}'). Đây nhiều khả năng là lỗi hệ thống "
+        "(vd calibration/prompt sai chung cho cả lớp nội dung), không phải lỗi riêng 1 video — "
+        "cân nhắc dừng loop (`ytb batch stop`) và kiểm tra trước khi để nó tiếp tục đốt compute."
+    )
+
+
 def run_with_retry(
     item: QueueItem,
     backoff: list[int] | None = None,
@@ -227,7 +266,9 @@ def run_with_retry(
     """Chạy pipeline cho 1 video; tự retry nếu lỗi tạm thời, tối đa len(backoff) lần.
 
     Lỗi không tạm thời -> dừng ngay, không retry. Cả 2 trường hợp thất bại cuối
-    cùng đều gọi emit_warning() (Telegram + log) trước khi trả về False.
+    cùng đều gọi emit_warning() (Telegram + log) trước khi trả về False, và đếm
+    streak để escalate riêng nếu cùng mã lỗi lặp lại nhiều lần liên tiếp (xem
+    `_maybe_escalate_recovery_streak`).
 
     Dừng GRACEFUL (`ytb batch stop`, cờ `_stop_requested`) không tính là lỗi:
     trả về False ngay, KHÔNG retry, KHÔNG emit_warning — `run_pipeline_once`
@@ -244,25 +285,30 @@ def run_with_retry(
         if cli._stop_requested:
             return False, last_output
         if result.returncode == 0:
+            cli._reset_recovery_streaks()
             return True, last_output
 
         plan = cli.recovery_for_output(last_output)
         if not plan.retryable:
             report = cli.write_failure_recovery_report(item, last_output)
+            streak = cli._track_recovery_failure(plan)
             cli.emit_warning(
                 f"Video '{item.slug}' dừng an toàn [{plan.code}]: {plan.action}. "
                 f"KHÔNG retry tự động; report={report or 'không ghi được'}. "
                 f"Xem log trước khi can thiệp. Đuôi log:\n{last_output[-1500:]}"
             )
+            cli._maybe_escalate_recovery_streak(plan, streak, item)
             return False, last_output
 
         allowed_retries = min(len(backoff), plan.max_attempts)
         if attempt >= allowed_retries:
             report = cli.write_failure_recovery_report(item, last_output)
+            streak = cli._track_recovery_failure(plan)
             cli.emit_warning(
                 f"Video '{item.slug}' [{plan.code}] đã retry hết {allowed_retries} lần — "
                 f"{plan.action}. report={report or 'không ghi được'}. Đuôi log:\n{last_output[-1500:]}"
             )
+            cli._maybe_escalate_recovery_streak(plan, streak, item)
             return False, last_output
 
         wait = backoff[attempt]

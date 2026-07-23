@@ -25,7 +25,7 @@ là nơi duy nhất giữ:
   - Các hằng số/state toàn cục có thể bị test patch (PID_TRACKED_COMMANDS,
     VN_TZ, DEFAULT_SCHEDULE_SLOTS, MAX_BATCH_WORKERS, WORKER_STATE_PATH,
     _current_proc, _current_procs, _queue_claim_lock, _claimed_slugs,
-    _stop_requested) — mọi submodule đọc/ghi các tên này qua `_cli()` tại
+    _stop_requested, _recovery_code_streak) — mọi submodule đọc/ghi các tên này qua `_cli()` tại
     thời điểm gọi (không capture biến module-level tĩnh riêng), y hệt quy ước
     đã có sẵn ở queue_manager.py/pipeline_runner.py/doctor.py/ideation_cmd.py.
   - `main()`/argparse.
@@ -61,10 +61,14 @@ from ..ideation_cmd import (
 )
 from ..local_benchmark import format_benchmark_report, run_local_benchmark
 from ..pipeline_runner import (
+    RECOVERY_ESCALATION_THRESHOLD,
     RETRY_BACKOFF_SEC,
     STAGE_START_MARKERS,
     TRANSIENT_ERROR_PATTERNS,
     YOUTUBE_VERIFY_TIMEOUT_SEC,
+    _maybe_escalate_recovery_streak,
+    _reset_recovery_streaks,
+    _track_recovery_failure,
     build_env,
     check_schedule_drift,
     detect_stage_marker,
@@ -160,6 +164,9 @@ _current_procs: dict[str, subprocess.Popen] = {}
 _queue_claim_lock = threading.Lock()
 _claimed_slugs: set[str] = set()
 _stop_requested = False
+# Đếm streak lỗi liên tiếp CÙNG recovery code trong phiên --loop hiện tại —
+# xem pipeline_runner.py::_maybe_escalate_recovery_streak.
+_recovery_code_streak: dict[str, int] = {}
 
 
 def main(argv: list[str] | None = None) -> None:

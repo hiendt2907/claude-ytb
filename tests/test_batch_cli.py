@@ -304,6 +304,37 @@ def test_run_with_retry_writes_a_sanitized_recovery_report_for_terminal_failure(
     assert reports == [True]
 
 
+# ── escalation: cùng recovery code lặp liên tiếp ────────────────────────────
+def test_run_with_retry_escalates_after_threshold_consecutive_same_code_failures(_capture_telegram):
+    for n in range(1, cli.RECOVERY_ESCALATION_THRESHOLD + 1):
+        item = cli.QueueItem(n, f"slug-{n}", "2026-06-23T06:00:00+0700", "queued")
+        cli.run_with_retry(
+            item,
+            backoff=[1],
+            sleep_fn=lambda _s: None,
+            run_fn=lambda _item, **_kwargs: _completed(1, stderr="FileNotFoundError: scripts/x.json"),
+        )
+
+    escalations = [msg for msg in _capture_telegram if "ESCALATION" in msg]
+    assert len(escalations) == 1
+    assert f"lặp lại {cli.RECOVERY_ESCALATION_THRESHOLD} lần liên tiếp" in escalations[0]
+    assert "slug-3" in escalations[0]
+
+
+def test_run_with_retry_streak_resets_after_a_success(_capture_telegram):
+    item = cli.QueueItem(1, "x", "2026-06-23T06:00:00+0700", "queued")
+    fail_fn = lambda _item, **_kwargs: _completed(1, stderr="FileNotFoundError: scripts/x.json")  # noqa: E731
+    ok_fn = lambda _item, **_kwargs: _completed(0, stdout="ok")  # noqa: E731
+
+    for _ in range(cli.RECOVERY_ESCALATION_THRESHOLD - 1):
+        cli.run_with_retry(item, backoff=[1], sleep_fn=lambda _s: None, run_fn=fail_fn)
+    cli.run_with_retry(item, backoff=[1], sleep_fn=lambda _s: None, run_fn=ok_fn)
+    for _ in range(cli.RECOVERY_ESCALATION_THRESHOLD - 1):
+        cli.run_with_retry(item, backoff=[1], sleep_fn=lambda _s: None, run_fn=fail_fn)
+
+    assert not any("ESCALATION" in msg for msg in _capture_telegram)
+
+
 # ── extract_claimed_video_id ──────────────────────────────────────────────────
 def test_extract_claimed_video_id_found():
     output = "...\n  ✓ Đã upload: https://youtu.be/b917RPp2o7o\n[4/4] Publish   ✓  uploaded=True"
@@ -1145,6 +1176,13 @@ def _reset_stop_flag():
     yield
     cli._stop_requested = False
     cli._current_proc = None
+
+
+@pytest.fixture(autouse=True)
+def _reset_recovery_streak():
+    cli._recovery_code_streak.clear()
+    yield
+    cli._recovery_code_streak.clear()
 
 
 def test_handle_stop_signal_sets_flag_and_killpgs_current_proc_group(monkeypatch):
