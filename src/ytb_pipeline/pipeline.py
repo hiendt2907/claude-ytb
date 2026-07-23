@@ -1,8 +1,9 @@
 """Orchestrator: chạy 1 project qua WorkflowGraph 4 node (DAG + checkpoint).
 
-`ytb batch start` là cổng ideation + QA duy nhất. Khi chạy production từ một
-script đã được batch start chấp nhận, pipeline chỉ nạp input rồi thực thi TTS,
-render và publish; tuyệt đối không re-gate hay re-QA nội dung.
+`ytb batch start` là cổng ideation + QA đầu tiên. Node `input` ở đây chạy lại
+`validate_script_payload` + `QAAgent` (strict nếu ruleset_id khớp) như một lớp
+phòng thủ thứ hai ngay trước khi tốn TTS/render — không tin tưởng mù quáng vào
+trạng thái đã duyệt lúc batch start, vì file script trên đĩa có thể đã đổi.
 
 Trạng thái từng node persist vào `<projects_dir>/<slug>/project.json`
 (CheckpointManager) — resume skip node DONE, node stale được reset qua
