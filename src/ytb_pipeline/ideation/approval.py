@@ -55,6 +55,24 @@ def _format_full(script: Script) -> str:
     """Bản đầy đủ để duyệt trên điện thoại: tiêu đề, tags, toàn bộ narration."""
     tags = ", ".join(script.tags) if script.tags else "(không)"
     lines = [f"📌 {script.title}", f"🏷️ {tags}", ""]
+    if script.strategy is not None:
+        strategy = script.strategy
+        lines.extend(
+            [
+                f"🧭 Format: {strategy.format_id}",
+                f"🎯 Cơ chế: {strategy.core_mechanism}",
+                f"👤 Nỗi đau: {strategy.audience_problem}",
+            ]
+        )
+        if strategy.hook is not None:
+            hook = strategy.hook
+            deadline = f"{hook.answer_by_sec:g}"
+            lines.append(
+                f"⚡ Hook 0–{deadline}s: {hook.situation} → {hook.core_answer}"
+            )
+        if strategy.long_form_slug:
+            lines.append(f"↗️ Long đích: {strategy.long_form_slug}")
+        lines.append("")
     for i, seg in enumerate(script.segments, 1):
         lines.append(f"[{i}] {seg.narration}")
     return "\n".join(lines)
