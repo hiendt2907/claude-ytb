@@ -121,17 +121,25 @@ Current/target stack by capability:
   B-roll source (`settings.video_provider`/`broll_strategy = "pexels"`,
   confirmed live in `render/compose_ai.py`) — local diffusion has not
   replaced it as default yet. `script.json` → `project.json` migration:
-  the new domain model exists (`project/models.py`,
-  `project/checkpoint.py`, `project/workflow.py`) but is not wired into the
-  production orchestrator yet (see v3).
-- **v3 (partially built, not wired):** DAG executor exists —
+  the domain model (`project/models.py`, `project/checkpoint.py`,
+  `project/workflow.py`) is wired into the production orchestrator — see
+  v3.
+- **v3 (wired, 2026-07-23):** DAG executor is live in production. Each
+  video's per-node state (`input`/`voiceover`/`audio_quality`/`render`/
+  `render_quality`/`publish`) is driven by `pipeline.run_project` →
   `project/workflow.py::WorkflowGraph` (Kahn topo-sort) +
-  `project/checkpoint.py::CheckpointManager` (atomic write, per-node
-  pending/running/done/failed). `batch_cli.py` has been decomposed (1330 →
-  382 lines) but still runs the old linear `assets/auto_state.json` state
-  machine — it does not yet call into `WorkflowGraph`/`CheckpointManager`.
-  Next step for v3 completion: wire `batch_cli.py` (or its successor) to the
-  DAG executor instead of maintaining two parallel state systems.
+  `project/checkpoint.py::CheckpointManager` (atomic write,
+  pending/running/done/failed), checkpointed per-project at
+  `assets/projects/<slug>/project.json`. `python -m ytb_pipeline` (the
+  subprocess `batch_cli.py`'s `run`/`retry` commands spawn) is the entry
+  point into this DAG; stale nodes (missing output file, old dry-run
+  publish) are reset automatically before resume
+  (`pipeline._reset_stale_nodes`). `assets/auto_state.json` remains the
+  **batch-level** queue (video ordering, `publish_at` scheduling) — that is
+  a legitimate, separate concern from a single video's per-node DAG state
+  and is not itself technical debt. `batch_cli.py` was 883 lines
+  (over the 400-line limit) as of 2026-07-23; see the refactor tracked in
+  this same change for its current shape.
 - **v4:** Multi-platform `Publisher` adapters (Shorts, TikTok, Instagram,
   Podcast). Plugin discovery/registration mechanism for third-party
   providers.
