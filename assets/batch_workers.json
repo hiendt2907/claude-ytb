@@ -1,14 +1,38 @@
 {
   "1": {
-    "slug": "tin-nhan-da-xem-va-hieu-ung-den-san-khau",
-    "stage": "running-voiceover",
-    "started_at": "2026-07-17T13:57:52+07:00",
-    "last_error": ""
+    "slug": "da-hoc-vai-buoi-vi-sao-kho-dung-lop-khong-con-can",
+    "stage": "error",
+    "started_at": "2026-07-22T22:06:54+07:00",
+    "last_error": "omplete\n    return future.result()\n           ~~~~~~~~~~~~~^^\n  File \"/Users/hiendang/claude-ytb/src/ytb_pipeline/pipeline.py\", line 542, in run_project\n    return await graph.execute(project)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/hiendang/claude-ytb/src/ytb_pipeline/project/workflow.py\", line 103, in execute\n    raise WorkflowError(node_id, str(exc)) from exc\nytb_pipeline.project.workflow.WorkflowError: Node 'voiceover' failed: Core answer kết thúc ở 20.5s, vượt deadline 5.0s.\n"
   },
   "2": {
     "slug": "so-sanh-anh-dai-dien-va-hieu-ung-den-san-khau",
-    "stage": "running-ideation",
-    "started_at": "2026-07-17T14:00:50+07:00",
+    "stage": "running-voiceover",
+    "started_at": "2026-07-17T14:07:13+07:00",
+    "last_error": ""
+  },
+  "tts-1": {
+    "slug": "giao-ca-truc-khien-nguoi-moi-khong-biet-bat-dau",
+    "stage": "running-voiceover",
+    "started_at": "2026-07-17T23:38:03+07:00",
+    "last_error": ""
+  },
+  "tts-2": {
+    "slug": "ban-giao-chiec-may-in-cho-nguoi-moi",
+    "stage": "running-voiceover",
+    "started_at": "2026-07-17T23:52:25+07:00",
+    "last_error": ""
+  },
+  "render-1": {
+    "slug": "giao-ca-truc-khien-nguoi-moi-khong-biet-bat-dau",
+    "stage": "done",
+    "started_at": "2026-07-18T00:01:13+07:00",
+    "last_error": ""
+  },
+  "render-2": {
+    "slug": "ban-giao-chiec-may-in-cho-nguoi-moi",
+    "stage": "done",
+    "started_at": "2026-07-18T00:08:58+07:00",
     "last_error": ""
   }
 }
