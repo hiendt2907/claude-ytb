@@ -7,43 +7,92 @@ prompt ở đây diff được qua git, không rải string trong logic gọi pr
 from __future__ import annotations
 
 import json
-from math import ceil, floor
 
-from ..ideation.generator import (
-    CHARS_PER_MIN,
-    LONG_MAX_MINUTES,
-    LONG_MIN_MINUTES,
-    SHORT_MAX_MINUTES,
-    SHORT_MIN_MINUTES,
+from ..config.settings import settings
+from ..content_contract import CONTRACT_VERSION, chars_per_min_for_provider, contract_for
+
+SHORT_CONTRACT = contract_for("short")
+LONG_CONTRACT = contract_for("long")
+LONG_MIN_MINUTES = int(LONG_CONTRACT.viewer_runtime_bounds_sec[0] / 60)
+LONG_MAX_MINUTES = int(LONG_CONTRACT.viewer_runtime_bounds_sec[1] / 60)
+SHORT_MIN_MINUTES = SHORT_CONTRACT.viewer_runtime_bounds_sec[0] / 60
+SHORT_MAX_MINUTES = SHORT_CONTRACT.viewer_runtime_bounds_sec[1] / 60
+SHORT_ANSWER_START_TARGET_SEC = SHORT_CONTRACT.answer_start_target_sec or 4.0
+
+# Ideation and loader must plan with the same active TTS profile.  F5 is the
+# production default, while Edge remains a valid deterministic development path.
+PLANNING_CHARS_PER_MIN = chars_per_min_for_provider(settings.tts_provider)
+SHORT_TARGET_CHARS = int(PLANNING_CHARS_PER_MIN * 1.25)
+SHORT_MIN_CHARS, SHORT_MAX_CHARS = SHORT_CONTRACT.audio_runtime_bounds_sec(
+    segment_count=SHORT_CONTRACT.minimum_sections
+)
+SHORT_MIN_CHARS = int(PLANNING_CHARS_PER_MIN * SHORT_MIN_CHARS / 60)
+SHORT_MAX_CHARS = int(PLANNING_CHARS_PER_MIN * SHORT_MAX_CHARS / 60)
+SHORT_SAFE_MIN_CHARS, SHORT_SAFE_MAX_CHARS = SHORT_CONTRACT.safe_character_bounds(
+    chars_per_minute=PLANNING_CHARS_PER_MIN, segment_count=SHORT_CONTRACT.minimum_sections
+)
+LONG_MIN_CHARS, LONG_MAX_CHARS = LONG_CONTRACT.audio_runtime_bounds_sec(
+    segment_count=LONG_CONTRACT.minimum_sections
+)
+LONG_MIN_CHARS = int(PLANNING_CHARS_PER_MIN * LONG_MIN_CHARS / 60)
+LONG_MAX_CHARS = int(PLANNING_CHARS_PER_MIN * LONG_MAX_CHARS / 60)
+LONG_SAFE_MIN_CHARS, LONG_SAFE_MAX_CHARS = LONG_CONTRACT.safe_character_bounds(
+    chars_per_minute=PLANNING_CHARS_PER_MIN, segment_count=LONG_CONTRACT.minimum_sections
 )
 
-SHORT_TARGET_CHARS = int(CHARS_PER_MIN * 1.25)
-SHORT_MIN_CHARS = ceil(CHARS_PER_MIN * SHORT_MIN_MINUTES)
-SHORT_MAX_CHARS = floor(CHARS_PER_MIN * SHORT_MAX_MINUTES)
-LONG_MIN_CHARS = ceil(CHARS_PER_MIN * LONG_MIN_MINUTES)
-LONG_MAX_CHARS = floor(CHARS_PER_MIN * LONG_MAX_MINUTES)
-# Biên AN TOÀN để `_validate_length` không reject: LLM khai target_minutes =
-# LONG_MIN (12) rồi viết DƯ tới ~13-14.5 phút, nên số phút đo được
-# (chars / CHARS_PER_MIN) luôn ≥ target và ≤ LONG_MAX (15). Tránh khai 14 rồi
-# viết 13.7 phút (est < target => "quá mỏng").
-LONG_SAFE_MIN_CHARS = int(CHARS_PER_MIN * 13.0)
-LONG_SAFE_MAX_CHARS = int(CHARS_PER_MIN * 14.5)
+CHANNEL_EDITORIAL_BRIEF = """Kênh là "1 Cốc Café 6h", theo ngách "phát triển bản thân THẬT, không self-help": giải thích một cơ chế tâm lý, hành vi hoặc mental model trong mỗi tập bằng tình huống đời thường cụ thể. Khán giả phải hiểu vì sao hành vi xảy ra, giới hạn của cơ chế và một bước áp dụng ít rào cản; không dùng khẩu hiệu, mẹo chữa nhanh hoặc lời hứa tuyệt đối. Short là phễu cho long-form cùng cơ chế, không phải clip độc lập chỉ để lấy view."""
+
+STRATEGY_V1_CONTRACT = """Every newly generated Short MUST include a strategy object. strategy contains format_id, core_mechanism, audience_problem, angle, long_form_slug, playlist, cta_target, and hook. hook contains situation, core_answer, open_loop, answer_by_sec. Use format_id="core_answer_first_v1" unless explicit analytics feedback says another tested format won. The Short must show the situation in the first segment, put the exact core_answer in a section whose purpose is "core_answer", and set answer_by_sec to 5 or less. Every section must include purpose: situation, core_answer, evidence, application, or payoff. Do not delay the core answer with a greeting, a generic question, or an abstract definition. The core_answer should be a careful explanation, not an absolute diagnosis or a dopamine cliché."""
+
+PERSONAL_FINANCE_PSYCHOLOGY_PROFILE = "personal_finance_psychology"
+_PERSONAL_FINANCE_MARKERS = ("tài chính", "tài chánh", "tiền bạc", "personal finance")
+
+
+def is_personal_finance_psychology_request(requirement: str) -> bool:
+    """Whether a batch must use the evidence-register safety contract."""
+    normalized = requirement.casefold()
+    return any(marker in normalized for marker in _PERSONAL_FINANCE_MARKERS)
+
+
+def personal_finance_source_contract(requirement: str) -> str:
+    """Return the mandatory source contract only for financial-behaviour batches."""
+    if not is_personal_finance_psychology_request(requirement):
+        return ""
+    return f"""
+Financial editorial profile is mandatory: set `editorial_profile` to
+`{PERSONAL_FINANCE_PSYCHOLOGY_PROFILE}`. This is educational personal-finance
+psychology, never investment, tax, legal, credit, insurance, or product advice.
+Before writing, research the claim and retain only claims you can substantiate.
+Return an `evidence_register` array. Each factual, numerical, financial, legal,
+or research claim used in narration must have one row with: `claim`,
+`source_title`, `publisher`, `published_year`, `url`, and `source_type`.
+`source_type` is exactly `primary`, `peer_reviewed`, or `official`; every URL
+must be a direct HTTPS source. Use a primary, peer-reviewed, or official source
+where available. Never cite a search-result page, an unverifiable blog, another
+creator, a made-up author, or a source you did not actually check. If a claim
+cannot be entered in this register, remove it from the narration. In
+`compliance.accuracy`, explicitly state that the evidence_register covers every
+factual claim. `compliance.passed` is false until this register is complete.
+"""
 
 # System contract dùng chung cho lần sinh đầu và mọi vòng repair. Giữ ở đây để
 # prompt là artifact có version/diff, không phân tán thành câu lệnh ngắn trong
 # các call-site provider.
 SCRIPT_GENERATION_SYSTEM_PROMPT = f"""You are the senior editorial writer and factual-safety reviewer for a Vietnamese YouTube channel.
 Return exactly one valid JSON object and no markdown. Treat the user requirement and the declared JSON title/topic as the editorial contract.
-Timing estimates use the pipeline's calibrated ~2x Vietnamese narration rate, shared by Edge-TTS and F5-TTS.
+Timing estimates use the active TTS provider's calibrated Vietnamese narration rate; measured audio is the final authority.
 
 Non-negotiable editorial rules:
-1. Every spoken sentence must directly serve the declared title and topic. Keep one coherent causal mechanism per video. Never import an example, mechanism, scene, CTA, or conclusion from another topic. Refer to that single mechanism by ONE consistent full name. Whenever the narration uses the word "cơ chế", follow it only with that one mechanism's own name (e.g. "cơ chế lời nguyền tri thức"). NEVER write "cơ chế" followed by a varying generic word such as "cơ chế duy nhất", "cơ chế này", "cơ chế đó", "cơ chế tâm lý", "cơ chế chung": an automated scanner reads every distinct phrase after "cơ chế" as a separate competing mechanism and REJECTS the script. For generic mentions use "hiện tượng", "hiệu ứng", "nguyên lý", or "quá trình" instead.
-2. For a Short without target_minutes, narration must be {SHORT_MIN_CHARS}-{SHORT_MAX_CHARS} Vietnamese characters for 1.0-1.5 minutes. Reach the range by developing the same topic with new, relevant reasoning and evidence; never pad length with generic filler, repetition, or a reusable template.
-3. For a Long, set target_minutes to EXACTLY {LONG_MIN_MINUTES} and write {LONG_SAFE_MIN_CHARS}-{LONG_SAFE_MAX_CHARS} Vietnamese characters (~13-14.5 spoken minutes), within the validator's absolute {LONG_MIN_CHARS}-{LONG_MAX_CHARS} character range for a 12-15 minutes Long. The pipeline measures runtime as total_characters / {CHARS_PER_MIN:.0f} and REJECTS the script if measured minutes fall below the declared target_minutes or above {LONG_MAX_MINUTES}. So always overshoot the declared floor and never declare a number you do not exceed — declaring 14 while writing ~13.7 minutes FAILS. Build depth from the same mechanism: causal explanation, supported evidence, exact-topic example, application, and next-episode bridge; never stretch the runtime with repeated phrasing.
-4. Open a Short with a concrete conflict, consequence, or question; do not greet or read the title. Open a Long with "Mến chào các bạn," then its title and a topic-specific hook. Each section must add information, explain why, and use visuals that match its spoken narration. For EVERY section, `time_goal` is required and MUST be a positive JSON number in minutes (never 0/null/string/timestamp/range); use values such as 0.5, 0.75, or 1.0. Section time_goal values must sum approximately to the declared target duration. The final narration section of BOTH Shorts and Longs must include: (a) one direct, specific action the viewer can do immediately, starting that sentence with exactly "Hãy " and naming the object, action, and a concrete time or scope; (b) a natural, brief invitation to like the video; and (c) a natural, brief invitation to subscribe to the channel for future videos. These like-and-subscribe invitations are a channel-growth requirement, not optional filler, and must fit the topic and tone without sounding repetitive or manipulative. For a Short with a funnel target, the long-form bridge CTA must remain present alongside the like and subscribe invitations. A question inviting a comment may follow, but never replace the action or the like-and-subscribe invitations.
-5. Write knowledge, not slogans: explain the mechanism, use a concrete example that belongs to this exact topic, and give an immediately usable application. Keep those elements explicit in the narration, but choose natural wording; do not rely on fixed labels or template phrases. Do not drift into generic self-help, comedy, or unrelated advice.
+1. Set root JSON field `ruleset_id` to EXACTLY `{CONTRACT_VERSION}`. Every spoken sentence must directly serve the declared title and topic. Keep one coherent causal mechanism per video. Never import an example, mechanism, scene, CTA, or conclusion from another topic. Refer to that single mechanism by ONE consistent full name. Whenever the narration uses the word "cơ chế", follow it only with that one mechanism's own name (e.g. "cơ chế lời nguyền tri thức"). NEVER write "cơ chế" followed by a varying generic word such as "cơ chế duy nhất", "cơ chế này", "cơ chế đó", "cơ chế tâm lý", "cơ chế chung": an automated scanner reads every distinct phrase after "cơ chế" as a separate competing mechanism and REJECTS the script. For generic mentions use "hiện tượng", "hiệu ứng", "nguyên lý", or "quá trình" instead.
+2. For a Short without target_minutes, narration must be {SHORT_MIN_CHARS}-{SHORT_MAX_CHARS} Vietnamese characters for 1.0-1.5 minutes. Aim for {SHORT_SAFE_MIN_CHARS:,}-{SHORT_SAFE_MAX_CHARS:,} characters. Use six sections: situation ≤120 characters; core_answer 120–220; evidence 550–700; concrete example 550–700; application 500–650; payoff/CTA 200–350. Silently count the combined voiceover before responding and expand evidence, example, or application — never the hook — if under {SHORT_SAFE_MIN_CHARS:,}. For strategy-v1, the first `situation` is visual setup only, must include a concrete tension marker, and the `core_answer` must be section two. Its very first sentence must exactly equal hook.core_answer. `answer_by_sec` means when that sentence STARTS, not when the explanatory section ends. Keep the situation short enough that the answer is estimated to begin by {SHORT_ANSWER_START_TARGET_SEC:.0f}s, leaving safety before the hard 5s gate.
+3. For a Long, set target_minutes to EXACTLY {LONG_MIN_MINUTES} and write {LONG_SAFE_MIN_CHARS:,}-{LONG_SAFE_MAX_CHARS:,} Vietnamese characters, within the validator's absolute {LONG_MIN_CHARS}-{LONG_MAX_CHARS} character range for a {LONG_MIN_MINUTES}-{LONG_MAX_MINUTES} minute Long. The pipeline measures planning duration as total_characters / {PLANNING_CHARS_PER_MIN:.0f} and verifies the actual audio stays {LONG_MIN_MINUTES}-{LONG_MAX_MINUTES} minutes. Build depth from the same mechanism: causal explanation, supported evidence, exact-topic example, application, and next-episode bridge; never stretch runtime with repeated phrasing.
+4. Open a Short with a concrete conflict, consequence, or question; do not greet or read the title. Open a Long with "Mến chào các bạn," then its title and a topic-specific hook. In the first 28 spoken words after the greeting, the hook MUST contain either a concrete question or one explicit tension marker: "nhưng", "thật ra", "đừng", "không phải", "vì sao", or "sai lầm". Each section must add information, explain why, and use visuals that match its spoken narration. For EVERY section, `time_goal` is required and MUST be a positive JSON number in minutes (never 0/null/string/timestamp/range); use values such as 0.5, 0.75, or 1.0. Section time_goal values must sum approximately to the declared target duration. Use one optional retention beat in both Shorts and Longs: choose its natural position after the viewer has received a concrete insight (for a Short, usually the final third; for a Long, usually after an explanatory or application payoff). It should briefly state the specific value the viewer has just received and invite a lightweight next action such as liking or following/subscribing. Make it value-first, topic-specific, and conversational; do not use a fixed sentence, put it in every section, or interrupt the hook/explanation. The final narration section of BOTH Shorts and Longs must include: (a) one direct, specific action the viewer can do immediately, starting that sentence with exactly "Hãy " and naming the object, action, and a concrete time or scope; (b) a natural, brief invitation to like the video; and (c) a natural, brief invitation to subscribe to the channel for future videos. These like-and-subscribe invitations are a channel-growth requirement, not optional filler, and must fit the topic and tone without sounding repetitive or manipulative. For a Short with a funnel target, the long-form bridge CTA must remain present alongside the like and subscribe invitations. A question inviting a comment may follow, but never replace the action or the like-and-subscribe invitations.
+5. Write knowledge, not slogans: explain the mechanism when it genuinely helps, use a concrete example that belongs to this exact topic, and give an immediately usable application. Keep those elements explicit in the narration, but choose natural wording; do not rely on fixed labels or template phrases. Do not drift into generic self-help, comedy, or unrelated advice. Channel topic compass: {CHANNEL_EDITORIAL_BRIEF}
 6. Verify every factual, numerical, medical, financial, legal, or research claim before including it. Omit any claim whose source cannot be named in the compliance notes; never invent statistics, studies, authors, or certainty.
+   When the request is personal-finance psychology, follow its evidence-register contract exactly; a plausible-sounding citation is still a failure.
 7. Respect YouTube community safety, copyright, advertiser-friendliness, COPPA, and the existing-ledger blacklist supplied in the user prompt. Use original narration and license-safe B-roll instructions.
+8. When video_type is "short", strategy-v1 is mandatory: {STRATEGY_V1_CONTRACT} The JSON must contain this strategy object before sections; a missing or incomplete strategy is invalid output, never a legacy fallback.
+9. Every new script MUST include a `thumbnail_brief` JSON object with exactly these non-empty string fields: `visual_contradiction`, `subject`, `emotion`, and `headline`. Show one instantly understandable visual contradiction, a concrete human/object subject, and one emotion; `headline` must be 4 words or fewer. The headline must reinforce the title/hook rather than repeat the full title. Produce this brief in the first JSON response; do not wait for a separate thumbnail or repair prompt.
 
 Before responding, silently audit title/topic-to-narration coherence sentence by sentence, the character contract, factual support, one mechanism, visual alignment, and the required JSON schema. If any check fails, rewrite the script before returning it."""
 
@@ -67,6 +116,7 @@ def build_resume_prompt(remaining: int, type_of_vid: str, type_of_rules: str, ex
         f"Cần viết THÊM {remaining} video loại \"{vid_label}\" — dùng skill youtube-ideation, "
         f"tuân thủ ĐẦY ĐỦ .claude/skills/youtube-ideation/video-quality-rules.md "
         f"(cổng verify mục 0, luật series mục 0d, độ dài mục 2a/2b). {topic_guidance}\n\n"
+        f"La bàn chủ đề bắt buộc:\n{CHANNEL_EDITORIAL_BRIEF}\n\n"
         "Every section MUST include time_goal as a positive JSON number of minutes; never 0/null/string/timestamp/range (examples: 0.5, 0.75, 1.0). The sum of time_goal values must approximately match the target duration.\n\n"
         "Trước khi chọn chủ đề: đọc data/ledger.md, loại bỏ mọi chủ đề trùng/tương tự "
         "(mọi status, không chỉ done).\n\n"
@@ -108,6 +158,7 @@ def build_start_prompt(num_of_vid: int, type_of_vid: str, type_of_rules: str) ->
         f"\"{vid_label}\" — dùng skill youtube-ideation, tuân thủ ĐẦY ĐỦ "
         f".claude/skills/youtube-ideation/video-quality-rules.md (cổng verify mục 0, "
         f"luật series mục 0d, độ dài mục 2a/2b). {topic_guidance}\n\n"
+        f"La bàn chủ đề bắt buộc:\n{CHANNEL_EDITORIAL_BRIEF}\n\n"
         "Every section MUST include time_goal as a positive JSON number of minutes; never 0/null/string/timestamp/range (examples: 0.5, 0.75, 1.0). The sum of time_goal values must approximately match the target duration.\n\n"
         "Trước khi chọn chủ đề: đọc data/ledger.md, loại bỏ mọi chủ đề trùng/tương tự "
         "(mọi status, không chỉ done).\n\n"
@@ -150,19 +201,21 @@ def local_script_prompt(
     generated_summaries: list[str] | None = None,
     analytics_feedback: list[str] | None = None,
     funnel: dict[str, str] | None = None,
+    source_long_context: dict | None = None,
 ) -> str:
     """Prompt sinh 1 script JSON qua local/structured LLM (khác luồng Claude skill)."""
     target = (
         (
-            '"video_type": "long", "target_minutes": 12 (declare EXACTLY 12), total narration '
-            f'{LONG_SAFE_MIN_CHARS}-{LONG_SAFE_MAX_CHARS} Vietnamese characters (~13-14.5 min so '
-            f'measured minutes = chars / {CHARS_PER_MIN:.0f} always exceed the declared 12 and stay '
+            f'"video_type": "long", "target_minutes": {LONG_MIN_MINUTES} (declare EXACTLY {LONG_MIN_MINUTES}), total narration '
+            f'{LONG_SAFE_MIN_CHARS}-{LONG_SAFE_MAX_CHARS} Vietnamese characters (~12.25-14.5 min so '
+            f'measured minutes = chars / {PLANNING_CHARS_PER_MIN:.0f} always exceed the declared {LONG_MIN_MINUTES} and stay '
             f'under {LONG_MAX_MINUTES}), and 24-36 rich sections'
         )
         if type_of_vid == "long"
         else (
             '"video_type": "short", no target_minutes, and total narration '
-            f'{SHORT_MIN_CHARS}-{SHORT_MAX_CHARS} Vietnamese characters for a 1.0-1.5 minute Short'
+            f'{SHORT_SAFE_MIN_CHARS:,}-{SHORT_SAFE_MAX_CHARS:,} Vietnamese characters (safe target inside the '
+            f'absolute {SHORT_MIN_CHARS}-{SHORT_MAX_CHARS} range) for a 1.0-1.5 minute Short'
         )
     )
     generated_summaries = generated_summaries or []
@@ -188,9 +241,34 @@ def local_script_prompt(
             f"cta_target={funnel.get('cta_target', '')}. "
             "Make the final spoken CTA point to that exact long-form topic.\n"
         )
+    source_long_instruction = ""
+    if type_of_vid == "short" and source_long_context:
+        candidates = source_long_context.get("candidates", [])
+        candidate_text = "\n".join(
+            "- section_index={section_index}; purpose={purpose}; excerpt={excerpt}".format(
+                section_index=item.get("section_index"),
+                purpose=item.get("purpose", ""),
+                excerpt=item.get("excerpt", ""),
+            )
+            for item in candidates
+        )
+        source_long_instruction = (
+            "\nLong-derived Short contract: choose EXACTLY one source candidate below. It must be the "
+            "intersection of a concrete value and an unresolved curiosity, never a generic introduction, "
+            "retention beat, closing, or CTA. In strategy include source_long_slug, source_section_index, "
+            "and source_excerpt; source_excerpt must exactly equal the selected candidate excerpt. Preserve "
+            "the source segment's substantive claim and evidence scope. Add only a tension hook, a concise "
+            "everyday context or example, a low-risk observation step, and the funnel CTA. Do not add a new "
+            "factual claim unless it is covered by the evidence_register.\n"
+            f"Source Long: slug={source_long_context.get('slug', '')}; title={source_long_context.get('title', '')}\n"
+            f"Eligible source candidates:\n{candidate_text}\n"
+            "For every factual or research claim retained from the source segment, reuse the matching source "
+            "row from this Source Long evidence register; do not invent or substitute a citation.\n"
+            f"Source Long evidence register: {json.dumps(source_long_context.get('evidence_register', []), ensure_ascii=False)}\n"
+        )
     format_name = "long-form video" if type_of_vid == "long" else "Short"
     target_minutes_field = (
-        '"target_minutes" is required for a Long and must be the JSON number 12.'
+        f'"target_minutes" is required for a Long and must be the JSON number {LONG_MIN_MINUTES}.'
         if type_of_vid == "long"
         else 'Do not include "target_minutes" for a Short.'
     )
@@ -204,13 +282,31 @@ def local_script_prompt(
         "application step, and grounded Pexels queries for real stock footage.\n"
         "- The narration must contain a concrete everyday example and an actionable application in natural Vietnamese; do not use fixed labels or template phrases.\n"
     )
+    strategy_instruction = (
+        f"\nStrategy-v1 contract:\n{STRATEGY_V1_CONTRACT}\n"
+        if type_of_vid == "short"
+        else "\nFor a Long, omit strategy; its single mechanism and series bridge belong in the narration.\n"
+    )
+    strategy_schema = '"strategy", ' if type_of_vid == "short" else ""
+    financial_source_contract = personal_finance_source_contract(type_of_rules)
+    financial_schema = '"editorial_profile", "evidence_register", ' if financial_source_contract else ""
+    uniqueness_instruction = (
+        "This Short may reuse the declared source Long only. Do not reuse any existing Short's slug, "
+        "title, source section, scene setup, or punchline listed below.\n"
+        if type_of_vid == "short" and source_long_context else
+        "This must be a NEW concept inside the current batch. Do not reuse any slug, title, "
+        "topic, scene setup, or punchline already listed below.\n"
+    )
     return (
         "You are writing a Vietnamese YouTube script JSON for a local-first pipeline.\n"
         f"Video {index}/{total}. Type: {type_of_vid}. Requirement: {topic}\n"
+        f"Channel topic compass:\n{CHANNEL_EDITORIAL_BRIEF}\n"
+        f"{strategy_instruction}"
         f"Length contract: {target}.\n"
         f"{funnel_instruction}"
-        "This must be a NEW concept inside the current batch. Do not reuse any slug, title, "
-        "topic, scene setup, or punchline already listed below.\n"
+        f"{source_long_instruction}"
+        f"{financial_source_contract}"
+        f"{uniqueness_instruction}"
         f"{custom_rules}\n"
         "Already generated in this batch:\n"
         f"{generated}\n\n"
@@ -220,31 +316,103 @@ def local_script_prompt(
         "Blocked historical titles/topics:\n"
         f"{blocked_titles or '- none'}\n\n"
         "Return ONLY one JSON object with keys: slug, topic, title, description, tags, "
-        "video_type, target_minutes, voice_profile, sections, compliance. video_type is only long or short. "
+        f"video_type, target_minutes, voice_profile, \"thumbnail_brief\", {financial_schema}{strategy_schema}sections, compliance. video_type is only long or short. "
         f"{target_minutes_field} "
-        "voice_profile is knowledge or inspiring. Each section needs time_goal as a positive JSON number of minutes (never 0/null/string/timestamp/range), voiceover, "
+        "voice_profile is knowledge or inspiring. Each section needs time_goal as a positive JSON number of minutes (never 0/null/string/timestamp/range), purpose, voiceover, "
         "visual_intent, pexels_query, caption, hook, transition, payoff, emphasis. "
         "Use these canonical fields only; the pipeline reads voiceover and pexels_query directly.\n"
+        "thumbnail_brief is required for this newly generated script and has exactly four non-empty string fields: visual_contradiction, subject, emotion, headline. "
+        "Make the visual_contradiction immediately legible, name a concrete subject and one emotion, and use a headline of 4 words or fewer (never the full title).\n"
         "compliance.passed must be true and include community/copyright/accuracy/"
         "advertiser/coppa/notes."
+        "For a strategy-v1 Short, use exactly six sections and this voiceover budget: situation <=120; core_answer 120-220; evidence 550-700; concrete example 550-700; application 500-650; payoff/CTA 200-350 characters. "
+        "Make `situation` the first section with voiceover under 120 characters and a concrete tension marker (nhưng, thật ra, đừng, không phải, or vì sao); "
+        "make `core_answer` the next section and begin its voiceover with the exact strategy.hook.core_answer. "
+        "This immediate answer contract is mandatory.\n"
     )
 
 
-def repair_prompt(payload: dict, qa_output: dict | None, validation_error: str | None) -> str:
+def long_extension_prompt(payload: dict, missing_chars: int) -> str:
+    """Ask for only the missing Long sections, keeping one Codex response bounded."""
+    context = {
+        key: payload.get(key)
+        for key in ("slug", "topic", "title", "description", "tags", "voice_profile", "compliance")
+    }
+    context["existing_sections"] = payload.get("sections", [])
+    return (
+        "Extend a Vietnamese long-form YouTube script without rewriting its existing narration.\n"
+        "Return ONLY one JSON object with a `sections` array; do not return the full script or markdown.\n"
+        "Do not rewrite, repeat, or summarize the existing sections. Add 10-12 new, topic-specific sections "
+        f"whose combined `voiceover` is at least {missing_chars:,} Vietnamese characters. Each section must "
+        "have purpose, time_goal (a positive number), voiceover, visual_intent, pexels_query, caption, hook, "
+        "transition, payoff, and emphasis. Place the new material before the final conclusion; develop only the "
+        "same named mechanism through fresh evidence, concrete examples, limits, or applications. Do not add a "
+        "second greeting, a duplicate CTA, a generic self-help list, or unsupported factual claims.\n\n"
+        f"Script context:\n{json.dumps(context, ensure_ascii=False, indent=2)}"
+    )
+
+
+def short_expansion_prompt(payload: dict, missing_chars: int) -> str:
+    """Ask for bounded additions to existing Short sections, never a rewrite."""
+    context = {
+        key: payload.get(key)
+        for key in ("slug", "topic", "title", "strategy", "compliance")
+    }
+    context["sections"] = payload.get("sections", [])
+    return (
+        "Expand only the underdeveloped middle narration of this Vietnamese Short.\n"
+        "Return ONLY one JSON object with a `section_updates` array. Do not return the full script "
+        "or markdown. Every item is exactly `{\"index\": <existing section index>, "
+        "\"append_voiceover\": <new Vietnamese text>}`. Do not change title, metadata, hook, "
+        "source trace, section order, or the first situation/core_answer sections. Select only evidence "
+        "or application sections that already exist, and add specific topic-relevant explanation, example, "
+        "or action. The combined appended text must be at least "
+        f"{missing_chars:,} characters. Do not add greetings, duplicated CTA, generic self-help, or unsupported claims.\n\n"
+        f"Script context:\n{json.dumps(context, ensure_ascii=False, indent=2)}"
+    )
+
+
+def repair_prompt(
+    payload: dict,
+    qa_output: dict | None,
+    validation_error: str | None,
+    recovery_directive: str = "",
+) -> str:
     """Prompt yêu cầu LLM sửa script JSON không qua validation/QA."""
     issues = {
         "validation_error": validation_error,
         "qa": qa_output or {},
     }
+    is_financial_psychology = (
+        payload.get("editorial_profile") == PERSONAL_FINANCE_PSYCHOLOGY_PROFILE
+        or isinstance(payload.get("evidence_register"), list)
+        or "financial script" in (validation_error or "").casefold()
+    )
+    financial_repair_contract = (
+        "Preserve editorial_profile=personal_finance_psychology exactly. Preserve the complete "
+        "evidence_register and every source URL unless a source itself is invalid; do not replace "
+        "a cited claim with an uncited claim. Keep compliance.accuracy explicitly confirming that "
+        "the evidence_register covers every factual financial, psychological, or research claim. "
+        "Remove any wording that predicts the same financial behaviour or outcome for all people; "
+        "state the research scope and its limits instead.\n"
+        if is_financial_psychology
+        else ""
+    )
+    financial_schema = "editorial_profile, evidence_register, " if is_financial_psychology else ""
     return (
         "Repair this Vietnamese YouTube script JSON for the local-first pipeline.\n"
         "Return ONLY the full corrected JSON object. Do not add markdown.\n"
         "Preserve the topic and core story unless a listed violation requires a narrow fix.\n"
+        "If Current JSON already has a strategy object, preserve it. For a strategy-v1 Short, keep "
+        "format_id, core_mechanism, audience_problem, angle, long_form_slug, playlist, cta_target, "
+        "source_long_slug, source_section_index, source_excerpt, and hook; retain a situation section followed by a core_answer section whose narration STARTS with "
+        "the exact hook.core_answer before hook.answer_by_sec seconds.\n"
+        f"{financial_repair_contract}"
         f"For Shorts without target_minutes, total narration MUST be {SHORT_MIN_CHARS}-{SHORT_MAX_CHARS} "
         "Vietnamese characters for 1.0-1.5 minutes. Do not overshoot. Do not add greetings. "
         f"For Longs, target_minutes MUST be EXACTLY {LONG_MIN_MINUTES} and total narration MUST be "
-        f"{LONG_SAFE_MIN_CHARS}-{LONG_SAFE_MAX_CHARS} Vietnamese characters (~13-14.5 minutes); measured "
-        f"minutes = total_chars / {CHARS_PER_MIN:.0f} must be >= target_minutes and <= {LONG_MAX_MINUTES}. "
+        f"{LONG_SAFE_MIN_CHARS}-{LONG_SAFE_MAX_CHARS} Vietnamese characters (~12.25-14.5 minutes); measured "
+        f"minutes = total_chars / {PLANNING_CHARS_PER_MIN:.0f} must be >= target_minutes and <= {LONG_MAX_MINUTES}. "
         "When the narration uses 'cơ chế', follow it only with the one mechanism's own name; never pair "
         "'cơ chế' with varying generic words (duy nhất, này, đó, tâm lý) or QA rejects it as competing mechanisms. "
         "If the script is too short, retain every valid existing narration section and add the missing specific "
@@ -255,12 +423,15 @@ def repair_prompt(payload: dict, qa_output: dict | None, validation_error: str |
         "punchline, and gag narration if present. Keep a concrete "
         "everyday example, mechanism, application step, and real-stock-footage Pexels queries.\n"
         "If review reports a missing example, repair the narration with a specific everyday context, observable action, consequence, and practical application in natural Vietnamese. Do not add fixed labels merely to satisfy a parser.\n"
+        "For both Shorts and Longs, retain or add at most one value-first retention beat only where it follows a concrete insight: acknowledge the topic-specific value just delivered, then make a brief natural invitation to like or follow/subscribe. Do not use a fixed sentence, repeat it across sections, or place it before the hook.\n"
+        "Rewrite the first narration section whenever the QA issues include rule 'hook': for a Long, keep the required greeting but make the first 28 spoken words after it contain a concrete question or one explicit tension marker (nhưng, thật ra, đừng, không phải, vì sao, sai lầm). Do not merely add a marker later in the section.\n"
         "Required schema: slug, topic, title, description, tags, video_type, target_minutes, voice_profile, "
-        "sections, compliance. video_type is only short or long. \"target_minutes\" is required for a Long "
+        f"{financial_schema}strategy, sections, compliance. video_type is only short or long. \"target_minutes\" is required for a Long "
         f"and must be the JSON number {LONG_MIN_MINUTES}; omit it for a Short. voice_profile is knowledge "
         "or inspiring. Each section needs time_goal as a positive JSON number of minutes (never 0/null/string/timestamp/range; examples 0.5, 0.75, 1.0), voiceover, visual_intent, pexels_query, "
-        "caption, hook, transition, payoff, emphasis. Use these canonical fields only. "
+        "caption, hook, transition, payoff, emphasis, purpose. Use these canonical fields only. "
         "compliance.passed must be true.\n\n"
+        f"Recovery directive:\n{recovery_directive or 'Apply the listed validation and QA fixes.'}\n\n"
         f"Issues:\n{json.dumps(issues, ensure_ascii=False, indent=2)}\n\n"
         f"Current JSON:\n{json.dumps(payload, ensure_ascii=False, indent=2)}"
     )
