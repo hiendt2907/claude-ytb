@@ -11,20 +11,71 @@ import json
 import re
 from copy import deepcopy
 from pathlib import Path
+from urllib.parse import urlparse
 
 from ..agents.base import AgentStatus
 from ..agents.qa_agent import QAAgent
 from ..ideation.generator import load_script
+from ..ideation.script_contract import validate_script_payload
 from .state_io import atomic_write_json
+from .ideation_error_engine import record_ideation_failure
 from .ideation_prompts import (
     SCRIPT_GENERATION_SYSTEM_PROMPT,
+    LONG_SAFE_MIN_CHARS,
     LONG_SAFE_MAX_CHARS,
     SHORT_MAX_CHARS,
     SHORT_MIN_CHARS,
+    SHORT_SAFE_MIN_CHARS,
     SHORT_TARGET_CHARS,
     ledger_topics,
-    repair_prompt,
+    long_extension_prompt,
+    short_expansion_prompt,
+    PERSONAL_FINANCE_PSYCHOLOGY_PROFILE,
 )
+
+
+class IdeationQualityFailure(RuntimeError):
+    """A rejected candidate that a batch may replace without stopping all work."""
+
+    def __init__(self, message: str, payload: dict) -> None:
+        super().__init__(message)
+        self.payload = payload
+
+
+_EVIDENCE_SOURCE_TYPES = {"primary", "peer_reviewed", "official"}
+_EVIDENCE_FIELDS = ("claim", "source_title", "publisher", "published_year", "url", "source_type")
+
+
+def validate_financial_evidence_register(payload: dict, *, required: bool) -> None:
+    """Fail closed when a financial-psychology script lacks auditable evidence."""
+    if not required:
+        return
+    if payload.get("editorial_profile") != PERSONAL_FINANCE_PSYCHOLOGY_PROFILE:
+        raise ValueError("Financial script phải khai editorial_profile=personal_finance_psychology.")
+    register = payload.get("evidence_register")
+    if not isinstance(register, list) or not register:
+        raise ValueError("Financial script cần evidence_register không rỗng cho mọi claim kiểm chứng.")
+    accuracy = str((payload.get("compliance") or {}).get("accuracy", "")).casefold()
+    if "evidence_register" not in accuracy:
+        raise ValueError("compliance.accuracy phải xác nhận evidence_register bao phủ các factual claim.")
+    for index, source in enumerate(register, start=1):
+        if not isinstance(source, dict):
+            raise ValueError(f"evidence_register[{index}] phải là object.")
+        missing = [field for field in _EVIDENCE_FIELDS if not str(source.get(field, "")).strip()]
+        if missing:
+            raise ValueError(f"evidence_register[{index}] thiếu: {', '.join(missing)}.")
+        url = str(source["url"]).strip()
+        parsed = urlparse(url)
+        if parsed.scheme != "https" or not parsed.netloc:
+            raise ValueError(f"evidence_register[{index}].url phải là URL HTTPS trực tiếp.")
+        if str(source["source_type"]).strip() not in _EVIDENCE_SOURCE_TYPES:
+            raise ValueError(f"evidence_register[{index}].source_type không hợp lệ.")
+        try:
+            published_year = int(str(source["published_year"]).strip())
+        except ValueError as exc:
+            raise ValueError(f"evidence_register[{index}].published_year phải là năm.") from exc
+        if not 1900 <= published_year <= 2100:
+            raise ValueError(f"evidence_register[{index}].published_year ngoài khoảng hợp lệ.")
 
 
 def json_from_llm(text: str) -> dict:
@@ -116,6 +167,92 @@ def validate_expected_video_type(
         raise ValueError(f"Kịch bản {script_name}: expected short must not declare target_minutes.")
 
 
+def validate_short_strategy_v1(payload: dict, *, source_long_context: dict | None = None) -> None:
+    """Reject a new Short that would silently fall back to the legacy contract."""
+    strategy = payload.get("strategy")
+    if not isinstance(strategy, dict):
+        raise ValueError("Short strategy-v1 bắt buộc phải có object strategy.")
+    required = (
+        "format_id", "core_mechanism", "audience_problem", "angle",
+        "long_form_slug", "playlist", "cta_target",
+    )
+    missing = [field for field in required if not str(strategy.get(field, "")).strip()]
+    hook = strategy.get("hook")
+    if not isinstance(hook, dict):
+        missing.append("hook")
+        hook = {}
+    missing.extend(
+        f"hook.{field}"
+        for field in ("situation", "core_answer", "open_loop")
+        if not str(hook.get(field, "")).strip()
+    )
+    try:
+        answer_by_sec = float(hook.get("answer_by_sec", 0))
+    except (TypeError, ValueError):
+        answer_by_sec = 0
+    if not 0 < answer_by_sec <= 5:
+        missing.append("hook.answer_by_sec<=5")
+    if source_long_context is not None:
+        required_source_fields = ("source_long_slug", "source_section_index", "source_excerpt")
+        missing.extend(
+            field for field in required_source_fields if not str(strategy.get(field, "")).strip()
+        )
+        candidates = source_long_context.get("candidates", [])
+        selected = next(
+            (
+                candidate for candidate in candidates
+                if candidate.get("section_index") == strategy.get("source_section_index")
+                and candidate.get("excerpt") == strategy.get("source_excerpt")
+            ),
+            None,
+        )
+        if strategy.get("source_long_slug") != source_long_context.get("slug"):
+            missing.append("source_long_slug")
+        if selected is None:
+            missing.append("source_excerpt")
+        source_urls = {
+            str(row.get("url", "")).strip()
+            for row in source_long_context.get("evidence_register", [])
+            if isinstance(row, dict) and str(row.get("url", "")).strip()
+        }
+        if source_urls:
+            short_urls = {
+                str(row.get("url", "")).strip()
+                for row in payload.get("evidence_register", [])
+                if isinstance(row, dict) and str(row.get("url", "")).strip()
+            }
+            if not source_urls.intersection(short_urls):
+                missing.append("evidence_register source URL")
+    ordered_sections = [
+        section for section in payload.get("sections", []) or [] if isinstance(section, dict)
+    ]
+    purposes = {str(section.get("purpose", "")).strip() for section in ordered_sections}
+    for purpose in ("situation", "core_answer"):
+        if purpose not in purposes:
+            missing.append(f"section.purpose={purpose}")
+    if len(ordered_sections) >= 2 and purposes.issuperset({"situation", "core_answer"}):
+        first_purpose = str(ordered_sections[0].get("purpose", "")).strip()
+        second_purpose = str(ordered_sections[1].get("purpose", "")).strip()
+        if (first_purpose, second_purpose) != ("situation", "core_answer"):
+            missing.append("core_answer immediately after situation")
+        else:
+            situation = str(
+                ordered_sections[0].get("voiceover") or ordered_sections[0].get("narration") or ""
+            )
+            if len(situation) > 120:
+                missing.append("situation.voiceover<=120 characters")
+            if not re.search(r"\b(nhưng|thật ra|đừng|không phải|vì sao)\b", situation, re.IGNORECASE):
+                missing.append("situation needs a concrete tension marker")
+            core_answer = str(hook.get("core_answer", "")).strip()
+            core_voiceover = str(
+                ordered_sections[1].get("voiceover") or ordered_sections[1].get("narration") or ""
+            ).strip()
+            if core_answer and not core_voiceover.startswith(core_answer):
+                missing.append("core_answer must start the core_answer voiceover")
+    if missing:
+        raise ValueError("Short strategy-v1 thiếu/không hợp lệ: " + ", ".join(missing))
+
+
 def normalize_short_narration(
     payload: dict, expected_video_type: str | None = None
 ) -> tuple[dict, str | None]:
@@ -194,24 +331,88 @@ def normalize_long_overflow(payload: dict, expected_video_type: str | None = Non
     return payload, f"trimmed long narration to {short_narration_chars(payload)} chars"
 
 
+def append_long_extension(payload: dict, extension: dict) -> dict:
+    """Insert new long-form sections before the existing conclusion without mutation."""
+    sections = extension.get("sections")
+    if not isinstance(sections, list) or not sections or not all(isinstance(item, dict) for item in sections):
+        raise ValueError("Long extension phải trả về một mảng sections không rỗng.")
+    current_sections = payload.get("sections")
+    if not isinstance(current_sections, list) or len(current_sections) < 2:
+        raise ValueError("Long cần ít nhất phần mở đầu và phần kết trước khi bổ sung.")
+    enriched = deepcopy(payload)
+    enriched["sections"] = [*current_sections[:-1], *sections, current_sections[-1]]
+    return enriched
+
+
+def apply_short_expansion(payload: dict, delta: dict) -> dict:
+    """Apply an LLM's bounded additions without allowing a full script rewrite."""
+    updates = delta.get("section_updates")
+    if not isinstance(updates, list) or not updates:
+        raise ValueError("Short expansion phải trả về section_updates không rỗng.")
+    current_sections = payload.get("sections")
+    if not isinstance(current_sections, list):
+        raise ValueError("Short hiện tại phải có mảng sections trước khi bổ sung.")
+
+    enriched = deepcopy(payload)
+    seen: set[int] = set()
+    for update in updates:
+        if not isinstance(update, dict):
+            raise ValueError("Mỗi short section_update phải là object.")
+        index = update.get("index")
+        addition = str(update.get("append_voiceover", "")).strip()
+        if not isinstance(index, int) or isinstance(index, bool) or index in seen:
+            raise ValueError("short section_update.index phải là số nguyên không trùng.")
+        if index < 2 or index >= len(current_sections) - 1:
+            raise ValueError("Short chỉ được bổ sung section giữa, không sửa hook/CTA.")
+        if not addition:
+            raise ValueError("short section_update.append_voiceover không được rỗng.")
+        section = enriched["sections"][index]
+        if not isinstance(section, dict):
+            raise ValueError("Short section cần bổ sung phải là object.")
+        existing = str(section.get("voiceover") or section.get("narration") or "").strip()
+        if not existing:
+            raise ValueError("Short section cần bổ sung phải có narration gốc.")
+        combined = f"{existing} {addition}".strip()
+        if "voiceover" in section:
+            section["voiceover"] = combined
+        if "narration" in section:
+            section["narration"] = combined
+        if "voiceover" not in section and "narration" not in section:
+            section["voiceover"] = combined
+        seen.add(index)
+    return enriched
+
+
 async def validate_or_repair_script(
     provider,
     payload: dict,
     script_path: Path,
     ledger_text: str,
-    max_attempts: int = 3,
+    max_attempts: int = 2,
     log_path: Path | None = None,
     console_prefix: str = "",
     strict: bool = True,
     semantic_history: list[str] | None = None,
     expected_video_type: str | None = None,
+    requires_financial_evidence: bool = False,
+    source_long_context: dict | None = None,
 ) -> dict:
-    """Write, validate, QA, and repair a local LLM script JSON with bounded retries."""
+    """Write, validate, QA, and make at most one bounded content delta.
+
+    Deterministic schema and formatting defects are normalized locally.  The
+    only LLM follow-ups permitted here are a Long section insertion for missing
+    runtime or a Short middle-section expansion for missing runtime.  Any other
+    failure is retained for review rather than asking a model to rewrite a
+    script it did not need to touch.
+    """
     qa = QAAgent()
     done_topics = ledger_topics(ledger_text) + list(semantic_history or [])
     current = dict(payload)
     last_validation_error: str | None = None
     last_qa_output: dict | None = None
+    long_extension_attempted = False
+    short_expansion_attempted = False
+    report_path = script_path.parent.parent / "assets" / "quality_reports" / "ideation_errors.jsonl"
 
     for attempt in range(1, max_attempts + 1):
         current, long_note = normalize_long_overflow(current, expected_video_type)
@@ -233,20 +434,93 @@ async def validate_or_repair_script(
                 json.dumps(current, ensure_ascii=False, indent=2),
             )
         try:
+            contract_result = validate_script_payload(current)
+            if not contract_result.publishable:
+                findings = "; ".join(
+                    f"{finding.path}: {finding.message}"
+                    for finding in contract_result.findings
+                )
+                raise ValueError(f"Script contract không đạt: {findings}")
             if expected_video_type is not None:
                 validate_expected_video_type(
                     current,
                     expected_video_type=expected_video_type,
                     script_name=script_path.name,
                 )
+            if expected_video_type == "short":
+                validate_short_strategy_v1(current, source_long_context=source_long_context)
+            validate_financial_evidence_register(
+                current, required=requires_financial_evidence
+            )
             script_path.write_text(json.dumps(current, ensure_ascii=False, indent=2), encoding="utf-8")
             script = load_script(script_path)
             last_validation_error = None
         except Exception as exc:  # noqa: BLE001
             script = None
             last_validation_error = str(exc)
+            record_ideation_failure(
+                report_path,
+                script_name=script_path.name,
+                attempt=attempt,
+                validation_error=last_validation_error,
+                qa=None,
+            )
             if log_path:
                 append_local_start_log(log_path, f"VALIDATION_ERROR {attempt}", last_validation_error)
+
+        if (
+            script is None
+            and expected_video_type == "long"
+            and max_attempts > 1
+            and not long_extension_attempted
+            and last_validation_error
+            and "nội dung quá mỏng" in last_validation_error
+        ):
+            missing_chars = max(1, LONG_SAFE_MIN_CHARS - short_narration_chars(current))
+            extension_request = long_extension_prompt(current, missing_chars)
+            if console_prefix:
+                print(f"{console_prefix} extend: asking LLM for missing long-form sections", flush=True)
+            if log_path:
+                append_local_start_log(log_path, "LONG_EXTENSION_PROMPT", extension_request)
+            extension_text = await provider.complete(
+                extension_request,
+                system=SCRIPT_GENERATION_SYSTEM_PROMPT,
+                max_tokens=8192,
+                temperature=0.2,
+                json_output=True,
+            )
+            if log_path:
+                append_local_start_log(log_path, "LONG_EXTENSION_RESPONSE", extension_text)
+            current = append_long_extension(current, json_from_llm(extension_text))
+            long_extension_attempted = True
+            continue
+
+        if (
+            script is None
+            and expected_video_type == "short"
+            and max_attempts > 1
+            and not short_expansion_attempted
+            and last_validation_error
+            and "quá ngắn" in last_validation_error
+        ):
+            missing_chars = max(1, SHORT_SAFE_MIN_CHARS - short_narration_chars(current))
+            expansion_request = short_expansion_prompt(current, missing_chars)
+            if console_prefix:
+                print(f"{console_prefix} extend: asking LLM for bounded Short additions", flush=True)
+            if log_path:
+                append_local_start_log(log_path, "SHORT_EXPANSION_PROMPT", expansion_request)
+            expansion_text = await provider.complete(
+                expansion_request,
+                system=SCRIPT_GENERATION_SYSTEM_PROMPT,
+                max_tokens=2048,
+                temperature=0.2,
+                json_output=True,
+            )
+            if log_path:
+                append_local_start_log(log_path, "SHORT_EXPANSION_RESPONSE", expansion_text)
+            current = apply_short_expansion(current, json_from_llm(expansion_text))
+            short_expansion_attempted = True
+            continue
 
         if script is not None:
             result = await qa.run({"script": script, "done_topics": done_topics, "strict": strict})
@@ -260,6 +534,13 @@ async def validate_or_repair_script(
                     )
                 if result.output and result.output.get("passed"):
                     return current
+                record_ideation_failure(
+                    report_path,
+                    script_name=script_path.name,
+                    attempt=attempt,
+                    validation_error=None,
+                    qa=last_qa_output,
+                )
             else:
                 last_qa_output = {"passed": False, "violations": [{"rule": "qa_agent", "detail": result.error}]}
                 if log_path:
@@ -269,25 +550,14 @@ async def validate_or_repair_script(
                         json.dumps(last_qa_output, ensure_ascii=False, indent=2),
                     )
 
-        if attempt == max_attempts:
+        if attempt == max_attempts or (
+            (long_extension_attempted or short_expansion_attempted) and script is None
+        ):
             break
-
-        if console_prefix:
-            print(f"{console_prefix} repair: asking LLM to fix validation issues", flush=True)
-        repair = repair_prompt(current, last_qa_output, last_validation_error)
-        if log_path:
-            append_local_start_log(log_path, f"REPAIR_PROMPT {attempt}", repair)
-        repaired = await provider.complete(
-            repair,
-            system=SCRIPT_GENERATION_SYSTEM_PROMPT,
-            max_tokens=8192,
-            temperature=0.2,
-            json_output=True,
-        )
-        if log_path:
-            append_local_start_log(log_path, f"REPAIR_RESPONSE {attempt}", repaired)
-        current = json_from_llm(repaired)
-        current["slug"] = script_path.stem
+        # Fail closed.  A broad "repair the full JSON" prompt is deliberately
+        # forbidden: it spends cloud tokens and can regress already-approved
+        # narrative, source trace, or funnel metadata.
+        break
 
     if log_path:
         append_local_start_log(
@@ -303,7 +573,8 @@ async def validate_or_repair_script(
         "qa": last_qa_output,
     }
     atomic_write_json(script_path, current)
-    raise SystemExit(
+    raise IdeationQualityFailure(
         "✗ LLM tạo script không qua QA sau "
-        f"{max_attempts} lần. validation={last_validation_error!r} qa={last_qa_output!r}"
+        f"{max_attempts} lần. validation={last_validation_error!r} qa={last_qa_output!r}",
+        current,
     )
