@@ -52,8 +52,14 @@ def render_video(voiceover: Voiceover) -> RenderedVideo:
     _concat_clips(clips, video_path)
 
     thumb = OUTPUT_DIR / f"{slug}_thumb.jpg"
-    _caption_image(voiceover.title, index=0, total=1, thumbnail=True,
-                   danger=True).convert("RGB").save(thumb, quality=90)
+    _caption_image(
+        _thumbnail_text(voiceover),
+        index=0,
+        total=1,
+        thumbnail=True,
+        danger=True,
+        thumbnail_context=_thumbnail_context(voiceover),
+    ).convert("RGB").save(thumb, quality=90)
 
     return replace(
         RenderedVideo(**vars(voiceover)),
@@ -113,8 +119,22 @@ def _background_image(index: int, total: int, prompt: str = "") -> Image.Image:
         return Image.open(out_path).convert("RGB")
 
 
+def _thumbnail_text(voiceover: Voiceover) -> str:
+    """Use the editorial headline while preserving legacy title thumbnails."""
+    brief = voiceover.thumbnail_brief
+    return brief.headline if brief is not None else voiceover.title
+
+
+def _thumbnail_context(voiceover: Voiceover) -> str:
+    """Small visual direction rendered under a structured thumbnail headline."""
+    brief = voiceover.thumbnail_brief
+    if brief is None:
+        return ""
+    return f"{brief.subject} — {brief.emotion}\n{brief.visual_contradiction}"
+
+
 def _caption_image(text: str, index: int, total: int, thumbnail: bool = False,
-                   danger: bool = False) -> Image.Image:
+                   danger: bool = False, thumbnail_context: str = "") -> Image.Image:
     img = _gradient()
     draw = ImageDraw.Draw(img)
     font = _font(96 if not thumbnail else 104)
@@ -127,6 +147,14 @@ def _caption_image(text: str, index: int, total: int, thumbnail: bool = False,
         draw.text((W / 2, y + line_h / 2), line, font=font,
                   fill=DANGER if danger else FG, anchor="mm")
         y += line_h
+    if thumbnail and thumbnail_context:
+        context_font = _font(42)
+        context_lines = _wrap(draw, thumbnail_context, context_font, max_width=W - 180)
+        context_y = min(H - 110, y + 120)
+        for line in context_lines:
+            draw.text((W / 2, context_y), line, font=context_font,
+                      fill=FG, anchor="mm")
+            context_y += context_font.getbbox("Ag")[3] + 12
     return img
 
 

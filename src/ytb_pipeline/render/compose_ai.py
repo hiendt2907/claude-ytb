@@ -24,6 +24,7 @@ from ..pkg.models import RenderedVideo, Voiceover
 from . import compose as slide
 from . import stock
 from . import transitions
+from .hook_sequence import validate_visual_hook
 from .validation import validate_render
 
 OUTPUT_DIR = Path("assets/output")
@@ -84,6 +85,7 @@ def _dims() -> tuple[int, int, bool]:
 
 def render_video_ai(voiceover: Voiceover) -> RenderedVideo:
     """Ghép từng segment (B-roll nền + overlay + audio) thành .mp4, sinh thumbnail."""
+    validate_visual_hook(voiceover)
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     slug = slide._slug(voiceover)
     # Mỗi video có workspace riêng. Publish/backup của một worker có thể dọn
@@ -116,20 +118,20 @@ def render_video_ai(voiceover: Voiceover) -> RenderedVideo:
         clips.append(clip)
         whoosh_before.append(seg.transition)
 
-    # Cold-open hook: dồn các cảnh hành động (seg.hook) lên đầu video.
-    cold = _hook_coldopen(voiceover, dims=(w, h), landscape=landscape,
-                          work=work, slug=f"{slug}_{visual_suffix}", used=used_broll)
-    if cold is not None:
-        clips.insert(0, cold)
-        whoosh_before.insert(0, False)
-        whoosh_before[1] = False  # cold-open -> câu chuyện: đã là cú cắt, không whoosh
+    # The viewer-facing hook must begin with the voiced first segment.  A silent
+    # montage before it would shift a Short's measured core-answer onset beyond
+    # its tested 5-second contract.
 
     video_path = OUTPUT_DIR / f"{slug}.mp4"
     transitions.concat_with_transitions(clips, whoosh_before, video_path)
     expected_duration = _timeline_duration(clips)
 
     thumb = OUTPUT_DIR / f"{slug}_thumb.jpg"
-    _thumbnail(voiceover.title, dims=(w, h)).convert("RGB").save(thumb, quality=90)
+    _thumbnail(
+        _thumbnail_text(voiceover),
+        dims=(w, h),
+        context=_thumbnail_context(voiceover),
+    ).convert("RGB").save(thumb, quality=90)
 
     rendered = replace(
         RenderedVideo(**vars(voiceover)),
@@ -495,11 +497,28 @@ def _text_overlay(text: str, full_caption: str, dims: tuple[int, int],
     return img
 
 
-def _thumbnail(title: str, dims: tuple[int, int]) -> Image.Image:
+def _thumbnail_text(voiceover: Voiceover) -> str:
+    """Keep AI renderer text selection identical to the slide renderer."""
+    return slide._thumbnail_text(voiceover)
+
+
+def _thumbnail_context(voiceover: Voiceover) -> str:
+    """Expose the brief's visual direction on the rendered thumbnail."""
+    return slide._thumbnail_context(voiceover)
+
+
+def _thumbnail(title: str, dims: tuple[int, int], *, context: str = "") -> Image.Image:
     """Thumbnail: dọc dùng helper compose; ngang vẽ gradient + tiêu đề căn giữa."""
     w, h = dims
     if h >= w:
-        return slide._caption_image(title, index=0, total=1, thumbnail=True, danger=True)
+        return slide._caption_image(
+            title,
+            index=0,
+            total=1,
+            thumbnail=True,
+            danger=True,
+            thumbnail_context=context,
+        )
 
     img = Image.new("RGB", (w, h), slide.BG_TOP)
     px = img.load()
@@ -517,6 +536,13 @@ def _thumbnail(title: str, dims: tuple[int, int]) -> Image.Image:
     for line in lines:
         draw.text((w / 2, y + line_h / 2), line, font=font, fill=slide.DANGER, anchor="mm")
         y += line_h
+    if context:
+        context_font = slide._font(48)
+        context_lines = slide._wrap(draw, context, context_font, max_width=w - 280)
+        context_y = min(h - 100, y + 90)
+        for line in context_lines:
+            draw.text((w / 2, context_y), line, font=context_font, fill=slide.FG, anchor="mm")
+            context_y += context_font.getbbox("Ag")[3] + 14
     return img
 
 
