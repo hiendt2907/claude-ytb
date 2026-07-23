@@ -70,8 +70,9 @@ def _script() -> Script:
     # QAAgent's always-on checks (compliance + length) run even with
     # strict=False, so this fixture needs a passing ComplianceCheck and
     # enough narration to clear content_contract's Short audio-runtime
-    # floor (~60s, ~2000 chars at the default f5 chars/minute rate).
-    filler = "Sự mơ hồ của bước đầu khiến ta ngần ngại bắt tay vào việc. " * 12
+    # floor without exceeding its ceiling (~60-90s at the calibrated f5
+    # chars/minute rate, content_contract.py::F5_CHARS_PER_MIN).
+    filler = "Sự mơ hồ của bước đầu khiến ta ngần ngại bắt tay vào việc. " * 8
     return Script(
         topic="Trì hoãn",
         title="Não né việc khó",
@@ -294,7 +295,7 @@ def test_strict_post_render_qa_failure_preserves_render_checkpoint(monkeypatch, 
     # blank for the other, non-publish tests in this file, so this test
     # supplies its own strict-QA-compliant Script/metadata instead of
     # mutating the shared fixture).
-    filler = "Một bước nhỏ mỗi ngày giúp giảm sự mơ hồ khi bắt đầu. " * 12
+    filler = "Một bước nhỏ mỗi ngày giúp giảm sự mơ hồ khi bắt đầu. " * 8
     strict_script = Script(
         topic="Trì hoãn",
         title="Não né việc khó",

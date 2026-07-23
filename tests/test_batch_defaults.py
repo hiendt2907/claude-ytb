@@ -11,7 +11,7 @@ def _health_script() -> SimpleNamespace:
     narration = (
         "Bạn đi bộ sau bữa ăn và thấy cơ thể nhẹ hơn. Cơ chế nằm ở việc vận động nhẹ "
         "giúp cơ thể xử lý năng lượng ổn định hơn trong đời sống hàng ngày. "
-    ) * 20
+    ) * 15
     return SimpleNamespace(
         slug="di-bo-sau-bua-an",
         topic="thói quen đi bộ sau bữa ăn",
@@ -253,7 +253,7 @@ def test_short_prompt_uses_a_safe_length_buffer_and_immediate_answer_contract():
         }
     )
 
-    assert "2,200-2,800" in prompt
+    assert "1,760-2,240" in prompt
     assert "120 characters" in prompt
     assert "concrete tension marker" in prompt
     assert "exactly six sections" in prompt

@@ -6,7 +6,7 @@ import pytest
 def test_loader_hydrates_optional_strategy_without_breaking_legacy_scripts(tmp_path):
     from ytb_pipeline.ideation.generator import load_script
 
-    narration = "a" * 2_400
+    narration = "a" * 2_300
     source = tmp_path / "strategy-short.json"
     source.write_text(
         """{

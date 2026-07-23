@@ -12,7 +12,14 @@ from dataclasses import dataclass
 
 
 CONTRACT_VERSION = "2026-07-23.1"
-F5_CHARS_PER_MIN = 2_000.0
+# Recalibrated 2026-07-23 từ 128 project.json đã DONE thật (audio đo bằng
+# ffprobe, không phải ước lượng): median 1557.7 ký tự/phút cho Short,
+# 1612.6 cho Long — hằng số cũ 2000 làm Script QA pass sai nhiều kịch bản mà
+# audio F5 thật lệch quá bound (vd Long 1067.2s dù ước lượng nằm trong 840s,
+# xem data/ledger.md 2026-07-22). 1600 vẫn cao hơn median Short để không siết
+# quá tay content budget, nhưng đủ thấp để safety margin trong
+# `safe_character_bounds` có tác dụng thật thay vì bị hằng số gốc nuốt mất.
+F5_CHARS_PER_MIN = 1_600.0
 EDGE_CHARS_PER_MIN = 1_197.0
 TRANSITION_OVERLAP_SEC = 0.4
 

@@ -221,7 +221,7 @@ async def test_qa_agent_rejects_long_over_fifteen_minutes():
     assert result.output["passed"] is False
     assert result.output["violations"] == [{
         "rule": "length",
-        "detail": "Long quá dài 900s: audio 906.5s.",
+        "detail": "Long quá dài 900s: audio 906.7s.",
     }]
 
 
@@ -558,13 +558,13 @@ async def test_qa_agent_accepts_stickman_visual_gag_structure():
             ),
             Segment(
                 caption="Càng rối",
-                narration=unit * 2,
+                narration=unit,
                 broll="người que vấp ngã khi cánh cửa bật ngược lại",
                 emphasis=("leo thang",),
             ),
             Segment(
                 caption="Punchline",
-                narration=unit * 2,
+                narration=unit,
                 broll="người que đứng hình khi cánh cửa khóa nó bên ngoài",
                 emphasis=("punchline",),
             ),
