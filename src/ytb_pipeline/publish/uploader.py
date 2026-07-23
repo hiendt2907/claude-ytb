@@ -16,6 +16,12 @@ Hashtag + khai báo AI:
   - Luôn set status.containsSyntheticMedia = settings.youtube_contains_synthetic_media
     (mặc định True) — khai báo "nội dung thay đổi/tổng hợp bởi AI", bắt buộc minh bạch
     theo chính sách YouTube từ 2024 vì kênh này 100% voice TTS + visual AI render.
+
+Comment CTA (Short -> Long funnel):
+  - Sau khi upload 1 Short có `strategy.cta_target` (slug Long đích), tự động đăng 1
+    comment dẫn về Long đó NẾU Long đã publish (dòng ledger `stage=done, status=ok`
+    có URL). YouTube Data API v3 KHÔNG có endpoint ghim comment — chỉ đăng được, việc
+    ghim vẫn phải làm tay trong Studio; log luôn nhắc rõ để không gây kỳ vọng sai.
 """
 
 import json
@@ -33,6 +39,9 @@ from .validation import validate_monetization_ready
 SHORT_MAX_SEC = 180
 HASHTAG_LIMIT = 12
 YOUTUBE_TAG_LIMIT = 30
+
+ROOT = Path(__file__).resolve().parents[3]
+LEDGER_PATH = ROOT / "data" / "ledger.md"
 
 _metadata_adapter = MetadataAdapter()
 
@@ -114,6 +123,7 @@ def publish(video: RenderedVideo, platform: str = "youtube_short") -> PublishRes
 
     _set_thumbnail(youtube, youtube_id, video)
     _add_to_playlist(youtube, youtube_id)
+    _post_cta_comment(youtube, youtube_id, video)
 
     return replace(
         PublishResult(**vars(video)),
@@ -224,6 +234,60 @@ def _add_to_playlist(youtube, youtube_id: str) -> None:  # noqa: ANN001
     ).execute()
 
 
+def _published_url_for_slug(slug: str, ledger_path: Path | None = None) -> str | None:
+    """URL youtu.be của lần publish MỚI NHẤT (`stage=done, status=ok`) cho `slug`.
+
+    None nếu slug chưa từng done/ok — Long đích có thể chưa lên lịch/chưa publish.
+    """
+    path = ledger_path if ledger_path is not None else LEDGER_PATH
+    if not path.exists():
+        return None
+    url = None
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip().startswith("|"):
+            continue
+        cols = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cols) < 6 or cols[0] in ("Ngày", "---") or cols[0].startswith("---"):
+            continue
+        if cols[1] != slug or cols[3] != "done" or cols[4] != "ok":
+            continue
+        match = re.search(r"https://youtu\.be/\S+", cols[5])
+        if match:
+            url = match.group(0)
+    return url
+
+
+def _post_cta_comment(youtube, youtube_id: str, video: RenderedVideo) -> None:  # noqa: ANN001
+    """Đăng comment dẫn về Long-form funnel đích của Short (nếu có + đã publish).
+
+    Chỉ đăng comment — YouTube Data API v3 không có endpoint ghim comment, nên
+    KHÔNG được hứa hẹn tự động ghim. Lỗi ở đây không chặn publish đã thành công.
+    """
+    target_slug = str(getattr(video.strategy, "cta_target", "") or "").strip()
+    if not target_slug:
+        return
+    target_url = _published_url_for_slug(target_slug)
+    if not target_url:
+        print(f"  ⚠ Chưa đăng comment CTA: Long đích '{target_slug}' chưa publish (chưa có trong ledger).")
+        return
+    try:
+        youtube.commentThreads().insert(
+            part="snippet",
+            body={
+                "snippet": {
+                    "videoId": youtube_id,
+                    "topLevelComment": {
+                        "snippet": {"textOriginal": f"Xem phân tích đầy đủ ở video này: {target_url}"},
+                    },
+                },
+            },
+        ).execute()
+        print(f"  ✓ Đã tự động đăng comment dẫn Long-form: {target_url}")
+        print("  [Action Required] Đã tự động đăng comment. Sếp nhớ mở Studio ghim tay nhé!")
+    except Exception as exc:  # noqa: BLE001
+        print(f"  ⚠ Không đăng được comment CTA (không chặn publish): {exc}")
+
+
 def _dry_run(video: RenderedVideo) -> PublishResult:
     is_short = _is_short(video)
     print("── DRY RUN — không upload thật ──")
@@ -235,4 +299,12 @@ def _dry_run(video: RenderedVideo) -> PublishResult:
     print(f"  Video : {video.video_path}")
     print(f"  Thumb : {video.thumbnail_path}")
     print(f"  Privacy: {settings.youtube_privacy}  |  Thời lượng: {video.duration_sec:.1f}s")
+    target_slug = str(getattr(video.strategy, "cta_target", "") or "").strip()
+    if target_slug:
+        target_url = _published_url_for_slug(target_slug)
+        print(
+            f"  Comment CTA: sẽ đăng dẫn tới '{target_slug}' -> {target_url}"
+            if target_url else
+            f"  Comment CTA: bỏ qua — Long đích '{target_slug}' chưa publish"
+        )
     return replace(PublishResult(**vars(video)), uploaded=False, url=None)
