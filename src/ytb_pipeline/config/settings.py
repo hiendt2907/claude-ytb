@@ -1,8 +1,9 @@
 """Cấu hình tập trung, nạp từ env vars. Validate tại startup (fail fast)."""
 
 from pathlib import Path
+from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -83,6 +84,15 @@ class Settings(BaseSettings):
     # Checkpoint DAG: mỗi video 1 file <projects_dir>/<slug>/project.json —
     # resume skip node đã DONE (xem project/workflow.py).
     projects_dir: Path = Field(default=Path("assets/projects"))
+    # Local-only post-TTS and post-render evidence.  ``report`` is deliberately
+    # the default while the existing production batch is audited; ``strict``
+    # only stops a failed audio gate before expensive rendering begins.
+    quality_gate_mode: Literal["off", "report", "strict"] = "report"
+    quality_reports_dir: Path = Field(default=Path("assets/quality_reports"))
+    # Optional local Faster-Whisper model directory for post-TTS transcript QA.
+    # Empty keeps STT disabled; the pipeline never accepts a remote model name/URL
+    # and never downloads a model on behalf of the operator.
+    quality_stt_model_path: Path | None = None
 
     # Drive — sau khi upload YouTube THẬT, MOVE video lên Drive rồi xoá file local
     # (chỉ giữ trên máy tới khi upload xong). Cần token có scope drive.file.
@@ -123,6 +133,14 @@ class Settings(BaseSettings):
     # Render vẫn dùng Pexels footage thật; không quay lại Pillow image-motion.
     local_mode: bool = False
     allow_cloud_providers: bool = False
+
+    @field_validator("quality_stt_model_path", mode="before")
+    @classmethod
+    def _blank_stt_model_path_is_disabled(cls, value: object) -> object:
+        """Keep an empty env var opt-in rather than resolving it to ``Path('.')``."""
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
     def model_post_init(self, __context) -> None:  # noqa: ANN001
         """Make local-first the default even when legacy .env still names cloud providers.

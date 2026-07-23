@@ -19,7 +19,7 @@ from .project.workflow import WorkflowError
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("script_source", help="Đường dẫn/slug kịch bản đã được batch start approve")
-    parser.add_argument("--through", choices=("voiceover", "publish"), default="publish")
+    parser.add_argument("--through", choices=("voiceover", "render", "publish"), default="publish")
     args = parser.parse_args()
     checkpoint = CheckpointManager(settings.projects_dir)
     project = load_or_create_project(args.script_source, checkpoint)
