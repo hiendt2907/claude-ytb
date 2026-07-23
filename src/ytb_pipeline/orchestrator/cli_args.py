@@ -104,8 +104,8 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
     )
     p_start.add_argument(
         "--llm-provider", "--llm", dest="llm_provider",
-        choices=["claude", "codex"], default=None,
-        help="LLM viết kịch bản: claude hoặc codex (mặc định theo LLM_PROVIDER).",
+        choices=["claude", "codex", "ollama"], default=None,
+        help="LLM viết kịch bản: claude, codex hoặc ollama (mặc định theo LLM_PROVIDER).",
     )
     p_start.add_argument(
         "--idea",
@@ -130,7 +130,8 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
     )
     p_start.add_argument(
         "--local", action="store_true", default=False,
-        help="Đã deprecated: luồng Ollama sinh kịch bản đã bị xoá; dùng --llm claude/codex",
+        help="Tương đương --llm ollama: sinh kịch bản bằng Qwen local qua Ollama, "
+        "fallback tự động về Claude nếu Ollama không sẵn sàng.",
     )
     p_start.add_argument(
         "--cloud", action="store_true", default=False,

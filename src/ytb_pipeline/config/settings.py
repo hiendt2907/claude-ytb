@@ -120,10 +120,12 @@ class Settings(BaseSettings):
     # Cho phép lệnh /sh chạy shell tùy ý trên máy (mạnh + nguy hiểm). Bật có chủ đích.
     listener_allow_shell: bool = True
 
-    # LLM
-    llm_provider: str = "claude"          # claude | codex | ollama
+    # LLM — Ollama/Qwen local là default cho ideation từ 2026-07-23 (amendment
+    # docs/TOOL_UPGRADE_PLAN.md), fallback tự động về Claude qua
+    # OllamaScriptProvider khi Ollama không sẵn sàng/lỗi giữa chừng.
+    llm_provider: str = "ollama"          # claude | codex | ollama
     ollama_url: str = "http://127.0.0.1:11434"
-    ollama_model: str = "qwen3:8b"
+    ollama_model: str = "qwen3.6:27b"
     ollama_coder_model: str = "qwen2.5-coder:7b"
 
     # Video generation

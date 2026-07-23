@@ -158,12 +158,15 @@ def _valid_short_script() -> dict:
 
 
 def test_settings_default_to_local_first_stack():
-    # llm_provider/tts_provider giờ chọn tường minh qua .env (claude+edge —
-    # xem CLAUDE.md amendment 2026-07-06); chỉ image/video còn cố định local-first.
+    # llm_provider mặc định "ollama" từ 2026-07-23 (docs/TOOL_UPGRADE_PLAN.md
+    # amendment) — Ollama/Qwen local là default, fallback Claude qua
+    # OllamaScriptProvider. tts_provider vẫn chọn tường minh qua .env (claude
+    # CLI trước đó + edge — xem CLAUDE.md amendment 2026-07-06); image/video
+    # còn cố định local-first.
     assert settings.image_provider == "pillow"
     assert settings.video_provider == "pexels"
     assert settings.broll_strategy == "pexels"
-    assert settings.llm_provider == "claude"
+    assert settings.llm_provider == "ollama"
 
 
 def test_ai_render_provider_requires_pexels_for_real_footage(monkeypatch):
@@ -236,7 +239,7 @@ def test_batch_start_local_uses_llm_provider_without_claude(tmp_path, monkeypatc
     monkeypatch.setattr(cli, "AUTO_STATE_PATH", auto_state)
     monkeypatch.setattr(cli, "LEDGER_PATH", ledger)
     provider = FakeLLM()
-    monkeypatch.setattr(ideation_cmd, "get_llm_provider", lambda: provider)
+    monkeypatch.setattr(ideation_cmd, "get_llm_provider", lambda *_a, **_kw: provider)
     monkeypatch.setattr(cli.subprocess, "Popen", fail_popen)
 
     args = _strategy_short_args()
@@ -283,7 +286,7 @@ def test_batch_start_local_prints_steps_and_writes_trace_log(tmp_path, monkeypat
     monkeypatch.setattr(cli, "AUTO_STATE_PATH", auto_state)
     monkeypatch.setattr(cli, "LEDGER_PATH", ledger)
     monkeypatch.setattr(ideation_cmd, "PIPELINE_LOG_DIR", log_dir)
-    monkeypatch.setattr(ideation_cmd, "get_llm_provider", lambda: FakeLLM())
+    monkeypatch.setattr(ideation_cmd, "get_llm_provider", lambda *_a, **_kw: FakeLLM())
 
     ideation_cmd.cmd_start(_strategy_short_args())
 
@@ -339,7 +342,7 @@ def test_batch_start_local_can_clear_old_ledger_for_user_idea(tmp_path, monkeypa
     monkeypatch.setattr(cli, "ROOT", tmp_path)
     monkeypatch.setattr(cli, "AUTO_STATE_PATH", auto_state)
     monkeypatch.setattr(cli, "LEDGER_PATH", ledger)
-    monkeypatch.setattr(ideation_cmd, "get_llm_provider", lambda: FakeLLM())
+    monkeypatch.setattr(ideation_cmd, "get_llm_provider", lambda *_a, **_kw: FakeLLM())
 
     ideation_cmd.cmd_start(_strategy_short_args(
         type_of_rules="cơ chế xấu hổ",
@@ -439,7 +442,7 @@ def test_batch_start_local_rejects_and_archives_a_qa_failed_candidate_fail_fast(
     monkeypatch.setattr(cli, "ROOT", tmp_path)
     monkeypatch.setattr(cli, "AUTO_STATE_PATH", auto_state)
     monkeypatch.setattr(cli, "LEDGER_PATH", ledger)
-    monkeypatch.setattr(ideation_cmd, "get_llm_provider", lambda: provider)
+    monkeypatch.setattr(ideation_cmd, "get_llm_provider", lambda *_a, **_kw: provider)
     monkeypatch.setattr(cli.subprocess, "Popen", lambda *_args, **_kwargs: pytest.fail("Claude must not run"))
 
     args = _strategy_short_args()
@@ -499,7 +502,7 @@ def test_batch_start_local_rejects_a_duplicate_second_candidate_without_overwrit
     monkeypatch.setattr(cli, "ROOT", tmp_path)
     monkeypatch.setattr(cli, "AUTO_STATE_PATH", auto_state)
     monkeypatch.setattr(cli, "LEDGER_PATH", ledger)
-    monkeypatch.setattr(ideation_cmd, "get_llm_provider", lambda: provider)
+    monkeypatch.setattr(ideation_cmd, "get_llm_provider", lambda *_a, **_kw: provider)
 
     with pytest.raises(SystemExit, match="1 candidate bị QA từ chối"):
         ideation_cmd.cmd_start(_strategy_short_args(

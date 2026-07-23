@@ -14,9 +14,19 @@ Không sửa tool chỉ để tăng số lượng video. Mỗi thay đổi phả
 
 - Đọc `data/ledger.md` và `assets/auto_state.json` trước khi tạo hoặc chạy video.
 - Không sản xuất chủ đề trùng nghĩa với bất kỳ dòng ledger nào.
-- Không gọi Ollama cho việc viết kịch bản.
-- Claude hoặc Codex là provider hợp lệ cho ideation.
-- QA phải chặn script không có ví dụ cụ thể, hành động áp dụng hoặc payoff.
+- Claude, Codex hoặc Ollama (Qwen local) là provider hợp lệ cho ideation.
+- QA phải chặn script không có ví dụ cụ thể, hành động áp dụng hoặc payoff — bắt
+  buộc như nhau bất kể provider nào sinh script (xem `_cmd_start_local`,
+  `strict_qa=True` cho mọi provider).
+- **Amendment 2026-07-23** (chủ sở hữu quyết định: User): đảo ngược invariant cũ
+  "Không gọi Ollama cho việc viết kịch bản". Lý do: Qwen3.6:27b (local, đã pull
+  qua Ollama) kết hợp lớp heal JSON quyết định (`ideation_json_heal.py`, dùng
+  `json_repair` khi `json.loads` chuẩn thất bại) đạt chất lượng đủ dùng cho
+  script generation, và local-first là nguyên tắc bất biến gốc của dự án
+  (`CLAUDE.md` §Triết lý dự án). `llm_provider` mặc định đổi từ `"claude"` sang
+  `"ollama"`; `OllamaScriptProvider` fallback tự động về Claude CLI khi Ollama
+  không sẵn sàng hoặc lỗi giữa chừng — QA gate không đổi, vẫn `strict_qa=True`
+  bất kể provider nào sinh ra script.
 - Không đưa người que hoặc legacy `image_motion` vào production.
 - Publish phải tôn trọng `DRY_RUN`, privacy và publish schedule.
 - Mọi trạng thái phải resume được sau lỗi hoặc dừng graceful.

@@ -39,6 +39,7 @@ SCRIPT_LLM_MAX_TOKENS = int(os.environ.get("IDEATION_LLM_MAX_TOKENS", "14000"))
 from ..claude_cli import build_claude_cmd
 from ..ideation.series import slugify
 from ..providers.registry import get_llm_provider
+from .ideation_local_provider import OllamaScriptProvider
 from .ideation_prompts import (
     SCRIPT_GENERATION_SYSTEM_PROMPT,
     SHORT_MAX_CHARS,
@@ -369,6 +370,8 @@ def _configured_script_provider(name: str):
         return _ClaudeStartProvider()
     if name == "codex":
         return _CodexStartProvider()
+    if name == "ollama":
+        return OllamaScriptProvider(get_llm_provider("ollama"), claude_fallback=_ClaudeStartProvider())
     return get_llm_provider(name)
 
 
@@ -584,9 +587,7 @@ def cmd_start(args: argparse.Namespace) -> None:
             raise SystemExit("✗ --clear-ledger không dùng cùng --resume; resume cần ledger cũ để tránh chạy nhầm.")
 
     if getattr(args, "local", False):
-        raise SystemExit(
-            "✗ Luồng Ollama sinh kịch bản đã bị xoá. Dùng `--llm claude` hoặc `--llm codex`."
-        )
+        setattr(args, "llm_provider", "ollama")
 
     if getattr(args, "cloud", False):
         raise SystemExit(
@@ -597,7 +598,7 @@ def cmd_start(args: argparse.Namespace) -> None:
     _validate_short_generation_request(args)
 
     requested_provider = getattr(args, "llm_provider", None)
-    if requested_provider in {"claude", "codex"}:
+    if requested_provider in {"claude", "codex", "ollama"}:
         setattr(args, "_provider", _configured_script_provider(requested_provider))
         setattr(args, "_strict_qa", True)
         asyncio.run(_cmd_start_local(args))
@@ -608,7 +609,10 @@ def cmd_start(args: argparse.Namespace) -> None:
         asyncio.run(_cmd_start_local(args))
         return
     if _cli().settings.llm_provider == "ollama":
-        raise SystemExit("✗ Chỉ hỗ trợ Claude hoặc Codex để sinh kịch bản; Ollama đã bị xoá.")
+        setattr(args, "_provider", _configured_script_provider("ollama"))
+        setattr(args, "_strict_qa", True)
+        asyncio.run(_cmd_start_local(args))
+        return
     configured_provider = get_llm_provider()
     if getattr(configured_provider, "name", "") != "claude":
         setattr(args, "_provider", configured_provider)

@@ -19,6 +19,7 @@ from ..ideation.generator import load_script
 from ..ideation.script_contract import validate_script_payload
 from .state_io import atomic_write_json
 from .ideation_error_engine import record_ideation_failure
+from .ideation_json_heal import heal_json
 from .ideation_prompts import (
     SCRIPT_GENERATION_SYSTEM_PROMPT,
     LONG_SAFE_MIN_CHARS,
@@ -90,21 +91,41 @@ def json_from_llm(text: str) -> dict:
             raw = raw[4:].strip()
     try:
         return json.loads(raw)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as exc:
         start = raw.find("{")
         if start >= 0:
             decoder = json.JSONDecoder()
             try:
                 value, end = decoder.raw_decode(raw[start:])
             except json.JSONDecodeError:
-                raise
+                # Qwen/Ollama local dễ trả unescaped quote hơn Claude/Codex —
+                # heal_json là phương án cuối trước khi báo lỗi (xem
+                # docs/TOOL_UPGRADE_PLAN.md amendment 2026-07-23).
+                return _heal_or_reraise(raw[start:], exc)
             trailing = raw[start + end:].strip()
             # Một số CLI response kết thúc object bằng thêm một dấu `}`.
             # Chỉ bỏ qua closing brace dư, không nuốt text lỗi tùy ý.
             if trailing and set(trailing) != {"}"}:
-                raise
+                return _heal_or_reraise(raw[start:], exc)
             return value
         raise
+
+
+def _heal_or_reraise(candidate: str, original: json.JSONDecodeError) -> dict:
+    """Thử heal_json (json_repair); nếu không cứu được thì giữ nguyên lỗi gốc."""
+    try:
+        healed = heal_json(candidate)
+    except ValueError:
+        raise original from None
+    # Tín hiệu chất lượng: heal_json chạy nghĩa là Qwen/Ollama trả JSON hỏng cú
+    # pháp — cần thấy được để phát hiện sớm nếu tần suất tăng (xem finding
+    # review 2026-07-23 về observability của lớp heal).
+    print(
+        "⚠ json_from_llm: JSON hỏng cú pháp, đã heal bằng json_repair "
+        f"(lỗi gốc: {original}).",
+        flush=True,
+    )
+    return healed
 
 
 def append_local_start_log(path: Path, title: str, body: str) -> None:

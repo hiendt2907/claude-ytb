@@ -199,22 +199,37 @@ def test_script_providers_allow_long_generation_budget(monkeypatch):
     assert observed == [3600, 3600]
 
 
-def test_batch_start_rejects_ollama_script_provider(monkeypatch):
+def test_batch_start_uses_ollama_script_provider_when_configured(monkeypatch):
+    """Amendment 2026-07-23 (docs/TOOL_UPGRADE_PLAN.md): settings.llm_provider
+    == "ollama" phải route qua OllamaScriptProvider (fallback Claude), không
+    còn raise SystemExit như invariant cũ."""
     from ytb_pipeline.orchestrator import ideation_cmd
 
     monkeypatch.setattr(ideation_cmd, "_cli", lambda: type("CLI", (), {
         "settings": type("Settings", (), {"llm_provider": "ollama"})(),
     })())
 
-    with pytest.raises(SystemExit, match="Chỉ hỗ trợ Claude hoặc Codex"):
-        ideation_cmd.cmd_start(type("Args", (), {
-            "num_of_vid": 1,
-            "type_of_vid": "long",
-            "type_of_rules": "auto",
-            "resume": False,
-            "cloud": False,
-            "local": False,
-        })())
+    captured: dict = {}
+
+    async def fake_cmd_start_local(args):
+        captured["provider"] = args._provider
+        captured["strict_qa"] = args._strict_qa
+
+    monkeypatch.setattr(ideation_cmd, "_cmd_start_local", fake_cmd_start_local)
+
+    ideation_cmd.cmd_start(type("Args", (), {
+        "num_of_vid": 1,
+        "type_of_vid": "long",
+        "type_of_rules": "auto",
+        "resume": False,
+        "cloud": False,
+        "local": False,
+        "llm_provider": None,
+        "clear_ledger": False,
+    })())
+
+    assert captured["provider"].name == "ollama"
+    assert captured["strict_qa"] is True
 
 
 def test_repair_prompt_requires_a_natural_concrete_narrated_example():
@@ -547,3 +562,36 @@ def test_json_parser_accepts_prose_wrapped_fenced_json():
     response = 'Đây là JSON đã sửa:\n\n```json\n{"slug":"demo"}\n```'
 
     assert json_from_llm(response) == {"slug": "demo"}
+
+
+def test_json_parser_heals_unescaped_quote_from_qwen(monkeypatch):
+    """Qwen/Ollama local đôi khi để lọt quote chưa escape bên trong string —
+    json.loads/raw_decode chuẩn thất bại, heal_json (json_repair) phải cứu được."""
+    from ytb_pipeline.orchestrator.ideation_script_fix import json_from_llm
+
+    broken = '{"title": "Vì sao "não" lại né việc?", "slug": "vi-sao-nao-lai-ne-viec"}'
+
+    result = json_from_llm(broken)
+
+    assert result["slug"] == "vi-sao-nao-lai-ne-viec"
+    assert "não" in result["title"]
+
+
+def test_json_parser_heals_vietnamese_slug_with_diacritics(monkeypatch):
+    """slug tiếng Việt có dấu lọt vào JSON hỏng vẫn phải heal được thành string."""
+    from ytb_pipeline.orchestrator.ideation_script_fix import json_from_llm
+
+    broken = '{"slug": "vì sao "trì hoãn" là cơ chế sinh tồn", "ok": true'  # thiếu `}` cuối
+
+    result = json_from_llm(broken)
+
+    assert isinstance(result["slug"], str)
+    assert result["ok"] is True
+
+
+def test_json_parser_still_raises_original_error_when_unhealable(monkeypatch):
+    """heal_json không cứu được (không phải JSON) -> giữ nguyên lỗi gốc, không nuốt lỗi."""
+    from ytb_pipeline.orchestrator.ideation_script_fix import json_from_llm
+
+    with pytest.raises(json.JSONDecodeError):
+        json_from_llm("hoàn toàn không phải JSON, chỉ là văn xuôi tự do.")
