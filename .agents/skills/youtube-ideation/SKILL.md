@@ -55,14 +55,14 @@ thiếu khối này hoặc `passed != true` (nội dung FAIL phải sửa/loại
 
 **Short (dọc) — ÉP độ dài 1–1.5 phút & KHÔNG badge số thứ tự:** Short KHÔNG khai báo
 `target_minutes`; `load_script()` **fail-fast** nếu narration ước lượng ngoài 1–1.5 phút
-(~1.197–1.795 ký tự ở tốc độ đọc 2×). Renderer đã gỡ badge "n/total" — không
+(F5 mặc định đã hiệu chuẩn: ~2.000–3.000 ký tự). Renderer đã gỡ badge "n/total" — không
 hiển thị đếm phần/tổng trên khung hình. Nội dung dù ngắn vẫn phải chi tiết, cụ thể (cơ
 chế + con số/ví dụ thật + bước áp dụng), KHÔNG chung chung — xem mục **0b**, **2a** trong
 video-quality-rules.md.
 
 **Video dài (ngang) — ÉP độ dài & độ sâu:** khi lệnh yêu cầu video ngang/dài, kịch bản
-PHẢI đặt `"target_minutes"` 12–15 ở gốc JSON và viết 14.364–17.955 ký tự narration
-(~1.197 ký tự/phút ở tốc độ đọc 2×), chia 24–36 section. `load_script()` **fail-fast** nếu
+PHẢI đặt `"target_minutes"` 12–15 ở gốc JSON và viết 24.000–30.000 ký tự narration
+(F5 mặc định: ~2.000 ký tự/phút theo audio thật), chia 24–36 section. `load_script()` **fail-fast** nếu
 nội dung ngắn hơn 12 phút, mỏng hơn target, hoặc dài hơn 15 phút. Bắt buộc đào sâu mỗi luận điểm (cơ chế → bằng chứng có nguồn → ví dụ thực
 tế → bước áp dụng), KHÔNG nói chung chung — xem mục **2b** trong video-quality-rules.md.
 

@@ -116,10 +116,11 @@ Ideation lượt sau đọc các nhãn này để sinh chủ đề và format m�
 
 Tool phải hỗ trợ cấu hình theo chiến lược kênh:
 
-- Giai đoạn thử nghiệm: 2 Shorts/ngày.
-- 1 video dài/tuần.
-- Cho phép tăng lên 3–4 Shorts/ngày sau review dữ liệu.
-- Short và long có lịch riêng.
+- Mỗi ngày: 1 video dài và đúng 2 Shorts phễu cho video dài đó.
+- Mỗi Short phải khai báo cùng `long_form_slug` và `cta_target` của Long đích; audit chặn thiếu, thừa hoặc lệch liên kết.
+- Mỗi Short phải khai báo `source_long_slug`, `source_section_index` và `source_excerpt` từ đúng một phân đoạn Long; engine chỉ chọn phân đoạn có insight + curiosity, không chọn mở đầu/retention/kết thúc. Audit chặn thiếu dấu vết nguồn.
+- Hai Short cùng Long phải lấy hai phân đoạn khác nhau, rồi thêm hook/bối cảnh/bước quan sát/CTA; không là bản cắt máy móc.
+- Không tự gán lịch chỉ vì batch đã đủ; Short và Long chỉ được schedule sau QA/asset hợp lệ và lệnh schedule rõ ràng.
 - Không ghi đè `publish_at` đã tồn tại.
 - Không schedule video chưa qua QA hoặc chưa có asset hợp lệ.
 

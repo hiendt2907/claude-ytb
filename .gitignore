@@ -21,6 +21,7 @@ scripts/*.json
 assets/output/
 assets/audio/*.mp3
 assets/audio/*.wav
+assets/quality_reports/
 assets/auto_update.pid
 assets/batch_cli.pid
 assets/auto_update.failed_sha
@@ -33,6 +34,10 @@ assets/benchmarks/
 assets/update_logs/
 data/*.db
 *.mp4
+assets/f5-daemons/
+assets/script_revisions/
+assets/voice_reports/
+assets/ref/narrator_clean.*
 
 # video-render (copy từ Documents/video-render, đọc CLAUDE.md của nó)
 video-render/demo_data/

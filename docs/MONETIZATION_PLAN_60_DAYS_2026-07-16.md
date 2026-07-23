@@ -1,16 +1,16 @@
-# Kế hoạch 60 ngày mở kiếm tiền — 2026-07-16 → 2026-09-13
+# Kế hoạch 60 ngày mở kiếm tiền — 2026-07-21 → 2026-09-18
 
 ## Mục tiêu thực tế
 
-Mục tiêu chính là xây kênh đủ nguyên bản và đủ dữ liệu để tiến tới YPP, không
-cam kết đạt ngưỡng chỉ bằng tăng số lượng.
+Mục tiêu trong 60 ngày là tìm được một phễu nội dung lặp lại được: **Short tạo
+nhận diện → video dài tạo giờ xem và niềm tin → playlist tạo người xem quay
+lại → subscriber**. Không cam kết đạt YPP trong 60 ngày chỉ bằng tăng số lượng.
 
-YouTube hiện có hai mốc cần phân biệt:
+Hai mốc YouTube cần phân biệt:
 
 - **Expanded YPP:** 500 subscribers + 3 video public trong 90 ngày + 3.000 giờ
   xem public long-form trong 12 tháng, hoặc 3 triệu lượt xem Shorts public hợp
-  lệ trong 90 ngày. Mốc này mở một số tính năng fan funding/Shopping ở khu vực
-  đủ điều kiện.
+  lệ trong 90 ngày.
 - **Chia sẻ doanh thu quảng cáo:** 1.000 subscribers + 4.000 giờ xem public
   long-form trong 12 tháng, hoặc 10 triệu lượt xem Shorts public hợp lệ trong
   90 ngày. Giờ xem từ Shorts Feed không tính vào 4.000 giờ.
@@ -18,116 +18,171 @@ YouTube hiện có hai mốc cần phân biệt:
 Nguồn chính thức: [YPP overview & eligibility](https://support.google.com/youtube/answer/72851?hl=en)
 và [expanded YPP](https://support.google.com/youtube/answer/13429240?hl=en).
 
-Chiến lược ưu tiên đường long-form: 4.000 giờ tương đương khoảng 240.000 phút
-xem hợp lệ. Với 16 video dài trong 60 ngày, nếu mỗi video đạt 5.000 lượt xem
-và thời lượng xem trung bình 3 phút thì tạo khoảng 4.000 giờ. Đây là mô hình
-tính mục tiêu, không phải dự báo; phải đo dữ liệu thật sau từng tuần.
+Vì vậy, chỉ số đích của kế hoạch này là **public watch hours của long-form**,
+không phải tổng Watch Time trong Analytics hay lượt xem Shorts.
 
-## Nhịp sản xuất
+## Trạng thái bắt đầu: Batch 3 là nhóm đối chứng
 
-- **2 video dài/tuần**, 8–12 phút, mỗi video đúng một cơ chế tâm lý/hành vi:
-  khoảng 16 long-form trong 60 ngày.
-- **4 Shorts/ngày**, khoảng 240 Shorts trong 60 ngày.
-- Mỗi Short phải gắn với một trong hai long-form gần nhất qua
-  `long_form_slug`, playlist và CTA. Trong 14 Shorts/long-form mỗi tuần, tối đa
-  5 Short là biến thể trực tiếp; phần còn lại là ví dụ/góc khám phá mới cùng
-  cơ chế, tránh cắt máy móc.
-- 4 Shorts/ngày là trần vận hành, không phải lý do bỏ qua QA. Nếu hai ngày liên
-  tiếp có retention/hook hoặc subscriber conversion giảm, hạ nhịp xuống 2/ngày.
-- Lịch thử cho queue mới: Shorts 06:00, 11:30, 18:00, 22:00; long-form thứ
-  Ba và thứ Sáu lúc 20:30. Không ghi đè `publish_at` của batch cũ.
+- **Batch đang chạy:** `shorts_funnel_batch_2026-07-20` (Batch 3).
+- **Trạng thái:** `active`, gồm **28 Shorts + 2 video dài**.
+- **Quyết định:** giữ nguyên script, queue và `publish_at` của Batch 3. Đây là
+  nhóm đối chứng cho cấu trúc Short cũ; không trộn Short strategy-v1 vào đó.
+- **Việc cần làm ngay:** sau khi mỗi Short đủ 48–72 giờ, lưu retained/viewed,
+  AVD, subscriber và Short→long clicks. Batch 3 cho baseline thực tế để đánh
+  giá cohort mới; chưa phải lý do tăng nhịp đăng.
 
-## Mục tiêu sản lượng và quality gate
+## Chuẩn nội dung áp dụng từ batch mới
 
-| Giai đoạn | Long | Shorts | Điều kiện tiếp tục |
+### Short: `core_answer_first_v1`
+
+Mỗi Short mới phải khai báo một `strategy` có cơ chế, nỗi đau, angle, đích
+long-form, playlist và CTA. Bố cục bắt buộc:
+
+1. **0–2 giây:** tình huống nhìn thấy được.
+2. **Không muộn hơn giây 5:** nói đáp án lõi; không hỏi chung chung hay dẫn
+   nhập kiểu “Bạn đã bao giờ…”.
+3. Phần còn lại: bằng chứng/cảm giác đời thường → một áp dụng nhỏ → cầu nối
+   có lý do sang long-form.
+
+Ví dụ: “Mở laptop rồi lại cầm điện thoại? Không phải bạn lười; não đang né
+khoảnh khắc chưa biết bắt đầu từ đâu.”
+
+### Video dài
+
+Mỗi video chỉ giải thích một cơ chế: hook nghịch lý → vấn đề → cơ chế → 2–3 ví
+dụ đời thường → khung áp dụng → cầu nối tập sau. Mục tiêu biên tập là 10–12
+phút; engine kiểm tra thời lượng an toàn 12–15 phút theo audio F5 đã hiệu chuẩn.
+Short cùng cơ chế phải mở một câu hỏi mà long-form trả lời sâu hơn, không phải
+cắt lại nguyên xi.
+
+## Nhịp xuất bản và tổng sản lượng
+
+Nhịp chuẩn sau Batch 3 là **mỗi ngày 1 video dài + đúng 2 Shorts cùng Long**.
+Short thứ ba trong ngày chỉ được phép khi cohort đã nhận nhãn `scale`; tool sẽ
+chặn batch strategy-v1 vượt giới hạn này nếu chưa được ủy quyền.
+
+| Phần kế hoạch | Video dài | Shorts | Mục đích |
 |---|---:|---:|---|
-| Ngày 1–7 | 2 | 28 | 2 long qua QA; 28 Shorts có đích; không lỗi phễu |
-| Ngày 8–21 | 4 | 56 | retention long ổn định; không có format lặp hàng loạt |
-| Ngày 22–42 | 6 | 84 | scale 2–3 format có sub conversion tốt |
-| Ngày 43–60 | 4 | 72 | dọn catalog, chuẩn bị YPP, giữ chất lượng |
+| Batch 3 đang chạy | 2 | 28 | Nhóm đối chứng, không sửa queue |
+| Ngày 1–3 | 0 | 0 | Audit và chốt baseline |
+| Ngày 4–17 | 2 | 24 | Cohort `core_answer_first_v1` đầu tiên |
+| Ngày 18–38 | 3 | 36 | Đo tối thiểu 4 mẫu/format rồi sửa có chủ đích |
+| Ngày 39–60 | 3 | 36 | Nhân rộng có điều kiện format thắng |
+| **Tổng trong cửa sổ 60 ngày** | **10** | **124** | 2 long + 28 Short đối chứng; 8 long + 96 Short strategy-v1 |
 
-Tổng: **16 long-form + 240 Shorts**. Nếu không đủ người/giờ để viết và QA,
-giảm số lượng nhưng giữ tỷ lệ 2 long/tuần và không publish nội dung sơ sài.
+Không bù chỉ tiêu bằng video mỏng. Nếu quality gate, asset hay review chưa đạt,
+giảm số lượng và giữ khoảng trống để sửa cohort.
 
-## Tuần 1 — Dọn phễu và chạy thử 2 long + 28 Shorts
+## Step by step
 
-- Hoàn tất audit batch hiện tại; không thêm vào queue legacy.
-- Tạo một batch mới độc lập có 2 long-form và 28 Shorts; mọi Short phải trỏ về
-  một trong hai long-form.
-- Phân loại các video đã đăng theo: đúng ngách, lệch ngách, trùng, cần theo dõi.
-- Xử lý lỗi custom thumbnail/verification.
-- Tạo một playlist cho mỗi cụm cơ chế.
-- Đặt baseline trong YouTube Studio: subscribers, public watch hours, Shorts
-  views 90 ngày, views/video, subscribers/video, returning viewers.
-- Chọn hai cơ chế không trùng: một long về attentional residue; một long về
-  false consensus effect hoặc cơ chế tương đương sau khi đối chiếu ledger.
+### Ngày 1–3 — Audit Batch 3, chưa sản xuất batch mới
 
-**Gate:** không chạy batch mới nếu doctor vẫn báo `no_long_form`, Short thiếu
-`cta_target`, hoặc 2 long chưa có script đã QA.
+1. Trong YouTube Studio, chụp baseline: subscriber, Earn/public long watch
+   hours, returning viewers, views/video dài, Shorts Viewed/Stayed to watch,
+   AVD, retention mốc 3 giây và 10 giây.
+2. Lưu baseline Shorts vào tool, ví dụ:
 
-## Tuần 2 — Giữ 2 long + 28 Shorts, đo format
+   ```bash
+   ytb batch analytics baseline --stayed-to-watch 0.22
+   ```
 
-- Viết và xuất bản 2 long-form theo cấu trúc hook nghịch lý → vấn đề → cơ chế →
-  ví dụ → framework → cầu nối tập sau.
-- Tạo 28 Shorts, chia đều cho hai long-form, nhưng chỉ tối đa 5 Short là cùng
-  một luận điểm trực tiếp.
-- So sánh 4 khung giờ Shorts; long-form giữ thứ Ba/thứ Sáu 20:30.
+3. Khi từng video đủ 48–72 giờ, lưu snapshot. Đây là dữ liệu nhập tay vì
+   YouTube Analytics API không trả đủ chỉ số swipe/Stayed to watch:
 
-**KPI:** hook pass, average percentage viewed, subscribers gained/video,
-Short→long clicks.
+   ```bash
+   ytb batch analytics snapshot --slug <slug> \
+     --format-id legacy_batch_3 --age-hours 72 --stayed-to-watch 0.22 \
+     --short-to-long-clicks 0 --subscribers-gained 0
+   ```
 
-## Tuần 3–4 — Tìm format thắng với 4 long + 56 Shorts
+4. Ghi riêng nội dung đã xảy ra trong giây 0–10 của mỗi Short có drop mạnh.
+   Kết luận phải chỉ rõ: lời hứa sai, đáp án lõi đến muộn, hay hình ảnh đứng
+   yên/nhịp dựng chậm. Không kết luận từ một video.
 
-- 4 long-form và 56 Shorts trong hai tuần.
-- Thử ba format Shorts:
-  1. nghịch lý đời thường;
-  2. “não đang làm gì với bạn?”;
-  3. một thử nghiệm hành vi trong 24 giờ.
-- Mỗi format phải có ít nhất 4 mẫu trước khi kết luận.
-- Sau 48–72 giờ, gắn nhãn `scale`, `revise_hook`, `revise_value` hoặc
-  `drop_format`.
+**Gate sang batch mới:** có baseline, Batch 3 vẫn nguyên vẹn, và biết rõ một
+giả thuyết cần kiểm tra: “đáp án lõi trước 5 giây”.
 
-**Gate:** chỉ scale format có cả view và subscriber tốt; view cao nhưng sub thấp
-thì sửa value/CTA.
+### Ngày 4–17 — Chạy cohort strategy-v1 đầu tiên
 
-## Tuần 5–6 — Nhân rộng có kiểm soát với 4 long + 56 Shorts
+1. Tạo **batch mới**, tách hoàn toàn Batch 3: 2 long + 24 Short.
+2. Mỗi Long có đúng 2 Short cùng ngày, liên kết bằng `long_form_slug`, `playlist` và
+   `cta_target`.
+3. Giữ cùng `format_id=core_answer_first_v1`, nhưng mỗi cơ chế có nhiều angle
+   khác nhau: trang trắng, hộp thư chưa trả lời, tab cũ, cuộc họp sắp bắt đầu.
+4. Duyệt Telegram trước render: kiểm tra cơ chế, nỗi đau, câu trả lời lõi
+   0–5 giây và long đích hiển thị ngay trong bản xem trước.
+5. Render chỉ qua khi Short có cảnh `situation` và `core_answer` với mô tả
+   hình/b-roll cụ thể; tránh khung text tĩnh ở điểm rơi 4–10 giây.
 
-- 4 long-form và 56 Shorts từ hai hoặc ba format tốt nhất.
-- Mỗi cơ chế mới phải đối chiếu ledger và queue trước khi viết.
-- Tối ưu title/thumbnail theo vấn đề cụ thể, không nhồi hashtag.
-- Bổ sung end screen, pinned comment và CTA nhất quán tới long-form kế tiếp.
+**Gate:** không có Short nào thiếu strategy hoặc đích long-form; không quá 2
+Short/ngày; không scale trước tối thiểu 4 Short cùng format đủ 48 giờ.
 
-**Mốc giữa kỳ:** nếu subscriber tăng nhưng watch hours thấp, ưu tiên nâng chất
-lượng long-form; nếu views cao nhưng subscriber thấp, sửa lời hứa và cầu nối.
+### Ngày 18–38 — Ra quyết định theo cohort, không theo một video viral
 
-## Ngày 43–60 — Tối ưu theo dữ liệu và chuẩn bị nộp
+1. Mỗi ngày xuất bản 1 Long + 2 Short phễu mới.
+2. Sau 48–72 giờ, nhập snapshot cho từng Short và chạy:
 
-- 4 long-form và 72 Shorts, chỉ giữ 2–3 format có tín hiệu.
-- Dọn video lệch ngách, metadata spam hoặc asset/license không rõ; không xóa
-  video chỉ vì view thấp nếu chưa có lý do chính sách/brand rõ ràng.
-- Kiểm tra toàn bộ nội dung có commentary/phân tích gốc, không phải slideshow
-  hoặc stock footage với narration sơ sài.
-- Kiểm tra 2-Step Verification, advanced features, quốc gia đủ điều kiện và
-  AdSense trong YouTube Studio.
-- Nếu đạt mốc Expanded YPP: nộp mốc sớm. Nếu đạt 1.000 + 4.000 giờ hoặc
-  1.000 + 10 triệu Shorts: nộp mốc chia sẻ quảng cáo.
+   ```bash
+   ytb batch analytics summary
+   ```
 
-## Bảng điều khiển hằng tuần
+3. Tool đánh giá theo **median của ít nhất 4 Short cùng format**:
+   - `revise_hook`: Stayed to watch thấp hơn baseline.
+   - `scale`: Stayed to watch cao hơn baseline ít nhất 20%, đồng thời có click
+     sang long và subscriber.
+   - `revise_value`: hook không tệ nhưng chưa tạo click long/subscriber.
+   - `needs_more_data`: chưa đủ bốn mẫu hoặc chưa đủ 48 giờ.
+4. Với `revise_hook`, đổi cảnh đầu và câu đáp án; không chỉ đổi caption. Với
+   `revise_value`, giữ hook nhưng làm rõ ví dụ, payoff và lý do phải xem long.
 
-| Nhóm | Chỉ số | Quyết định |
+**Gate:** chỉ format `scale` mới mở quyền Short thứ ba/ngày; nếu không có format
+nào scale, tiếp tục 2/ngày và thay đổi một biến cho cohort sau.
+
+### Ngày 39–60 — Củng cố series và giờ xem long-form
+
+1. Giữ 1 long/tuần từ cơ chế/angle đã tạo returning viewers hoặc long watch
+   hours tốt nhất; tiêu đề và thumbnail nói về vấn đề cụ thể, không nói chung
+   chung về “tập trung hơn”.
+2. Các Short thắng được nhân thành 3 angle mới, không nhân bản narration hoặc
+   chuỗi cảnh.
+3. Trước publish long: kiểm tra playlist, end screen, pinned comment và CTA từ
+   Short cùng cơ chế.
+4. Cuối ngày 60, audit toàn kênh: originality/commentary, nguồn và license,
+   metadata, policy, 2-Step Verification, advanced features và trạng thái
+   Earn. Chỉ nộp Expanded YPP/YPP khi tab Earn cho thấy đã đủ điều kiện.
+
+## Dashboard và quy tắc quyết định hằng tuần
+
+| Tín hiệu | Đo ở đâu | Hành động |
 |---|---|---|
-| Reach | views, impressions, CTR | sửa title/thumbnail nếu reach có nhưng click thấp |
-| Hook | retention 3 giây, viewed/swiped | viết lại 2 giây đầu |
-| Value | average percentage viewed, retention curve | cắt đoạn giảng dài, tăng ví dụ |
-| Loyalty | subscribers gained/video, returning viewers | giữ series và CTA cầu nối |
-| Funnel | Short→long clicks, long watch hours | nối lại playlist/end screen/CTA |
-| Safety | claim, license, AI disclosure, reused-content risk | chuyển `needs_review`, không publish |
+| Stayed to watch, retention 3s/10s | Shorts Studio | Sửa cảnh/câu trả lời đầu nếu dưới baseline |
+| AVD, average percentage viewed | Analytics | Cắt phần giảng; tăng ví dụ cụ thể |
+| Short→long clicks | Link/related video + Studio | Làm rõ khoảng trống và CTA nếu bằng 0 |
+| Public watch hours long-form | Tab Earn | Ưu tiên long có retention/returning viewer tốt |
+| Subscriber/video, returning viewers | Analytics | Giữ cơ chế/series mang người xem quay lại |
+| CTR long-form | Reach | Chỉnh lời hứa title + thumbnail, không suy diễn từ mẫu impressions nhỏ |
+
+## Tool đã được dùng để ép kế hoạch
+
+- `ContentStrategy` + `HookPlan`: Short mới mang contract rõ về cơ chế, hook
+  và đường sang long-form; dữ liệu bất biến đi xuyên pipeline.
+- QA + voiceover gate: từ chối strategy Short thiếu `core_answer`, hoặc nói
+  đáp án lõi sau hạn 5 giây.
+- Render gate: từ chối Short strategy-v1 không có hình minh hoạ riêng cho
+  tình huống và đáp án lõi.
+- Queue/funnel audit: Batch 3 legacy được giữ nguyên; batch strategy-v1 phải
+  có metadata đầy đủ và đúng 2 Short/ngày đi cùng một Long trước khi scale.
+- Telegram preview: hiển thị format, cơ chế, hook 0–5 giây và long đích để
+  duyệt bằng nội dung, không chỉ đọc cả kịch bản.
+- `ytb batch analytics`: lưu baseline/snapshot nhập từ Studio và đưa nhãn
+  cohort vào prompt ideation của batch kế tiếp.
 
 ## Nguyên tắc không phá monetization
 
-- Không dùng 256 nội dung như mục tiêu bắt buộc nếu chất lượng giảm; con số kế
-  hoạch là 16 long + 240 Shorts.
-- Không mass-produce cùng template, cùng voiceover logic và chỉ đổi footage.
-- Không dùng Shorts để “bù” 4.000 giờ vì Shorts Feed watch hours không được tính.
-- Không coi đủ threshold là tự động được duyệt; YouTube vẫn review toàn kênh
-  theo chính sách monetization.
+- Shorts là reach và phễu; không dùng giờ xem Shorts Feed để dự báo 4.000 giờ.
+- Không mass-produce một template rồi chỉ đổi footage hoặc tiêu đề.
+- Không coi view cao là thắng nếu không có subscriber, click long hoặc returning
+  viewer.
+- Không sửa/xáo Batch 3 để “đẹp dữ liệu”; cohort cũ và cohort mới phải tách.
+- Threshold không đồng nghĩa tự động được duyệt: YouTube review toàn kênh về
+  tính nguyên bản, giá trị bình luận và chính sách.
