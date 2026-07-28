@@ -48,6 +48,9 @@ class FasterWhisperSttAdapter:
     """Optional faster-whisper adapter, restricted to an existing local model path."""
 
     model_path: Path | None = None
+    device: str | None = None
+    compute_type: str | None = None
+    cpu_threads: int | None = None
     module_available: Callable[[str], bool] | None = None
     name: str = "faster-whisper"
 
@@ -75,7 +78,14 @@ class FasterWhisperSttAdapter:
         # filesystem path prevents faster-whisper from resolving a remote model.
         from faster_whisper import WhisperModel  # type: ignore[import-not-found]
 
-        model = WhisperModel(str(self.model_path))
+        model_kwargs: dict[str, object] = {}
+        if self.device is not None:
+            model_kwargs["device"] = self.device
+        if self.compute_type is not None:
+            model_kwargs["compute_type"] = self.compute_type
+        if self.cpu_threads is not None:
+            model_kwargs["cpu_threads"] = self.cpu_threads
+        model = WhisperModel(str(self.model_path), **model_kwargs)
         segments, _info = model.transcribe(str(audio_path), vad_filter=True)
         return " ".join(segment.text.strip() for segment in segments if segment.text.strip())
 
@@ -91,6 +101,11 @@ class FasterWhisperSttAdapter:
             "adapter": self.name,
             "available": status.available,
             "model": _local_model_identity(self.model_path),
+            "runtime": {
+                "device": self.device,
+                "compute_type": self.compute_type,
+                "cpu_threads": self.cpu_threads,
+            },
             "package_version": _package_version("faster-whisper") if status.available else "",
         }
 

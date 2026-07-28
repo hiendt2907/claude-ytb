@@ -99,6 +99,11 @@ class Settings(BaseSettings):
     # Empty keeps STT disabled; the pipeline never accepts a remote model name/URL
     # and never downloads a model on behalf of the operator.
     quality_stt_model_path: Path | None = None
+    # Leave all runtime knobs unset to preserve Faster-Whisper's legacy defaults.
+    # Operators can opt into a reproducible local CPU int8 audit when needed.
+    quality_stt_device: Literal["auto", "cpu", "cuda"] | None = None
+    quality_stt_compute_type: Literal["default", "int8", "int8_float16", "float16", "float32"] | None = None
+    quality_stt_cpu_threads: int | None = Field(default=None, ge=1)
 
     # Drive — sau khi upload YouTube THẬT, MOVE video lên Drive rồi xoá file local
     # (chỉ giữ trên máy tới khi upload xong). Cần token có scope drive.file.
@@ -167,6 +172,8 @@ class Settings(BaseSettings):
         Pexels is the production video-footage path and is not downgraded to
         Pillow image-motion anymore.
         """
+        if self.quality_stt_device == "cpu" and self.quality_stt_compute_type in {"float16", "int8_float16"}:
+            raise ValueError("quality_stt_compute_type is not supported with quality_stt_device=cpu")
         if self.allow_cloud_providers:
             return
         if self.tts_provider in {"edge", "elevenlabs"}:

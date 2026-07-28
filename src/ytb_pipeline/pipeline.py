@@ -530,7 +530,12 @@ async def run_project(project: Project, checkpoint: CheckpointManager, through: 
         try:
             result = run_audio_quality_gate(
                 voiceover,
-                stt_adapter=FasterWhisperSttAdapter(model_path=settings.quality_stt_model_path),
+                stt_adapter=FasterWhisperSttAdapter(
+                    model_path=settings.quality_stt_model_path,
+                    device=settings.quality_stt_device,
+                    compute_type=settings.quality_stt_compute_type,
+                    cpu_threads=settings.quality_stt_cpu_threads,
+                ),
                 cache_dir=settings.quality_reports_dir / "audio_cache",
             )
             state["audio_quality"] = result
