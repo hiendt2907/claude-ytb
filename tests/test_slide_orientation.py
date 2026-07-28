@@ -1,6 +1,7 @@
 """Orientation contract for the local, offline slide renderer."""
 
 from ytb_pipeline.config.settings import settings
+from PIL import Image, ImageDraw
 from ytb_pipeline.providers.image.pillow_provider import PillowImageProvider
 from ytb_pipeline.render import compose
 
@@ -41,3 +42,15 @@ def test_slide_renderer_keeps_portrait_dimensions_for_short_frames(monkeypatch):
 
     assert calls == [(1080, 1920)]
     assert frame.size == (1080, 1920)
+
+
+def test_landscape_terminal_card_fits_within_the_frame():
+    """Long code cards must never extend below a 1080px landscape frame."""
+    width, height, top = 1920, 1080, 400
+    draw = ImageDraw.Draw(Image.new("RGB", (width, height)))
+
+    layout = compose._terminal_layout(
+        draw, "echo " + "x" * 400, width=width, top=top, height=height
+    )
+
+    assert top + layout.card_height <= height - 48
