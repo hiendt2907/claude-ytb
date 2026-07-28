@@ -1,4 +1,4 @@
-"""Khâu 3 — Dựng video Short dọc (1080x1920): caption (Pillow) + audio (ffmpeg)."""
+"""Khâu 3 — Dựng slide video theo orientation: caption (Pillow) + audio (ffmpeg)."""
 
 import subprocess
 import tempfile
@@ -12,7 +12,10 @@ from ..pkg.models import RenderedVideo, Voiceover
 from ..providers.registry import get_image_provider
 
 OUTPUT_DIR = Path("assets/output")
+# Kept for compatibility with callers that inspect the established Short canvas.
 W, H = 1080, 1920
+PORTRAIT_WH = (1080, 1920)
+LANDSCAPE_WH = (1920, 1080)
 BG_TOP = (13, 17, 23)        # GitHub dark
 BG_BOTTOM = (22, 27, 34)
 FG = (240, 246, 252)
@@ -40,12 +43,13 @@ def render_video(voiceover: Voiceover) -> RenderedVideo:
     work = OUTPUT_DIR / "_frames"
     work.mkdir(exist_ok=True)
     slug = _slug(voiceover)
+    dims = _dims()
 
     clips: list[Path] = []
     for i, seg in enumerate(voiceover.segments):
         clip = work / f"{slug}_{i:02d}.mp4"
         _render_segment(seg, index=i, total=len(voiceover.segments),
-                        work=work, prefix=f"{slug}_{i:02d}", out=clip)
+                        work=work, prefix=f"{slug}_{i:02d}", out=clip, dims=dims)
         clips.append(clip)
 
     video_path = OUTPUT_DIR / f"{slug}.mp4"
@@ -59,6 +63,7 @@ def render_video(voiceover: Voiceover) -> RenderedVideo:
         thumbnail=True,
         danger=True,
         thumbnail_context=_thumbnail_context(voiceover),
+        dims=dims,
     ).convert("RGB").save(thumb, quality=90)
 
     return replace(
@@ -69,7 +74,7 @@ def render_video(voiceover: Voiceover) -> RenderedVideo:
 
 
 def _render_segment(seg, index: int, total: int, work: Path,
-                    prefix: str, out: Path) -> None:
+                    prefix: str, out: Path, dims: tuple[int, int]) -> None:
     """Dựng clip cho 1 segment.
 
     - Đoạn có code: terminal card tĩnh (1 frame, giữ nguyên).
@@ -78,13 +83,13 @@ def _render_segment(seg, index: int, total: int, work: Path,
     """
     if seg.code:
         png = work / f"{prefix}.png"
-        _terminal_segment(seg, index, total).save(png)
+        _terminal_segment(seg, index, total, dims=dims).save(png)
         _image_audio_clip(png, seg.audio_path, out)
         return
 
     caption = (seg.caption or "").strip()
     prompt = caption or (seg.narration or "")[:80]
-    bg = _background_image(index, total, prompt=prompt)
+    bg = _background_image(index, total, prompt=prompt, dims=dims)
     # Không caption HOẶC tắt caption chạy (settings.show_captions) → nền trơn,
     # không chữ chạy theo lời nói. Mặt video sạch.
     if not caption or not settings.show_captions:
@@ -98,24 +103,31 @@ def _render_segment(seg, index: int, total: int, work: Path,
     frames: list[tuple[Path, float]] = []
     for k, (text, dur) in enumerate(steps):
         frame = bg.copy()
-        _draw_caption(frame, text, danger=seg.danger)
+        _draw_caption(frame, text, danger=seg.danger, dims=dims)
         png = work / f"{prefix}_w{k:02d}.png"
         frame.save(png)
         frames.append((png, dur))
     _caption_clip(frames, seg.audio_path, out)
 
 
-def _background_image(index: int, total: int, prompt: str = "") -> Image.Image:
+def _dims() -> tuple[int, int]:
+    """Return the native frame size selected for the current video orientation."""
+    return LANDSCAPE_WH if settings.orientation == "landscape" else PORTRAIT_WH
+
+
+def _background_image(index: int, total: int, prompt: str = "",
+                      dims: tuple[int, int] | None = None) -> Image.Image:
     """Nền sinh từ ImageProvider (mặc định "pillow" = gradient gốc) — caption
     phủ động ở lower-third (KHÔNG hiện số thứ tự).
 
     Backward-compat: provider "pillow" tái lập đúng gradient GitHub dark gốc
     khi prompt rỗng/không khớp từ khoá màu, nên hành vi mặc định KHÔNG đổi.
     """
+    width, height = dims or _dims()
     provider = get_image_provider()
     with tempfile.TemporaryDirectory() as tmp:
         out_path = Path(tmp) / "bg.png"
-        provider.generate(prompt=prompt, width=W, height=H, output_path=out_path)
+        provider.generate(prompt=prompt, width=width, height=height, output_path=out_path)
         return Image.open(out_path).convert("RGB")
 
 
@@ -134,54 +146,60 @@ def _thumbnail_context(voiceover: Voiceover) -> str:
 
 
 def _caption_image(text: str, index: int, total: int, thumbnail: bool = False,
-                   danger: bool = False, thumbnail_context: str = "") -> Image.Image:
-    img = _gradient()
+                   danger: bool = False, thumbnail_context: str = "",
+                   dims: tuple[int, int] | None = None) -> Image.Image:
+    width, height = dims or _dims()
+    img = _gradient(dims=(width, height))
     draw = ImageDraw.Draw(img)
     font = _font(96 if not thumbnail else 104)
 
-    lines = _wrap(draw, text, font, max_width=W - 160)
+    lines = _wrap(draw, text, font, max_width=width - 160)
     line_h = font.getbbox("Ag")[3] + 28
     total_h = line_h * len(lines)
-    y = (H - total_h) / 2
+    y = (height - total_h) / 2
     for line in lines:
-        draw.text((W / 2, y + line_h / 2), line, font=font,
+        draw.text((width / 2, y + line_h / 2), line, font=font,
                   fill=DANGER if danger else FG, anchor="mm")
         y += line_h
     if thumbnail and thumbnail_context:
         context_font = _font(42)
-        context_lines = _wrap(draw, thumbnail_context, context_font, max_width=W - 180)
-        context_y = min(H - 110, y + 120)
+        context_lines = _wrap(draw, thumbnail_context, context_font, max_width=width - 180)
+        context_y = min(height - 110, y + 120)
         for line in context_lines:
-            draw.text((W / 2, context_y), line, font=context_font,
+            draw.text((width / 2, context_y), line, font=context_font,
                       fill=FG, anchor="mm")
             context_y += context_font.getbbox("Ag")[3] + 12
     return img
 
 
-def _terminal_segment(seg, index: int, total: int) -> Image.Image:
+def _terminal_segment(seg, index: int, total: int,
+                      dims: tuple[int, int] | None = None) -> Image.Image:
     """Caption phía trên + terminal card hiển thị lệnh ở giữa."""
-    img = _gradient()
+    width, _ = dims or _dims()
+    img = _gradient(dims=dims)
     draw = ImageDraw.Draw(img)
 
     # caption (tiêu đề đoạn) — KHÔNG hiện số thứ tự
     cap_font = _font(78)
-    cap_lines = _wrap(draw, seg.caption, cap_font, max_width=W - 140)
+    cap_lines = _wrap(draw, seg.caption, cap_font, max_width=width - 140)
     cap_h = (cap_font.getbbox("Ag")[3] + 18)
     y = 360
     for line in cap_lines:
-        draw.text((W / 2, y, ), line, font=cap_font,
+        draw.text((width / 2, y, ), line, font=cap_font,
                   fill=DANGER if seg.danger else FG, anchor="ma")
         y += cap_h
 
     # terminal card
-    _draw_terminal(img, draw, seg.code, top=y + 90, danger=seg.danger)
+    _draw_terminal(img, draw, seg.code, top=y + 90, danger=seg.danger, width=width)
     return img
 
 
-def _draw_terminal(img, draw, code: str, top: int, danger: bool) -> None:
+def _draw_terminal(img, draw, code: str, top: int, danger: bool,
+                   width: int | None = None) -> None:
+    width = width or _dims()[0]
     mono = _mono(58)
     pad = 60
-    card_w = W - 120
+    card_w = width - 120
     x0 = 60
     # đo chiều cao theo số dòng (wrap lệnh dài)
     code_lines = _wrap_mono(draw, code, mono, card_w - 2 * pad - 40)
@@ -230,14 +248,15 @@ def _wrap_mono(draw, text: str, font, max_width: int) -> list[str]:
     return out
 
 
-def _gradient() -> Image.Image:
-    base = Image.new("RGB", (W, H), BG_TOP)
+def _gradient(dims: tuple[int, int] | None = None) -> Image.Image:
+    width, height = dims or _dims()
+    base = Image.new("RGB", (width, height), BG_TOP)
     top, bottom = BG_TOP, BG_BOTTOM
     px = base.load()
-    for y in range(H):
-        t = y / H
+    for y in range(height):
+        t = y / height
         row = tuple(int(top[c] + (bottom[c] - top[c]) * t) for c in range(3))
-        for x in range(W):
+        for x in range(width):
             px[x, y] = row
     return base
 
@@ -329,23 +348,25 @@ def _reveal_steps(caption: str, duration: float) -> list[tuple[str, float]]:
     return steps
 
 
-def _draw_caption(img: Image.Image, text: str, *, danger: bool = False) -> None:
+def _draw_caption(img: Image.Image, text: str, *, danger: bool = False,
+                  dims: tuple[int, int] | None = None) -> None:
     """Vẽ caption ở lower-third kèm dải nền mờ (chú thích chạy theo lời nói)."""
+    width, height = dims or _dims()
     draw = ImageDraw.Draw(img, "RGBA")
     font = _font(CAPTION_SIZE)
-    lines = _wrap(draw, text, font, max_width=W - 200)
+    lines = _wrap(draw, text, font, max_width=width - 200)
     line_h = font.getbbox("Ag")[3] + 24
     total_h = line_h * len(lines)
-    y0 = int(H * CAPTION_Y) - total_h // 2
+    y0 = int(height * CAPTION_Y) - total_h // 2
 
     pad = 36
     draw.rounded_rectangle(
-        [80, y0 - pad, W - 80, y0 + total_h + pad],
+        [80, y0 - pad, width - 80, y0 + total_h + pad],
         radius=28, fill=CAPTION_BAND,
     )
     y = y0
     for line in lines:
-        draw.text((W / 2, y + line_h / 2), line, font=font,
+        draw.text((width / 2, y + line_h / 2), line, font=font,
                   fill=DANGER if danger else FG, anchor="mm")
         y += line_h
 
