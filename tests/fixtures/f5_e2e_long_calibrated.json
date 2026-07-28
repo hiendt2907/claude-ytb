@@ -1,0 +1,128 @@
+{
+  "slug": "f5-e2e-ao-tuong-giai-thich",
+  "ruleset_id": "2026-07-28.1",
+  "video_type": "long",
+  "target_minutes": 3,
+  "voice_profile": "knowledge",
+  "topic": "Ảo tưởng chiều sâu giải thích: vì sao ta tin mình hiểu một việc cho đến khi phải giải thích nó.",
+  "title": "Bạn Có Thật Sự Hiểu Điều Mình Tin? Cơ Chế Ảo Tưởng Giải Thích",
+  "description": "Một cơ chế nhận thức khiến cảm giác quen thuộc dễ bị nhầm với hiểu biết: ảo tưởng chiều sâu giải thích. Video dùng ví dụ đời thường, nguồn nghiên cứu truy được và một phép kiểm tra nhỏ để biến cảm giác chắc chắn thành câu hỏi tốt hơn.",
+  "tags": [
+    "ảo tưởng chiều sâu giải thích",
+    "illusion of explanatory depth",
+    "tư duy phản biện",
+    "tâm lý học hành vi",
+    "phát triển bản thân thật",
+    "mental model"
+  ],
+  "thumbnail_brief": {
+    "visual_contradiction": "Một người tự tin giơ tay trước sơ đồ chiếc khóa kéo, nhưng các mũi tên trong sơ đồ biến thành dấu hỏi khi họ bắt đầu giải thích.",
+    "subject": "Người đi làm trẻ đang suy nghĩ trước bảng trắng",
+    "emotion": "Tự tin chuyển thành ngạc nhiên",
+    "headline": "TƯỞNG LÀ HIỂU"
+  },
+  "compliance": {
+    "passed": true,
+    "community": "Nội dung giáo dục, không công kích cá nhân hay nhóm nào.",
+    "copyright": "Lời dẫn gốc; hình minh họa được mô tả để tìm footage có giấy phép phù hợp.",
+    "accuracy": "Khái niệm Illusion of Explanatory Depth được diễn giải theo Rozenblit và Keil, 2002, Cognitive Science 26(5), 521-562, DOI 10.1207/S15516709COG2605_1. Video không khẳng định hiện tượng giải thích mọi dạng thiếu hiểu biết.",
+    "advertiser": "Giọng điệu kiến thức, không có chủ đề nhạy cảm hoặc lời hứa thay đổi đời sống.",
+    "coppa": "Nội dung hướng đến người trưởng thành đang học tập và làm việc, phù hợp khán giả phổ thông.",
+    "notes": "Fixture E2E cô lập cho calibration F5. Một cơ chế duy nhất: cảm giác hiểu biết vượt quá khả năng giải thích nhân quả. Mỗi section thêm một vai trò riêng: hook, tình huống, cơ chế, nguồn, giới hạn, khung áp dụng, quan sát, và cầu nối. Không dùng lặp lại để kéo thời lượng."
+  },
+  "_wording_engine": {
+    "layer": 2,
+    "encoding_valid": true,
+    "flags": []
+  },
+  "sections": [
+    {
+      "purpose": "hook",
+      "time_goal": 0.35,
+      "voiceover": "Mến chào các bạn, có một kiểu tự tin rất dễ đánh lừa chúng ta: nghe một ý quen thuộc, ta gật đầu ngay và tin rằng mình đã hiểu. Nhưng khi phải giải thích bằng lời của chính mình, các mắt xích bỗng biến mất. Bạn biết chiếc khóa kéo hoạt động, biết quy trình cần tối ưu, biết mình ủng hộ một chính sách. Vậy tại sao câu hỏi “nó vận hành thế nào, từ đầu đến cuối?” lại đủ làm ta lúng túng? Đây không phải bằng chứng bạn kém thông minh. Nó là ảo tưởng chiều sâu giải thích.",
+      "visual_intent": "Người đi làm gật đầu tự tin trước một sơ đồ đơn giản, rồi dừng lại khi được yêu cầu nối các bước còn thiếu.",
+      "pexels_query": "young professional confused explaining whiteboard diagram",
+      "caption": "Cảm giác hiểu không phải lúc nào cũng là hiểu",
+      "hook": true,
+      "transition": "Cảm giác chắc chắn ấy thường lộ ra rõ nhất trong một tình huống rất bình thường.",
+      "payoff": "Nhận diện khoảng cách giữa quen thuộc và hiểu biết."
+    },
+    {
+      "purpose": "concrete_example",
+      "time_goal": 0.42,
+      "voiceover": "Hãy hình dung cả nhóm đồng ý thay công cụ quản lý việc. Bạn đã dùng nó vài tháng, xem hướng dẫn và từng giới thiệu nó. Khi sếp hỏi dữ liệu cũ sẽ đi đâu, ai nhận thông báo, hai người sửa cùng một việc thì sao, và làm sao hoàn tác lỗi, bạn chỉ trả lời được vài mảnh. Điều này không làm công cụ đó tệ. Kinh nghiệm sử dụng tạo cảm giác trơn tru, còn chuỗi nguyên nhân phía sau vẫn nằm ngoài đầu bạn. Ta mượn cấu trúc của giao diện, người hướng dẫn và cả nhóm rồi vô tình tính chúng như kiến thức cá nhân.",
+      "visual_intent": "Cuộc họp nhỏ với bảng kanban; một người đang chỉ vào quy trình di chuyển dữ liệu nhưng dừng lại trước các nhánh phụ.",
+      "pexels_query": "team meeting kanban board workflow discussion office",
+      "caption": "Dùng được chưa chắc giải thích được",
+      "hook": false,
+      "transition": "Khoảng trống này xuất hiện vì não dùng một phép thay thế rất nhanh.",
+      "payoff": "Tách khả năng thao tác khỏi hiểu cơ chế."
+    },
+    {
+      "purpose": "mechanism",
+      "time_goal": 0.43,
+      "voiceover": "Ảo tưởng chiều sâu giải thích xảy ra khi ta đo hiểu biết bằng cảm giác quen thuộc thay vì khả năng dựng lại quan hệ nhân quả. Một nhãn quen hay thao tác thành thói quen khiến câu trả lời có vẻ ở ngay đầu lưỡi. Nhưng để giải thích, bạn phải chỉ ra bộ phận nào làm gì, bước nào dẫn tới bước nào, và điều kiện nào làm kết quả đổi khác. Não tiết kiệm công sức bằng một bản tóm tắt đủ để hành động trong tình huống quen thuộc. Bản tóm tắt hữu ích, nhưng không tự thành mô hình đầy đủ. Rắc rối bắt đầu khi ta dùng nó để tranh luận, dự đoán hậu quả, hoặc quyết định thay người khác.",
+      "visual_intent": "Đồ họa hai lớp: bên ngoài là biểu tượng quen thuộc, bên trong là chuỗi bánh răng và mũi tên nguyên nhân còn trống.",
+      "pexels_query": "abstract gears causal process animation blue background",
+      "caption": "Quen thuộc là một tín hiệu rẻ",
+      "hook": false,
+      "transition": "Điều thú vị là nghiên cứu về hiện tượng này không bắt đầu từ những chủ đề cao siêu.",
+      "payoff": "Hiểu vì sao cảm giác trôi chảy dễ bị đánh đồng với chiều sâu."
+    },
+    {
+      "purpose": "evidence",
+      "time_goal": 0.43,
+      "voiceover": "Trong bài báo năm 2002, Leonid Rozenblit và Frank Keil yêu cầu người tham gia tự đánh giá mức hiểu biết về vật quen thuộc, rồi thử giải thích nó hoạt động ra sao. Sau khi cố giải thích, nhiều người hạ đánh giá của chính mình: tự tin ban đầu cao hơn độ chi tiết có thể nêu ra. Nếu một niềm tin chỉ đứng vững khi ta không bị hỏi tiếp, nó chưa đủ chắc cho quyết định lớn. Nghiên cứu không nói ai thiếu lời giải thích cũng thiếu năng lực; nhiều kỹ năng là thực hành, và hệ thống quá phức tạp để một người nắm toàn bộ. Nó nhắc ta đo hiểu biết bằng đúng nhiệm vụ mình sắp dùng nó cho.",
+      "visual_intent": "Cận cảnh người tham gia khảo sát viết các bước hoạt động của một vật dụng quen thuộc, xen với trang bài báo học thuật.",
+      "pexels_query": "research participant writing questionnaire cognitive study",
+      "caption": "Tự tin giảm sau khi phải giải thích",
+      "hook": false,
+      "transition": "Vì vậy, điều cần sửa không phải là xấu hổ vì khoảng trống.",
+      "payoff": "Có nguồn truy được và giới hạn diễn giải rõ ràng."
+    },
+    {
+      "purpose": "boundary",
+      "time_goal": 0.38,
+      "voiceover": "Cần phân biệt ba việc. Một, bạn biết cách dùng công cụ mà không biết toàn bộ kỹ thuật bên trong; đó là phân công nhận thức bình thường. Hai, bạn biết nguyên tắc nhưng chưa đủ dữ liệu để dự đoán mọi trường hợp; đó là giới hạn hợp lý. Ba mới là ảo tưởng: ta tuyên bố chắc về quan hệ nguyên nhân nhưng chưa kiểm tra bước trung gian. Phân biệt này tránh hai cực: tự tin như thể hiểu hết, hoặc đòi hiểu hoàn hảo rồi không dám quyết định. Mục tiêu là biết phần nào cần kiểm tra trước khi chịu trách nhiệm, và câu hỏi nào phải để chuyên gia trả lời.",
+      "visual_intent": "Ba cột trên bảng: biết dùng, biết giới hạn, và tuyên bố vượt bằng chứng; người xem đánh dấu cột giữa.",
+      "pexels_query": "person comparing three options whiteboard decision making",
+      "caption": "Không phải khoảng trống nào cũng là vấn đề",
+      "hook": false,
+      "transition": "Khi đã phân biệt được ba việc này, bạn có thể dùng một phép kiểm tra rất ngắn.",
+      "payoff": "Giữ được tính khiêm tốn mà không tê liệt quyết định."
+    },
+    {
+      "purpose": "application_framework",
+      "time_goal": 0.42,
+      "voiceover": "Trước một quyết định đáng kể, hãy thử khung BẢN ĐỒ gồm bốn câu. Bắt đầu từ kết quả: điều gì sẽ khác nếu lựa chọn này đúng? Ánh xạ chuỗi: nêu hai hoặc ba bước nối hành động với kết quả. Rào điều kiện: điều gì phải đúng thì chuỗi chạy, và điều gì có thể làm nó đứt? Nói rõ phần mượn: số liệu, kinh nghiệm hay chuyên môn nào đến từ người khác? Khung này không biến cuộc nói chuyện thành bài thi. Nó giúp nhận ra lúc câu “tôi biết rồi” chỉ là “tôi đã nghe điều này nhiều lần”. Nếu không trả lời được một bước, đó là chỗ để tìm nguồn hoặc thu nhỏ cam kết.",
+      "visual_intent": "Bốn thẻ ghi chú xếp thành lộ trình với nhãn kết quả, chuỗi, điều kiện và nguồn mượn.",
+      "pexels_query": "sticky notes causal map planning desk overhead",
+      "caption": "BẢN ĐỒ: kiểm tra trước khi tin",
+      "hook": false,
+      "transition": "Nhưng một khung chỉ hữu ích khi được thử trên việc thật, không phải trên một ý tưởng đẹp.",
+      "payoff": "Có cách kiểm tra ngắn, không phải khẩu hiệu tự tin."
+    },
+    {
+      "purpose": "experiment",
+      "time_goal": 0.42,
+      "voiceover": "Trong ba ngày tới, hãy chọn một niềm tin nhỏ ảnh hưởng đến cách bạn làm việc. Mỗi ngày dành năm phút viết lời giải thích không tra cứu trước. Sau đó khoanh một chỗ bạn phải dùng từ mơ hồ như “tự động”, “tối ưu”, hoặc “thường là”. Chỉ tra cứu hoặc hỏi người liên quan về chỗ đó, rồi cập nhật bằng một điều kiện cụ thể. Bạn không cần chứng minh mình sai; bạn đang biến cảm giác chắc chắn thành giả thuyết kiểm tra được. Nếu chỗ mơ hồ vẫn còn, có thể hệ thống quá phức tạp hoặc câu hỏi ban đầu quá rộng.",
+      "visual_intent": "Người ghi nhật ký ba ngày, khoanh các từ mơ hồ rồi đối chiếu với một cuộc trao đổi ngắn cùng đồng nghiệp.",
+      "pexels_query": "professional journaling notes reviewing work process",
+      "caption": "Biến tự tin thành giả thuyết",
+      "hook": false,
+      "transition": "Phép thử này dẫn đến một thay đổi nhỏ nhưng quan trọng trong cách ta dùng kiến thức.",
+      "payoff": "Quan sát được khoảng trống thay vì tự phán xét."
+    },
+    {
+      "purpose": "conclusion_bridge",
+      "time_goal": 0.35,
+      "voiceover": "Ảo tưởng chiều sâu giải thích không bảo bạn phải nghi ngờ mọi điều mình biết. Cảm giác quen thuộc là điểm bắt đầu để hỏi tiếp, không phải giấy chứng nhận đã hiểu. Khi cần dùng một niềm tin để quyết định, hãy dựng chuỗi nguyên nhân, nêu điều kiện và nói rõ phần mượn từ người khác. Hãy chọn một quyết định trong tuần này, viết BẢN ĐỒ trong năm phút trước khi chốt cuộc họp. Nếu video giúp bạn có một câu hỏi chính xác hơn, hãy thích video và đăng ký kênh để theo dõi chuỗi cơ chế tâm lý đời thường. Tập sau, chúng ta xem vì sao một câu chuyện dễ nhớ có thể làm ta đánh giá xác suất sai: hiệu ứng sẵn có.",
+      "visual_intent": "Người đóng sổ ghi chú, gửi một quyết định đã được làm rõ, rồi nhìn sang thẻ chủ đề tập tiếp theo.",
+      "pexels_query": "professional closing notebook sending clear decision laptop",
+      "caption": "Hỏi tiếp trước khi chốt",
+      "hook": false,
+      "transition": null,
+      "payoff": "Cầu nối sang hiệu ứng sẵn có."
+    }
+  ]
+}

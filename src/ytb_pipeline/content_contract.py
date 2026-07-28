@@ -19,7 +19,7 @@ CONTRACT_VERSION = "2026-07-23.1"
 # xem data/ledger.md 2026-07-22). 1600 vẫn cao hơn median Short để không siết
 # quá tay content budget, nhưng đủ thấp để safety margin trong
 # `safe_character_bounds` có tác dụng thật thay vì bị hằng số gốc nuốt mất.
-F5_CHARS_PER_MIN = 1_600.0
+F5_CHARS_PER_MIN = 1347.0
 EDGE_CHARS_PER_MIN = 1_197.0
 TRANSITION_OVERLAP_SEC = 0.4
 

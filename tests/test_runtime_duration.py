@@ -34,7 +34,7 @@ def _rendered(tmp_path: Path, *, video_type: str) -> RenderedVideo:
 
 
 def test_f5_planning_rate_matches_measured_production_pacing():
-    assert chars_per_min_for_provider("f5") == 1600.0
+    assert chars_per_min_for_provider("f5") == 1347.0
     assert chars_per_min_for_provider("edge") == 1197.0
 
 
