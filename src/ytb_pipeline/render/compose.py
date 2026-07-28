@@ -375,10 +375,11 @@ CAPTION_BAND = (13, 17, 23, 175)   # dải nền mờ phía sau cho dễ đọc
 
 
 def _image_audio_clip(png: Path, audio: Path, out: Path) -> None:
+    duration = _audio_duration(audio)
     subprocess.run(
         ["ffmpeg", "-y", "-loop", "1", "-i", str(png), "-i", str(audio),
          "-c:v", "libx264", "-tune", "stillimage", "-pix_fmt", "yuv420p",
-         "-c:a", "aac", "-b:a", "192k", "-shortest", str(out)],
+         "-c:a", "aac", "-b:a", "192k", "-t", f"{duration:.6f}", "-shortest", str(out)],
         capture_output=True, check=True,
     )
 
