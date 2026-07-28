@@ -106,7 +106,7 @@ def _synth_all_edge_parallel(script: Script, slug: str, profile: VoiceProfile) -
     """
     from concurrent.futures import ThreadPoolExecutor
 
-    pending: list[tuple[int, Segment, Path]] = []
+    pending: list[tuple[int, Segment, Path, VoiceProfile]] = []
     voiced: list[Segment | None] = [None] * len(script.segments)
 
     for i, seg in enumerate(script.segments):
@@ -116,10 +116,10 @@ def _synth_all_edge_parallel(script: Script, slug: str, profile: VoiceProfile) -
         if dur > 0:
             voiced[i] = replace(seg, audio_path=seg_path, duration_sec=dur)
         else:
-            pending.append((i, seg, seg_path))
+            pending.append((i, seg, seg_path, segment_profile))
 
-    def _work(item: tuple[int, Segment, Path]) -> tuple[int, Segment]:
-        i, seg, seg_path = item
+    def _work(item: tuple[int, Segment, Path, VoiceProfile]) -> tuple[int, Segment]:
+        i, seg, seg_path, segment_profile = item
         _synth_segment(_prepare_narration(seg.narration), script.voice, seg_path, segment_profile)
         dur = _probe_duration(seg_path)
         return i, replace(seg, audio_path=seg_path, duration_sec=dur)
@@ -216,13 +216,17 @@ def _synth_all_f5(script: Script, slug: str, profile: VoiceProfile) -> list[Segm
 
 def _segment_audio_path(slug: str, profile: VoiceProfile, index: int) -> Path:
     # Changing F5 tempo must not resume a segment rendered at an older speed.
-    # Edge has its own remote rate setting and keeps its existing cache key.
+    # An explicit Edge rate override must also keep cached audio distinct.
     f5_cache_key = (
         f"_f5x{profile.f5_tempo:.2f}p{profile.pitch_semitones:+.1f}"
         f"g{profile.gain_db:+.1f}b{profile.pause_before:.2f}a{profile.pause_after:.2f}"
         if settings.tts_provider == "f5" else ""
     )
-    return AUDIO_DIR / f"{slug}_{profile.name}{f5_cache_key}_{index:02d}.mp3"
+    edge_cache_key = (
+        f"_edge{settings.edge_tts_rate_override.replace('+', 'p').replace('-', 'm').rstrip('%')}"
+        if settings.tts_provider == "edge" and settings.edge_tts_rate_override else ""
+    )
+    return AUDIO_DIR / f"{slug}_{profile.name}{f5_cache_key}{edge_cache_key}_{index:02d}.mp3"
 
 
 def _edge_rate_pct(edge_rate: str) -> int:
@@ -448,7 +452,7 @@ async def _tts(text: str, voice: str, out: Path, profile: VoiceProfile | None = 
             communicate = edge_tts.Communicate(
                 text,
                 voice,
-                rate=profile.edge_rate,
+                rate=settings.edge_tts_rate_override or profile.edge_rate,
                 pitch=profile.edge_pitch,
             )
             await communicate.save(str(out))

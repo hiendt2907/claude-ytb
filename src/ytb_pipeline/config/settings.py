@@ -1,5 +1,6 @@
 """Cấu hình tập trung, nạp từ env vars. Validate tại startup (fail fast)."""
 
+import re
 from pathlib import Path
 from typing import Literal
 
@@ -15,6 +16,8 @@ class Settings(BaseSettings):
 
     # TTS
     tts_provider: str = "f5"  # f5 | vieneu | vixtts | edge | elevenlabs
+    # Optional operator override for Edge remote speech rate. Empty keeps the profile rate.
+    edge_tts_rate_override: str = ""
     elevenlabs_api_key: str = ""
     vieneu_tts_cmd: str = ""
     vixtts_cmd: str = ""
@@ -145,6 +148,16 @@ class Settings(BaseSettings):
         """Keep an empty env var opt-in rather than resolving it to ``Path('.')``."""
         if isinstance(value, str) and not value.strip():
             return None
+        return value
+
+    @field_validator("edge_tts_rate_override")
+    @classmethod
+    def _edge_tts_rate_override_is_valid(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            return ""
+        if not re.fullmatch(r"[+-](?:[0-9]|[1-9][0-9]|100)%", value):
+            raise ValueError("EDGE_TTS_RATE_OVERRIDE must be between -100% and +100%.")
         return value
 
     def model_post_init(self, __context) -> None:  # noqa: ANN001
