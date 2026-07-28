@@ -20,7 +20,8 @@ from typing import Any, Callable, Mapping, Protocol
 
 from ..pkg.models import Voiceover
 
-_CACHE_VERSION = 2
+_CACHE_VERSION = 3
+TRANSCRIPT_SIMILARITY_ALGORITHM = "sequence-matcher-no-autojunk-v1"
 _WORD_RE = re.compile(r"[\wÀ-ỹ]+", re.UNICODE)
 
 
@@ -431,6 +432,7 @@ def _gate_cache_context(
         }
     return {
         "version": _CACHE_VERSION,
+        "transcript_similarity_algorithm": TRANSCRIPT_SIMILARITY_ALGORITHM,
         "thresholds": {
             "duration_tolerance_sec": duration_tolerance_sec,
             "transcript_similarity_threshold": transcript_similarity_threshold,
@@ -486,7 +488,9 @@ def _number(value: object) -> float | None:
 
 
 def _transcript_similarity(expected: str, actual: str) -> float:
-    return SequenceMatcher(None, _normalise_words(expected), _normalise_words(actual)).ratio()
+    return SequenceMatcher(
+        None, _normalise_words(expected), _normalise_words(actual), autojunk=False,
+    ).ratio()
 
 
 def _normalise_words(text: str) -> str:
