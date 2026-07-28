@@ -36,6 +36,12 @@ F5_DEVICE = "mps"  # GPU Apple Silicon; đổi "cpu" nếu máy khác
 # PYTHONHASHSEED (which CPython limits to 32 bits). Keep the inference seed in
 # the worker contract so all helper processes remain startable.
 F5_INFERENCE_SEED = 0
+# The isolated 3-minute Long E2E run measured only 71.6s at 0.85 for a script
+# that legitimately passed the 3-minute planning budget.  Use F5's documented
+# safe floor so the acoustic output remains near natural duration before the
+# bounded 0.95–1.18 playback tempo is applied. This is deliberately separate
+# from the user-facing f5_tempo envelope.
+F5_INFERENCE_SPEED = 0.30
 
 F5_REF_AUDIO = ROOT / "assets" / "ref" / "narrator.wav"
 F5_REF_TEXT_FILE = ROOT / "assets" / "ref" / "narrator.txt"

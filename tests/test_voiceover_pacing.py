@@ -208,11 +208,14 @@ def test_legacy_hook_copy_does_not_route_every_section_as_hook():
 
 
 def test_f5_segment_cache_key_includes_tempo(monkeypatch):
+    from ytb_pipeline.voiceover.f5_provider import F5_INFERENCE_SPEED
+
     monkeypatch.setattr(tts.settings, "tts_provider", "f5")
 
     path = tts._segment_audio_path("demo", tts.VOICE_KNOWLEDGE, 0)
 
-    assert "f5x1.96" in path.name
+    assert f"f5x{tts.VOICE_KNOWLEDGE.f5_tempo:.2f}" in path.name
+    assert f"s{F5_INFERENCE_SPEED:.2f}" in path.name
 
 
 def test_to_mp3_trims_provider_boundary_silence(monkeypatch, tmp_path):
