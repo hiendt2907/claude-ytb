@@ -376,8 +376,12 @@ CAPTION_BAND = (13, 17, 23, 175)   # dải nền mờ phía sau cho dễ đọc
 
 def _image_audio_clip(png: Path, audio: Path, out: Path) -> None:
     duration = _audio_duration(audio)
+    # Keep the looped image alive for one extra 25fps frame.  `-shortest` then
+    # ends on the complete audio stream rather than truncating audio that ends
+    # between video-frame boundaries.
+    video_input_duration = duration + 1 / 25
     subprocess.run(
-        ["ffmpeg", "-y", "-loop", "1", "-t", f"{duration:.6f}", "-i", str(png), "-i", str(audio),
+        ["ffmpeg", "-y", "-loop", "1", "-t", f"{video_input_duration:.6f}", "-i", str(png), "-i", str(audio),
          "-c:v", "libx264", "-tune", "stillimage", "-pix_fmt", "yuv420p",
          "-c:a", "aac", "-b:a", "192k", "-shortest", str(out)],
         capture_output=True, check=True,
