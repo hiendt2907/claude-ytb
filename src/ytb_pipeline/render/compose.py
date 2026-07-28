@@ -2,7 +2,7 @@
 
 import subprocess
 import tempfile
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -35,6 +35,16 @@ MONO_CANDIDATES = [
     "/System/Library/Fonts/Monaco.ttf",
     "/System/Library/Fonts/SFNSMono.ttf",
 ]
+
+
+@dataclass(frozen=True)
+class _TerminalLayout:
+    font: ImageFont.FreeTypeFont
+    padding: int
+    code_lines: list[str]
+    line_height: int
+    bar_height: int
+    card_height: int
 
 
 def render_video(voiceover: Voiceover) -> RenderedVideo:
@@ -175,37 +185,41 @@ def _caption_image(text: str, index: int, total: int, thumbnail: bool = False,
 def _terminal_segment(seg, index: int, total: int,
                       dims: tuple[int, int] | None = None) -> Image.Image:
     """Caption phía trên + terminal card hiển thị lệnh ở giữa."""
-    width, _ = dims or _dims()
+    width, height = dims or _dims()
     img = _gradient(dims=dims)
     draw = ImageDraw.Draw(img)
 
     # caption (tiêu đề đoạn) — KHÔNG hiện số thứ tự
-    cap_font = _font(78)
+    landscape = width > height
+    cap_font = _font(54 if landscape else 78)
     cap_lines = _wrap(draw, seg.caption, cap_font, max_width=width - 140)
     cap_h = (cap_font.getbbox("Ag")[3] + 18)
-    y = 360
+    y = int(height * 0.12) if landscape else 360
     for line in cap_lines:
         draw.text((width / 2, y, ), line, font=cap_font,
                   fill=DANGER if seg.danger else FG, anchor="ma")
         y += cap_h
 
     # terminal card
-    _draw_terminal(img, draw, seg.code, top=y + 90, danger=seg.danger, width=width)
+    _draw_terminal(
+        img, draw, seg.code, top=y + 90, danger=seg.danger,
+        width=width, height=height,
+    )
     return img
 
 
 def _draw_terminal(img, draw, code: str, top: int, danger: bool,
-                   width: int | None = None) -> None:
-    width = width or _dims()[0]
-    mono = _mono(58)
-    pad = 60
+                   width: int | None = None, height: int | None = None) -> None:
+    width, height = width or _dims()[0], height or _dims()[1]
+    layout = _terminal_layout(draw, code, width=width, top=top, height=height)
+    mono = layout.font
+    pad = layout.padding
     card_w = width - 120
     x0 = 60
-    # đo chiều cao theo số dòng (wrap lệnh dài)
-    code_lines = _wrap_mono(draw, code, mono, card_w - 2 * pad - 40)
-    line_h = mono.getbbox("Ag")[3] + 22
-    bar_h = 90
-    card_h = bar_h + pad + line_h * len(code_lines) + pad
+    code_lines = layout.code_lines
+    line_h = layout.line_height
+    bar_h = layout.bar_height
+    card_h = layout.card_height
     y0 = top
     radius = 32
 
@@ -231,6 +245,38 @@ def _draw_terminal(img, draw, code: str, top: int, danger: bool,
         draw.text((x0 + pad + pw, cy), line, font=mono,
                   fill=DANGER if danger else FG, anchor="la")
         cy += line_h
+
+
+def _terminal_layout(draw, code: str, *, width: int, top: int, height: int) -> _TerminalLayout:
+    """Fit a terminal card within the available frame height.
+
+    Normal portrait cards keep their previous typography.  Landscape cards can
+    have much less vertical space, so the type scales down before content is
+    ellipsized as a final fallback instead of drawing beyond the canvas.
+    """
+    card_width = width - 120
+    available_height = max(1, height - top - 48)
+    for font_size in range(58, 17, -2):
+        mono = _mono(font_size)
+        pad = max(24, round(font_size * 1.03))
+        code_lines = _wrap_mono(draw, code, mono, card_width - 2 * pad - 40)
+        line_height = mono.getbbox("Ag")[3] + max(10, round(font_size * 0.38))
+        bar_height = max(56, round(font_size * 1.55))
+        card_height = bar_height + pad + line_height * len(code_lines) + pad
+        if card_height <= available_height:
+            return _TerminalLayout(mono, pad, code_lines, line_height, bar_height, card_height)
+
+    mono = _mono(18)
+    pad = 24
+    code_lines = _wrap_mono(draw, code, mono, card_width - 2 * pad - 40)
+    line_height = mono.getbbox("Ag")[3] + 10
+    bar_height = 56
+    max_lines = max(1, (available_height - bar_height - 2 * pad) // line_height)
+    if len(code_lines) > max_lines:
+        code_lines = code_lines[:max_lines]
+        code_lines[-1] = f"{code_lines[-1][:-1]}…"
+    card_height = bar_height + pad + line_height * len(code_lines) + pad
+    return _TerminalLayout(mono, pad, code_lines, line_height, bar_height, card_height)
 
 
 def _wrap_mono(draw, text: str, font, max_width: int) -> list[str]:
