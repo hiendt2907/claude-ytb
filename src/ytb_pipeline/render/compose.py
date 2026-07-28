@@ -193,9 +193,12 @@ def _terminal_segment(seg, index: int, total: int,
     # caption (tiêu đề đoạn) — KHÔNG hiện số thứ tự
     landscape = width > height
     cap_font = _font(54 if landscape else 78)
-    cap_lines = _wrap(draw, seg.caption, cap_font, max_width=width - 140)
     cap_h = (cap_font.getbbox("Ag")[3] + 18)
     y = int(height * 0.12) if landscape else 360
+    cap_lines, caption_bottom, terminal_layout = _fit_terminal_caption(
+        draw, seg.caption, seg.code, width=width, height=height,
+        start_y=y, font=cap_font, line_height=cap_h,
+    )
     for line in cap_lines:
         draw.text((width / 2, y, ), line, font=cap_font,
                   fill=DANGER if seg.danger else FG, anchor="ma")
@@ -203,7 +206,7 @@ def _terminal_segment(seg, index: int, total: int,
 
     # terminal card
     _draw_terminal(
-        img, draw, seg.code, top=y + 90, danger=seg.danger,
+        img, draw, seg.code, top=terminal_layout.top, danger=seg.danger,
         width=width, height=height,
     )
     return img
@@ -256,11 +259,7 @@ def _terminal_layout(draw, code: str, *, width: int, top: int, height: int) -> _
     ellipsized as a final fallback instead of drawing beyond the canvas.
     """
     card_width = width - 120
-    safe_bottom = height - 48
-    min_line_height = _mono(18).getbbox("Ag")[3] + 10
-    min_card_height = 56 + 24 + min_line_height + 24
-    top = max(0, min(top, safe_bottom - min_card_height))
-    available_height = max(1, safe_bottom - top)
+    available_height = max(1, height - top - 48)
     for font_size in range(58, 17, -2):
         mono = _mono(font_size)
         pad = max(24, round(font_size * 1.03))
@@ -282,6 +281,34 @@ def _terminal_layout(draw, code: str, *, width: int, top: int, height: int) -> _
         code_lines[-1] = f"{code_lines[-1][:-1]}…"
     card_height = bar_height + pad + line_height * len(code_lines) + pad
     return _TerminalLayout(top, mono, pad, code_lines, line_height, bar_height, card_height)
+
+
+def _fit_terminal_caption(
+    draw, caption: str, code: str, *, width: int, height: int,
+    start_y: int | None = None, font=None, line_height: int | None = None,
+) -> tuple[list[str], int, _TerminalLayout]:
+    """Shorten a slide-only code caption until the terminal can follow it.
+
+    The shared terminal drawer deliberately does not move its requested top:
+    compose_ai also calls it.  The slide renderer instead reserves space before
+    drawing its own caption, preserving a visible gap and frame bounds.
+    """
+    landscape = width > height
+    font = font or _font(54 if landscape else 78)
+    line_height = line_height or font.getbbox("Ag")[3] + 18
+    start_y = start_y if start_y is not None else (int(height * 0.12) if landscape else 360)
+    lines = _wrap(draw, caption, font, max_width=width - 140)
+    for count in range(len(lines), -1, -1):
+        caption_bottom = start_y + line_height * count
+        layout = _terminal_layout(
+            draw, code, width=width, top=caption_bottom + 90, height=height
+        )
+        if layout.top + layout.card_height <= height - 48:
+            visible = lines[:count]
+            if count and count < len(lines):
+                visible[-1] = f"{visible[-1].rstrip()}…"
+            return visible, caption_bottom, layout
+    raise RuntimeError("Không thể bố trí terminal card trong khung hình.")
 
 
 def _wrap_mono(draw, text: str, font, max_width: int) -> list[str]:
