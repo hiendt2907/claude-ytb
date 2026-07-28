@@ -53,4 +53,17 @@ def test_landscape_terminal_card_fits_within_the_frame():
         draw, "echo " + "x" * 400, width=width, top=top, height=height
     )
 
-    assert top + layout.card_height <= height - 48
+    assert layout.top + layout.card_height <= height - 48
+
+
+def test_landscape_terminal_card_moves_up_when_caption_consumes_the_frame():
+    """A long but valid caption must not force the code card out of frame."""
+    width, height, caption_bottom = 1920, 1080, 999
+    draw = ImageDraw.Draw(Image.new("RGB", (width, height)))
+
+    layout = compose._terminal_layout(
+        draw, "echo " + "x" * 400, width=width, top=caption_bottom, height=height
+    )
+
+    assert layout.top < caption_bottom
+    assert layout.top + layout.card_height <= height - 48
