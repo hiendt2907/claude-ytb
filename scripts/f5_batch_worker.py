@@ -59,6 +59,18 @@ def _inference_seed(manifest: dict) -> int:
     return seed
 
 
+def _validate_daemon_request_speed(request: dict, manifest: dict) -> None:
+    """Reject daemon jobs calibrated for a different acoustic speed."""
+    if "inference_speed" not in request:
+        raise ValueError("Daemon request thiếu inference_speed.")
+    requested = _inference_speed(request)
+    expected = _inference_speed(manifest)
+    if requested != expected:
+        raise ValueError(
+            f"Daemon inference_speed không khớp: request={requested:.2f}, daemon={expected:.2f}."
+        )
+
+
 def _is_valid_wav(path: Path) -> bool:
     """True nếu `path` là wav đọc được và có frame — chặn file dở dang do bị kill giữa lúc ghi."""
     try:
@@ -205,6 +217,7 @@ def _serve(socket_path: Path, manifest: dict) -> int:
                     stream.flush()
 
                 try:
+                    _validate_daemon_request_speed(request, manifest)
                     code = _run_jobs(tts, {**manifest, "jobs": request["jobs"]}, emit=emit)
                     if code:
                         stream.write(json.dumps({"event": "error", "detail": f"job worker exit {code}"}).encode("utf-8") + b"\n")

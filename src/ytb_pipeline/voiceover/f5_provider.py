@@ -235,7 +235,10 @@ def run_daemon_batch(socket_path: Path, jobs: list[dict]) -> None:
                     raise TimeoutError(f"F5 daemon chưa sẵn sàng: {socket_path}")
                 time.sleep(0.1)
         with client.makefile("rwb") as stream:
-            stream.write(json.dumps({"jobs": jobs}, ensure_ascii=False).encode("utf-8") + b"\n")
+            stream.write(json.dumps({
+                "jobs": jobs,
+                "inference_speed": F5_INFERENCE_SPEED,
+            }, ensure_ascii=False).encode("utf-8") + b"\n")
             stream.flush()
             for raw in stream:
                 event = json.loads(raw)
