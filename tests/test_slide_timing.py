@@ -17,4 +17,5 @@ def test_static_slide_clip_caps_video_to_measured_audio_duration(monkeypatch, tm
 
     compose._image_audio_clip(tmp_path / "frame.png", tmp_path / "segment.mp3", tmp_path / "clip.mp4")
 
-    assert command[command.index("-t") + 1] == "19.222517"
+    image_input = command.index("-i")
+    assert command[image_input - 2:image_input] == ["-t", "19.222517"]
