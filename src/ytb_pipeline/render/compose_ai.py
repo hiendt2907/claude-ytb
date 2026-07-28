@@ -434,14 +434,20 @@ def _static_overlay(seg, index: int, total: int,
 
     if seg.code and w <= h:
         cap_font = slide._font(78)
-        cap_lines = slide._wrap(draw, seg.caption, cap_font, max_width=w - 140)
         cap_h = cap_font.getbbox("Ag")[3] + 18
         y = 360
+        cap_lines, _, terminal_layout = slide._fit_terminal_caption(
+            draw, seg.caption, seg.code, width=w, height=h,
+            start_y=y, font=cap_font, line_height=cap_h,
+        )
         for line in cap_lines:
             draw.text((w / 2, y), line, font=cap_font,
                       fill=slide.DANGER if seg.danger else slide.FG, anchor="ma")
             y += cap_h
-        slide._draw_terminal(img, draw, seg.code, top=y + 90, danger=seg.danger)
+        slide._draw_terminal(
+            img, draw, seg.code, top=terminal_layout.top, danger=seg.danger,
+            width=w, height=h,
+        )
     return img
 
 
