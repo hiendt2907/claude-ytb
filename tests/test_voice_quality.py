@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from pathlib import Path
-
+import sys
+from types import ModuleType, SimpleNamespace
 from ytb_pipeline.pkg.models import Segment, Voiceover
 from ytb_pipeline.voiceover import quality
 
@@ -251,3 +252,75 @@ def test_settings_treats_blank_local_stt_model_path_as_disabled(monkeypatch):
     settings = Settings(_env_file=None)
 
     assert settings.quality_stt_model_path is None
+
+
+def test_settings_exposes_explicit_cpu_int8_stt_runtime_configuration(tmp_path):
+    from ytb_pipeline.config.settings import Settings
+
+    settings = Settings(
+        _env_file=None,
+        quality_stt_model_path=tmp_path,
+        quality_stt_device="cpu",
+        quality_stt_compute_type="int8",
+        quality_stt_cpu_threads=4,
+    )
+
+    assert (settings.quality_stt_device, settings.quality_stt_compute_type, settings.quality_stt_cpu_threads) == (
+        "cpu", "int8", 4,
+    )
+
+
+def test_settings_rejects_cpu_only_unsupported_stt_compute_types():
+    from pydantic import ValidationError
+    from ytb_pipeline.config.settings import Settings
+
+    for compute_type in ("float16", "int8_float16"):
+        try:
+            Settings(_env_file=None, quality_stt_device="cpu", quality_stt_compute_type=compute_type)
+        except ValidationError as exc:
+            assert "quality_stt_compute_type" in str(exc)
+        else:
+            raise AssertionError(f"CPU must reject {compute_type}")
+
+
+def test_faster_whisper_adapter_passes_explicit_cpu_int8_runtime(monkeypatch, tmp_path):
+    calls = []
+
+    class FakeModel:
+        def __init__(self, path, **kwargs):
+            calls.append((path, kwargs))
+
+        def transcribe(self, _audio_path, **_options):
+            return iter((SimpleNamespace(text="xin chào"),)), None
+
+    fake_module = ModuleType("faster_whisper")
+    fake_module.WhisperModel = FakeModel
+    monkeypatch.setitem(sys.modules, "faster_whisper", fake_module)
+    model_dir = tmp_path / "whisper-model"
+    model_dir.mkdir()
+    adapter = quality.FasterWhisperSttAdapter(
+        model_path=model_dir,
+        device="cpu",
+        compute_type="int8",
+        cpu_threads=4,
+        module_available=lambda _name: True,
+    )
+
+    assert adapter.transcribe(tmp_path / "audio.mp3") == "xin chào"
+    assert calls == [(str(model_dir), {"device": "cpu", "compute_type": "int8", "cpu_threads": 4})]
+
+
+def test_faster_whisper_adapter_runtime_changes_cache_context(tmp_path):
+    model_dir = tmp_path / "whisper-model"
+    model_dir.mkdir()
+    (model_dir / "model.bin").write_bytes(b"model")
+    cpu_int8 = quality.FasterWhisperSttAdapter(
+        model_path=model_dir, device="cpu", compute_type="int8", cpu_threads=4,
+        module_available=lambda _name: True,
+    )
+    cpu_float32 = quality.FasterWhisperSttAdapter(
+        model_path=model_dir, device="cpu", compute_type="float32", cpu_threads=4,
+        module_available=lambda _name: True,
+    )
+
+    assert cpu_int8.cache_context() != cpu_float32.cache_context()

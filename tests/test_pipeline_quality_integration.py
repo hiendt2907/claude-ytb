@@ -414,3 +414,37 @@ def test_pipeline_passes_an_explicit_local_stt_path_to_the_audio_gate(monkeypatc
     asyncio.run(pipeline.run_project(project, checkpoint, through="render"))
 
     assert captured["adapter"].model_path == model_dir
+
+
+def test_pipeline_passes_explicit_local_stt_runtime_to_the_audio_gate(monkeypatch, tmp_path):
+    audio_result = SimpleNamespace(
+        passed=True, issues=(), cache_key="audio-key", cached=False, metrics={}, repair_payload={},
+    )
+    project, checkpoint, _rendered_calls = _prepare_run(monkeypatch, tmp_path, audio_result)
+    model_dir = tmp_path / "whisper-model"
+    model_dir.mkdir()
+    captured = {}
+
+    def _gate(_voice, *, cache_dir, stt_adapter, require_transcript=False):
+        captured["adapter"] = stt_adapter
+        return audio_result
+
+    class PassingQa:
+        async def run(self, _payload):
+            return SimpleNamespace(status=pipeline.AgentStatus.SUCCESS, output={"passed": True})
+
+    monkeypatch.setattr(pipeline, "run_audio_quality_gate", _gate)
+    monkeypatch.setattr(pipeline, "QAAgent", PassingQa)
+    monkeypatch.setattr(pipeline.settings, "quality_gate_mode", "report")
+    monkeypatch.setattr(pipeline.settings, "quality_stt_model_path", model_dir)
+    monkeypatch.setattr(pipeline.settings, "quality_stt_device", "cpu", raising=False)
+    monkeypatch.setattr(pipeline.settings, "quality_stt_compute_type", "int8", raising=False)
+    monkeypatch.setattr(pipeline.settings, "quality_stt_cpu_threads", 4, raising=False)
+
+    asyncio.run(pipeline.run_project(project, checkpoint, through="render"))
+
+    assert (
+        captured["adapter"].device,
+        captured["adapter"].compute_type,
+        captured["adapter"].cpu_threads,
+    ) == ("cpu", "int8", 4)
