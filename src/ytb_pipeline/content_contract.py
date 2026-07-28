@@ -20,7 +20,11 @@ CONTRACT_VERSION = "2026-07-23.1"
 # quá tay content budget, nhưng đủ thấp để safety margin trong
 # `safe_character_bounds` có tác dụng thật thay vì bị hằng số gốc nuốt mất.
 F5_CHARS_PER_MIN = 1347.0
-EDGE_CHARS_PER_MIN = 1_197.0
+# The current knowledge profile requests Edge at +96%.  An isolated Long E2E
+# run measured 4,316 prepared Vietnamese characters in 161.4 seconds, or
+# 1,604 CPM rounded.  Planning must follow the active profile, while measured
+# audio remains the final runtime authority.
+EDGE_CHARS_PER_MIN = 1_604.0
 TRANSITION_OVERLAP_SEC = 0.4
 
 

@@ -45,3 +45,18 @@ def test_calibrated_e2e_long_fixture_loads_inside_safe_character_window():
     assert script.target_minutes == 3
     assert len(script.segments) == 8
     assert minimum <= characters <= maximum
+
+
+def test_expanded_e2e_fixture_fits_the_measured_edge_window():
+    _require_e2e_contract()
+
+    script = load_script(FIXTURE)
+    characters = sum(len(segment.narration) for segment in script.segments)
+    minimum, maximum = contract_for("long").safe_character_bounds(
+        chars_per_minute=chars_per_min_for_provider("edge"),
+        segment_count=len(script.segments),
+    )
+
+    assert characters == 5081
+    assert (minimum, maximum) == (4993, 6276)
+    assert minimum <= characters <= maximum

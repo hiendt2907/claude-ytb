@@ -33,9 +33,11 @@ def _rendered(tmp_path: Path, *, video_type: str) -> RenderedVideo:
     )
 
 
-def test_f5_planning_rate_matches_measured_production_pacing():
+def test_provider_planning_rates_match_measured_production_pacing():
     assert chars_per_min_for_provider("f5") == 1347.0
-    assert chars_per_min_for_provider("edge") == 1197.0
+    # Edge knowledge profile (+96%) measured 4,316 Vietnamese characters in
+    # 161.4 seconds during the isolated Long E2E run: 1,604 CPM rounded.
+    assert chars_per_min_for_provider("edge") == 1604.0
 
 
 def test_audio_gate_rejects_short_that_f5_spoke_too_fast(monkeypatch, tmp_path):
