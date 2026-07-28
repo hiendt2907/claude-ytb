@@ -39,6 +39,7 @@ MONO_CANDIDATES = [
 
 @dataclass(frozen=True)
 class _TerminalLayout:
+    top: int
     font: ImageFont.FreeTypeFont
     padding: int
     code_lines: list[str]
@@ -220,7 +221,7 @@ def _draw_terminal(img, draw, code: str, top: int, danger: bool,
     line_h = layout.line_height
     bar_h = layout.bar_height
     card_h = layout.card_height
-    y0 = top
+    y0 = layout.top
     radius = 32
 
     # thân terminal
@@ -255,7 +256,11 @@ def _terminal_layout(draw, code: str, *, width: int, top: int, height: int) -> _
     ellipsized as a final fallback instead of drawing beyond the canvas.
     """
     card_width = width - 120
-    available_height = max(1, height - top - 48)
+    safe_bottom = height - 48
+    min_line_height = _mono(18).getbbox("Ag")[3] + 10
+    min_card_height = 56 + 24 + min_line_height + 24
+    top = max(0, min(top, safe_bottom - min_card_height))
+    available_height = max(1, safe_bottom - top)
     for font_size in range(58, 17, -2):
         mono = _mono(font_size)
         pad = max(24, round(font_size * 1.03))
@@ -264,7 +269,7 @@ def _terminal_layout(draw, code: str, *, width: int, top: int, height: int) -> _
         bar_height = max(56, round(font_size * 1.55))
         card_height = bar_height + pad + line_height * len(code_lines) + pad
         if card_height <= available_height:
-            return _TerminalLayout(mono, pad, code_lines, line_height, bar_height, card_height)
+            return _TerminalLayout(top, mono, pad, code_lines, line_height, bar_height, card_height)
 
     mono = _mono(18)
     pad = 24
@@ -276,7 +281,7 @@ def _terminal_layout(draw, code: str, *, width: int, top: int, height: int) -> _
         code_lines = code_lines[:max_lines]
         code_lines[-1] = f"{code_lines[-1][:-1]}…"
     card_height = bar_height + pad + line_height * len(code_lines) + pad
-    return _TerminalLayout(mono, pad, code_lines, line_height, bar_height, card_height)
+    return _TerminalLayout(top, mono, pad, code_lines, line_height, bar_height, card_height)
 
 
 def _wrap_mono(draw, text: str, font, max_width: int) -> list[str]:
