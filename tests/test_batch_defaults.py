@@ -8,10 +8,12 @@ import pytest
 
 
 def _health_script() -> SimpleNamespace:
-    narration = (
+    unit = (
         "Bạn đi bộ sau bữa ăn và thấy cơ thể nhẹ hơn. Cơ chế nằm ở việc vận động nhẹ "
         "giúp cơ thể xử lý năng lượng ổn định hơn trong đời sống hàng ngày. "
-    ) * 12
+    )
+    from conftest import chars_for_minutes
+    narration = (unit * (-(-len(chars_for_minutes(1.2)) // len(unit))))[:len(chars_for_minutes(1.2))]
     return SimpleNamespace(
         slug="di-bo-sau-bua-an",
         topic="thói quen đi bộ sau bữa ăn",
@@ -290,7 +292,9 @@ def test_short_prompt_uses_a_safe_length_buffer_and_immediate_answer_contract():
         }
     )
 
-    assert "1,481-1,885" in prompt
+    from ytb_pipeline.orchestrator.ideation_prompts import SHORT_SAFE_MAX_CHARS, SHORT_SAFE_MIN_CHARS
+
+    assert f"{SHORT_SAFE_MIN_CHARS:,}-{SHORT_SAFE_MAX_CHARS:,}" in prompt
     assert "120 characters" in prompt
     assert "concrete tension marker" in prompt
     assert "exactly six sections" in prompt
@@ -673,15 +677,27 @@ def test_json_parser_heals_unescaped_quote_from_qwen(monkeypatch):
 
 
 def test_json_parser_heals_vietnamese_slug_with_diacritics(monkeypatch):
-    """slug tiếng Việt có dấu lọt vào JSON hỏng vẫn phải heal được thành string."""
+    """A missing closing brace is structural and must not be silently healed."""
     from ytb_pipeline.orchestrator.ideation_script_fix import json_from_llm
 
     broken = '{"slug": "vì sao "trì hoãn" là cơ chế sinh tồn", "ok": true'  # thiếu `}` cuối
 
-    result = json_from_llm(broken)
+    with pytest.raises(json.JSONDecodeError):
+        json_from_llm(broken)
 
-    assert isinstance(result["slug"], str)
-    assert result["ok"] is True
+
+def test_json_parser_rejects_the_recorded_xkiro_structural_corruption():
+    """The real extra quote must never expand six sections into repaired garbage."""
+    from pathlib import Path
+    from ytb_pipeline.orchestrator.ideation_script_fix import json_from_llm
+
+    raw = (
+        Path(__file__).resolve().parents[1]
+        / "assets/script_revisions/failed_ideation/candidate_1_20260824_160432_629562.raw.txt"
+    ).read_text(encoding="utf-8")
+
+    with pytest.raises(json.JSONDecodeError):
+        json_from_llm(raw)
 
 
 def test_json_parser_still_raises_original_error_when_unhealable(monkeypatch):

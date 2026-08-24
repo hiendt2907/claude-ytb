@@ -10,14 +10,59 @@ response đã hợp lệ (Claude/Codex không bị ảnh hưởng).
 
 from __future__ import annotations
 
+import re
 
-def heal_json(raw: str) -> dict:
-    """Best-effort repair cho JSON hỏng cú pháp (unescaped quote, ký tự lạc).
+
+def _is_unescaped_quote_inside_complete_json_container(raw: str, error_pos: int) -> bool:
+    """Allow repair only for a quote that prematurely ends a JSON string.
+
+    This deliberately rejects missing delimiters/braces and an extra quote
+    between JSON values.  `json_repair` is useful for one local escaping typo,
+    but is unsafe as a general structural parser for a publish pipeline.
+    """
+    if not (0 <= error_pos < len(raw)):
+        return False
+    # Python's decoder reports the character *after* a premature quote for
+    # ``Expecting ',' delimiter``.  Accept that one-position form only.
+    quote_pos = error_pos if raw[error_pos] == '"' else error_pos - 1
+    if quote_pos < 0 or raw[quote_pos] != '"':
+        return False
+    if raw.count("{") != raw.count("}") or raw.count("[") != raw.count("]"):
+        return False
+    # `,"{"key` is an extra quote between values, not a quote inside text.
+    # The recorded xKiro failure has exactly this shape.
+    if re.search(r',\s*"\s*\{\s*"', raw[max(0, quote_pos - 4):quote_pos + 4]):
+        return False
+    in_string = False
+    escaped = False
+    for char in raw[:quote_pos]:
+        if escaped:
+            escaped = False
+        elif char == "\\":
+            escaped = True
+        elif char == '"':
+            in_string = not in_string
+    return in_string
+
+
+def heal_json(raw: str, *, error_pos: int | None = None) -> dict:
+    """Repair only one unescaped quote inside an otherwise complete JSON string.
 
     Raise `ValueError` nếu không heal được thành `dict` — caller (`json_from_llm`)
     coi đây như JSON không parse được, giữ nguyên lỗi gốc cho người vận hành.
     """
+    import json
     import json_repair
+
+    if error_pos is None:
+        try:
+            json.loads(raw)
+        except json.JSONDecodeError as exc:
+            error_pos = exc.pos
+        else:
+            raise ValueError("heal_json chỉ nhận JSON đang hỏng.")
+    if not _is_unescaped_quote_inside_complete_json_container(raw, error_pos):
+        raise ValueError("JSON lỗi cấu trúc; không dùng json_repair.")
 
     data = json_repair.repair_json(raw, return_objects=True)
     if not isinstance(data, dict):

@@ -9,13 +9,13 @@ payload so the next QA gate can fail closed when Vietnamese encoding is lost.
 from __future__ import annotations
 
 import copy
+import json
 import re
 import unicodedata
 from typing import Any
 
-import json_repair
-
 from ..content_contract import CONTRACT_VERSION
+from ..orchestrator.ideation_json_heal import heal_json
 
 
 _NARRATION_KEYS = {"narration_text", "voiceover", "narration"}
@@ -81,9 +81,12 @@ def process_and_sanitize(raw_llm_output: str) -> dict:
     if not isinstance(raw_llm_output, str) or not raw_llm_output.strip():
         raise ValueError("raw_llm_output phải là JSON text không rỗng.")
     try:
-        payload = json_repair.repair_json(raw_llm_output, return_objects=True)
-    except Exception as exc:  # json_repair exposes several parser exceptions.
-        raise ValueError(f"Không thể heal JSON từ LLM: {exc}") from exc
+        payload = json.loads(raw_llm_output)
+    except json.JSONDecodeError as exc:
+        try:
+            payload = heal_json(raw_llm_output, error_pos=exc.pos)
+        except ValueError as heal_exc:
+            raise ValueError(f"Không thể parse JSON từ LLM: {exc}") from heal_exc
     if not isinstance(payload, dict):
         raise ValueError("Wording Engine chỉ nhận JSON object.")
 

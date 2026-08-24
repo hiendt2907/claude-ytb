@@ -41,8 +41,10 @@ def chars_per_min_for_provider(provider: str | None = None) -> float:
     return _contract_chars_per_min(provider or settings.tts_provider)
 
 
-# Tương thích cho prompt/test cũ; local F5 là mặc định của project.
-CHARS_PER_MIN = chars_per_min_for_provider("f5")
+# Compatibility export for older callers.  It must match the configured voice
+# provider; keeping F5 here would make fixtures and planning disagree with the
+# runtime duration gate whenever the provider changes.
+CHARS_PER_MIN = chars_per_min_for_provider()
 # Compatibility exports.  Values belong to ``content_contract.py``; stages
 # must call ``contract_for`` rather than introduce format-local thresholds.
 LONG_MIN_MINUTES = int(contract_for("long").viewer_runtime_bounds_sec[0] / 60)
@@ -343,7 +345,7 @@ def _validate_length(segments, target_minutes, name: str, *, renderer_aware: boo
         contract.transition_loss_sec(len(segments)) if renderer_aware else 0.0
     )
     if est_sec < required_target_sec:
-        chars_can = int(required_target_sec / 60 * CHARS_PER_MIN)
+        chars_can = int(required_target_sec / 60 * chars_per_min_for_provider())
         raise ValueError(
             f"Kịch bản {name}: nội dung quá mỏng — audio ước lượng ~{est_sec / 60:.1f} phút nhưng "
             f"mục tiêu {target_minutes:.0f} phút. Viết chi tiết & sâu hơn (cần ~"

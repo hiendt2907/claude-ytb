@@ -386,13 +386,14 @@ def test_fetch_broll_variants_tai_dung_khi_het_link_moi(monkeypatch, tmp_path):
 
 
 def test_loader_doc_emphasis_hook_transition(tmp_path):
+    from conftest import chars_for_minutes
     from ytb_pipeline.ideation.generator import load_script
     import json
     data = {
         "title": "T", "topic": "t", "description": "d",
         "compliance": {"passed": True},
         "sections": [
-            {"narration": "x" * 1600, "caption": "cap", "broll": "gym",
+            {"narration": chars_for_minutes(1.2), "caption": "cap", "broll": "gym",
              "emphasis": ["Quy tắc 2 phút"], "hook": True, "transition": True},
         ],
     }

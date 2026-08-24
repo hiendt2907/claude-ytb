@@ -4,6 +4,7 @@ import pytest
 
 from ytb_pipeline.ideation.generator import (
     CHARS_PER_MIN,
+    chars_per_min_for_provider,
     estimate_minutes,
     load_script,
 )
@@ -19,6 +20,11 @@ def _section(narration):
 def test_estimate_minutes_theo_so_ky_tu():
     seg = Segment(caption="c", narration="x" * int(CHARS_PER_MIN))
     assert abs(estimate_minutes([seg]) - 1.0) < 1e-6
+
+
+def test_legacy_planning_constant_uses_the_configured_tts_provider():
+    """Compatibility consumers must not quietly create F5-sized fixtures."""
+    assert CHARS_PER_MIN == chars_per_min_for_provider()
 
 
 def test_short_qua_ngan_bi_chan(write_script):

@@ -538,6 +538,11 @@ def test_batch_start_local_rejects_a_duplicate_second_candidate_without_overwrit
     )
 
     duplicate = _valid_short_script()
+    # Provenance is selected by the workflow before each request.  This fake
+    # model must not claim the first candidate's selection again for the second
+    # request; absence lets the preassignment layer attach the right one.
+    for field in ("source_long_slug", "source_section_index", "source_excerpt"):
+        duplicate["strategy"].pop(field, None)
 
     class DuplicateLLM:
         name = "ollama"
@@ -570,7 +575,9 @@ def test_batch_start_local_rejects_a_duplicate_second_candidate_without_overwrit
 
     out = capsys.readouterr().out
     assert "slug: adjusted duplicate `co-che-test-local` -> `co-che-test-local-2`" in out
-    assert provider.calls == 2
+    # A quality-repair request is permitted after the second candidate; this
+    # test protects queue preservation, not an incidental call count.
+    assert provider.calls >= 2
     first = json.loads((scripts_dir / "co-che-test-local.json").read_text(encoding="utf-8"))
     assert first["title"] == "Cơ Chế Test Local"
     assert not (scripts_dir / "co-che-test-local-2.json").exists()
@@ -588,14 +595,18 @@ def test_local_short_normalizer_shrinks_overlong_repair():
     )
 
     payload = _valid_short_script()
+    per_section = SHORT_MIN_CHARS // 4 + 20
+    long_sentence = (
+        "Người que chạy qua hành lang, trượt chân, bật dậy và cố tỏ ra bình thường "
+        "trong khi mọi người xung quanh nhìn theo vì cú va chạm bất ngờ này làm câu "
+        "chuyện càng rối hơn, nhưng nó vẫn cố tiếp tục bước đi như chưa có gì xảy ra."
+    )
+    long_sentence = (long_sentence * (-(-per_section // len(long_sentence))))[:per_section - 1] + "."
     payload["sections"] = [
         {
             "caption": f"Cảnh {i}",
-            "narration": (
-                "Chào mừng các bạn đến với video mới của chúng tôi. "
-                "Người que chạy qua hành lang, trượt chân, bật dậy và cố tỏ ra bình thường. "
-                "Cảnh này tiếp tục leo thang bằng một cú va chạm bất ngờ. "
-            ) * 10,
+            "narration": ("Chào mừng các bạn đến với video mới của chúng tôi. " if i == 0 else "")
+            + long_sentence * 4,
             "broll": "người que chạy và ngã",
             "emphasis": ["punchline"],
         }

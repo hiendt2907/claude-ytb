@@ -80,6 +80,18 @@ def _valid_payload(video_type: str = "short", **overrides) -> dict:
     return payload
 
 
+def test_release_contract_fails_closed_when_a_section_lacks_voiceover():
+    from ytb_pipeline.ideation.script_contract import validate_script_payload
+
+    payload = _valid_payload()
+    payload["sections"][2].pop("voiceover")
+
+    result = validate_script_payload(payload)
+
+    assert result.publishable is False
+    assert any(item.path == "sections[2]" for item in result.findings)
+
+
 def test_write_local_batch_item_honors_explicit_batch_key(tmp_path, monkeypatch):
     from ytb_pipeline.orchestrator import ideation_state
 

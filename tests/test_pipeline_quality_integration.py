@@ -17,6 +17,15 @@ from ytb_pipeline.project.checkpoint import CheckpointManager
 from ytb_pipeline.project.models import NodeStatus, Project
 
 
+def _short_fixture_text(prefix: str, *, fraction: float = 0.25) -> str:
+    """Keep pipeline fixtures inside the active provider's Short contract."""
+    from conftest import chars_for_minutes
+
+    target = int(len(chars_for_minutes(1.2)) * fraction)
+    filler = "Sự mơ hồ của bước đầu khiến ta ngần ngại bắt tay vào việc. "
+    return (prefix + " " + filler * (-(-target // len(filler))))[:target]
+
+
 def _raw_script_payload() -> dict:
     """Minimal on-disk payload satisfying script_contract.validate_script_payload.
 
@@ -70,9 +79,8 @@ def _script() -> Script:
     # QAAgent's always-on checks (compliance + length) run even with
     # strict=False, so this fixture needs a passing ComplianceCheck and
     # enough narration to clear content_contract's Short audio-runtime
-    # floor without exceeding its ceiling (~60-90s at the calibrated f5
-    # chars/minute rate, content_contract.py::F5_CHARS_PER_MIN).
-    filler = "Sự mơ hồ của bước đầu khiến ta ngần ngại bắt tay vào việc. " * 7
+    # floor without exceeding its ceiling at the active provider's calibrated
+    # chars/minute rate.
     return Script(
         topic="Trì hoãn",
         title="Não né việc khó",
@@ -88,10 +96,10 @@ def _script() -> Script:
             coppa="không hướng tới trẻ em",
         ),
         segments=(
-            Segment("Tình huống", "Mở laptop rồi lại cầm điện thoại." + filler, purpose="situation"),
-            Segment("Cơ chế", "Não né sự mơ hồ của việc khó." + filler, purpose="core_answer"),
-            Segment("Thử ngay", "Viết bước đầu tiên trong mười phút." + filler, purpose="application"),
-            Segment("Chốt", "Rõ bước đầu, não bớt né việc khó." + filler, purpose="payoff"),
+            Segment("Tình huống", _short_fixture_text("Mở laptop rồi lại cầm điện thoại."), purpose="situation"),
+            Segment("Cơ chế", _short_fixture_text("Não né sự mơ hồ của việc khó."), purpose="core_answer"),
+            Segment("Thử ngay", _short_fixture_text("Viết bước đầu tiên trong mười phút."), purpose="application"),
+            Segment("Chốt", _short_fixture_text("Rõ bước đầu, não bớt né việc khó."), purpose="payoff"),
         ),
     )
 
@@ -303,7 +311,6 @@ def test_strict_post_render_qa_failure_preserves_render_checkpoint(monkeypatch, 
     # blank for the other, non-publish tests in this file, so this test
     # supplies its own strict-QA-compliant Script/metadata instead of
     # mutating the shared fixture).
-    filler = "Một bước nhỏ mỗi ngày giúp giảm sự mơ hồ khi bắt đầu. " * 7
     strict_script = Script(
         topic="Trì hoãn",
         title="Não né việc khó",
@@ -320,19 +327,19 @@ def test_strict_post_render_qa_failure_preserves_render_checkpoint(monkeypatch, 
         ),
         segments=(
             Segment(
-                "Tình huống", "Bạn định làm việc ngay, nhưng tay lại mở điện thoại trước." + filler,
+                "Tình huống", _short_fixture_text("Bạn định làm việc ngay, nhưng tay lại mở điện thoại trước."),
                 purpose="situation", pexels_query="person checking phone at desk", payoff="x",
             ),
             Segment(
-                "Giải thích", "Não né sự mơ hồ của việc khó." + filler,
+                "Giải thích", _short_fixture_text("Não né sự mơ hồ của việc khó."),
                 purpose="core_answer", pexels_query="person staring at blank page", payoff="x",
             ),
             Segment(
-                "Thử ngay", "Viết bước đầu tiên trong mười phút." + filler,
+                "Thử ngay", _short_fixture_text("Viết bước đầu tiên trong mười phút."),
                 purpose="application", pexels_query="person writing in notebook at desk", payoff="x",
             ),
             Segment(
-                "Chốt", "Rõ bước đầu, não bớt né việc khó. Hãy viết một dòng vào sổ ngay hôm nay." + filler,
+                "Chốt", _short_fixture_text("Rõ bước đầu, não bớt né việc khó. Hãy viết một dòng vào sổ ngay hôm nay."),
                 purpose="payoff", pexels_query="person closing notebook satisfied",
                 payoff="Bạn thấy bước đầu rõ ràng hơn.",
             ),

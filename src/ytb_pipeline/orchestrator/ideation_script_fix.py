@@ -115,7 +115,7 @@ def json_from_llm(text: str) -> dict:
 def _heal_or_reraise(candidate: str, original: json.JSONDecodeError) -> dict:
     """Thử heal_json (json_repair); nếu không cứu được thì giữ nguyên lỗi gốc."""
     try:
-        healed = heal_json(candidate)
+        healed = heal_json(candidate, error_pos=original.pos)
     except ValueError:
         raise original from None
     # Tín hiệu chất lượng: heal_json chạy nghĩa là LLM provider trả JSON hỏng cú

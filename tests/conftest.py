@@ -25,7 +25,7 @@ def _isolate_batch_state(tmp_path, monkeypatch):
         '{"shorts_funnel_batch_test": {"long_videos": [], "short_videos": []}}', encoding="utf-8"
     )
 
-from ytb_pipeline.ideation.generator import CHARS_PER_MIN
+from ytb_pipeline.ideation.generator import chars_per_min_for_provider
 
 
 def passing_compliance(**overrides) -> dict:
@@ -65,8 +65,8 @@ def make_script(sections, *, target_minutes=None, compliance=None, **fields) -> 
 
 
 def chars_for_minutes(minutes: float) -> str:
-    """Chuỗi narration ước lượng đúng `minutes` phút theo CHARS_PER_MIN."""
-    return "x" * int(CHARS_PER_MIN * minutes)
+    """Chuỗi narration theo tốc độ của TTS provider đang được cấu hình."""
+    return "x" * int(chars_per_min_for_provider() * minutes)
 
 
 @pytest.fixture
