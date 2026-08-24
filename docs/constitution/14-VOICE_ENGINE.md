@@ -4,9 +4,9 @@
 
 Own text-to-speech synthesis end to end — provider selection, voice cloning,
 prosody, Vietnamese pronunciation correctness, chunking, batching, and
-resume — generalizing the project's existing `tts.py`/`f5_provider.py`/
-`pronunciation.py` trio into a provider-agnostic engine with the same
-local-first discipline as the rest of the stack.
+resume — generalizing the project's existing providers into a
+provider-agnostic engine. Under the 2026-08-24 amendment, xKiro is the
+cloud-primary default; local voice providers remain explicit options.
 
 ## Provider Interface
 
@@ -52,19 +52,17 @@ class VoiceProvider(Protocol):
 
 | Provider | Type | Notes |
 |---|---|---|
-| **F5-TTS** | local | Vietnamese fine-tuned (`hynt/F5-TTS-Vietnamese-ViVoice`, the project's existing checkpoint). Zero-shot voice clone from a reference clip. Primary provider for the channel's anonymous narrator voice. Runs on MPS; segfaults on overly long single-pass text (existing `F5_MAX_CHARS=300` guard). |
+| **xKiro** | cloud | Current default (`tts_provider="xkiro"`), via the OpenAI-compatible speech endpoint. |
+| **F5-TTS** | local, opt-in | Vietnamese fine-tuned (`hynt/F5-TTS-Vietnamese-ViVoice`) and available when explicitly configured. |
 | **Kokoro** | local | Lightweight, fast local alternative; useful for high-volume low-stakes synthesis (e.g. rapid draft-pass narration during iteration, before committing to the slower F5-TTS clone pass for final output). |
 | **XTTS** | local | Multilingual voice-clone alternative to F5-TTS; candidate fallback if F5-TTS's Vietnamese checkpoint has a specific phrase/term it handles poorly. |
-| **Edge-TTS** | online, free | The project's current default (`tts_provider="edge"`). No API key required, no voice cloning, coarser prosody control. Useful as a no-setup fallback and for rapid prototyping before F5-TTS voice-clone infrastructure is configured on a new machine. |
+| **Edge-TTS** | online, free | Configured alternative; no API key required, no voice cloning, and coarser prosody control. |
 | **ElevenLabs** | cloud | Cloud fallback for highest-quality multi-voice/emotional-range needs beyond current local model capability; opt-in given per-character cost. |
 
-Default chain: `[f5_tts_local, edge_tts_online, elevenlabs_cloud]` for the
-channel's primary cloned-narrator voice; `kokoro_local` is selected
-explicitly for draft/preview passes rather than sitting in the production
-fallback chain, since draft and final audio should not be silently
-interchangeable in the cache (different provider = different content hash,
-per 09-ASSET_ENGINE, so this is enforced structurally, not just by
-convention).
+Default voice provider: `xkiro`. F5, Edge-TTS, ElevenLabs and other registered
+voices are explicit configuration choices; unlike ideation, this document does
+not define an automatic cross-provider TTS cascade. Provider identity remains
+part of the cache key, so draft/final audio is not silently interchangeable.
 
 ## Voice Cloning
 
@@ -223,11 +221,11 @@ content-hash addressing closes this gap by construction.
 
 ## Current State
 
-- `voiceover/tts.py` — dispatcher selecting between `edge` (default,
-  `edge_tts` library, online/free) and `f5` (local voice-clone) via
-  `settings.tts_provider`. Edge path synthesizes per-segment sequentially
-  with file-existence-based resume; F5 path delegates the whole script to
-  `_synth_all_f5` for one-load batch processing.
+- `providers/voice/xkiro_provider.py` — current default provider, selected by
+  `settings.tts_provider="xkiro"`; it synthesizes through xKiro's speech
+  endpoint with retries and cache-aware segment filenames.
+- `voiceover/tts.py` and local F5 support remain available when explicitly
+  selected; F5 retains its one-load batch behavior.
 - `voiceover/f5_provider.py` — F5-TTS adapter: builds the manifest, invokes
   `scripts/f5_batch_worker.py` in `.venv-tts` (separate Python 3.12
   environment, since F5-TTS/torch don't yet support the main pipeline's

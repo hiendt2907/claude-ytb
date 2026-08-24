@@ -148,7 +148,7 @@ narration segment (Segment.narration, Segment.duration_sec)
     — includes segment narration, prior scene's character roster (continuity)
         │
         ▼
-[2] LLM Call (Ollama/Qwen3, local-first per provider system)
+[2] LLM Call (xKiro default; ideation cascade per provider system)
     — returns JSON matching StickmanScene schema (strict; reject + retry on
       schema violation, never best-effort parse of free text)
         │

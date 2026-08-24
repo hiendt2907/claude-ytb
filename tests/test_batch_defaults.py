@@ -11,7 +11,7 @@ def _health_script() -> SimpleNamespace:
     narration = (
         "Bạn đi bộ sau bữa ăn và thấy cơ thể nhẹ hơn. Cơ chế nằm ở việc vận động nhẹ "
         "giúp cơ thể xử lý năng lượng ổn định hơn trong đời sống hàng ngày. "
-    ) * 15
+    ) * 12
     return SimpleNamespace(
         slug="di-bo-sau-bua-an",
         topic="thói quen đi bộ sau bữa ăn",
@@ -104,6 +104,16 @@ def test_personal_finance_psychology_prompt_requires_a_claim_level_evidence_regi
     assert "personal_finance_psychology" in prompt
     assert "evidence_register" in prompt
     assert "primary, peer-reviewed, or official source" in prompt
+
+
+def test_finance_safety_exclusion_does_not_activate_finance_editorial_profile():
+    from ytb_pipeline.orchestrator.ideation_prompts import is_personal_finance_psychology_request
+
+    for requirement in (
+        "Thiên kiến hiện trạng; không tư vấn tài chính hay y tế.",
+        "Thiên kiến hiện trạng; tránh chủ đề tài chính, y tế.",
+    ):
+        assert is_personal_finance_psychology_request(requirement) is False
 
 
 def test_financial_evidence_gate_rejects_an_unverifiable_register():
@@ -199,14 +209,15 @@ def test_script_providers_allow_long_generation_budget(monkeypatch):
     assert observed == [3600, 3600]
 
 
-def test_batch_start_uses_ollama_script_provider_when_configured(monkeypatch):
-    """Amendment 2026-07-23 (docs/TOOL_UPGRADE_PLAN.md): settings.llm_provider
-    == "ollama" phải route qua OllamaScriptProvider (fallback Claude), không
-    còn raise SystemExit như invariant cũ."""
+def test_batch_start_uses_xkiro_cascade_provider_by_default(monkeypatch):
+    """Amendment 2026-08-24 (PROJECT_VISION.md Amendment Log): settings.llm_provider
+    == "xkiro" (default) phải route qua CascadeScriptProvider (xKiro -> Codex CLI
+    -> Claude CLI), không raise SystemExit."""
     from ytb_pipeline.orchestrator import ideation_cmd
+    from ytb_pipeline.orchestrator.ideation_provider_cascade import CascadeScriptProvider
 
     monkeypatch.setattr(ideation_cmd, "_cli", lambda: type("CLI", (), {
-        "settings": type("Settings", (), {"llm_provider": "ollama"})(),
+        "settings": type("Settings", (), {"llm_provider": "xkiro"})(),
     })())
 
     captured: dict = {}
@@ -228,7 +239,8 @@ def test_batch_start_uses_ollama_script_provider_when_configured(monkeypatch):
         "clear_ledger": False,
     })())
 
-    assert captured["provider"].name == "ollama"
+    assert isinstance(captured["provider"], CascadeScriptProvider)
+    assert captured["provider"].name == "xkiro"
     assert captured["strict_qa"] is True
 
 
@@ -259,6 +271,16 @@ def test_system_prompt_makes_strategy_v1_non_negotiable_for_every_new_short():
     assert "core_answer" in SCRIPT_GENERATION_SYSTEM_PROMPT
 
 
+def test_system_prompt_does_not_require_removed_central_mechanism_scanner():
+    """Qwen must not be constrained by a QA rule that no longer exists."""
+    from ytb_pipeline.orchestrator.ideation_prompts import SCRIPT_GENERATION_SYSTEM_PROMPT
+
+    prompt = SCRIPT_GENERATION_SYSTEM_PROMPT.casefold()
+
+    assert "automated scanner reads every distinct phrase" not in prompt
+    assert "never write \"cơ chế\" followed by" not in prompt
+
+
 def test_short_prompt_uses_a_safe_length_buffer_and_immediate_answer_contract():
     from ytb_pipeline.orchestrator.ideation_prompts import local_script_prompt
 
@@ -268,7 +290,7 @@ def test_short_prompt_uses_a_safe_length_buffer_and_immediate_answer_contract():
         }
     )
 
-    assert "1,760-2,240" in prompt
+    assert "1,481-1,885" in prompt
     assert "120 characters" in prompt
     assert "concrete tension marker" in prompt
     assert "exactly six sections" in prompt
@@ -380,6 +402,25 @@ def test_long_prompt_declares_a_safe_runtime_floor():
     assert "first 28 spoken words after the greeting" in SCRIPT_GENERATION_SYSTEM_PROMPT
 
 
+def test_long_prompt_uses_the_active_contract_not_legacy_duration_or_section_counts():
+    """The E2E 3-minute contract must not inherit production's 12-minute prose."""
+    from ytb_pipeline.orchestrator.ideation_prompts import (
+        LONG_CONTRACT,
+        LONG_MAX_MINUTES,
+        LONG_MIN_MINUTES,
+        PLANNING_CHARS_PER_MIN,
+        local_script_prompt,
+    )
+
+    prompt = local_script_prompt(1, 1, "long", "một cơ chế tâm lý", "")
+    expected_max_sections = int(LONG_CONTRACT.minimum_sections * 1.5)
+
+    assert f"{LONG_MIN_MINUTES}-{LONG_MAX_MINUTES} min at {PLANNING_CHARS_PER_MIN:.0f}" in prompt
+    assert f"{LONG_CONTRACT.minimum_sections}-{expected_max_sections} rich sections" in prompt
+    assert "always exceed the declared" not in prompt
+    assert "~12.25-14.5 min" not in prompt
+
+
 def test_custom_long_prompt_does_not_describe_the_long_as_a_short():
     from ytb_pipeline.orchestrator.ideation_prompts import local_script_prompt
 
@@ -409,6 +450,60 @@ def test_expected_long_is_never_normalized_as_a_short_when_target_is_missing():
 
     assert fixed == payload
     assert note is None
+
+
+def test_short_normalization_preserves_the_exact_core_answer_prefix():
+    from ytb_pipeline.orchestrator.ideation_script_fix import normalize_short_narration
+
+    core_answer = (
+        "Cơ chế này xuất hiện để làm dịu khoảng cách giữa điều bạn chọn và điều bạn muốn tin, "
+        "trước khi bạn vội dùng một lý do dễ chịu để khép lại sự khó chịu đó."
+    )
+    payload = {
+        "strategy": {"hook": {"core_answer": core_answer}},
+        "sections": [
+            {"purpose": "situation", "voiceover": "Bạn vừa mua món này, nhưng vẫn thấy cấn. " * 20},
+            {"purpose": "core_answer", "voiceover": core_answer + " " + "Diễn giải tiếp. " * 90},
+            *[
+                {"purpose": "evidence", "voiceover": "Một chi tiết cụ thể giúp bạn nhìn rõ hơn. " * 80}
+                for _ in range(4)
+            ],
+        ],
+    }
+
+    fixed, note = normalize_short_narration(payload)
+
+    assert note is not None
+    assert fixed["sections"][1]["voiceover"].startswith(core_answer)
+
+
+def test_preassigned_short_source_provenance_fills_only_the_declared_candidate():
+    from ytb_pipeline.orchestrator.ideation_cmd import attach_preassigned_short_source_provenance
+
+    payload = {"strategy": {"long_form_slug": "long-a"}}
+    source_context = {
+        "slug": "long-a",
+        "candidates": [{"section_index": 4, "excerpt": "Đoạn Long đã được chọn."}],
+    }
+
+    result = attach_preassigned_short_source_provenance(payload, source_context)
+
+    assert result["strategy"] == {
+        "long_form_slug": "long-a",
+        "source_long_slug": "long-a",
+        "source_section_index": 4,
+        "source_excerpt": "Đoạn Long đã được chọn.",
+    }
+
+
+def test_preassigned_short_source_provenance_rejects_a_model_claiming_another_source():
+    from ytb_pipeline.orchestrator.ideation_cmd import attach_preassigned_short_source_provenance
+
+    with pytest.raises(ValueError, match="provenance mâu thuẫn"):
+        attach_preassigned_short_source_provenance(
+            {"strategy": {"source_section_index": 9}},
+            {"slug": "long-a", "candidates": [{"section_index": 4, "excerpt": "Đoạn Long."}]},
+        )
 
 
 def test_long_repair_prompt_requires_target_minutes_and_preserves_valid_narration():

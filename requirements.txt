@@ -4,6 +4,7 @@ pydantic>=2.0             # validation tại ranh giới hệ thống
 pydantic-settings>=2.0    # config qua env vars
 python-dotenv>=1.0
 json_repair>=0.61          # heal JSON hỏng từ Ollama/Qwen local (xem ideation_json_heal.py)
+mlx-lm>=0.31; platform_machine == "arm64"   # ideation local qua MLX (Apple Silicon), xem providers/llm/mlx_provider.py
 
 # Voiceover (TTS)
 elevenlabs>=1.0           # TTS chất lượng cao (tuỳ chọn)

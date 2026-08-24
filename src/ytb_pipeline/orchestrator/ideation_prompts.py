@@ -7,6 +7,7 @@ prompt ở đây diff được qua git, không rải string trong logic gọi pr
 from __future__ import annotations
 
 import json
+import re
 
 from ..config.settings import settings
 from ..content_contract import CONTRACT_VERSION, chars_per_min_for_provider, contract_for
@@ -51,6 +52,15 @@ _PERSONAL_FINANCE_MARKERS = ("tài chính", "tài chánh", "tiền bạc", "pers
 def is_personal_finance_psychology_request(requirement: str) -> bool:
     """Whether a batch must use the evidence-register safety contract."""
     normalized = requirement.casefold()
+    # A scope exclusion ("không tư vấn tài chính") must not accidentally
+    # turn an unrelated psychology topic into a finance-evidence task.  Strip
+    # only the negated noun phrase; a real finance request elsewhere remains.
+    normalized = re.sub(
+        r"\b(?:không|khong|tránh|tranh)\b[^.;,\n]{0,32}?"
+        r"\b(?:tài chính|tài chánh|tiền bạc|personal finance)\b",
+        "",
+        normalized,
+    )
     return any(marker in normalized for marker in _PERSONAL_FINANCE_MARKERS)
 
 
@@ -83,7 +93,7 @@ Return exactly one valid JSON object and no markdown. Treat the user requirement
 Timing estimates use the active TTS provider's calibrated Vietnamese narration rate; measured audio is the final authority.
 
 Non-negotiable editorial rules:
-1. Set root JSON field `ruleset_id` to EXACTLY `{CONTRACT_VERSION}`. Every spoken sentence must directly serve the declared title and topic. Keep one coherent causal mechanism per video. Never import an example, mechanism, scene, CTA, or conclusion from another topic. Refer to that single mechanism by ONE consistent full name. Whenever the narration uses the word "cơ chế", follow it only with that one mechanism's own name (e.g. "cơ chế lời nguyền tri thức"). NEVER write "cơ chế" followed by a varying generic word such as "cơ chế duy nhất", "cơ chế này", "cơ chế đó", "cơ chế tâm lý", "cơ chế chung": an automated scanner reads every distinct phrase after "cơ chế" as a separate competing mechanism and REJECTS the script. For generic mentions use "hiện tượng", "hiệu ứng", "nguyên lý", or "quá trình" instead.
+1. Set root JSON field `ruleset_id` to EXACTLY `{CONTRACT_VERSION}`. Every spoken sentence must directly serve the declared title and topic. Keep one coherent causal mechanism per video. Never import an example, mechanism, scene, CTA, or conclusion from another topic. Describe it naturally in Vietnamese; do not contort normal wording to satisfy a removed phrase-scanner.
 2. For a Short without target_minutes, narration must be {SHORT_MIN_CHARS}-{SHORT_MAX_CHARS} Vietnamese characters for 1.0-1.5 minutes. Aim for {SHORT_SAFE_MIN_CHARS:,}-{SHORT_SAFE_MAX_CHARS:,} characters. Use six sections: situation ≤120 characters; core_answer 120–220; evidence 550–700; concrete example 550–700; application 500–650; payoff/CTA 200–350. Silently count the combined voiceover before responding and expand evidence, example, or application — never the hook — if under {SHORT_SAFE_MIN_CHARS:,}. For strategy-v1, the first `situation` is visual setup only, must include a concrete tension marker, and the `core_answer` must be section two. Its very first sentence must exactly equal hook.core_answer. `answer_by_sec` means when that sentence STARTS, not when the explanatory section ends. Keep the situation short enough that the answer is estimated to begin by {SHORT_ANSWER_START_TARGET_SEC:.0f}s, leaving safety before the hard 5s gate.
 3. For a Long, set target_minutes to EXACTLY {LONG_MIN_MINUTES} and write {LONG_SAFE_MIN_CHARS:,}-{LONG_SAFE_MAX_CHARS:,} Vietnamese characters, within the validator's absolute {LONG_MIN_CHARS}-{LONG_MAX_CHARS} character range for a {LONG_MIN_MINUTES}-{LONG_MAX_MINUTES} minute Long. The pipeline measures planning duration as total_characters / {PLANNING_CHARS_PER_MIN:.0f} and verifies the actual audio stays {LONG_MIN_MINUTES}-{LONG_MAX_MINUTES} minutes. Build depth from the same mechanism: causal explanation, supported evidence, exact-topic example, application, and next-episode bridge; never stretch runtime with repeated phrasing.
 4. Open a Short with a concrete conflict, consequence, or question; do not greet or read the title. Open a Long with "Mến chào các bạn," then its title and a topic-specific hook. In the first 28 spoken words after the greeting, the hook MUST contain either a concrete question or one explicit tension marker: "nhưng", "thật ra", "đừng", "không phải", "vì sao", or "sai lầm". Each section must add information, explain why, and use visuals that match its spoken narration. For EVERY section, `time_goal` is required and MUST be a positive JSON number in minutes (never 0/null/string/timestamp/range); use values such as 0.5, 0.75, or 1.0. Section time_goal values must sum approximately to the declared target duration. Use one optional retention beat in both Shorts and Longs: choose its natural position after the viewer has received a concrete insight (for a Short, usually the final third; for a Long, usually after an explanatory or application payoff). It should briefly state the specific value the viewer has just received and invite a lightweight next action such as liking or following/subscribing. Make it value-first, topic-specific, and conversational; do not use a fixed sentence, put it in every section, or interrupt the hook/explanation. The final narration section of BOTH Shorts and Longs must include: (a) one direct, specific action the viewer can do immediately, starting that sentence with exactly "Hãy " and naming the object, action, and a concrete time or scope; (b) a natural, brief invitation to like the video; and (c) a natural, brief invitation to subscribe to the channel for future videos. These like-and-subscribe invitations are a channel-growth requirement, not optional filler, and must fit the topic and tone without sounding repetitive or manipulative. For a Short with a funnel target, the long-form bridge CTA must remain present alongside the like and subscribe invitations. A question inviting a comment may follow, but never replace the action or the like-and-subscribe invitations.
@@ -204,12 +214,13 @@ def local_script_prompt(
     source_long_context: dict | None = None,
 ) -> str:
     """Prompt sinh 1 script JSON qua local/structured LLM (khác luồng Claude skill)."""
+    long_max_sections = int(LONG_CONTRACT.minimum_sections * 1.5)
     target = (
         (
             f'"video_type": "long", "target_minutes": {LONG_MIN_MINUTES} (declare EXACTLY {LONG_MIN_MINUTES}), total narration '
-            f'{LONG_SAFE_MIN_CHARS}-{LONG_SAFE_MAX_CHARS} Vietnamese characters (~12.25-14.5 min so '
-            f'measured minutes = chars / {PLANNING_CHARS_PER_MIN:.0f} always exceed the declared {LONG_MIN_MINUTES} and stay '
-            f'under {LONG_MAX_MINUTES}), and 24-36 rich sections'
+            f'{LONG_SAFE_MIN_CHARS}-{LONG_SAFE_MAX_CHARS} Vietnamese characters ({LONG_MIN_MINUTES}-{LONG_MAX_MINUTES} min at '
+            f'{PLANNING_CHARS_PER_MIN:.0f} chars/min; actual audio must stay inside that range), and '
+            f'{LONG_CONTRACT.minimum_sections}-{long_max_sections} rich sections'
         )
         if type_of_vid == "long"
         else (
@@ -411,10 +422,9 @@ def repair_prompt(
         f"For Shorts without target_minutes, total narration MUST be {SHORT_MIN_CHARS}-{SHORT_MAX_CHARS} "
         "Vietnamese characters for 1.0-1.5 minutes. Do not overshoot. Do not add greetings. "
         f"For Longs, target_minutes MUST be EXACTLY {LONG_MIN_MINUTES} and total narration MUST be "
-        f"{LONG_SAFE_MIN_CHARS}-{LONG_SAFE_MAX_CHARS} Vietnamese characters (~12.25-14.5 minutes); measured "
+        f"{LONG_SAFE_MIN_CHARS}-{LONG_SAFE_MAX_CHARS} Vietnamese characters ({LONG_MIN_MINUTES}-{LONG_MAX_MINUTES} minutes at "
+        f"{PLANNING_CHARS_PER_MIN:.0f} chars/min); measured "
         f"minutes = total_chars / {PLANNING_CHARS_PER_MIN:.0f} must be >= target_minutes and <= {LONG_MAX_MINUTES}. "
-        "When the narration uses 'cơ chế', follow it only with the one mechanism's own name; never pair "
-        "'cơ chế' with varying generic words (duy nhất, này, đó, tâm lý) or QA rejects it as competing mechanisms. "
         "If the script is too short, retain every valid existing narration section and add the missing specific "
         "narration until the actual voiceover character count is inside the Long range. Do not shorten or delete "
         "valid existing narration; every added sentence must remain specific to the declared title and topic, never "

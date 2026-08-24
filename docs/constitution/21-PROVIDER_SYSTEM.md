@@ -1,6 +1,12 @@
 # 21 — Provider System
 
-> Status: **AD HOC (string-flag if/else, no registry).** `settings.py`
+> **Runtime provider policy (2026-08-24):** This document's generic
+> local-first selector is target-state design, not the current LLM/TTS
+> default. Current LLM and voice defaults are xKiro, and ideation's concrete
+> cascade is xKiro → Codex CLI → Claude CLI. Ollama/MLX-LM/local-stack paths
+> are retired; visual/render providers remain local-first.
+
+> Status: **PARTIALLY IMPLEMENTED.** `settings.py`
 > already has the *config surface* of a provider system
 > (`tts_provider`, `render_provider`) but no actual `Provider` protocol,
 > registry, or dependency-injection mechanism exists — call sites branch
@@ -188,7 +194,7 @@ def test_synthesize_uses_injected_provider():
 
 This is the concrete mechanism that satisfies the Testing rule's
 requirement for unit tests of individual functions without invoking real
-edge-tts/F5/Ollama calls in CI.
+edge-tts/F5/xKiro calls in CI.
 
 ## 7. Local-First Selection Strategy
 
@@ -227,7 +233,7 @@ it is called before every `run()`, never assumed. Examples per capability:
 | Provider | `is_available()` check |
 |---|---|
 | F5-TTS | Model checkpoint file exists under `models/vi-f5-tts/` and `.venv-tts` interpreter is reachable |
-| Ollama/Qwen3 | `GET {OMNI_OLLAMA_BASE_URL}/api/tags`-equivalent ping succeeds, model name present in list |
+| xKiro | `xkiro_api_key` is non-empty; the request path handles provider/model failures through its configured retry/fallback policy |
 | ElevenLabs | `elevenlabs_api_key` non-empty (cheap check; does not call the API just to check availability — that would burn quota) |
 | MusicGen/AudioCraft | Local model weights present, MPS/CPU backend importable |
 | YouTube publish | OAuth token file exists and is non-expired (or refreshable) |
@@ -256,7 +262,7 @@ own request/result types — listed here for cross-reference:
 
 | Capability | Protocol | Defined in |
 |---|---|---|
-| LLM | `LLMProvider` | (ideation stage; planned alongside Ollama/Qwen3 migration) |
+| LLM | `LLMProvider` | `providers/registry.py` and xKiro/Codex/Claude ideation cascade |
 | Image | `ImageProvider` | (planned, Flux/SDXL migration) |
 | Video | `VideoProvider` | (planned, Wan2.2 migration) |
 | Voice | `TTSProvider` | `voiceover/provider.py` (planned) |

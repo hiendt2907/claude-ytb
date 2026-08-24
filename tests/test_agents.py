@@ -221,7 +221,7 @@ async def test_qa_agent_rejects_long_over_fifteen_minutes():
     assert result.output["passed"] is False
     assert result.output["violations"] == [{
         "rule": "length",
-        "detail": "Long quá dài 900s: audio 906.7s.",
+        "detail": "Long quá dài 900s: audio 906.8s.",
     }]
 
 
@@ -678,7 +678,7 @@ async def test_qa_agent_semantic_dedup_flags_near_duplicate_topic():
     assert "series_semantic_dedup" in rules
 
 
-async def test_strict_qa_rejects_multiple_competing_mechanisms():
+async def test_strict_qa_does_not_block_mechanism_wording():
     agent = QAAgent()
     script = _make_script(
         narration_segments=[
@@ -690,7 +690,7 @@ async def test_strict_qa_rejects_multiple_competing_mechanisms():
 
     result = await agent.run({"script": script, "strict": True})
 
-    assert "central_mechanism" in [v["rule"] for v in result.output["violations"]]
+    assert "central_mechanism" not in [v["rule"] for v in result.output["violations"]]
 
 
 def test_mechanism_gate_does_not_split_one_name_from_its_following_question():

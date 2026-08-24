@@ -203,7 +203,7 @@ content-addressed.
 
 1. **Stand up `ComfyUIProvider` against a local Flux checkpoint first** —
    validate the M4/MPS performance characteristics (latency, memory
-   headroom alongside Ollama running concurrently) before any agent code
+   headroom alongside other local render workers) before any agent code
    depends on it.
 2. **Replace `compose_ai.py`'s gradient/Pexels background with a generated
    `background` image** behind a feature flag (`IMAGE_ENGINE_ENABLED`),

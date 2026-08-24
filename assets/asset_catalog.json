@@ -1774,7 +1774,8 @@
       "source_url": "https://videos.pexels.com/video-files/8519522/8519522-hd_1080_1920_30fps.mp4",
       "local_path": "assets/broll/6450e299533d9e05.mp4",
       "topics": [
-        "language learning flashcards calendar hand writing"
+        "language learning flashcards calendar hand writing",
+        "writing notes phone calendar planning online learning"
       ],
       "orientation": "portrait",
       "duration_sec": 6.0,
@@ -1783,6 +1784,11 @@
           "video_slug": "ban-hoc-sai-vi-on-ung-mot-lan_knowledge",
           "role": "payoff",
           "used_at": "2026-07-16T00:36:32.117633+00:00"
+        },
+        {
+          "video_slug": "a-mua-roi-vi-sao-ta-cang-tin-minh-can-no_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-24T08:29:44.663634+00:00"
         }
       ]
     },
@@ -1793,7 +1799,8 @@
       "source_url": "https://videos.pexels.com/video-files/9903485/9903485-hd_1080_2048_25fps.mp4",
       "local_path": "assets/broll/2dfa74c8cd21a68d.mp4",
       "topics": [
-        "language learning flashcards calendar hand writing"
+        "language learning flashcards calendar hand writing",
+        "writing notes phone calendar planning online learning"
       ],
       "orientation": "portrait",
       "duration_sec": 6.0,
@@ -1802,6 +1809,11 @@
           "video_slug": "ban-hoc-sai-vi-on-ung-mot-lan_knowledge",
           "role": "payoff",
           "used_at": "2026-07-16T00:36:32.119346+00:00"
+        },
+        {
+          "video_slug": "a-mua-roi-vi-sao-ta-cang-tin-minh-can-no_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-24T08:29:44.644900+00:00"
         }
       ]
     },
@@ -1831,7 +1843,8 @@
       "source_url": "https://videos.pexels.com/video-files/8472408/8472408-hd_1080_2048_25fps.mp4",
       "local_path": "assets/broll/3d4ad9af2dfab2b5.mp4",
       "topics": [
-        "student writing notes from memory laptop calendar reminder"
+        "student writing notes from memory laptop calendar reminder",
+        "writing notes phone calendar planning online learning"
       ],
       "orientation": "portrait",
       "duration_sec": 6.0,
@@ -1840,6 +1853,11 @@
           "video_slug": "ban-hoc-sai-vi-on-ung-mot-lan_knowledge",
           "role": "payoff",
           "used_at": "2026-07-16T00:36:49.135730+00:00"
+        },
+        {
+          "video_slug": "a-mua-roi-vi-sao-ta-cang-tin-minh-can-no_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-24T08:29:44.651377+00:00"
         }
       ]
     },
@@ -1850,7 +1868,8 @@
       "source_url": "https://videos.pexels.com/video-files/9198585/9198585-hd_1080_1920_25fps.mp4",
       "local_path": "assets/broll/3f0a4f25b8d12db0.mp4",
       "topics": [
-        "student writing notes from memory laptop calendar reminder"
+        "student writing notes from memory laptop calendar reminder",
+        "writing notes phone calendar planning online learning"
       ],
       "orientation": "portrait",
       "duration_sec": 6.0,
@@ -1859,6 +1878,11 @@
           "video_slug": "ban-hoc-sai-vi-on-ung-mot-lan_knowledge",
           "role": "payoff",
           "used_at": "2026-07-16T00:36:49.136665+00:00"
+        },
+        {
+          "video_slug": "a-mua-roi-vi-sao-ta-cang-tin-minh-can-no_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-24T08:29:44.657518+00:00"
         }
       ]
     },
@@ -2814,7 +2838,8 @@
       "source_url": "https://videos.pexels.com/video-files/5716999/5716999-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/1d0474263a11180c.mp4",
       "topics": [
-        "empty meeting room office friday afternoon chairs"
+        "empty meeting room office friday afternoon chairs",
+        "messy room overwhelming clutter"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -2823,6 +2848,11 @@
           "video_slug": "vi-sao-ban-nghi-ai-cung-ong-y-voi-minh_knowledge",
           "role": "payoff",
           "used_at": "2026-07-16T05:39:45.606993+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:58:47.289980+00:00"
         }
       ]
     },
@@ -3287,7 +3317,8 @@
       "source_url": "https://videos.pexels.com/video-files/33439147/14229998_1920_1080_25fps.mp4",
       "local_path": "assets/broll/8e3b1fb9cee4b25f.mp4",
       "topics": [
-        "hand writing assumption sticky note computer monitor"
+        "hand writing assumption sticky note computer monitor",
+        "person smiling self compassion sticky note"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -3296,6 +3327,11 @@
           "video_slug": "vi-sao-ban-nghi-ai-cung-ong-y-voi-minh_knowledge",
           "role": "payoff",
           "used_at": "2026-07-16T05:41:45.838190+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:59:16.919360+00:00"
         }
       ]
     },
@@ -3993,7 +4029,8 @@
       "local_path": "assets/broll/ac2e805fa9a2931c.mp4",
       "topics": [
         "crowd walking city one person standing opposite direction",
-        "preparing water bottle commute walking city evening phone app settings"
+        "preparing water bottle commute walking city evening phone app settings",
+        "glass overflowing water"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -4007,6 +4044,11 @@
           "video_slug": "khi-ly-do-bao-ve-hinh-anh-ban-than-bat-hoa-nhan-thuc_knowledge",
           "role": "payoff",
           "used_at": "2026-07-22T04:20:47.379637+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:58:53.697591+00:00"
         }
       ]
     },
@@ -6134,15 +6176,21 @@
       "source_url": "https://videos.pexels.com/video-files/5682774/5682774-hd_1080_1920_25fps.mp4",
       "local_path": "assets/broll/0d599807216f6947.mp4",
       "topics": [
-        "confident presenter meeting room colleagues nodding"
+        "confident presenter meeting room colleagues nodding",
+        "messy room cluttered desk overwhelming view"
       ],
       "orientation": "portrait",
-      "duration_sec": 2.5,
+      "duration_sec": 6.0,
       "uses": [
         {
           "video_slug": "nguoi-noi-au-tien-trong-hop-inh-hinh-ca-phong_knowledge",
           "role": "hook",
           "used_at": "2026-07-16T08:22:52.165697+00:00"
+        },
+        {
+          "video_slug": "quyet-inh-ro-rang-hanh-ong-cham-chap-tai-sao-nao-bo-lai-treo-khi-thieu-tin-hieu-cu-the_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:54:39.462835+00:00"
         }
       ]
     },
@@ -7050,15 +7098,21 @@
       "source_url": "https://videos.pexels.com/video-files/8369279/8369279-hd_2048_1080_25fps.mp4",
       "local_path": "assets/broll/dea4696ed3079874.mp4",
       "topics": [
-        "person closing laptop after meeting office thinking"
+        "person closing laptop after meeting office thinking",
+        "person afraid to climb high wall with rope"
       ],
       "orientation": "landscape",
-      "duration_sec": 2.5,
+      "duration_sec": 6.0,
       "uses": [
         {
           "video_slug": "ban-a-oi-viec-nhung-mot-phan-tam-tri-van-o-lai_knowledge",
           "role": "hook",
           "used_at": "2026-07-16T10:00:06.778827+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:59:19.211006+00:00"
         }
       ]
     },
@@ -7246,7 +7300,8 @@
       "source_url": "https://videos.pexels.com/video-files/8134312/8134312-hd_2048_1080_25fps.mp4",
       "local_path": "assets/broll/38b7a79f459dca65.mp4",
       "topics": [
-        "person writing clear note planner desk close up"
+        "person writing clear note planner desk close up",
+        "brain lighting up clear path"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -7255,6 +7310,11 @@
           "video_slug": "ban-a-oi-viec-nhung-mot-phan-tam-tri-van-o-lai_knowledge",
           "role": "payoff",
           "used_at": "2026-07-16T10:00:56.989672+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:59:26.124853+00:00"
         }
       ]
     },
@@ -7705,7 +7765,8 @@
       "source_url": "https://videos.pexels.com/video-files/8499779/8499779-hd_1920_1080_30fps.mp4",
       "local_path": "assets/broll/e2a2d3756294f6a3.mp4",
       "topics": [
-        "student studying textbook phone distraction desk night"
+        "student studying textbook phone distraction desk night",
+        "person placing book on pillow hiding phone"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -7714,6 +7775,11 @@
           "video_slug": "ban-a-oi-viec-nhung-mot-phan-tam-tri-van-o-lai_knowledge",
           "role": "payoff",
           "used_at": "2026-07-16T10:03:12.025553+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:59:13.528058+00:00"
         }
       ]
     },
@@ -7749,7 +7815,8 @@
       "source_url": "https://videos.pexels.com/video-files/8550152/8550152-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/7e40d4adc8deb415.mp4",
       "topics": [
-        "person putting phone down study timer focus"
+        "person putting phone down study timer focus",
+        "snowball rolling down hill gaining size"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -7758,6 +7825,11 @@
           "video_slug": "ban-a-oi-viec-nhung-mot-phan-tam-tri-van-o-lai_knowledge",
           "role": "payoff",
           "used_at": "2026-07-16T10:03:26.585011+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:59:10.189607+00:00"
         }
       ]
     },
@@ -7793,7 +7865,8 @@
       "source_url": "https://videos.pexels.com/video-files/7657450/7657450-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/b7141aa50f6cd438.mp4",
       "topics": [
-        "person putting phone down study timer focus"
+        "person putting phone down study timer focus",
+        "person placing book on pillow hiding phone"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -7802,6 +7875,11 @@
           "video_slug": "ban-a-oi-viec-nhung-mot-phan-tam-tri-van-o-lai_knowledge",
           "role": "payoff",
           "used_at": "2026-07-16T10:03:26.593585+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:59:13.521818+00:00"
         }
       ]
     },
@@ -7812,7 +7890,8 @@
       "source_url": "https://videos.pexels.com/video-files/4497681/4497681-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/9591fac6a962708d.mp4",
       "topics": [
-        "person putting phone down study timer focus"
+        "person putting phone down study timer focus",
+        "snowball rolling down hill gaining size"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -7821,6 +7900,11 @@
           "video_slug": "ban-a-oi-viec-nhung-mot-phan-tam-tri-van-o-lai_knowledge",
           "role": "payoff",
           "used_at": "2026-07-16T10:03:26.597087+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:59:10.196138+00:00"
         }
       ]
     },
@@ -8138,7 +8222,8 @@
       "source_url": "https://videos.pexels.com/video-files/5146009/5146009-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/4e28507bcbe4b56f.mp4",
       "topics": [
-        "hand writing action item notebook then typing laptop"
+        "hand writing action item notebook then typing laptop",
+        "hand clearing fog from screen revealing button"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -8147,6 +8232,11 @@
           "video_slug": "ban-a-oi-viec-nhung-mot-phan-tam-tri-van-o-lai_knowledge",
           "role": "payoff",
           "used_at": "2026-07-16T10:04:57.543175+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:58:59.545491+00:00"
         }
       ]
     },
@@ -8524,7 +8614,8 @@
       "local_path": "assets/broll/32d119c29a3a98dd.mp4",
       "topics": [
         "person resting looking out window calm office",
-        "morning reflection journal window natural light"
+        "morning reflection journal window natural light",
+        "person looking in mirror frustrated reflection"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -8538,6 +8629,11 @@
           "video_slug": "khi-ly-do-bao-ve-hinh-anh-ban-than-bat-hoa-nhan-thuc_knowledge",
           "role": "payoff",
           "used_at": "2026-07-22T04:20:42.342660+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:58:51.324001+00:00"
         }
       ]
     },
@@ -8573,15 +8669,21 @@
       "source_url": "https://videos.pexels.com/video-files/8023795/8023795-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/dbd5dde2bccd10e7.mp4",
       "topics": [
-        "person resting looking out window calm office"
+        "person resting looking out window calm office",
+        "person looking at clock tired office"
       ],
       "orientation": "landscape",
-      "duration_sec": 6.0,
+      "duration_sec": 2.5,
       "uses": [
         {
           "video_slug": "ban-a-oi-viec-nhung-mot-phan-tam-tri-van-o-lai_knowledge",
           "role": "payoff",
           "used_at": "2026-07-16T10:06:29.172053+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "hook",
+          "used_at": "2026-07-27T13:58:30.166348+00:00"
         }
       ]
     },
@@ -8593,10 +8695,11 @@
       "local_path": "assets/broll/0754560b1eaba859.mp4",
       "topics": [
         "person resting looking out window calm office",
-        "person reflection cafe window thoughtful evening"
+        "person reflection cafe window thoughtful evening",
+        "person looking at clock tired office"
       ],
       "orientation": "landscape",
-      "duration_sec": 6.0,
+      "duration_sec": 2.5,
       "uses": [
         {
           "video_slug": "ban-a-oi-viec-nhung-mot-phan-tam-tri-van-o-lai_knowledge",
@@ -8607,6 +8710,11 @@
           "video_slug": "khi-ly-do-bao-ve-hinh-anh-ban-than-bat-hoa-nhan-thuc_knowledge",
           "role": "payoff",
           "used_at": "2026-07-22T04:19:38.293492+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "hook",
+          "used_at": "2026-07-27T13:58:30.172638+00:00"
         }
       ]
     },
@@ -8914,7 +9022,8 @@
       "local_path": "assets/broll/c04f8e77de8cef87.mp4",
       "topics": [
         "stressed employee reading email late deadline office",
-        "late commute bus worker water bottle phone note"
+        "late commute bus worker water bottle phone note",
+        "person stressed in messy room then looking at phone"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -8928,6 +9037,11 @@
           "video_slug": "khi-ly-do-bao-ve-hinh-anh-ban-than-bat-hoa-nhan-thuc_knowledge",
           "role": "payoff",
           "used_at": "2026-07-22T04:22:16.605447+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:58:49.640366+00:00"
         }
       ]
     },
@@ -9228,15 +9342,21 @@
       "source_url": "https://videos.pexels.com/video-files/7801554/7801554-hd_1080_2048_25fps.mp4",
       "local_path": "assets/broll/1084d05115ff9fb3.mp4",
       "topics": [
-        "people typing on laptop social media discussion at home"
+        "people typing on laptop social media discussion at home",
+        "person reviewing online course laptop home evening"
       ],
       "orientation": "portrait",
-      "duration_sec": 2.5,
+      "duration_sec": 6.0,
       "uses": [
         {
           "video_slug": "cai-nhau-online-hai-nguoi-va-hai-am-ong-tuong-tuong_knowledge",
           "role": "hook",
           "used_at": "2026-07-16T10:45:13.396961+00:00"
+        },
+        {
+          "video_slug": "a-mua-roi-vi-sao-ta-cang-tin-minh-can-no_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-24T08:29:32.985721+00:00"
         }
       ]
     },
@@ -10834,15 +10954,21 @@
       "source_url": "https://videos.pexels.com/video-files/6336610/6336610-hd_1080_1920_25fps.mp4",
       "local_path": "assets/broll/0b744745e47e7d85.mp4",
       "topics": [
-        "parent distracted playing blocks child living room evening"
+        "parent distracted playing blocks child living room evening",
+        "messy room cluttered desk overwhelming view"
       ],
       "orientation": "portrait",
-      "duration_sec": 2.5,
+      "duration_sec": 6.0,
       "uses": [
         {
           "video_slug": "ngoi-choi-voi-con-ma-au-van-o-cong-ty_knowledge",
           "role": "hook",
           "used_at": "2026-07-16T11:55:10.156563+00:00"
+        },
+        {
+          "video_slug": "quyet-inh-ro-rang-hanh-ong-cham-chap-tai-sao-nao-bo-lai-treo-khi-thieu-tin-hieu-cu-the_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:54:39.456592+00:00"
         }
       ]
     },
@@ -11327,15 +11453,21 @@
       "source_url": "https://videos.pexels.com/video-files/7679962/7679962-hd_1080_1920_25fps.mp4",
       "local_path": "assets/broll/00975da31892beaa.mp4",
       "topics": [
-        "office worker writing task note beside laptop spreadsheet"
+        "office worker writing task note beside laptop spreadsheet",
+        "brain animation frontal lobe highlighting stress"
       ],
       "orientation": "portrait",
-      "duration_sec": 2.0,
+      "duration_sec": 6.0,
       "uses": [
         {
           "video_slug": "tra-loi-tin-nhan-xong-nao-van-o-cuoc-tro-chuyen-cu_knowledge_pexels-pexels-pillow-portrait",
           "role": "hook",
           "used_at": "2026-07-16T11:56:37.821568+00:00"
+        },
+        {
+          "video_slug": "quyet-inh-ro-rang-hanh-ong-cham-chap-tai-sao-nao-bo-lai-treo-khi-thieu-tin-hieu-cu-the_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:54:33.071228+00:00"
         }
       ]
     },
@@ -11593,15 +11725,21 @@
       "source_url": "https://videos.pexels.com/video-files/6931246/6931246-hd_1080_1920_25fps.mp4",
       "local_path": "assets/broll/7e9d86127a935fcc.mp4",
       "topics": [
-        "professional scheduling calendar laptop office focused work"
+        "professional scheduling calendar laptop office focused work",
+        "tired person laptop online purchase busy calendar morning"
       ],
       "orientation": "portrait",
-      "duration_sec": 2.0,
+      "duration_sec": 6.0,
       "uses": [
         {
           "video_slug": "email-kho-tra-loi-cang-ngam-cang-am_knowledge_pexels-pexels-pillow-portrait",
           "role": "hook",
           "used_at": "2026-07-16T12:15:25.944784+00:00"
+        },
+        {
+          "video_slug": "a-mua-roi-vi-sao-ta-cang-tin-minh-can-no_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-24T08:29:39.727504+00:00"
         }
       ]
     },
@@ -13515,15 +13653,21 @@
       "source_url": "https://videos.pexels.com/video-files/7710420/7710420-hd_1080_2048_25fps.mp4",
       "local_path": "assets/broll/c08c2841ed99aee1.mp4",
       "topics": [
-        "professional taking notes during video meeting focused laptop"
+        "professional taking notes during video meeting focused laptop",
+        "person phone notes subscribe video laptop"
       ],
       "orientation": "portrait",
-      "duration_sec": 2.0,
+      "duration_sec": 6.0,
       "uses": [
         {
           "video_slug": "a-nhiem-lam-hai-viec-xong-khong-viec-nao_knowledge_pexels-pexels-pillow-portrait",
           "role": "hook",
           "used_at": "2026-07-16T13:16:15.172870+00:00"
+        },
+        {
+          "video_slug": "a-mua-roi-vi-sao-ta-cang-tin-minh-can-no_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-24T08:29:50.800253+00:00"
         }
       ]
     },
@@ -13553,15 +13697,21 @@
       "source_url": "https://videos.pexels.com/video-files/8298301/8298301-hd_1080_1920_25fps.mp4",
       "local_path": "assets/broll/ad8c696277ccc3e8.mp4",
       "topics": [
-        "office worker checking calendar reminder while working on laptop"
+        "office worker checking calendar reminder while working on laptop",
+        "tired person laptop online purchase busy calendar morning"
       ],
       "orientation": "portrait",
-      "duration_sec": 2.5,
+      "duration_sec": 6.0,
       "uses": [
         {
           "video_slug": "deadline-viec-b-am-ban-trong-luc-lam-viec-a_knowledge",
           "role": "hook",
           "used_at": "2026-07-16T13:25:07.126542+00:00"
+        },
+        {
+          "video_slug": "a-mua-roi-vi-sao-ta-cang-tin-minh-can-no_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-24T08:29:39.734082+00:00"
         }
       ]
     },
@@ -16363,15 +16513,21 @@
       "source_url": "https://videos.pexels.com/video-files/7710454/7710454-hd_2048_1080_25fps.mp4",
       "local_path": "assets/broll/b547d0b4b9f9f5b5.mp4",
       "topics": [
-        "new employee confused searching spreadsheet files office"
+        "new employee confused searching spreadsheet files office",
+        "battery draining fast animation"
       ],
       "orientation": "landscape",
-      "duration_sec": 2.5,
+      "duration_sec": 6.0,
       "uses": [
         {
           "video_slug": "loi-nguyen-tri-thuc-biet-roi-ban-quen-cam-giac-chua-biet_knowledge",
           "role": "hook",
           "used_at": "2026-07-17T06:44:42.158841+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:58:41.574699+00:00"
         }
       ]
     },
@@ -16382,15 +16538,21 @@
       "source_url": "https://videos.pexels.com/video-files/7640083/7640083-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/f48b88641ca585a4.mp4",
       "topics": [
-        "new employee confused searching spreadsheet files office"
+        "new employee confused searching spreadsheet files office",
+        "clock running fast person confused"
       ],
       "orientation": "landscape",
-      "duration_sec": 2.5,
+      "duration_sec": 6.0,
       "uses": [
         {
           "video_slug": "loi-nguyen-tri-thuc-biet-roi-ban-quen-cam-giac-chua-biet_knowledge",
           "role": "hook",
           "used_at": "2026-07-17T06:44:42.162619+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:59:29.168985+00:00"
         }
       ]
     },
@@ -16603,15 +16765,21 @@
       "source_url": "https://videos.pexels.com/video-files/6538596/6538596-hd_2048_1080_25fps.mp4",
       "local_path": "assets/broll/8b9ad971c3cabe08.mp4",
       "topics": [
-        "new employee confused searching spreadsheet files office"
+        "new employee confused searching spreadsheet files office",
+        "confused manager looking at empty blueprint"
       ],
       "orientation": "landscape",
-      "duration_sec": 2.0,
+      "duration_sec": 6.0,
       "uses": [
         {
           "video_slug": "loi-nguyen-tri-thuc-biet-roi-ban-quen-cam-giac-chua-biet_knowledge_pexels-pexels-pillow-landscape",
           "role": "hook",
           "used_at": "2026-07-17T06:45:29.060145+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:58:35.586090+00:00"
         }
       ]
     },
@@ -16622,15 +16790,21 @@
       "source_url": "https://videos.pexels.com/video-files/9364040/9364040-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/cdaefd461b694b8a.mp4",
       "topics": [
-        "coworkers clarifying spreadsheet task office"
+        "coworkers clarifying spreadsheet task office",
+        "whiteboard breaking down task into small steps"
       ],
       "orientation": "landscape",
-      "duration_sec": 2.0,
+      "duration_sec": 6.0,
       "uses": [
         {
           "video_slug": "loi-nguyen-tri-thuc-biet-roi-ban-quen-cam-giac-chua-biet_knowledge_pexels-pexels-pillow-landscape",
           "role": "hook",
           "used_at": "2026-07-17T06:45:34.321932+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:59:01.587384+00:00"
         }
       ]
     },
@@ -16641,15 +16815,21 @@
       "source_url": "https://videos.pexels.com/video-files/6780074/6780074-hd_1920_1080_30fps.mp4",
       "local_path": "assets/broll/e44aa057a542ee17.mp4",
       "topics": [
-        "clear work brief checklist spreadsheet laptop"
+        "clear work brief checklist spreadsheet laptop",
+        "brain lighting up clear path"
       ],
       "orientation": "landscape",
-      "duration_sec": 2.0,
+      "duration_sec": 6.0,
       "uses": [
         {
           "video_slug": "loi-nguyen-tri-thuc-biet-roi-ban-quen-cam-giac-chua-biet_knowledge_pexels-pexels-pillow-landscape",
           "role": "hook",
           "used_at": "2026-07-17T06:45:35.809219+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:59:26.118585+00:00"
         }
       ]
     },
@@ -17548,15 +17728,21 @@
       "source_url": "https://videos.pexels.com/video-files/7652006/7652006-hd_1920_1080_30fps.mp4",
       "local_path": "assets/broll/d215e04fa980e43e.mp4",
       "topics": [
-        "person hesitating before posting on laptop meeting"
+        "person hesitating before posting on laptop meeting",
+        "person afraid to climb high wall with rope"
       ],
       "orientation": "landscape",
-      "duration_sec": 2.5,
+      "duration_sec": 6.0,
       "uses": [
         {
           "video_slug": "hieu-ung-en-san-khau-vi-sao-mot-loi-nho-khien-ban-tuong-ai-cung-ang-chu-y_knowledge",
           "role": "hook",
           "used_at": "2026-07-17T13:56:16.401509+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:59:19.203895+00:00"
         }
       ]
     },
@@ -17568,7 +17754,8 @@
       "local_path": "assets/broll/1ca47182d48e18c6.mp4",
       "topics": [
         "person hesitating before posting on laptop meeting",
-        "person holding drink journaling self reflection realistic"
+        "person holding drink journaling self reflection realistic",
+        "self driving car stopping error"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -17582,6 +17769,11 @@
           "video_slug": "khi-ly-do-bao-ve-hinh-anh-ban-than-bat-hoa-nhan-thuc_knowledge",
           "role": "payoff",
           "used_at": "2026-07-22T04:21:13.179296+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:58:45.251200+00:00"
         }
       ]
     },
@@ -19254,15 +19446,21 @@
       "source_url": "https://videos.pexels.com/video-files/5020286/5020286-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/9390edec4f252325.mp4",
       "topics": [
-        "office coworker explaining spreadsheet confused colleague"
+        "office coworker explaining spreadsheet confused colleague",
+        "confused manager looking at empty blueprint"
       ],
       "orientation": "landscape",
-      "duration_sec": 2.5,
+      "duration_sec": 6.0,
       "uses": [
         {
           "video_slug": "loi-nguyen-tri-thuc-vi-sao-biet-roi-lai-kho-giai-thich-cho-nguoi-khac_knowledge",
           "role": "hook",
           "used_at": "2026-07-17T14:07:20.463057+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:58:35.598540+00:00"
         }
       ]
     },
@@ -19273,15 +19471,21 @@
       "source_url": "https://videos.pexels.com/video-files/5939450/5939450-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/959a0f284e05793a.mp4",
       "topics": [
-        "office coworker explaining spreadsheet confused colleague"
+        "office coworker explaining spreadsheet confused colleague",
+        "amygdala brain animation fear response"
       ],
       "orientation": "landscape",
-      "duration_sec": 2.5,
+      "duration_sec": 6.0,
       "uses": [
         {
           "video_slug": "loi-nguyen-tri-thuc-vi-sao-biet-roi-lai-kho-giai-thich-cho-nguoi-khac_knowledge",
           "role": "hook",
           "used_at": "2026-07-17T14:07:20.478805+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:58:39.997403+00:00"
         }
       ]
     },
@@ -19292,15 +19496,21 @@
       "source_url": "https://videos.pexels.com/video-files/5020277/5020277-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/8bc0798f98e9b5ea.mp4",
       "topics": [
-        "office coworker explaining spreadsheet confused colleague"
+        "office coworker explaining spreadsheet confused colleague",
+        "confused manager looking at empty blueprint"
       ],
       "orientation": "landscape",
-      "duration_sec": 2.5,
+      "duration_sec": 6.0,
       "uses": [
         {
           "video_slug": "loi-nguyen-tri-thuc-vi-sao-biet-roi-lai-kho-giai-thich-cho-nguoi-khac_knowledge",
           "role": "hook",
           "used_at": "2026-07-17T14:07:20.498755+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:58:35.592414+00:00"
         }
       ]
     },
@@ -19905,7 +20115,8 @@
       "source_url": "https://videos.pexels.com/video-files/7659665/7659665-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/06697dab94df50e1.mp4",
       "topics": [
-        "business process planning whiteboard office"
+        "business process planning whiteboard office",
+        "whiteboard breaking down task into small steps"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -19914,6 +20125,11 @@
           "video_slug": "loi-nguyen-tri-thuc-vi-sao-biet-roi-lai-kho-giai-thich-cho-nguoi-khac_knowledge",
           "role": "payoff",
           "used_at": "2026-07-17T14:10:20.893188+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:59:01.600268+00:00"
         }
       ]
     },
@@ -19943,7 +20159,8 @@
       "source_url": "https://videos.pexels.com/video-files/6862470/6862470-hd_2048_1080_25fps.mp4",
       "local_path": "assets/broll/2f2e3f927601162d.mp4",
       "topics": [
-        "person writing actionable plan notebook laptop"
+        "person writing actionable plan notebook laptop",
+        "writing detailed to-do list in leather notebook"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -19952,6 +20169,11 @@
           "video_slug": "hieu-ung-en-san-khau-vi-sao-mot-loi-nho-khien-ban-tuong-ai-cung-ang-chu-y_knowledge",
           "role": "payoff",
           "used_at": "2026-07-17T14:10:50.255345+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:59:22.467094+00:00"
         }
       ]
     },
@@ -20101,7 +20323,8 @@
       "source_url": "https://videos.pexels.com/video-files/6952856/6952856-hd_2048_1080_25fps.mp4",
       "local_path": "assets/broll/2d48e841b4ce308a.mp4",
       "topics": [
-        "person publishing post and subscribing youtube laptop"
+        "person publishing post and subscribing youtube laptop",
+        "youtube subscribe button animation coffee cup"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -20110,6 +20333,11 @@
           "video_slug": "hieu-ung-en-san-khau-vi-sao-mot-loi-nho-khien-ban-tuong-ai-cung-ang-chu-y_knowledge",
           "role": "payoff",
           "used_at": "2026-07-17T14:11:33.059775+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:59:31.164441+00:00"
         }
       ]
     },
@@ -20682,7 +20910,8 @@
       "source_url": "https://videos.pexels.com/video-files/7791933/7791933-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/02778cbb33fb454e.mp4",
       "topics": [
-        "manager sending clear task instructions laptop"
+        "manager sending clear task instructions laptop",
+        "whiteboard breaking down task into small steps"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -20691,6 +20920,11 @@
           "video_slug": "loi-nguyen-tri-thuc-vi-sao-biet-roi-lai-kho-giai-thich-cho-nguoi-khac_knowledge",
           "role": "payoff",
           "used_at": "2026-07-17T14:16:42.256382+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:59:01.594102+00:00"
         }
       ]
     },
@@ -21758,7 +21992,8 @@
       "source_url": "https://videos.pexels.com/video-files/7597593/7597593-hd_1080_2048_25fps.mp4",
       "local_path": "assets/broll/4a1d3c0d9442d145.mp4",
       "topics": [
-        "person taking notes during online video meeting laptop"
+        "person taking notes during online video meeting laptop",
+        "person phone notes subscribe video laptop"
       ],
       "orientation": "portrait",
       "duration_sec": 6.0,
@@ -21767,6 +22002,11 @@
           "video_slug": "oi-anh-ai-dien-xong-vi-sao-ban-nghi-ai-cung-ang-nhin_knowledge",
           "role": "payoff",
           "used_at": "2026-07-17T14:27:02.078282+00:00"
+        },
+        {
+          "video_slug": "a-mua-roi-vi-sao-ta-cang-tin-minh-can-no_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-24T08:29:50.807861+00:00"
         }
       ]
     },
@@ -21777,15 +22017,21 @@
       "source_url": "https://videos.pexels.com/video-files/5636183/5636183-hd_1080_1920_24fps.mp4",
       "local_path": "assets/broll/32dad17def85a43d.mp4",
       "topics": [
-        "person taking notes during online video meeting laptop"
+        "person taking notes during online video meeting laptop",
+        "online course laptop receipt disappointed person"
       ],
       "orientation": "portrait",
-      "duration_sec": 6.0,
+      "duration_sec": 2.5,
       "uses": [
         {
           "video_slug": "oi-anh-ai-dien-xong-vi-sao-ban-nghi-ai-cung-ang-nhin_knowledge",
           "role": "payoff",
           "used_at": "2026-07-17T14:27:02.099903+00:00"
+        },
+        {
+          "video_slug": "a-mua-roi-vi-sao-ta-cang-tin-minh-can-no_xkiro",
+          "role": "hook",
+          "used_at": "2026-08-24T08:29:31.366577+00:00"
         }
       ]
     },
@@ -21910,15 +22156,21 @@
       "source_url": "https://videos.pexels.com/video-files/7496258/7496258-hd_1080_1920_30fps.mp4",
       "local_path": "assets/broll/bffe7c953e350f46.mp4",
       "topics": [
-        "person taking notes during online video meeting laptop"
+        "person taking notes during online video meeting laptop",
+        "tired person laptop online purchase busy calendar morning"
       ],
       "orientation": "portrait",
-      "duration_sec": 2.0,
+      "duration_sec": 6.0,
       "uses": [
         {
           "video_slug": "oi-anh-ai-dien-xong-vi-sao-ban-nghi-ai-cung-ang-nhin_knowledge_pexels-pexels-pillow-portrait",
           "role": "hook",
           "used_at": "2026-07-17T14:27:50.268795+00:00"
+        },
+        {
+          "video_slug": "a-mua-roi-vi-sao-ta-cang-tin-minh-can-no_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-24T08:29:39.742192+00:00"
         }
       ]
     },
@@ -22181,7 +22433,8 @@
       "source_url": "https://videos.pexels.com/video-files/6755021/6755021-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/3d54871efcd5b919.mp4",
       "topics": [
-        "person writing clear task instructions notebook office"
+        "person writing clear task instructions notebook office",
+        "writing detailed to-do list in leather notebook"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -22190,6 +22443,11 @@
           "video_slug": "loi-nguyen-tri-thuc-vi-sao-biet-roi-lai-kho-giai-thich-cho-nguoi-khac_knowledge",
           "role": "payoff",
           "used_at": "2026-07-17T14:31:02.771915+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:59:22.473694+00:00"
         }
       ]
     },
@@ -22238,15 +22496,21 @@
       "source_url": "https://videos.pexels.com/video-files/7691550/7691550-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/c0050be8d35836a8.mp4",
       "topics": [
-        "office coworker explaining spreadsheet confused colleague"
+        "office coworker explaining spreadsheet confused colleague",
+        "battery draining fast animation"
       ],
       "orientation": "landscape",
-      "duration_sec": 2.0,
+      "duration_sec": 6.0,
       "uses": [
         {
           "video_slug": "loi-nguyen-tri-thuc-vi-sao-biet-roi-lai-kho-giai-thich-cho-nguoi-khac_knowledge_pexels-pexels-pillow-landscape",
           "role": "hook",
           "used_at": "2026-07-17T14:31:40.376171+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:58:41.581733+00:00"
         }
       ]
     },
@@ -22257,15 +22521,21 @@
       "source_url": "https://videos.pexels.com/video-files/8266175/8266175-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/856ad3694c42ff31.mp4",
       "topics": [
-        "person learning complex software interface computer"
+        "person learning complex software interface computer",
+        "brain animation prefrontal cortex glowing"
       ],
       "orientation": "landscape",
-      "duration_sec": 2.0,
+      "duration_sec": 6.0,
       "uses": [
         {
           "video_slug": "loi-nguyen-tri-thuc-vi-sao-biet-roi-lai-kho-giai-thich-cho-nguoi-khac_knowledge_pexels-pexels-pillow-landscape",
           "role": "hook",
           "used_at": "2026-07-17T14:31:41.885403+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:58:31.884060+00:00"
         }
       ]
     },
@@ -24435,15 +24705,21 @@
       "source_url": "https://videos.pexels.com/video-files/5742406/5742406-hd_1080_2048_25fps.mp4",
       "local_path": "assets/broll/3d390d4710ae8aca.mp4",
       "topics": [
-        "hands typing laptop uploading document online form"
+        "hands typing laptop uploading document online form",
+        "online course laptop receipt disappointed person"
       ],
       "orientation": "portrait",
-      "duration_sec": 6.0,
+      "duration_sec": 2.5,
       "uses": [
         {
           "video_slug": "nop-on-online-vi-sao-ba-buoc-nho-khien-ban-bo-cuoc_knowledge",
           "role": "payoff",
           "used_at": "2026-07-17T16:01:59.105581+00:00"
+        },
+        {
+          "video_slug": "a-mua-roi-vi-sao-ta-cang-tin-minh-can-no_xkiro",
+          "role": "hook",
+          "used_at": "2026-08-24T08:29:31.373102+00:00"
         }
       ]
     },
@@ -26100,7 +26376,8 @@
       "local_path": "assets/broll/1bab34e1b72ac2ab.mp4",
       "topics": [
         "overwhelmed person looking at laptop task list",
-        "person looking at receipt coffee shop thoughtful close up"
+        "person looking at receipt coffee shop thoughtful close up",
+        "youtube subscribe button animation coffee cup"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -26114,6 +26391,11 @@
           "video_slug": "khi-ly-do-bao-ve-hinh-anh-ban-than-bat-hoa-nhan-thuc_knowledge",
           "role": "payoff",
           "used_at": "2026-07-22T04:19:06.534252+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:59:31.170702+00:00"
         }
       ]
     },
@@ -26125,7 +26407,8 @@
       "local_path": "assets/broll/148624015f88926f.mp4",
       "topics": [
         "overwhelmed person looking at laptop task list",
-        "person looking at receipt coffee shop thoughtful close up"
+        "person looking at receipt coffee shop thoughtful close up",
+        "person looking at long bridge foggy distance"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -26139,6 +26422,11 @@
           "video_slug": "khi-ly-do-bao-ve-hinh-anh-ban-than-bat-hoa-nhan-thuc_knowledge",
           "role": "payoff",
           "used_at": "2026-07-22T04:19:06.527333+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:58:55.205168+00:00"
         }
       ]
     },
@@ -26149,15 +26437,21 @@
       "source_url": "https://videos.pexels.com/video-files/38611417/16398573_1920_1080_25fps.mp4",
       "local_path": "assets/broll/8b87ff720d051bb5.mp4",
       "topics": [
-        "overwhelmed person looking at laptop task list"
+        "overwhelmed person looking at laptop task list",
+        "brain animation prefrontal cortex glowing"
       ],
       "orientation": "landscape",
-      "duration_sec": 2.5,
+      "duration_sec": 6.0,
       "uses": [
         {
           "video_slug": "danh-sach-cang-dai-ban-cang-kho-bat-au-vi-mot-co-che-trong-nao_knowledge",
           "role": "hook",
           "used_at": "2026-07-20T12:27:24.783491+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:58:31.892311+00:00"
         }
       ]
     },
@@ -26945,15 +27239,21 @@
       "source_url": "https://videos.pexels.com/video-files/9057503/9057503-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/dbd24b8e68049ae6.mp4",
       "topics": [
-        "overwhelmed person looking at laptop task list"
+        "overwhelmed person looking at laptop task list",
+        "person looking at long bridge foggy distance"
       ],
       "orientation": "landscape",
-      "duration_sec": 2.0,
+      "duration_sec": 6.0,
       "uses": [
         {
           "video_slug": "danh-sach-cang-dai-ban-cang-kho-bat-au-vi-mot-co-che-trong-nao_knowledge_pexels-pexels-pillow-landscape",
           "role": "hook",
           "used_at": "2026-07-20T12:30:33.934077+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:58:55.198600+00:00"
         }
       ]
     },
@@ -27360,7 +27660,8 @@
       "source_url": "https://videos.pexels.com/video-files/8926528/8926528-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/39d0b02f3e805f0c.mp4",
       "topics": [
-        "person putting documents beside front door"
+        "person putting documents beside front door",
+        "hands picking up socks putting in basket"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -27369,6 +27670,11 @@
           "video_slug": "ban-muon-lam-nhung-mot-quyet-inh-mo-ho-khien-ban-khong-bat-au_knowledge",
           "role": "payoff",
           "used_at": "2026-07-20T14:11:14.413252+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:59:06.158204+00:00"
         }
       ]
     },
@@ -27474,7 +27780,8 @@
       "source_url": "https://videos.pexels.com/video-files/5483092/5483092-hd_2048_1080_25fps.mp4",
       "local_path": "assets/broll/1b9761a257de1fbb.mp4",
       "topics": [
-        "hands typing spreadsheet laptop office"
+        "hands typing spreadsheet laptop office",
+        "hands picking up socks putting in basket"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -27483,6 +27790,11 @@
           "video_slug": "ban-muon-lam-nhung-mot-quyet-inh-mo-ho-khien-ban-khong-bat-au_knowledge",
           "role": "payoff",
           "used_at": "2026-07-20T14:11:41.006711+00:00"
+        },
+        {
+          "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:59:06.152006+00:00"
         }
       ]
     },
@@ -29040,15 +29352,21 @@
       "source_url": "https://videos.pexels.com/video-files/6930234/6930234-hd_1080_1920_25fps.mp4",
       "local_path": "assets/broll/aab183340eea0a9b.mp4",
       "topics": [
-        "person waiting for data laptop office"
+        "person waiting for data laptop office",
+        "abstract data processing error red warning light"
       ],
       "orientation": "portrait",
-      "duration_sec": 2.5,
+      "duration_sec": 6.0,
       "uses": [
         {
           "video_slug": "vi-sao-mot-viec-phu-thuoc-viec-khac-khien-ban-tri-hoan_knowledge",
           "role": "hook",
           "used_at": "2026-07-20T15:49:14.364570+00:00"
+        },
+        {
+          "video_slug": "quyet-inh-ro-rang-hanh-ong-cham-chap-tai-sao-nao-bo-lai-treo-khi-thieu-tin-hieu-cu-the_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:54:34.996944+00:00"
         }
       ]
     },
@@ -29059,15 +29377,21 @@
       "source_url": "https://videos.pexels.com/video-files/5483083/5483083-hd_1080_2048_25fps.mp4",
       "local_path": "assets/broll/aa3a047d0f7d2a91.mp4",
       "topics": [
-        "person waiting for data laptop office"
+        "person waiting for data laptop office",
+        "abstract data processing error red warning light"
       ],
       "orientation": "portrait",
-      "duration_sec": 2.5,
+      "duration_sec": 6.0,
       "uses": [
         {
           "video_slug": "vi-sao-mot-viec-phu-thuoc-viec-khac-khien-ban-tri-hoan_knowledge",
           "role": "hook",
           "used_at": "2026-07-20T15:49:14.373865+00:00"
+        },
+        {
+          "video_slug": "quyet-inh-ro-rang-hanh-ong-cham-chap-tai-sao-nao-bo-lai-treo-khi-thieu-tin-hieu-cu-the_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:54:34.990894+00:00"
         }
       ]
     },
@@ -29249,15 +29573,21 @@
       "source_url": "https://videos.pexels.com/video-files/6622681/6622681-hd_1080_1920_24fps.mp4",
       "local_path": "assets/broll/40bd5465aa5b3fdc.mp4",
       "topics": [
-        "person waiting for data laptop office"
+        "person waiting for data laptop office",
+        "abstract data processing error red warning light"
       ],
       "orientation": "portrait",
-      "duration_sec": 2.0,
+      "duration_sec": 6.0,
       "uses": [
         {
           "video_slug": "vi-sao-mot-viec-phu-thuoc-viec-khac-khien-ban-tri-hoan_knowledge_pexels-pexels-pillow-portrait",
           "role": "hook",
           "used_at": "2026-07-20T15:49:54.865475+00:00"
+        },
+        {
+          "video_slug": "quyet-inh-ro-rang-hanh-ong-cham-chap-tai-sao-nao-bo-lai-treo-khi-thieu-tin-hieu-cu-the_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:54:34.984270+00:00"
         }
       ]
     },
@@ -30395,7 +30725,8 @@
       "source_url": "https://videos.pexels.com/video-files/12893567/12893567-hd_1080_1920_24fps.mp4",
       "local_path": "assets/broll/899adc41b105270f.mp4",
       "topics": [
-        "person starting small task timer laptop"
+        "person starting small task timer laptop",
+        "person smiling starting small task office calm"
       ],
       "orientation": "portrait",
       "duration_sec": 6.0,
@@ -30404,6 +30735,11 @@
           "video_slug": "danh-sach-qua-dai-khien-moi-viec-eu-nang-ne-vi-sao-ban-tri-hoan_knowledge",
           "role": "payoff",
           "used_at": "2026-07-20T17:11:40.591001+00:00"
+        },
+        {
+          "video_slug": "quyet-inh-ro-rang-hanh-ong-cham-chap-tai-sao-nao-bo-lai-treo-khi-thieu-tin-hieu-cu-the_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:54:46.709268+00:00"
         }
       ]
     },
@@ -30490,7 +30826,8 @@
       "source_url": "https://videos.pexels.com/video-files/6324549/6324549-hd_1080_1920_24fps.mp4",
       "local_path": "assets/broll/30cf4c5644cb5c07.mp4",
       "topics": [
-        "person staring at blank document laptop office"
+        "person staring at blank document laptop office",
+        "person staring at blank computer screen stressed office"
       ],
       "orientation": "portrait",
       "duration_sec": 2.5,
@@ -30499,6 +30836,11 @@
           "video_slug": "buoc-au-mo-ho-khien-ban-tri-hoan-vi-sao_knowledge",
           "role": "hook",
           "used_at": "2026-07-20T17:24:28.801312+00:00"
+        },
+        {
+          "video_slug": "quyet-inh-ro-rang-hanh-ong-cham-chap-tai-sao-nao-bo-lai-treo-khi-thieu-tin-hieu-cu-the_knowledge",
+          "role": "hook",
+          "used_at": "2026-07-27T13:54:32.356528+00:00"
         }
       ]
     },
@@ -31951,7 +32293,8 @@
       "source_url": "https://videos.pexels.com/video-files/6100897/6100897-hd_1080_2048_30fps.mp4",
       "local_path": "assets/broll/003a2ca4ed379385.mp4",
       "topics": [
-        "writing plan on paper desk timer"
+        "writing plan on paper desk timer",
+        "writing if-then plan on sticky note yellow paper"
       ],
       "orientation": "portrait",
       "duration_sec": 6.0,
@@ -31960,6 +32303,11 @@
           "video_slug": "mot-quyet-inh-tot-van-ung-yen-khi-thieu-tin-hieu-bat-au_knowledge",
           "role": "payoff",
           "used_at": "2026-07-20T18:47:12.710683+00:00"
+        },
+        {
+          "video_slug": "quyet-inh-ro-rang-hanh-ong-cham-chap-tai-sao-nao-bo-lai-treo-khi-thieu-tin-hieu-cu-the_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:54:43.220614+00:00"
         }
       ]
     },
@@ -31989,7 +32337,8 @@
       "source_url": "https://videos.pexels.com/video-files/8085795/8085795-hd_1080_2048_25fps.mp4",
       "local_path": "assets/broll/01741ef557d36c29.mp4",
       "topics": [
-        "writing plan on paper desk timer"
+        "writing plan on paper desk timer",
+        "writing if-then plan on sticky note yellow paper"
       ],
       "orientation": "portrait",
       "duration_sec": 6.0,
@@ -31998,6 +32347,11 @@
           "video_slug": "mot-quyet-inh-tot-van-ung-yen-khi-thieu-tin-hieu-bat-au_knowledge",
           "role": "payoff",
           "used_at": "2026-07-20T18:47:12.725051+00:00"
+        },
+        {
+          "video_slug": "quyet-inh-ro-rang-hanh-ong-cham-chap-tai-sao-nao-bo-lai-treo-khi-thieu-tin-hieu-cu-the_knowledge",
+          "role": "payoff",
+          "used_at": "2026-07-27T13:54:43.226998+00:00"
         }
       ]
     },
@@ -33274,10 +33628,11 @@
       "local_path": "assets/broll/a427b177b1015990.mp4",
       "topics": [
         "person working laptop phone notification desk",
-        "phone payment notification online shopping cart hand pause"
+        "phone payment notification online shopping cart hand pause",
+        "online shopping laptop course email calendar planning"
       ],
       "orientation": "portrait",
-      "duration_sec": 2.5,
+      "duration_sec": 6.0,
       "uses": [
         {
           "video_slug": "ban-a-muon-lam-nhung-mot-thong-bao-khien-ban-lai-khong-bat-au_knowledge",
@@ -33288,6 +33643,11 @@
           "video_slug": "vi-sao-tien-thuong-de-bien-thanh-khoan-chi-ngoai-ke-hoach_knowledge",
           "role": "hook",
           "used_at": "2026-07-22T09:48:59.965266+00:00"
+        },
+        {
+          "video_slug": "a-mua-roi-vi-sao-ta-cang-tin-minh-can-no_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-24T08:29:34.576752+00:00"
         }
       ]
     },
@@ -33324,10 +33684,11 @@
       "local_path": "assets/broll/06d03d79c77680dd.mp4",
       "topics": [
         "person working laptop phone notification desk",
-        "phone payment notification online shopping cart hand pause"
+        "phone payment notification online shopping cart hand pause",
+        "online shopping laptop course email calendar planning"
       ],
       "orientation": "portrait",
-      "duration_sec": 2.5,
+      "duration_sec": 6.0,
       "uses": [
         {
           "video_slug": "ban-a-muon-lam-nhung-mot-thong-bao-khien-ban-lai-khong-bat-au_knowledge",
@@ -33338,6 +33699,11 @@
           "video_slug": "vi-sao-tien-thuong-de-bien-thanh-khoan-chi-ngoai-ke-hoach_knowledge",
           "role": "hook",
           "used_at": "2026-07-22T09:48:59.957750+00:00"
+        },
+        {
+          "video_slug": "a-mua-roi-vi-sao-ta-cang-tin-minh-can-no_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-24T08:29:34.570691+00:00"
         }
       ]
     },
@@ -33349,10 +33715,11 @@
       "local_path": "assets/broll/0611634b965467e4.mp4",
       "topics": [
         "person working laptop phone notification desk",
-        "phone payment notification online shopping cart hand pause"
+        "phone payment notification online shopping cart hand pause",
+        "online shopping laptop course email calendar planning"
       ],
       "orientation": "portrait",
-      "duration_sec": 2.5,
+      "duration_sec": 6.0,
       "uses": [
         {
           "video_slug": "ban-a-muon-lam-nhung-mot-thong-bao-khien-ban-lai-khong-bat-au_knowledge",
@@ -33363,6 +33730,11 @@
           "video_slug": "vi-sao-tien-thuong-de-bien-thanh-khoan-chi-ngoai-ke-hoach_knowledge",
           "role": "hook",
           "used_at": "2026-07-22T09:48:59.946827+00:00"
+        },
+        {
+          "video_slug": "a-mua-roi-vi-sao-ta-cang-tin-minh-can-no_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-24T08:29:34.564201+00:00"
         }
       ]
     },

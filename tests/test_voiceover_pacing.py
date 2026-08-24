@@ -39,6 +39,43 @@ def test_split_pacing_preserves_all_words():
     assert "Học nhanh" in joined and "nhớ lâu" in joined and "Hiệu quả thật" in joined
 
 
+def test_f5_coalesces_tiny_pacing_fragments_without_losing_text_or_final_pause():
+    pieces = [
+        ("Bạn biết rồi,", 0.18),
+        ("nhưng vẫn giữ nguyên.", 0.42),
+        ("Một thay đổi nhỏ,", 0.18),
+        ("cũng có thể bắt đầu hôm nay.", 0.0),
+    ]
+
+    grouped = tts._coalesce_f5_pieces(pieces, min_chars=50, max_chars=90)
+
+    assert len(grouped) == 2
+    assert all(len(text) <= 90 for text, _pause in grouped)
+    assert " ".join(text for text, _pause in grouped) == " ".join(text for text, _pause in pieces)
+    assert grouped[-1][1] == 0.0
+
+
+def test_f5_piece_cache_path_is_content_addressed(tmp_path):
+    first = tts._f5_piece_audio_path(tmp_path, "slug", "knowledge", 0, 0, "Một câu ngắn.")
+    same = tts._f5_piece_audio_path(tmp_path, "slug", "knowledge", 0, 0, "Một câu ngắn.")
+    changed = tts._f5_piece_audio_path(tmp_path, "slug", "knowledge", 0, 0, "Một câu đã đổi.")
+
+    assert first == same
+    assert first != changed
+    assert first.suffix == ".wav"
+
+
+def test_f5_piece_cache_path_changes_when_provider_duration_calibration_changes(tmp_path):
+    normal = tts._f5_piece_audio_path(
+        tmp_path, "slug", "knowledge", 0, 0, "Một câu ngắn.", inference_speed=0.85
+    )
+    changed = tts._f5_piece_audio_path(
+        tmp_path, "slug", "knowledge", 0, 0, "Một câu ngắn.", inference_speed=0.90
+    )
+
+    assert normal != changed
+
+
 def test_voice_profile_entertainment_is_fast_and_not_news_reader():
     script = Script(
         topic="giải trí",
@@ -186,10 +223,9 @@ def test_to_mp3_applies_tempo_when_profile_needs_it(monkeypatch, tmp_path):
     assert any("atempo=" in part for part in calls[0])
 
 
-def test_f5_tempo_matches_each_edge_profile_speed():
+def test_f5_tempo_stays_inside_the_stt_safe_pacing_envelope():
     for profile in tts.VOICE_PROFILES.values():
-        edge_multiplier = 1 + tts._edge_rate_pct(profile.edge_rate) / 100
-        assert profile.f5_tempo == pytest.approx(edge_multiplier)
+        assert 0.95 <= profile.f5_tempo <= tts.MAX_F5_TEMPO
 
 
 def test_legacy_hook_copy_does_not_route_every_section_as_hook():
@@ -212,10 +248,10 @@ def test_f5_segment_cache_key_includes_tempo(monkeypatch):
 
     monkeypatch.setattr(tts.settings, "tts_provider", "f5")
 
-    path = tts._segment_audio_path("demo", tts.VOICE_KNOWLEDGE, 0)
+    path = tts._segment_audio_path("demo", tts.VOICE_KNOWLEDGE, 0, narration="nội dung", voice="vi-VN")
 
     assert f"f5x{tts.VOICE_KNOWLEDGE.f5_tempo:.2f}" in path.name
-    assert f"s{F5_INFERENCE_SPEED:.2f}" in path.name
+    assert f"s{F5_INFERENCE_SPEED:.3f}" in path.name
 
 
 def test_to_mp3_trims_provider_boundary_silence(monkeypatch, tmp_path):

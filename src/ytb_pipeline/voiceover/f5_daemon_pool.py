@@ -12,6 +12,7 @@ from .f5_provider import (
     F5_CKPT,
     F5_DEVICE,
     F5_INFERENCE_SEED,
+    F5_INFERENCE_SPEED,
     F5_MAX_CHARS,
     F5_MODEL_ARCH,
     F5_PYTHON,
@@ -55,6 +56,7 @@ class F5DaemonPool:
                 "ref_text": ref_text,
                 "max_chars": F5_MAX_CHARS,
                 "inference_seed": F5_INFERENCE_SEED,
+                "inference_speed": F5_INFERENCE_SPEED,
             }, ensure_ascii=False), encoding="utf-8")
             self._processes[lane] = subprocess.Popen(
                 [str(F5_PYTHON), str(F5_BATCH_WORKER), "--serve", str(socket_path), str(manifest_path)],

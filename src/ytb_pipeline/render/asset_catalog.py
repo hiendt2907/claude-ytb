@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from datetime import UTC, datetime
 from pathlib import Path
@@ -32,6 +33,15 @@ class AssetCatalog:
             raw = data.get("assets", {})
             return [dict(asset) for asset in raw.values() if isinstance(asset, dict)]
 
+    def assets_readonly(self) -> list[dict[str, Any]]:
+        """Read catalog records without taking a write lock or touching disk state."""
+        try:
+            raw = json.loads(self.path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return []
+        assets = raw.get("assets", {}) if isinstance(raw, dict) else {}
+        return [dict(asset) for asset in assets.values() if isinstance(asset, dict)] if isinstance(assets, dict) else []
+
     def select_urls(
         self,
         urls: list[str],
@@ -60,6 +70,7 @@ class AssetCatalog:
         orientation: str,
         excluded: set[str] | None = None,
         role: str = "body",
+        assets: list[dict[str, Any]] | None = None,
     ) -> list[tuple[str, Path]]:
         """Return usable local footage, ranked by relevance then least recent reuse.
 
@@ -70,7 +81,7 @@ class AssetCatalog:
         excluded = excluded or set()
         query_tokens = _meaningful_tokens(query)
         candidates: list[tuple[dict[str, Any], Path, int]] = []
-        for asset in self.assets():
+        for asset in (assets if assets is not None else self.assets()):
             source_url = asset.get("source_url")
             local_path = asset.get("local_path")
             if (

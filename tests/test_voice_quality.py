@@ -77,6 +77,22 @@ def test_gate_reports_duration_deviation_and_stt_unavailable(monkeypatch, tmp_pa
     assert result.repair_payload["STT_UNAVAILABLE"]["action"] == "configure_local_stt"
 
 
+def test_gate_requires_local_transcript_when_e2e_requests_it(monkeypatch, tmp_path):
+    voiceover = _voiceover(tmp_path)
+    monkeypatch.setattr(quality, "probe_audio_duration", lambda _path: 60.0)
+    monkeypatch.setattr(quality, "analyze_local_audio", lambda _path, _duration: {})
+
+    result = quality.run_audio_quality_gate(
+        voiceover,
+        stt_adapter=_UnavailableStt(),
+        require_transcript=True,
+    )
+
+    assert result.passed is False
+    assert result.issues[0].code == "STT_UNAVAILABLE"
+    assert result.issues[0].severity == "error"
+
+
 def test_gate_compares_transcript_and_detects_repeated_phrase(monkeypatch, tmp_path):
     voiceover = _voiceover(tmp_path, narration="Bạn có thể bắt đầu từ việc nhỏ hôm nay.")
     monkeypatch.setattr(quality, "probe_audio_duration", lambda _path: 60.0)
@@ -106,6 +122,26 @@ def test_gate_honours_transcript_similarity_threshold(monkeypatch, tmp_path):
 
     assert result.passed is True
     assert result.issues == ()
+
+
+def test_gate_accepts_expected_local_f5_transcription_noise(monkeypatch, tmp_path):
+    expected = (
+        "Đây là bài kiểm tra giọng đọc tiếng Việt ở nhịp tự nhiên. "
+        "Não bộ không cần bị ép chạy quá nhanh để người nghe hiểu được ý chính. "
+        "Một câu rõ ràng giúp cả người xem và bộ nhận dạng giọng nói theo kịp nội dung."
+    )
+    local_stt = (
+        "Với là bài kiểm tra giọng đọc tiếng Việt ở nhịp tự nhiên. "
+        "Náo bộ không cần bị ép chạy quá nhanh để người nghe hiểu được ý chính. "
+        "Một câu giao thẳng giúp cả người xem và bộ nhận dạng sọng nói theo kết nội dung."
+    )
+    voiceover = _voiceover(tmp_path, narration=expected)
+    monkeypatch.setattr(quality, "probe_audio_duration", lambda _path: 60.0)
+    monkeypatch.setattr(quality, "analyze_local_audio", lambda _path, _duration: {})
+
+    result = quality.run_audio_quality_gate(voiceover, stt_adapter=_TranscriptStt(local_stt))
+
+    assert result.passed is True
 
 
 def test_gate_reports_missing_audio_without_throwing(tmp_path):

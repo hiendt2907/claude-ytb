@@ -94,3 +94,27 @@ def test_main_skips_job_with_existing_valid_wav(tmp_path, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "JOB 1/2 skip (đã có)" in out
     assert "JOB 2/2 ok" in out
+
+
+@pytest.mark.unit
+def test_worker_forwards_manifest_inference_speed_to_every_f5_call(tmp_path):
+    """The batch boundary must preserve the provider duration calibration."""
+    out = tmp_path / "out.wav"
+    calls = []
+
+    class _FakeTTS:
+        def infer(self, **kwargs):
+            calls.append(kwargs)
+            _write_valid_wav(Path(kwargs["file_wave"]))
+
+    manifest = {
+        "ref_audio": "ref.wav",
+        "ref_text": "ref",
+        "inference_seed": 7,
+        "inference_speed": 0.85,
+        "jobs": [{"text": "Một câu đủ dài để kiểm thử.", "out": str(out)}],
+    }
+
+    assert worker._run_jobs(_FakeTTS(), manifest) == 0
+    assert calls[0]["seed"] == 7
+    assert calls[0]["speed"] == 0.85

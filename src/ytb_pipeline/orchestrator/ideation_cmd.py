@@ -39,7 +39,7 @@ SCRIPT_LLM_MAX_TOKENS = int(os.environ.get("IDEATION_LLM_MAX_TOKENS", "14000"))
 from ..claude_cli import build_claude_cmd
 from ..ideation.series import slugify
 from ..providers.registry import get_llm_provider
-from .ideation_local_provider import OllamaScriptProvider
+from .ideation_provider_cascade import CascadeScriptProvider
 from .ideation_prompts import (
     SCRIPT_GENERATION_SYSTEM_PROMPT,
     SHORT_MAX_CHARS,
@@ -62,7 +62,10 @@ from .ideation_script_fix import (
     trim_to_sentence,
     validate_or_repair_script,
 )
+from ..ideation.wording_engine import process_and_sanitize
+from ..ideation.generation_schema import script_generation_schema
 from .ideation_error_engine import record_ideation_failure
+from .external_long import completed_external_long_source
 from .ideation_state import (
     LEDGER_HEADER,
     clear_ledger_for_fresh_ideas,
@@ -115,6 +118,23 @@ def load_short_source_long_context(script_path: Path, long_slug: str) -> dict:
     }
 
 
+def resolve_short_source_long_path(
+    scripts_dir: Path, long_slug: str, *, allow_external_long: bool = False
+) -> Path:
+    """Resolve an active Long, or an explicitly allowed archived completed Long."""
+    active_path = scripts_dir / f"{long_slug}.json"
+    if active_path.exists():
+        return active_path
+    if allow_external_long:
+        archived_path = completed_external_long_source(
+            scripts_dir / "archive", long_slug, _cli().done_slugs()
+        )
+        if archived_path is not None:
+            return archived_path
+        raise SystemExit(f"✗ Long external '{long_slug}' cần done|ok và source archive Long hợp lệ.")
+    raise SystemExit("✗ --long-form-slug phải trỏ tới Long đã có trong cùng --batch-key.")
+
+
 def available_short_source_context(source_long_context: dict, used_section_indexes: set[int]) -> dict:
     """Return only source segments not already assigned to another Short."""
     candidates = [
@@ -126,6 +146,47 @@ def available_short_source_context(source_long_context: dict, used_section_index
             f"Long nguồn {source_long_context.get('slug', '')} không còn phân đoạn khác cho Short tiếp theo."
         )
     return {**source_long_context, "candidates": candidates}
+
+
+def preassign_short_source_context(source_long_context: dict) -> dict:
+    """Limit one generation to one auditable Long excerpt.
+
+    A source choice is workflow input, not model-authored metadata.  Giving
+    the model one candidate removes ambiguous provenance while preserving the
+    existing no-reuse rule in ``available_short_source_context``.
+    """
+    candidates = source_long_context.get("candidates", [])
+    if not candidates:
+        raise ValueError("Long nguồn không còn candidate hợp lệ cho Short.")
+    return {**source_long_context, "candidates": [candidates[0]]}
+
+
+def attach_preassigned_short_source_provenance(payload: dict, source_long_context: dict) -> dict:
+    """Attach only the provenance selected before the LLM request.
+
+    Missing metadata can be completed from the declared candidate; conflicting
+    metadata is a hard failure so a model can never silently point a Short at
+    another Long section.
+    """
+    candidates = source_long_context.get("candidates", [])
+    if len(candidates) != 1 or not isinstance(candidates[0], dict):
+        raise ValueError("Source provenance cần đúng một candidate đã chọn.")
+    strategy_raw = payload.get("strategy")
+    if not isinstance(strategy_raw, dict):
+        return dict(payload)
+    candidate = candidates[0]
+    expected = {
+        "source_long_slug": source_long_context.get("slug", ""),
+        "source_section_index": candidate.get("section_index"),
+        "source_excerpt": candidate.get("excerpt", ""),
+    }
+    strategy = dict(strategy_raw)
+    for field, value in expected.items():
+        supplied = strategy.get(field)
+        if supplied not in (None, "", value):
+            raise ValueError(f"Source provenance mâu thuẫn ở {field}.")
+        strategy[field] = value
+    return {**payload, "strategy": strategy}
 
 
 def reserve_invalid_json_regeneration(attempts: dict[int, int], candidate_index: int) -> bool:
@@ -267,7 +328,14 @@ def _validate_short_generation_request(args: argparse.Namespace) -> None:
         for item in batch.get("long_videos", [])
         if isinstance(item, dict)
     }
-    if required["long-form-slug"] not in long_slugs:
+    external_completed_long = False
+    if bool(getattr(args, "allow_external_long", False)):
+        external_completed_long = completed_external_long_source(
+            _cli().ROOT / "scripts" / "archive",
+            required["long-form-slug"],
+            _cli().done_slugs(),
+        ) is not None
+    if required["long-form-slug"] not in long_slugs and not external_completed_long:
         raise SystemExit("✗ --long-form-slug phải trỏ tới Long đã có trong cùng --batch-key.")
 
 
@@ -370,8 +438,11 @@ def _configured_script_provider(name: str):
         return _ClaudeStartProvider()
     if name == "codex":
         return _CodexStartProvider()
-    if name == "ollama":
-        return OllamaScriptProvider(get_llm_provider("ollama"), claude_fallback=_ClaudeStartProvider())
+    if name == "xkiro":
+        return CascadeScriptProvider(
+            [get_llm_provider("xkiro"), _CodexStartProvider(), _ClaudeStartProvider()],
+            name="xkiro",
+        )
     return get_llm_provider(name)
 
 
@@ -385,7 +456,8 @@ async def _cmd_start_local(args: argparse.Namespace) -> None:
     if not provider.is_available():
         raise SystemExit(
             f"✗ LLM provider `{provider.name}` chưa sẵn sàng. "
-            f"Chạy `ytb batch doctor --local` hoặc cấu hình {cli.settings.ollama_url}."
+            "Chạy `ytb batch doctor --local` hoặc kiểm tra XKIRO_API_KEY/"
+            "`claude`/`codex` CLI trong PATH."
         )
 
     if getattr(args, "clear_ledger", False):
@@ -411,7 +483,11 @@ async def _cmd_start_local(args: argparse.Namespace) -> None:
     used_source_section_indexes: set[int] = set()
     if args.type_of_vid == "short":
         source_long_context = load_short_source_long_context(
-            scripts_dir / f"{funnel['long_form_slug']}.json", funnel["long_form_slug"]
+            resolve_short_source_long_path(
+                scripts_dir, funnel["long_form_slug"],
+                allow_external_long=bool(getattr(args, "allow_external_long", False)),
+            ),
+            funnel["long_form_slug"],
         )
         state = json.loads(cli.AUTO_STATE_PATH.read_text(encoding="utf-8"))
         batch = state.get(str(getattr(args, "batch_key", "")), {})
@@ -456,6 +532,10 @@ async def _cmd_start_local(args: argparse.Namespace) -> None:
             available_short_source_context(source_long_context, used_source_section_indexes)
             if source_long_context is not None else None
         )
+        if available_source_long_context is not None:
+            available_source_long_context = preassign_short_source_context(
+                available_source_long_context
+            )
         prompt = local_script_prompt(
             i,
             requested_count,
@@ -474,14 +554,22 @@ async def _cmd_start_local(args: argparse.Namespace) -> None:
             prompt,
             system=SCRIPT_GENERATION_SYSTEM_PROMPT,
             max_tokens=SCRIPT_LLM_MAX_TOKENS,
-            temperature=0.7,
+            temperature=0.2,
             json_output=True,
+            response_schema=script_generation_schema(args.type_of_vid),
         )
         append_local_start_log(log_path, f"RAW_LLM_RESPONSE {i}", text)
         print(f"{prefix} LLM: response received", flush=True)
         try:
-            payload = json_from_llm(text)
-        except json.JSONDecodeError as exc:
+            # Layer 2: deterministic wording/JSON/slug sanitizer runs directly
+            # after Qwen and before validate_or_repair_script/QA.  It never
+            # spends an additional LLM call.
+            payload = process_and_sanitize(text)
+            if available_source_long_context is not None:
+                payload = attach_preassigned_short_source_provenance(
+                    payload, available_source_long_context
+                )
+        except (ValueError, json.JSONDecodeError) as exc:
             # A truncated/malformed object cannot be repaired deterministically.
             # Preserve the exact response and allow one full fresh generation;
             # this is cheaper than a repair conversation and never promotes a
@@ -580,14 +668,15 @@ def cmd_start(args: argparse.Namespace) -> None:
     if getattr(args, "ask", False) or args.num_of_vid is None:
         args = cli._prompt_start_interactive(args)
 
-    if getattr(args, "local", False) and getattr(args, "cloud", False):
-        raise SystemExit("✗ Chọn một trong hai: --local hoặc --cloud, không dùng cùng lúc.")
+    if getattr(args, "local", False):
+        raise SystemExit(
+            "✗ --local đã bị gỡ cùng Ollama/MLX-LM (amendment 2026-08-24, "
+            "PROJECT_VISION.md Amendment Log). Dùng `--llm xkiro` (mặc định), "
+            "`--llm claude` hoặc `--llm codex`."
+        )
     if getattr(args, "clear_ledger", False):
         if getattr(args, "resume", False):
             raise SystemExit("✗ --clear-ledger không dùng cùng --resume; resume cần ledger cũ để tránh chạy nhầm.")
-
-    if getattr(args, "local", False):
-        setattr(args, "llm_provider", "ollama")
 
     if getattr(args, "cloud", False):
         raise SystemExit(
@@ -597,30 +686,16 @@ def cmd_start(args: argparse.Namespace) -> None:
 
     _validate_short_generation_request(args)
 
-    requested_provider = getattr(args, "llm_provider", None)
-    if requested_provider in {"claude", "codex", "ollama"}:
+    # requested_provider từ --llm, hoặc settings.llm_provider mặc định
+    # (xkiro — cascade tự động sang Codex CLI rồi Claude CLI khi lỗi).
+    requested_provider = getattr(args, "llm_provider", None) or _cli().settings.llm_provider
+    if requested_provider in {"claude", "codex", "xkiro"}:
         setattr(args, "_provider", _configured_script_provider(requested_provider))
         setattr(args, "_strict_qa", True)
         asyncio.run(_cmd_start_local(args))
         return
-    if _cli().settings.llm_provider == "codex":
-        setattr(args, "_provider", _CodexStartProvider())
-        setattr(args, "_strict_qa", True)
-        asyncio.run(_cmd_start_local(args))
-        return
-    if _cli().settings.llm_provider == "ollama":
-        setattr(args, "_provider", _configured_script_provider("ollama"))
-        setattr(args, "_strict_qa", True)
-        asyncio.run(_cmd_start_local(args))
-        return
-    configured_provider = get_llm_provider()
-    if getattr(configured_provider, "name", "") != "claude":
-        setattr(args, "_provider", configured_provider)
-        asyncio.run(_cmd_start_local(args))
-        return
-    # Không ép Haiku/Sonnet: để CLI dùng model mặc định đã cấu hình trong
-    # Claude Code. Lỗi QA phải được báo nguyên nhân thật, không bị che bởi
-    # một lần gọi model thứ hai với tiêu chí khác.
-    setattr(args, "_provider", _ClaudeStartProvider())
+    # Provider khác đăng ký qua llm_registry ngoài bộ 3 chuẩn — dùng thẳng,
+    # không bọc cascade CLI (không có script provider tương ứng để cascade).
+    setattr(args, "_provider", get_llm_provider(requested_provider))
     setattr(args, "_strict_qa", True)
     asyncio.run(_cmd_start_local(args))

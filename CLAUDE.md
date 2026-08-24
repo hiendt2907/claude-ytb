@@ -17,21 +17,27 @@ Codex và Claude phải đọc cả hai tài liệu trước khi tạo queue, vi
 thay đổi pipeline hoặc quyết định tăng sản lượng.
 
 `claude-ytb` đang chuyển từ **pipeline tự động hoá YouTube** thành
-**AI Native Creative Operating System** — một engine local-first chạy chủ
-yếu trên MacBook Pro M4, biến một creative intent (chủ đề, series, nhân vật
-tái sử dụng) thành nội dung hoàn chỉnh đa nền tảng (video, audio, slide,
+**AI Native Creative Operating System** — một engine được điều phối và render
+chủ yếu trên MacBook Pro M4, biến một creative intent (chủ đề, series, nhân
+vật tái sử dụng) thành nội dung hoàn chỉnh đa nền tảng (video, audio, slide,
 text) qua một DAG các bước sản xuất dùng AI provider có thể thay thế lẫn
-nhau.
+nhau. Theo amendment 2026-08-24, LLM và TTS mặc định chạy qua xKiro; local
+compute vẫn là default cho render/visual.
 
 Nguyên tắc bất biến (xem `PROJECT_VISION.md` §2 — KHÔNG đổi trừ khi có
 amendment ghi rõ ngày + lý do trong chính file đó):
 
-1. **Offline-first.** Toàn pipeline (trừ bước publish cuối) phải chạy được
-   không cần internet.
-2. **Local inference priority.** LLM (Ollama/Qwen3), TTS (F5-TTS), ảnh
-   (Flux), video (Wan2.2) là **default**. Cloud (Claude API, ElevenLabs,
-   Pexels) là **fallback tuỳ chọn**, chọn rõ qua config — không bao giờ âm
-   thầm thay default.
+1. **Offline-first (amendment 2026-08-24 cho LLM+TTS — xem
+   `PROJECT_VISION.md` Amendment Log).** Render + publish-prep phải chạy
+   được không cần internet. LLM và TTS KHÔNG còn nằm trong yêu cầu này —
+   cả hai đã là cloud-primary (xKiro) theo chủ đích, MacBook chỉ chạy
+   workflow/pipeline orchestration + render.
+2. **Cloud-primary LLM+TTS, local-first phần còn lại (amendment 2026-08-24).**
+   LLM và TTS default là **xKiro** (cloud), cascade tự động sang Codex CLI
+   rồi Claude CLI khi xKiro lỗi (`orchestrator/ideation_provider_cascade.py`).
+   Ollama và MLX-LM đã bị GỠ KHỎI CODEBASE — không còn local LLM provider
+   nào. Ảnh (Flux), video (Wan2.2) KHÔNG đổi, vẫn **default local**. Mọi
+   provider chọn rõ qua config — không bao giờ âm thầm thay default.
 3. **Không stock video làm default.** Pexels không bao giờ là nguồn B-roll
    mặc định. Ảnh/video AI-generated là default path của `render.ai`.
    **CHƯA ĐẠT (2026-07-06):** `settings.video_provider`/`broll_strategy`
@@ -52,7 +58,7 @@ amendment ghi rõ ngày + lý do trong chính file đó):
 
 - **Clean + Hexagonal.** Dependency luôn hướng vào trong: Interface →
   Application → Domain. Domain layer (frozen dataclasses) không phụ thuộc
-  gì bên ngoài — không Pillow, không FFmpeg, không SDK Google/Ollama trực
+  gì bên ngoài — không Pillow, không FFmpeg, không SDK Google hay SDK provider
   tiếp.
 - **Provider Pattern.** Mọi pipeline/domain code chỉ import `Protocol`
   (`VoiceProvider`, `RenderProvider`, `ImageProvider`, `PublishProvider`),
@@ -148,18 +154,23 @@ buộc:
 
 ## AI Rules
 
-- **Local-first.** Default provider cho LLM/Voice/Image/Video luôn là local
-  model. Cloud chỉ dùng khi config chọn rõ ràng (không phải vì local "chưa
-  setup xong" trong code).
-- **Fallback to cloud** là một adapter hợp lệ, không phải nhánh đặc biệt —
-  implement như mọi `Provider` khác, chọn qua registry.
+- **xKiro mặc định cho LLM + Voice.** `llm_provider` và `tts_provider` đều
+  mặc định là `"xkiro"`; `allow_cloud_providers=true` mặc định. Ideation thử
+  xKiro trước, sau đó Codex CLI rồi Claude CLI khi xKiro không khả dụng hoặc
+  lỗi. Không thêm lại Ollama, MLX-LM, `local_stack`, hoặc một local ideation
+  provider mà không có amendment mới trong `PROJECT_VISION.md`.
+- **Local-first cho visual/render.** Flux, video generation và render vẫn ưu
+  tiên local theo §2 của `PROJECT_VISION.md`. F5 và các TTS local còn là lựa
+  chọn config rõ ràng, không phải default.
+- **Fallback là một adapter hợp lệ.** Cascade/fallback phải tập trung trong
+  provider/orchestrator boundary, không rải nhánh provider trong domain code.
 - **Token/cost tracking.** Mọi lời gọi cloud LLM/TTS phải log
   `tokens_used`/`cost_estimate` (nếu provider trả về) qua structured logging
   để theo dõi chi phí — local inference không cần track cost nhưng nên log
   `duration_ms` để theo dõi hiệu năng M4.
-- **Cost awareness.** Trước khi thêm 1 cloud call mới vào default path,
-  cân nhắc: có local alternative chưa được thử chưa? Nếu có, local phải là
-  default, cloud là fallback — không phải ngược lại.
+- **Cost awareness.** Cloud LLM/TTS là default đã được phê chuẩn. Trước khi
+  thêm cloud call mới ngoài hai capability này, vẫn đánh giá local alternative
+  và ghi rõ lý do/config; không lặng lẽ mở rộng cloud-default sang visual.
 
 ## Review Rules
 
@@ -423,3 +434,14 @@ Mọi cải tiến đều phải đảm bảo:
 - **Code trước.** Viết code ngay, không hỏi lại trừ khi thiếu thông tin
   chặn cứng.
 - **Giải thích tối đa 100 chữ** khi thật sự cần giải thích.
+
+## Batch safety boundary (P0)
+
+- `ytb batch preflight [slug...]` là cổng offline bắt buộc: contract/ruleset,
+  duration, orientation, TTS readiness, B-roll local, thumbnail và disk phải
+  đạt trước khi một script được nhận vào queue hoặc được batch worker chạy.
+- `ytb batch run` và `ytb batch retry` mặc định là dry-run local-only:
+  `DRY_RUN=true`, `BROLL_ALLOW_DOWNLOADS=false`, không được upload hay gọi
+  YouTube verify. Upload chỉ được phép khi operator truyền `--publish` rõ ràng.
+- Test mặc định là unit suite. Dùng `make test-integration` hoặc `make test-e2e`
+  cho marker tương ứng; các test này không được lẫn vào vòng phản hồi mặc định.

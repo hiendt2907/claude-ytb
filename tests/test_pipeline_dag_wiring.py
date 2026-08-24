@@ -51,6 +51,28 @@ def test_load_or_create_project_resumes_existing_done_nodes(tmp_path):
     assert checkpoint.is_done(project, "ideation")  # resume: node done giữ nguyên
 
 
+def test_load_or_create_project_invalidates_nodes_when_ruleset_is_legacy(tmp_path):
+    """Old 2x-tempo artifacts cannot be resumed after a contract migration."""
+    checkpoint = CheckpointManager(tmp_path / "projects")
+    script = _script_file(tmp_path)
+    script.write_text(json.dumps({"ruleset_id": "2026-07-23.1"}), encoding="utf-8")
+    existing = Project(
+        project_id="vid-x",
+        script_path=str(script),
+        metadata={
+            "script_sha256": pipeline._script_sha256(script),
+            "ruleset_id": "2026-07-23.1",
+        },
+    )
+    existing = checkpoint.mark_done(existing, "voiceover", str(tmp_path / "old-tempo.mp3"))
+    checkpoint.save(existing)
+
+    project = pipeline.load_or_create_project(str(script), checkpoint)
+
+    assert project.nodes == {}
+    assert project.metadata["ruleset_id"] == "2026-07-23.1"
+
+
 def test_script_change_invalidates_all_downstream_artifacts(tmp_path):
     checkpoint = CheckpointManager(tmp_path / "projects")
     script = _script_file(tmp_path)

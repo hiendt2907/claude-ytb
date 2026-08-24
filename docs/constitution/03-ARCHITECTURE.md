@@ -30,8 +30,8 @@ non-negotiable decisions in `PROJECT_VISION.md`.
                    │                    │              │               │
    ┌───────────────▼──┐   ┌────────────▼───┐  ┌───────▼────────┐ ┌────▼─────────┐
    │ INFRASTRUCTURE     │   │ INFRASTRUCTURE │  │ INFRASTRUCTURE │ │ INFRASTRUCTURE│
-   │ Ollama/Qwen3 adapter│  │ F5-TTS adapter │  │ Flux adapter   │ │ YouTube API   │
-   │ Claude API adapter  │  │ Edge-TTS adapter│ │ Pexels adapter │ │ Drive adapter │
+   │ xKiro adapter       │  │ xKiro adapter  │  │ Flux adapter   │ │ YouTube API   │
+   │ Codex/Claude CLI    │  │ F5/Edge adapters│ │ Pexels adapter │ │ Drive adapter │
    └─────────────────────┘   └────────────────┘  └────────────────┘ └───────────────┘
 
                          ┌─────────────────────────────────────────┐
@@ -55,7 +55,7 @@ Infrastructure directly.
 
 Location: `src/ytb_pipeline/pkg/models.py` (current), to be expanded per
 `04-DOMAIN.md`. Pure data: frozen dataclasses with no behavior beyond simple
-derived properties and no imports of Pillow, FFmpeg, Ollama clients, or any
+derived properties and no imports of Pillow, FFmpeg, provider clients, or any
 SDK. This layer encodes the non-negotiable platform independence from
 `PROJECT_VISION.md` §2.7 — it must never contain a YouTube-specific field
 bolted onto a generic concept.
@@ -108,8 +108,8 @@ quality-gate decisions, no provider selection logic.
 
 | Port (interface, owned by Application) | Adapters (Infrastructure, implement the port) |
 |---|---|
-| `LLMProvider` | Ollama/Qwen3 (local, default) · Claude API (`claude_cli.py`, cloud, opt-in) |
-| `VoiceProvider` | F5-TTS (`f5_provider.py`, local, default per v2) · Edge-TTS (`tts.py`, cloud-free but online) · ElevenLabs (cloud, opt-in) |
+| `LLMProvider` | xKiro (cloud, default) · Codex CLI → Claude CLI (ideation fallback cascade) |
+| `VoiceProvider` | xKiro (cloud, default) · F5-TTS (local opt-in) · Edge-TTS / ElevenLabs (configured alternatives) |
 | `ImageProvider` | Flux local diffusion (default per v2) |
 | `VideoProvider` | Local image-to-video / animation pipeline (default) · Pexels stock (`stock.py`, explicit opt-in fallback only, never default) |
 | `RenderProvider` (composition strategy) | `compose.py` (slide/gradient strategy) · `compose_ai.py` (AI B-roll + beat-sync strategy) |
@@ -127,10 +127,10 @@ Topic
   │
   ▼
 [IDEATION]  Research → KnowledgeBase → Outline → Narrative → Story/Script
-  │  (LLMProvider port; local Qwen3 default, Claude API opt-in)
+  │  (LLMProvider port; xKiro default, then Codex CLI → Claude CLI on failure)
   ▼
 [VOICEOVER] VoiceScript → synthesized Audio Asset + Subtitle/timing data
-  │  (VoiceProvider port; F5-TTS default, Edge-TTS/ElevenLabs opt-in)
+  │  (VoiceProvider port; xKiro default; local F5 remains explicit opt-in)
   ▼
 [RENDER]    Scene/Shot/Frame plans → ImagePrompt/VideoPrompt → visual Assets
             → Timeline assembly → RenderJob → final video Asset

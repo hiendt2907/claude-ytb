@@ -23,9 +23,12 @@ def _cli():
 
 def cmd_status(args: argparse.Namespace) -> None:
     cli = _cli()
+    batch_alive = cli.batch_process_is_alive()
     for worker_id, state in cli.worker_states().items():
         slug = state.get("slug") or "-"
         stage = state.get("stage") or "idle"
+        if stage.startswith(("starting-", "running-")) and not batch_alive:
+            stage = f"stale-no-process:{stage}"
         elapsed = cli.worker_elapsed(state)
         error = state.get("last_error") or "-"
         print(f"worker {worker_id}: {slug}  stage={stage}  elapsed={elapsed}  last_error={error}")
@@ -48,7 +51,16 @@ def cmd_retry(args: argparse.Namespace) -> None:
     if item is None:
         print(f"Không tìm thấy slug '{args.slug}' trong queue.")
         return
-    ok, _output = cli.run_with_retry(item)
+    preflight = cli.preflight_script(cli.ROOT / "scripts" / f"{item.slug}.json")
+    if not preflight.passed:
+        details = "; ".join(f"[{failure.code}] {failure.message}" for failure in preflight.failures)
+        print(f"✗ Không retry '{item.slug}': preflight chưa đạt: {details}")
+        return
+    publish = bool(getattr(args, "publish", False))
+    ok, _output = cli.run_with_retry(
+        item,
+        run_fn=lambda queued, **kwargs: cli.run_pipeline_once(queued, publish=publish, **kwargs),
+    )
     if cli._stop_requested:
         print(
             "⏸ Đã dừng graceful theo yêu cầu (`ytb batch stop`) — chạy lại lệnh "
@@ -105,9 +117,22 @@ def cmd_ps(args: argparse.Namespace) -> None:
 
 def cmd_reset(args: argparse.Namespace) -> None:
     cli = _cli()
-    queue = cli.load_queue()
-    if not any(i.slug == args.slug for i in queue):
+    state = json.loads(cli.AUTO_STATE_PATH.read_text(encoding="utf-8"))
+    matching_batches = [
+        batch_key
+        for batch_key, batch in state.items()
+        if batch_key.startswith("shorts_funnel_batch_")
+        and any(
+            video.get("slug") == args.slug
+            for group in ("long_videos", "short_videos")
+            for video in batch.get(group, [])
+        )
+    ]
+    if not matching_batches:
         print(f"✗ '{args.slug}' không có trong queue (auto_state.json) — không thể reset.")
+        return
+    if len(matching_batches) > 1:
+        print(f"✗ '{args.slug}' xuất hiện ở nhiều batch: {', '.join(sorted(matching_batches))}. Không reset mơ hồ.")
         return
     running = cli.current_running_slug()
     if running == args.slug:

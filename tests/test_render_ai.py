@@ -392,7 +392,7 @@ def test_loader_doc_emphasis_hook_transition(tmp_path):
         "title": "T", "topic": "t", "description": "d",
         "compliance": {"passed": True},
         "sections": [
-            {"narration": "x" * 2300, "caption": "cap", "broll": "gym",
+            {"narration": "x" * 1600, "caption": "cap", "broll": "gym",
              "emphasis": ["Quy tắc 2 phút"], "hook": True, "transition": True},
         ],
     }

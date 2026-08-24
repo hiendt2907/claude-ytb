@@ -10,22 +10,32 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .config.settings import settings
 
-CONTRACT_VERSION = "2026-07-23.1"
-# Recalibrated 2026-07-23 từ 128 project.json đã DONE thật (audio đo bằng
-# ffprobe, không phải ước lượng): median 1557.7 ký tự/phút cho Short,
-# 1612.6 cho Long — hằng số cũ 2000 làm Script QA pass sai nhiều kịch bản mà
-# audio F5 thật lệch quá bound (vd Long 1067.2s dù ước lượng nằm trong 840s,
-# xem data/ledger.md 2026-07-22). 1600 vẫn cao hơn median Short để không siết
-# quá tay content budget, nhưng đủ thấp để safety margin trong
-# `safe_character_bounds` có tác dụng thật thay vì bị hằng số gốc nuốt mất.
+
+CONTRACT_VERSION = "2026-07-28.1"
+# F5's former post-process tempos (1.82–2.16x) caused Faster-Whisper to
+# recover only 1% of a verified Long narration.  The voice profiles now keep
+# tempo near natural speech (0.98–1.18x).  The old 1600 cpm calibration was
+# measured from those accelerated artifacts, so retaining it would make newly
+# generated scripts almost twice as long as their actual spoken runtime.  A
+# native-F5 Long calibration measured 3,276 prepared Vietnamese characters in
+# 145.975 seconds, or 1,346.55 cpm; use the rounded 1,347 cpm planning rate.
+# Measured audio remains the runtime authority at the voiceover boundary.
 F5_CHARS_PER_MIN = 1347.0
+# Provisional xKiro calibration: one production Short measured on 2026-08-24
+# spoke 1,398 prepared Vietnamese characters in 81.34 seconds (≈1,031 CPM).
+# This must be replaced with the conservative p25 from a five-or-more sample
+# calibration; xKiro must not inherit F5's separately measured rate.
+XKIRO_CHARS_PER_MIN = 1030.0
 # The current knowledge profile requests Edge at +96%.  An isolated Long E2E
 # run measured 4,316 prepared Vietnamese characters in 161.4 seconds, or
 # 1,604 CPM rounded.  Planning must follow the active profile, while measured
 # audio remains the final runtime authority.
 EDGE_CHARS_PER_MIN = 1_604.0
 TRANSITION_OVERLAP_SEC = 0.4
+SAFE_LOWER_RUNTIME_MARGIN_SEC = 10.0
+SAFE_UPPER_RUNTIME_MARGIN_SEC = 15.0
 
 
 @dataclass(frozen=True)
@@ -54,10 +64,11 @@ class ContentContract:
         if chars_per_minute <= 0:
             raise ValueError("chars_per_minute phải > 0.")
         lower, upper = self.audio_runtime_bounds_sec(segment_count=segment_count)
-        # A 10-second margin eliminates most first-pass length repairs while
-        # keeping the script well inside the final viewer-runtime contract.
-        safe_lower = min(upper, lower + 4.0)
-        safe_upper = max(safe_lower, upper - 8.0)
+        # The prompt target must leave enough runtime headroom for natural
+        # provider variation.  The values are deliberately named so a future
+        # calibration can adjust them without reintroducing magic numbers.
+        safe_lower = min(upper, lower + SAFE_LOWER_RUNTIME_MARGIN_SEC)
+        safe_upper = max(safe_lower, upper - SAFE_UPPER_RUNTIME_MARGIN_SEC)
         return int(chars_per_minute * safe_lower / 60), int(chars_per_minute * safe_upper / 60)
 
     def validate_audio_runtime(self, duration_sec: float, *, segment_count: int) -> None:
@@ -85,7 +96,10 @@ class ContentContract:
 _CONTRACTS = {
     "short": ContentContract(
         video_type="short",
-        viewer_runtime_bounds_sec=(60.0, 90.0),
+        # E2E renderers can lose up to ~2s to transition overlap; keep the
+        # production 60s floor while allowing the bounded test profile to
+        # verify the complete downstream path without regenerating content.
+        viewer_runtime_bounds_sec=(58.0, 90.0) if settings.e2e_test else (60.0, 90.0),
         minimum_sections=6,
         answer_start_target_sec=4.0,
         answer_start_deadline_sec=5.0,
@@ -93,8 +107,8 @@ _CONTRACTS = {
     ),
     "long": ContentContract(
         video_type="long",
-        viewer_runtime_bounds_sec=(720.0, 900.0),
-        minimum_sections=24,
+        viewer_runtime_bounds_sec=(180.0, 240.0) if settings.e2e_test else (720.0, 900.0),
+        minimum_sections=8 if settings.e2e_test else 24,
     ),
 }
 
@@ -108,7 +122,10 @@ def contract_for(video_type: str) -> ContentContract:
 
 def chars_per_min_for_provider(provider: str) -> float:
     """Calibrated planning rate; measured audio remains the runtime authority."""
-    return F5_CHARS_PER_MIN if provider.strip().lower() == "f5" else EDGE_CHARS_PER_MIN
+    normalized = provider.strip().lower()
+    if normalized == "xkiro":
+        return XKIRO_CHARS_PER_MIN
+    return F5_CHARS_PER_MIN if normalized == "f5" else EDGE_CHARS_PER_MIN
 
 
 def estimate_duration_sec(characters: int, *, chars_per_minute: float) -> float:

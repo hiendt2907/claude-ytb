@@ -158,33 +158,68 @@ def _valid_short_script() -> dict:
 
 
 def test_settings_default_to_local_first_stack():
-    # llm_provider mặc định "ollama" từ 2026-07-23 (docs/TOOL_UPGRADE_PLAN.md
-    # amendment) — Ollama/Qwen local là default, fallback Claude qua
-    # OllamaScriptProvider. tts_provider vẫn chọn tường minh qua .env (claude
-    # CLI trước đó + edge — xem CLAUDE.md amendment 2026-07-06); image/video
-    # còn cố định local-first.
+    # llm_provider mặc định "xkiro" từ amendment 2026-08-24 (PROJECT_VISION.md
+    # Amendment Log) — Ollama/MLX-LM gỡ khỏi codebase, xKiro (cloud) là
+    # default, cascade tự động sang Codex CLI rồi Claude CLI khi lỗi qua
+    # CascadeScriptProvider. image/video vẫn cố định local-first.
     assert settings.image_provider == "pillow"
     assert settings.video_provider == "pexels"
     assert settings.broll_strategy == "pexels"
-    assert settings.llm_provider == "ollama"
+    assert settings.llm_provider == "xkiro"
 
 
-def test_ai_render_provider_requires_pexels_for_real_footage(monkeypatch):
+def test_ai_render_provider_local_only_available_without_pexels_key(monkeypatch):
+    """Rollback 2026-08-24 (xem docs/TOOL_UPGRADE_PLAN.md): local-only mode
+    (BROLL_ALLOW_DOWNLOADS=false, mặc định) KHÔNG được báo unavailable chỉ vì
+    thiếu PEXELS_API_KEY — renderer phụ thuộc asset catalog/cache local, không
+    phụ thuộc network."""
     from ytb_pipeline.providers.render.ai_provider import AiRenderProvider
 
     original = {
         "broll_strategy": settings.broll_strategy,
-        "image_provider": settings.image_provider,
+        "broll_allow_downloads": settings.broll_allow_downloads,
         "pexels_api_key": settings.pexels_api_key,
     }
     try:
         settings.broll_strategy = "pexels"
-        settings.image_provider = "pillow"
+        settings.broll_allow_downloads = False
         settings.pexels_api_key = ""
-        assert AiRenderProvider().is_available() is False
+        assert AiRenderProvider().is_available() is True
     finally:
         for key, value in original.items():
             setattr(settings, key, value)
+
+
+def test_ai_render_provider_requires_pexels_key_only_when_downloads_enabled(monkeypatch):
+    from ytb_pipeline.providers.render.ai_provider import AiRenderProvider
+
+    original = {
+        "broll_strategy": settings.broll_strategy,
+        "broll_allow_downloads": settings.broll_allow_downloads,
+        "pexels_api_key": settings.pexels_api_key,
+    }
+    try:
+        settings.broll_strategy = "pexels"
+        settings.broll_allow_downloads = True
+        settings.pexels_api_key = ""
+        assert AiRenderProvider().is_available() is False
+
+        settings.pexels_api_key = "test-key"
+        assert AiRenderProvider().is_available() is True
+    finally:
+        for key, value in original.items():
+            setattr(settings, key, value)
+
+
+def test_ai_render_provider_unavailable_when_broll_strategy_not_pexels(monkeypatch):
+    from ytb_pipeline.providers.render.ai_provider import AiRenderProvider
+
+    original = settings.broll_strategy
+    try:
+        settings.broll_strategy = "local_video"
+        assert AiRenderProvider().is_available() is False
+    finally:
+        settings.broll_strategy = original
 
 
 def test_local_doctor_reports_local_ai_readiness(monkeypatch):
@@ -195,7 +230,7 @@ def test_local_doctor_reports_local_ai_readiness(monkeypatch):
     checks = run_local_doctor_checks()
     names = {name for name, _ok, _detail in checks}
 
-    assert "Ollama local LLM" in names
+    assert "LLM provider (xkiro)" in names
     assert "Local image provider" in names
     assert "Vietnamese TTS provider" in names
     assert "ffprobe" in names
@@ -250,6 +285,28 @@ def test_batch_start_local_uses_llm_provider_without_claude(tmp_path, monkeypatc
     assert "co-che-test-local" in auto_state.read_text(encoding="utf-8")
     assert "co-che-test-local" in ledger.read_text(encoding="utf-8")
     assert provider.systems == [SCRIPT_GENERATION_SYSTEM_PROMPT]
+
+    # Rollback 2026-08-24: metadata mặc định của video mới trong auto_state.json
+    # phải là "ai" (B-roll local-only), không phải "motion" — batch runner
+    # không được vô tình chọn provider khác production default.
+    def _find_slug_entry(node):
+        if isinstance(node, dict):
+            if node.get("slug") == "co-che-test-local" and "render_provider" in node:
+                return node
+            for value in node.values():
+                found = _find_slug_entry(value)
+                if found is not None:
+                    return found
+        elif isinstance(node, list):
+            for item in node:
+                found = _find_slug_entry(item)
+                if found is not None:
+                    return found
+        return None
+
+    entry = _find_slug_entry(json.loads(auto_state.read_text(encoding="utf-8")))
+    assert entry is not None, "không tìm thấy metadata video mới trong auto_state.json"
+    assert entry["render_provider"] == "ai"
 
 
 def test_batch_start_local_prints_steps_and_writes_trace_log(tmp_path, monkeypatch, capsys):

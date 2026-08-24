@@ -20,6 +20,8 @@ import time
 from collections import deque
 from pathlib import Path
 
+from ..config.settings import settings
+
 ROOT = Path(__file__).resolve().parents[3]
 F5_BATCH_WORKER = ROOT / "scripts" / "f5_batch_worker.py"
 
@@ -31,7 +33,7 @@ F5_CLI = ROOT / ".venv-tts" / "bin" / "f5-tts_infer-cli"
 F5_CKPT = ROOT / "models" / "vivoice" / "model_last.pt"
 F5_VOCAB = ROOT / "models" / "vivoice" / "config.json"
 F5_MODEL_ARCH = "F5TTS_Base"  # kiến trúc nền của bản fine-tune Việt
-F5_DEVICE = "mps"  # GPU Apple Silicon; đổi "cpu" nếu máy khác
+F5_DEVICE = settings.f5_device
 # F5-TTS defaults to a random 64-bit seed, but then exports it as
 # PYTHONHASHSEED (which CPython limits to 32 bits). Keep the inference seed in
 # the worker contract so all helper processes remain startable.
@@ -100,6 +102,7 @@ def _f5_once(text: str, ref_text: str, out_path: Path) -> None:
         "--output_dir", str(out_path.parent),
         "--output_file", out_path.name,
         "--device", F5_DEVICE,
+        "--speed", str(F5_INFERENCE_SPEED),
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0 or not out_path.exists():
@@ -189,6 +192,7 @@ def run_batch(jobs: list[dict]) -> None:
         "ref_text": ref_text,
         "max_chars": F5_MAX_CHARS,
         "inference_seed": F5_INFERENCE_SEED,
+        "inference_speed": F5_INFERENCE_SPEED,
         "jobs": jobs,
     }
     with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False,
@@ -237,6 +241,7 @@ def run_daemon_batch(socket_path: Path, jobs: list[dict]) -> None:
         with client.makefile("rwb") as stream:
             stream.write(json.dumps({
                 "jobs": jobs,
+                "device": F5_DEVICE,
                 "inference_speed": F5_INFERENCE_SPEED,
             }, ensure_ascii=False).encode("utf-8") + b"\n")
             stream.flush()

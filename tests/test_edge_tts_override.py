@@ -35,10 +35,10 @@ def test_edge_rate_override_rejects_invalid_format():
 def test_edge_segment_cache_key_changes_for_explicit_rate_override(monkeypatch):
     monkeypatch.setattr(tts.settings, "tts_provider", "edge")
     monkeypatch.setattr(tts.settings, "edge_tts_rate_override", "", raising=False)
-    default = tts._segment_audio_path("demo", tts.VOICE_KNOWLEDGE, 0)
+    default = tts._segment_audio_path("demo", tts.VOICE_KNOWLEDGE, 0, narration="nội dung", voice="vi-VN")
 
     monkeypatch.setattr(tts.settings, "edge_tts_rate_override", "+40%", raising=False)
-    slower = tts._segment_audio_path("demo", tts.VOICE_KNOWLEDGE, 0)
+    slower = tts._segment_audio_path("demo", tts.VOICE_KNOWLEDGE, 0, narration="nội dung", voice="vi-VN")
 
     assert slower != default
     assert "edgep40" in slower.name

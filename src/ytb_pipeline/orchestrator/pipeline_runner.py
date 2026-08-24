@@ -108,7 +108,7 @@ def write_failure_recovery_report(item: QueueItem, output: str) -> Path | None:
         return None
 
 
-def build_env(item: QueueItem) -> dict:
+def build_env(item: QueueItem, *, publish: bool = False) -> dict:
     """Env bắt buộc cho mỗi lần chạy pipeline — TELEGRAM_APPROVAL=false để tránh
     đụng getUpdates với listener daemon (nguyên nhân lỗi 409 thực tế đã gặp)."""
     env = os.environ.copy()
@@ -119,10 +119,10 @@ def build_env(item: QueueItem) -> dict:
             "ALLOW_CLOUD_PROVIDERS": "true",
             "BROLL_STRATEGY": "pexels",
             "VIDEO_PROVIDER": "pexels",
+            "BROLL_ALLOW_DOWNLOADS": "false",
+            "E2E_TEST": "false",
             "ORIENTATION": item.orientation,
-            # Batch publish is explicitly real; queue metadata must not silently
-            # downgrade an authorized upload to a dry run.
-            "DRY_RUN": "false",
+            "DRY_RUN": "false" if publish else "true",
             "YOUTUBE_PUBLISH_AT": item.publish_at,
         }
     )
@@ -141,6 +141,7 @@ def run_pipeline_once(
     worker_id: int | str | None = None,
     *,
     through: str = "publish",
+    publish: bool = False,
     f5_daemon_socket: Path | None = None,
     initial_stage: str = "starting-voiceover",
 ) -> subprocess.CompletedProcess:
@@ -170,7 +171,7 @@ def run_pipeline_once(
     if worker_id is not None:
         cli.update_worker_state(worker_id, slug=item.slug, stage=initial_stage)
 
-    env = cli.build_env(item)
+    env = cli.build_env(item, publish=publish)
     if f5_daemon_socket is not None:
         env["F5_DAEMON_SOCKET"] = str(f5_daemon_socket)
 
@@ -447,6 +448,7 @@ def process_next(
     queue_path: Path | None = None, ledger_path: Path | None = None, *,
     worker_id: int | None = None, through: str = "publish", batch_key: str | None = None,
     completed_render_slugs: set[str] | None = None,
+    publish: bool = False,
 ) -> bool:
     """Chạy đúng 1 video kế tiếp trong queue: pipeline -> verify YouTube -> ledger.
 
@@ -458,13 +460,39 @@ def process_next(
         queue = cli.load_queue(queue_path, batch_key=batch_key)
         done = cli.done_slugs(ledger_path)
         failed = cli.failed_slugs(ledger_path)
-        item = cli.next_pending(queue, done | failed | cli._claimed_slugs | (completed_render_slugs or set()))
+        excluded = done | failed | cli._claimed_slugs | (completed_render_slugs or set())
+        pending = [candidate for candidate in queue if candidate.slug not in excluded]
+        blocked_shorts = [
+            candidate for candidate in pending
+            if candidate.long_form_slug and candidate.long_form_slug not in done
+        ]
+        item = next(
+            (
+                candidate for candidate in pending
+                if not candidate.long_form_slug or candidate.long_form_slug in done
+            ),
+            None,
+        )
         if item is None:
+            if blocked_shorts:
+                destinations = ", ".join(
+                    f"{candidate.slug}→{candidate.long_form_slug}"
+                    for candidate in blocked_shorts
+                )
+                print(f"⏸ Short đang chờ Long hoàn tất publish/API verify: {destinations}")
+                return False
             print("✓ Queue đã hết — không còn video pending.")
             return False
         cli._claimed_slugs.add(item.slug)
 
     try:
+        preflight = cli.preflight_script(cli.ROOT / "scripts" / f"{item.slug}.json")
+        if not preflight.passed:
+            detail = "; ".join(f"[{failure.code}] {failure.message}" for failure in preflight.failures)
+            cli.update_ledger(item.slug, "", "preflight", "error", detail, ledger_path=ledger_path)
+            if worker_id is not None:
+                cli.update_worker_state(worker_id, slug=item.slug, stage="preflight-error", last_error=detail[-500:])
+            return True
         if worker_id is not None:
             cli.update_worker_state(worker_id, slug=item.slug, stage="starting-voiceover")
         position = sum(1 for q in queue if q.slug in done or q.slug in failed) + 1
@@ -475,7 +503,7 @@ def process_next(
         ok, output = cli.run_with_retry(
             item, ledger_path=ledger_path, worker_id=worker_id,
             run_fn=lambda queued, **kwargs: cli.run_pipeline_once(
-                queued, through=through, **kwargs
+                queued, through=through, publish=publish, **kwargs
             ),
         )
 
@@ -495,12 +523,12 @@ def process_next(
             )
             return True
 
-        if through == "render":
+        if through == "render" or not publish:
             if completed_render_slugs is not None:
                 completed_render_slugs.add(item.slug)
             cli.update_ledger(
-                item.slug, "", "render", "ok",
-                "Batch smoke test: pipeline dừng sau render (--through render).",
+                item.slug, "", "render" if through == "render" else "publish-prep", "ok",
+                "Batch dry-run: render/publish-prep completed; uploaded=false.",
                 ledger_path=ledger_path,
             )
             if worker_id is not None:

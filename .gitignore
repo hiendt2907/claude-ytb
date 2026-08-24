@@ -51,3 +51,10 @@ video-render/.pytest_cache/
 video-render/.coverage*
 video-render/test-results/
 assets/projects/
+
+# Kho script cũ đã archive (nhất quán với `scripts/*.json` ở trên — script là
+# nội dung vận hành, không phải source). Bản gốc vẫn nằm trên đĩa.
+scripts/archive/
+# Backup của các file vận hành vốn đã gitignore (ledger, auto_state, worker state).
+data/archive/
+assets/archive/

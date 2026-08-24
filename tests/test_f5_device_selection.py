@@ -36,7 +36,7 @@ def test_f5_device_defaults_to_mps_and_only_accepts_cpu_or_mps(monkeypatch):
     assert Settings(_env_file=None).f5_device == "cpu"
 
     monkeypatch.setenv("F5_DEVICE", "cuda")
-    with pytest.raises(ValidationError, match="f5_device"):
+    with pytest.raises(ValidationError, match="F5_DEVICE"):
         Settings(_env_file=None)
 
 
@@ -146,11 +146,11 @@ def test_daemon_client_sends_device_and_fails_closed_on_mismatch(monkeypatch, tm
 def test_f5_cache_identity_includes_selected_device(monkeypatch, tmp_path):
     monkeypatch.setattr(tts.settings, "tts_provider", "f5")
     monkeypatch.setattr(f5_provider, "F5_DEVICE", "mps")
-    segment_mps = tts._segment_audio_path("video", tts.VOICE_KNOWLEDGE, 0)
+    segment_mps = tts._segment_audio_path("video", tts.VOICE_KNOWLEDGE, 0, narration="nội dung", voice="vi-VN")
     piece_mps = tts._f5_piece_audio_path(tmp_path, "video", "knowledge", 0, 0, "nội dung")
 
     monkeypatch.setattr(f5_provider, "F5_DEVICE", "cpu")
-    segment_cpu = tts._segment_audio_path("video", tts.VOICE_KNOWLEDGE, 0)
+    segment_cpu = tts._segment_audio_path("video", tts.VOICE_KNOWLEDGE, 0, narration="nội dung", voice="vi-VN")
     piece_cpu = tts._f5_piece_audio_path(tmp_path, "video", "knowledge", 0, 0, "nội dung")
 
     assert segment_mps != segment_cpu

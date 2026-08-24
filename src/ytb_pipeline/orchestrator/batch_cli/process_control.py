@@ -63,6 +63,20 @@ def _pid_alive(pid: int) -> bool:
     return True
 
 
+def batch_process_is_alive() -> bool:
+    """Return whether the PID tracked by batch CLI is still alive.
+
+    Worker state is deliberately persisted for post-mortem debugging.  It must
+    not be mistaken for a live process by the status command or an automation.
+    """
+    path = _cli().PID_PATH
+    try:
+        pid = int(path.read_text(encoding="utf-8").strip())
+    except (FileNotFoundError, ValueError, OSError):
+        return False
+    return _cli()._pid_alive(pid)
+
+
 def _descendant_pids(root_pid: int) -> list[int]:
     """Return the current descendant process IDs of a tracked batch process.
 

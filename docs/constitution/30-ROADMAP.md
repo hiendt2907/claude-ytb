@@ -62,14 +62,13 @@ Maps to Migration Plan Phase 5. Ideation decomposes into `ResearchAgent` +
 `StoryArchitectAgent` + `StoryboardAgent`, each independently testable and
 independently swappable on underlying LLM provider.
 
-### v4.0 (Q2 2027) — Full Local Stack
+### v4.0 (Q2 2027) — Provider Hardening
 
-Ollama/Qwen3 becomes the default ideation/research LLM, replacing the
-`claude -p` subprocess invocation as the default path (Claude API/CLI
-remains available as an explicit opt-in fallback, consistent with
-`PROJECT_VISION.md`'s local-inference-priority decision, not removed
-outright). F5-TTS is the default voice provider (Edge-TTS demoted to
-fallback). Flux is the default image provider (already true from v2.0).
+xKiro remains the default ideation/research LLM and voice provider unless a
+new `PROJECT_VISION.md` amendment says otherwise. Harden the implemented
+xKiro → Codex CLI → Claude CLI ideation cascade with observable health/cost
+signals rather than restoring local LLM inference. F5-TTS remains an explicit
+local voice option. Flux is the default image provider (already true from v2.0).
 Wan2.2 (or the best available local image-to-video/animation model at the
 time) becomes the default B-roll/video-generation source, closing the loop
 on "no stock video as default" for motion content as well as stills.

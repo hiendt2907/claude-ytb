@@ -374,7 +374,7 @@ class Provider:
     """Metadata describing a registered Provider adapter (not the adapter code itself)."""
     id: str
     port: str                # "LLMProvider" | "VoiceProvider" | "ImageProvider" | ...
-    name: str                 # "ollama_qwen3", "f5_tts", "flux_local", "pexels"
+    name: str                 # "xkiro", "f5_tts", "flux_local", "pexels"
     capability: ProviderCapability
     is_default: bool = False
 

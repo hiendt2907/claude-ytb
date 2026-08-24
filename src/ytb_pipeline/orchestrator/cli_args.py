@@ -71,9 +71,9 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
     p_start = _sub(
         sub, "start",
         help="Sinh phần SÁNG TẠO (ideation + viết N kịch bản)",
-        description="Mặc định dùng Claude khi LLM_PROVIDER=claude; có thể chọn Claude hoặc Codex "
-        "bằng --llm-provider/--llm, "
-        "hoặc local LLM provider khi cấu hình local/Ollama, để chọn chủ đề "
+        description="Mặc định dùng xKiro (cloud, cascade tự động sang Codex rồi Claude CLI "
+        "khi lỗi); có thể chọn Claude hoặc Codex trực tiếp bằng --llm-provider/--llm, "
+        "để chọn chủ đề "
         "(chống trùng data/ledger.md), viết kịch bản đầy đủ cho N video vào "
         "scripts/<slug>.json, và đăng ký từng video vào assets/auto_state.json. "
         "Dùng --cloud nếu muốn gọi Claude legacy không qua local QA loop.\n\n"
@@ -104,8 +104,9 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
     )
     p_start.add_argument(
         "--llm-provider", "--llm", dest="llm_provider",
-        choices=["claude", "codex", "ollama"], default=None,
-        help="LLM viết kịch bản: claude, codex hoặc ollama (mặc định theo LLM_PROVIDER).",
+        choices=["xkiro", "claude", "codex"], default=None,
+        help="LLM viết kịch bản: xkiro (mặc định, cascade tự động sang codex "
+        "rồi claude khi lỗi), claude, hoặc codex (mặc định theo LLM_PROVIDER).",
     )
     p_start.add_argument(
         "--idea",
@@ -130,8 +131,8 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
     )
     p_start.add_argument(
         "--local", action="store_true", default=False,
-        help="Tương đương --llm ollama: sinh kịch bản bằng Qwen local qua Ollama, "
-        "fallback tự động về Claude nếu Ollama không sẵn sàng.",
+        help="Đã gỡ cùng Ollama/MLX-LM (amendment 2026-08-24): MacBook không "
+        "còn chạy local LLM. Dùng --llm xkiro/claude/codex.",
     )
     p_start.add_argument(
         "--cloud", action="store_true", default=False,
@@ -148,6 +149,10 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
     p_start.add_argument(
         "--long-form-slug", default="",
         help="Slug video dài đích cho Short (bắt buộc khi --type-of-vid short trong batch funnel)",
+    )
+    p_start.add_argument(
+        "--allow-external-long", action="store_true",
+        help="Cho Short tham chiếu Long đã done ở batch cũ; chỉ dùng khi source archive còn nguyên.",
     )
     p_start.add_argument(
         "--playlist", default="",
@@ -175,12 +180,19 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
         epilog="Ví dụ:\n  ytb batch status\n",
     ).set_defaults(func=cmd_funcs["status"])
 
+    p_preflight = _sub(
+        sub, "preflight",
+        help="Kiểm tra offline script trước khi chạy batch",
+        description="Không gọi cloud, không render, không upload. Kiểm tra contract, duration, TTS, B-roll local, thumbnail và disk.",
+    )
+    p_preflight.add_argument("slugs", nargs="*", help="Slug cần kiểm tra; bỏ trống để kiểm tra toàn bộ queue.")
+    p_preflight.set_defaults(func=cmd_funcs.get("preflight", lambda _args: None))
+
     p_run = _sub(
         sub, "run",
         help="Chạy video kế tiếp (--loop để chạy hết queue)",
-        description="Chạy pipeline cho video PENDING đã được `batch start` approve: "
-        "voiceover -> render -> publish, rồi xác minh video thật qua YouTube Data API "
-        "(không tin stdout) và ghi 1 dòng mới vào ledger.\n\n"
+        description="Mặc định chạy dry-run local-only: voiceover -> render -> publish-prep, "
+        "không upload. Chỉ --publish mới upload và xác minh YouTube API.\n\n"
         "Tự retry lỗi tạm thời (409 Conflict, mất mạng, timeout) với backoff 30/60/120s. "
         "Lỗi khác (script sai, thiếu file...) bỏ qua ngay, KHÔNG retry. Mọi thất bại cuối "
         "cùng đều bắn cảnh báo Telegram + ghi assets/batch_cli_warnings.log.\n\n"
@@ -188,12 +200,14 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
         "muốn chạy liên tục cho tới khi queue hết video pending. Dùng --schedule để tự "
         "gán publish_at cho các video pending chưa có lịch trước khi chạy.",
         epilog="Ví dụ:\n"
-        "  ytb batch run            # chạy 1 video kế tiếp rồi dừng\n"
-        "  ytb batch run --loop     # chạy hết các video pending còn lại\n"
+        "  ytb batch run            # dry-run 1 video kế tiếp rồi dừng\n"
+        "  ytb batch run --loop     # dry-run hết các video pending còn lại\n"
+        "  ytb batch run --publish  # upload 1 video (explicit)\n"
         "  ytb batch run --schedule --loop  # lên lịch rồi chạy hết queue\n"
         "  ytb batch run --schedule --schedule-slots 09:00,12:00,20:30 --loop\n",
     )
     p_run.add_argument("--loop", action="store_true", help="Chạy hết queue, không chỉ 1 video")
+    p_run.add_argument("--publish", action="store_true", help="Cho phép upload YouTube; mặc định dry-run, không upload.")
     p_run.add_argument(
         "--batch-key",
         default="",
@@ -260,6 +274,7 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
         "  ytb batch retry thien-kien-xac-nhan-vi-sao-nao-chi-thay-dieu-ban-muon-thay\n",
     )
     p_retry.add_argument("slug", help="Slug video (khớp với auto_state.json)")
+    p_retry.add_argument("--publish", action="store_true", help="Cho phép upload YouTube; mặc định dry-run.")
     p_retry.set_defaults(func=cmd_funcs["retry"])
 
     p_logs = _sub(
@@ -399,7 +414,8 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
     )
     p_doctor.add_argument(
         "--local", action="store_true",
-        help="Kiểm tra local-first AI stack: Ollama, ComfyUI/Flux, TTS local, Wan/LTX, ffmpeg",
+        help="Kiểm tra stack local còn lại: LLM provider cấu hình (xkiro/claude/codex), "
+        "ComfyUI/Flux, TTS provider cấu hình, Wan/LTX, ffmpeg",
     )
     p_doctor.set_defaults(func=cmd_funcs["doctor"])
 

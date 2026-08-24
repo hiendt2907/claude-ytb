@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,10 +14,41 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # TTS
-    tts_provider: str = "f5"  # f5 | vieneu | vixtts | edge | elevenlabs
+    # TTS — xKiro (cloud) là default từ amendment 2026-08-24 (PROJECT_VISION.md
+    # Amendment Log): giảm tải TTS khỏi MacBook, Mac chỉ chạy workflow/pipeline.
+    tts_provider: str = "xkiro"  # xkiro | f5 | vieneu | vixtts | edge | elevenlabs
+    # xKiro exposes an OpenAI-compatible POST /v1/audio/speech endpoint.
+    # Keep the API key in .env only; it is never written to project artifacts.
+    xkiro_api_key: str = ""
+    xkiro_tts_url: str = "https://api.xkiro.com/v1/audio/speech"
+    xkiro_model: str = "xkiro-voice"
+    xkiro_voice: str = "confident-male-vietnamese"
+    xkiro_timeout_sec: float = Field(default=120.0, gt=0)
+    xkiro_max_retries: int = Field(default=3, ge=1, le=5)
+    # xKiro cũng lộ /v1/chat/completions OpenAI-compatible (LLM), tách endpoint
+    # riêng với TTS dù chung API key. `xkiro_llm_model` là model chính; nếu lỗi
+    # thì thử lần lượt các model trong `xkiro_llm_fallback_models` (CSV theo id
+    # từ GET /v1/models) — danh sách này chốt qua benchmark thật, không đoán.
+    xkiro_llm_url: str = "https://api.xkiro.com/v1/chat/completions"
+    # Benchmark 2026-08-24 (14 model đại diện, prompt JSON test): model gắn
+    # nhãn anthropic/openai/google/qwen trả HTTP 403 với free-tier key hiện
+    # tại — không phải lỗi code, tài khoản không có quyền. z-ai/glm-4.6 trả
+    # content rỗng (lỗi thật). 4 model dưới đây trả JSON hợp lệ 100%, không
+    # lỗi; xếp theo latency (deepseek-v4-flash 3.7s -> kimi-k2.6 11.0s).
+    xkiro_llm_model: str = "deepseek/deepseek-v4-flash"
+    xkiro_llm_fallback_models: str = (
+        "deepseek/deepseek-chat-v3.1,minimax/minimax-m2,moonshotai/kimi-k2.6"
+    )
+    # Cascade cấp CLI khi bản thân xKiro (mọi model) đều lỗi — Codex CLI rồi
+    # Claude CLI, xem `orchestrator/ideation_provider_cascade.py`.
+    xkiro_script_fallback_chain: str = "codex,claude"
     # Optional operator override for Edge remote speech rate. Empty keeps the profile rate.
     edge_tts_rate_override: str = ""
+    # Explicit local F5 backend. Production keeps Apple Silicon MPS; CPU is a
+    # deliberate fallback for isolated diagnosis when MPS is not progressing.
+    f5_device: Literal["mps", "cpu"] = Field(
+        default="mps", validation_alias=AliasChoices("F5_DEVICE")
+    )
     elevenlabs_api_key: str = ""
     vieneu_tts_cmd: str = ""
     vixtts_cmd: str = ""
@@ -28,13 +59,26 @@ class Settings(BaseSettings):
     telegram_approval: bool = True  # bật cổng duyệt ở khâu ideation
 
     # Render
-    render_provider: str = "ai"  # slide | ai
+    # ai (default, rollback 2026-08-24 — xem docs/TOOL_UPGRADE_PLAN.md): compose
+    # B-roll THẬT từ asset catalog/cache local đã có sẵn trên máy
+    # (assets/broll/ + asset_catalog.json). KHÔNG gọi Pexels online — tải mạng
+    # chỉ xảy ra khi operator tự bật rõ `BROLL_ALLOW_DOWNLOADS=true` (mặc định
+    # false). Renderer "motion" (Pillow+FFmpeg hình học) đã bị GỠ KHỎI CODEBASE
+    # 2026-08-24 — đây là sai lầm kiến trúc của một phiên trước, không dùng lại
+    # trừ khi có amendment mới trong PROJECT_VISION.md.
+    render_provider: str = "ai"  # ai | slide
     image_provider: str = "pillow"  # dùng cho thumbnail/overlay; không dùng làm video chính
-    broll_strategy: str = "pexels"  # pexels = footage thật; local_image_motion đã bỏ khỏi production
+    # "pexels" ở đây là TÊN NGUỒN GỐC asset (video licensed từ Pexels), KHÔNG
+    # đồng nghĩa "gọi Pexels API online" — với BROLL_ALLOW_DOWNLOADS=false
+    # (mặc định), toàn bộ B-roll lấy từ asset catalog/cache local đã tải sẵn.
+    broll_strategy: str = "pexels"  # pexels = compose từ thư viện B-roll (local-first)
     broll_allow_downloads: bool = False  # local-first: chỉ tải Pexels khi opt-in rõ ràng
     comfyui_url: str = "http://127.0.0.1:8188"  # ComfyUI local API (Flux)
     flux_checkpoint_name: str = "flux1-dev-fp8.safetensors"
     orientation: str = "portrait"   # portrait (1080x1920 Short) | landscape (1920x1080 clip)
+    # Chỉ bắt buộc khi BROLL_ALLOW_DOWNLOADS=true (opt-in tải thêm B-roll mới).
+    # Local-only mode (mặc định) không cần key này — key rỗng vẫn render được
+    # miễn asset catalog/cache local có đủ cảnh phù hợp.
     pexels_api_key: str = ""         # key free: https://www.pexels.com/api/
     # Caption chạy theo lời nói (lower-third). Mặc định TẮT — mặt video sạch, không
     # chữ chạy liên tục. Tiêu đề cold-open, terminal card và emphasis chip vẫn giữ.
@@ -128,13 +172,22 @@ class Settings(BaseSettings):
     # Cho phép lệnh /sh chạy shell tùy ý trên máy (mạnh + nguy hiểm). Bật có chủ đích.
     listener_allow_shell: bool = True
 
-    # LLM — Ollama/Qwen local là default cho ideation từ 2026-07-23 (amendment
-    # docs/TOOL_UPGRADE_PLAN.md), fallback tự động về Claude qua
-    # OllamaScriptProvider khi Ollama không sẵn sàng/lỗi giữa chừng.
-    llm_provider: str = "ollama"          # claude | codex | ollama
-    ollama_url: str = "http://127.0.0.1:11434"
-    ollama_model: str = "qwen3.6:27b"
-    ollama_coder_model: str = "qwen2.5-coder:7b"
+    # LLM — xKiro (cloud) là default từ amendment 2026-08-24 (PROJECT_VISION.md
+    # Amendment Log): MacBook chỉ chạy workflow/pipeline, không còn chạy local
+    # LLM inference. Ollama và MLX-LM đã bị gỡ khỏi codebase (xem Amendment
+    # Log lý do đầy đủ). Cascade khi xKiro lỗi: Codex CLI -> Claude CLI, xem
+    # `orchestrator/ideation_provider_cascade.py`.
+    llm_provider: str = "xkiro"          # xkiro | claude | codex
+    # Explicit opt-in only: shortens the Long contract for local E2E tests.
+    # Production remains 12–15 minutes unless this flag is set.
+    e2e_test: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("E2E_TEST", "YTB_E2E_TEST"),
+    )
+    # Cascade tự động sang provider kế tiếp (Codex/Claude CLI) khi xKiro lỗi.
+    # Bật mặc định vì mọi provider trong chain đều cloud — không còn rủi ro
+    # "âm thầm chuyển từ local sang cloud" mà cờ này từng canh giữ.
+    llm_fallback_enabled: bool = True
 
     # Video generation
     video_provider: str = "pexels"        # pexels là đường render footage thật mặc định
@@ -142,10 +195,11 @@ class Settings(BaseSettings):
     wan_cli: str = "wan2.2"
     render_validation_max_drift_sec: float = 1.0
 
-    # Local stack shortcut: set OMNI_LOCAL=true for local LLM/TTS only.
-    # Render vẫn dùng Pexels footage thật; không quay lại Pillow image-motion.
-    local_mode: bool = False
-    allow_cloud_providers: bool = False
+    # Default true từ amendment 2026-08-24: TTS/LLM mặc định đã là cloud
+    # (xKiro) nên cờ "cho phép cloud" phải mở theo, nếu không
+    # `model_post_init` bên dưới sẽ tự ép `tts_provider` về lại "f5" trên máy
+    # mới/.env trống. Set false tường minh trong .env nếu muốn ép về F5 local.
+    allow_cloud_providers: bool = True
 
     @field_validator("quality_stt_model_path", mode="before")
     @classmethod
@@ -176,7 +230,7 @@ class Settings(BaseSettings):
             raise ValueError("quality_stt_compute_type is not supported with quality_stt_device=cpu")
         if self.allow_cloud_providers:
             return
-        if self.tts_provider in {"edge", "elevenlabs"}:
+        if self.tts_provider in {"edge", "elevenlabs", "xkiro"}:
             self.tts_provider = "f5"
 
 

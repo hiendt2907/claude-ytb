@@ -1,5 +1,12 @@
 # 06 — AGENTS
 
+> **Runtime provider policy (2026-08-24):** The repeated `local-first
+> (Qwen3/Ollama)` model recommendations below describe the earlier target
+> architecture and are not current operations. LLM work defaults to xKiro;
+> ideation falls back xKiro → Codex CLI → Claude CLI. Local visual models are
+> unaffected. Keep the agent contracts, validation and retry semantics, but
+> do not use the old local-LLM recommendations to configure a run.
+
 ## Purpose
 
 Define the contract for every AI Agent in the Creative OS: what each agent is
@@ -60,7 +67,7 @@ class AgentResult[TOut]:
     output: TOut
     confidence: float          # 0.0-1.0, self-reported
     cost_usd: float            # 0.0 for local inference
-    model_used: str            # e.g. "ollama/qwen3:14b" or "claude-opus-4-6"
+    model_used: str            # e.g. configured xKiro model or "claude-cli"
     retries: int
     warnings: tuple[str, ...] = ()
 
@@ -230,9 +237,8 @@ mechanism, not enough supporting detail) → structure degenerates to filler.
 **Retry strategy**: request Research Agent for a targeted follow-up on the
 thin act before re-running structure generation; max 1 round-trip.
 
-**Model recommendation**: local-first (Ollama/Qwen3:14b+) — structural
-reasoning over already-researched material is well within local model
-capability; escalate to cloud only if local output fails QA twice.
+**Model recommendation**: xKiro primary; use the standard Codex CLI → Claude
+CLI cascade if it fails. Structural reasoning stays provider-agnostic.
 
 ---
 

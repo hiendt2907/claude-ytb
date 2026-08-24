@@ -9,6 +9,7 @@ import argparse
 import json
 import os
 import subprocess
+from types import SimpleNamespace
 from datetime import datetime
 
 import pytest
@@ -77,6 +78,12 @@ def _progress_off(monkeypatch):
     monkeypatch.setattr(cli.settings, "telegram_progress", False)
 
 
+@pytest.fixture(autouse=True)
+def _bypass_preflight_for_legacy_orchestration_tests(monkeypatch):
+    """These tests isolate queue behavior; dedicated preflight tests cover admission."""
+    monkeypatch.setattr(cli, "preflight_script", lambda _path: SimpleNamespace(passed=True, failures=()))
+
+
 # ── load_queue ────────────────────────────────────────────────────────────────
 def test_load_queue_sorted_by_day(auto_state_file):
     queue = cli.load_queue(auto_state_file)
@@ -119,6 +126,32 @@ def test_next_pending_none_when_all_done(auto_state_file):
     queue = cli.load_queue(auto_state_file)
     done = {i.slug for i in queue}
     assert cli.next_pending(queue, done) is None
+
+
+def test_process_next_does_not_run_short_when_its_long_has_not_completed(tmp_path, monkeypatch):
+    state = tmp_path / "auto_state.json"
+    state.write_text(json.dumps({
+        "shorts_funnel_batch_dependency": {
+            "long_videos": [{"day": 1, "slug": "long-a", "shorts_status": "queued"}],
+            "short_videos": [{
+                "day": 1, "slug": "short-a", "shorts_status": "queued",
+                "long_form_slug": "long-a", "cta_target": "long-a",
+            }],
+        },
+    }), encoding="utf-8")
+    ledger = tmp_path / "ledger.md"
+    ledger.write_text(
+        "| Ngày | Slug | Tiêu đề | Stage | Status | URL / ghi chú |\n"
+        "|---|---|---|---|---|---|\n"
+        "| 2026-07-28 | long-a | Long | voiceover | error | strict audio gate |\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(cli, "run_with_retry", lambda *_args, **_kwargs: pytest.fail("Short must wait for Long"))
+
+    handled = cli.process_next(queue_path=state, ledger_path=ledger)
+
+    assert handled is False
+    assert "short-a" not in ledger.read_text(encoding="utf-8")
 
 
 # ── is_transient_error ───────────────────────────────────────────────────────
@@ -167,8 +200,10 @@ def test_emit_warning_still_logs_when_telegram_fails(tmp_path, monkeypatch):
 
 
 # ── build_env ─────────────────────────────────────────────────────────────────
-def test_build_env_forces_telegram_approval_false():
+def test_build_env_defaults_to_dry_run_and_forces_local_stock(monkeypatch):
     item = cli.QueueItem(day=1, slug="x", publish_at="2026-06-23T06:00:00+0700", shorts_status="queued")
+    monkeypatch.setenv("BROLL_ALLOW_DOWNLOADS", "true")
+    monkeypatch.setenv("E2E_TEST", "true")
     env = cli.build_env(item)
     assert env["TELEGRAM_APPROVAL"] == "false"
     assert env["YOUTUBE_PUBLISH_AT"] == item.publish_at
@@ -176,10 +211,12 @@ def test_build_env_forces_telegram_approval_false():
     assert env["ALLOW_CLOUD_PROVIDERS"] == "true"
     assert env["BROLL_STRATEGY"] == "pexels"
     assert env["VIDEO_PROVIDER"] == "pexels"
-    assert env["DRY_RUN"] == "false"
+    assert env["DRY_RUN"] == "true"
+    assert env["BROLL_ALLOW_DOWNLOADS"] == "false"
+    assert env["E2E_TEST"] == "false"
 
 
-def test_build_env_always_uses_real_publish_for_batch_runs():
+def test_build_env_only_enables_publish_when_explicitly_requested():
     item = cli.QueueItem(
         day=1,
         slug="safe-preview",
@@ -188,7 +225,7 @@ def test_build_env_always_uses_real_publish_for_batch_runs():
         dry_run=True,
     )
 
-    env = cli.build_env(item)
+    env = cli.build_env(item, publish=True)
 
     assert env["DRY_RUN"] == "false"
 
@@ -538,7 +575,7 @@ def test_run_pipeline_once_can_target_resident_f5_voiceover_stage(tmp_path, monk
 
     cli.run_pipeline_once(
         item, script_path=script_path, through="voiceover",
-        f5_daemon_socket=socket_path,
+        f5_daemon_socket=socket_path, ledger_path=tmp_path / "ledger.md",
     )
 
     assert "--through" in captured["command"]
@@ -571,7 +608,7 @@ def test_process_next_happy_path(auto_state_file, ledger_file, monkeypatch, _cap
         },
     )
 
-    handled = cli.process_next(queue_path=auto_state_file, ledger_path=ledger_file)
+    handled = cli.process_next(queue_path=auto_state_file, ledger_path=ledger_file, publish=True)
 
     assert handled is True
     content = ledger_file.read_text(encoding="utf-8")
@@ -636,7 +673,7 @@ def test_failed_slug_is_skipped_by_batch_loop_but_remains_retryable(auto_state_f
 def test_process_next_records_error_on_run_failure(auto_state_file, ledger_file, monkeypatch, _capture_telegram):
     monkeypatch.setattr(cli, "run_with_retry", lambda item, **kw: (False, "boom"))
 
-    handled = cli.process_next(queue_path=auto_state_file, ledger_path=ledger_file)
+    handled = cli.process_next(queue_path=auto_state_file, ledger_path=ledger_file, publish=True)
 
     assert handled is True
     content = ledger_file.read_text(encoding="utf-8")
@@ -646,7 +683,7 @@ def test_process_next_records_error_on_run_failure(auto_state_file, ledger_file,
 def test_process_next_warns_when_no_video_id_in_output(auto_state_file, ledger_file, monkeypatch, _capture_telegram):
     monkeypatch.setattr(cli, "run_with_retry", lambda item, **kw: (True, "no url printed"))
 
-    handled = cli.process_next(queue_path=auto_state_file, ledger_path=ledger_file)
+    handled = cli.process_next(queue_path=auto_state_file, ledger_path=ledger_file, publish=True)
 
     assert handled is True
     assert len(_capture_telegram) == 1
@@ -761,7 +798,7 @@ def test_process_next_records_error_when_reauth_required(auto_state_file, ledger
 
     monkeypatch.setattr(cli, "verify_youtube_video", boom)
 
-    handled = cli.process_next(queue_path=auto_state_file, ledger_path=ledger_file)
+    handled = cli.process_next(queue_path=auto_state_file, ledger_path=ledger_file, publish=True)
 
     assert handled is True
     content = ledger_file.read_text(encoding="utf-8")
@@ -782,7 +819,7 @@ def test_process_next_records_verify_network_error_without_stalling_worker(
 
     monkeypatch.setattr(cli, "verify_youtube_video", boom)
 
-    handled = cli.process_next(queue_path=auto_state_file, ledger_path=ledger_file)
+    handled = cli.process_next(queue_path=auto_state_file, ledger_path=ledger_file, publish=True)
 
     assert handled is True
     content = ledger_file.read_text(encoding="utf-8")
@@ -877,6 +914,31 @@ def test_cmd_cancel_removes_short_video(tmp_path, monkeypatch, capsys):
     assert "Đã huỷ" in capsys.readouterr().out
 
 
+def test_cmd_reset_finds_slug_in_named_batch_not_lexicographically_latest(tmp_path, monkeypatch, capsys):
+    """Operational retries must target the requested test batch, not another queue."""
+    auto_state = tmp_path / "auto_state.json"
+    auto_state.write_text(json.dumps({
+        "shorts_funnel_batch_2026-07-28-test": {
+            "long_videos": [{"day": 1, "slug": "clean-long", "publish_at": ""}],
+            "short_videos": [],
+        },
+        "shorts_funnel_batch_2026-08-production": {
+            "long_videos": [{"day": 1, "slug": "production-long", "publish_at": ""}],
+            "short_videos": [],
+        },
+    }), encoding="utf-8")
+    ledger = tmp_path / "ledger.md"
+    ledger.write_text("# Ledger\n| Ngày | Slug | Tiêu đề | Stage | Status | URL / ghi chú |\n", encoding="utf-8")
+    monkeypatch.setattr(cli, "AUTO_STATE_PATH", auto_state)
+    monkeypatch.setattr(cli, "LEDGER_PATH", ledger)
+    monkeypatch.setattr(cli.settings, "projects_dir", str(tmp_path / "projects"))
+
+    cli.cmd_reset(argparse.Namespace(slug="clean-long"))
+
+    assert "Đã reset 'clean-long'" in capsys.readouterr().out
+    assert "| clean-long |  | reset | reset |" in ledger.read_text(encoding="utf-8")
+
+
 def test_cmd_ledger_prints_tail(ledger_file, monkeypatch, capsys):
     monkeypatch.setattr(cli, "LEDGER_PATH", ledger_file)
 
@@ -899,7 +961,7 @@ def test_process_next_warns_on_schedule_drift(auto_state_file, ledger_file, monk
         },
     )
 
-    handled = cli.process_next(queue_path=auto_state_file, ledger_path=ledger_file)
+    handled = cli.process_next(queue_path=auto_state_file, ledger_path=ledger_file, publish=True)
 
     assert handled is True
     assert any("lệch lịch publish" in m for m in _capture_telegram)
@@ -1146,7 +1208,7 @@ def test_cmd_start_rejects_clear_ledger_with_resume():
                 type_of_vid="short",
                 type_of_rules="cơ chế trì hoãn",
                 resume=True,
-                local=True,
+                local=False,
                 cloud=False,
                 clear_ledger=True,
             )
@@ -1301,12 +1363,8 @@ def test_cmd_run_stops_loop_when_stop_requested(monkeypatch, capsys):
     assert "dừng graceful" in capsys.readouterr().out
 
 
-def test_cmd_run_uses_decoupled_f5_lanes_for_two_worker_loop(monkeypatch):
-    """Two F5 producers must be selected instead of two full pipelines.
-
-    A full pipeline worker would keep its F5 model idle while render/upload
-    blocks. The staged runner is the contract that prevents that regression.
-    """
+def test_cmd_run_does_not_use_unsafe_f5_staged_lanes_by_default(monkeypatch, tmp_path):
+    """The legacy staged uploader is disabled until it enforces P0 admission."""
     called = []
     monkeypatch.setattr(cli.settings, "tts_provider", "f5")
     monkeypatch.setattr(cli, "cmd_run_f5_staged", lambda args: called.append(args))
@@ -1314,7 +1372,9 @@ def test_cmd_run_uses_decoupled_f5_lanes_for_two_worker_loop(monkeypatch):
     args = argparse.Namespace(loop=True, workers=2, schedule=False)
     cli.cmd_run(args)
 
-    assert called == [args]
+    assert called == []
+    assert cli.WORKER_STATE_PATH == tmp_path / "batch_workers.json"
+    assert cli.AUTO_STATE_PATH == tmp_path / "auto_state.json"
 
 
 def test_staged_f5_runner_hands_audio_to_render_consumer_and_keeps_lanes_distinct(monkeypatch, tmp_path):
@@ -1346,7 +1406,8 @@ def test_staged_f5_runner_hands_audio_to_render_consumer_and_keeps_lanes_distinc
         produced.append((item.slug, lane, socket_path.name))
         return item, True, "audio complete"
 
-    def fake_render(item, lane):
+    def fake_render(item, lane, *, publish):
+        assert publish is True
         consumed.append((item.slug, lane))
         cli._release_staged_claim(item)
 
@@ -1654,7 +1715,7 @@ def test_process_next_sends_progress_start_and_done(
     )
 
     # Act
-    handled = cli.process_next(queue_path=auto_state_file, ledger_path=ledger_file)
+    handled = cli.process_next(queue_path=auto_state_file, ledger_path=ledger_file, publish=True)
 
     # Assert — 2 tin tiến độ: bắt đầu + xong (kèm URL và vị trí trong queue)
     assert handled is True

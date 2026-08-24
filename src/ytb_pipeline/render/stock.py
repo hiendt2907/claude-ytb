@@ -89,6 +89,21 @@ def fetch_broll_variants(query: str, count: int, *, min_duration: float = 0.0,
     local = catalog.select_local_assets(
         query, orientation=orientation, excluded=used, role=role,
     )[:count]
+
+    if len(local) < count and not settings.broll_allow_downloads:
+        # Local-only: catalog cạn cảnh CHƯA dùng cho video này (dedup xuyên
+        # video) không có nghĩa là "thiếu asset local" thật sự — tái dùng
+        # cảnh local đã dùng vẫn tốt hơn fail khi thư viện sẵn có, đúng tinh
+        # thần "tận dụng asset Pexels đã tải sẵn trên máy". Chỉ fail-fast khi
+        # catalog KHÔNG có cảnh nào đúng hướng để tái dùng nữa.
+        already_selected = {url for url, _ in local}
+        for url, path in catalog.select_local_assets(query, orientation=orientation, role=role):
+            if len(local) >= count:
+                break
+            if url not in already_selected:
+                local.append((url, path))
+                already_selected.add(url)
+
     if local:
         _record_local_usage(
             catalog, local, used=used, query=query, orientation=orientation,

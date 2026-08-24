@@ -16,6 +16,8 @@ from pathlib import Path
 from ..content_contract import CONTRACT_VERSION
 from ..ideation.series import slugify
 from ..ideation.script_contract import validate_script_payload
+from .external_long import completed_external_long_source
+from .preflight import preflight_script
 from .state_io import locked_json_update
 
 LEDGER_HEADER = "# Ledger\n| Ngày | Slug | Tiêu đề | Stage | Status | URL / ghi chú |\n"
@@ -127,6 +129,10 @@ def write_local_batch_item(script_path: Path, payload: dict, args: argparse.Name
         details = "; ".join(f"{item.path}: {item.message}" for item in contract.findings)
         raise SystemExit(f"✗ Không ghi queue: script contract chưa đạt: {details}")
     cli = _cli()
+    preflight = preflight_script(script_path)
+    if not preflight.passed:
+        details = "; ".join(f"[{item.code}] {item.message}" for item in preflight.failures)
+        raise SystemExit(f"✗ Không ghi queue: preflight chưa đạt: {details}")
     with locked_json_update(cli.AUTO_STATE_PATH) as data:
         explicit_key = str(getattr(args, "batch_key", "") or "").strip()
         if explicit_key:
@@ -188,7 +194,14 @@ def write_local_batch_item(script_path: Path, payload: dict, args: argparse.Name
                 for item in batch.get("long_videos", [])
                 if isinstance(item, dict)
             }
-            if funnel["long_form_slug"] not in long_slugs:
+            external_completed_long = False
+            if bool(getattr(args, "allow_external_long", False)):
+                external_completed_long = completed_external_long_source(
+                    cli.ROOT / "scripts" / "archive",
+                    funnel["long_form_slug"],
+                    cli.done_slugs(),
+                ) is not None
+            if funnel["long_form_slug"] not in long_slugs and not external_completed_long:
                 raise SystemExit("✗ long_form_slug của Short phải trỏ tới Long đã có trong cùng batch.")
             if funnel["cta_target"] != funnel["long_form_slug"]:
                 raise SystemExit("✗ cta_target của Short phải khớp long_form_slug.")

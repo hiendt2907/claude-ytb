@@ -3,11 +3,12 @@ from __future__ import annotations
 from copy import deepcopy
 
 import pytest
+from ytb_pipeline.content_contract import CONTRACT_VERSION
 
 
 def _current_short_payload() -> dict:
     return {
-        "ruleset_id": "2026-07-23.1",
+        "ruleset_id": CONTRACT_VERSION,
         "video_type": "short",
         "thumbnail_brief": {
             "visual_contradiction": "A crowded desk beside one clear task.",

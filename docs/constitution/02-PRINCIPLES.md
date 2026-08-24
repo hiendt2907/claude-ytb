@@ -41,8 +41,8 @@ change: local model or cloud API?
 
 Dependencies point inward only: Interface → Application → Domain. The domain
 layer (frozen dataclasses in `04-DOMAIN.md`) has zero dependencies on
-anything outside itself — no Pillow, no FFmpeg, no Google API client, no
-Ollama client. See `03-ARCHITECTURE.md` for the full layer diagram.
+anything outside itself — no Pillow, no FFmpeg, no Google API client, and no
+concrete AI-provider client. See `03-ARCHITECTURE.md` for the full layer diagram.
 
 ### DRY
 
@@ -125,27 +125,21 @@ ideation/visual-planning stage is not actually conditioning on upstream DAG
 state — this is a defect to fix at the prompt-construction layer, not a
 property to tolerate.
 
-## Decision Framework: Local vs. Cloud AI
+## Decision Framework: Approved Provider Policy
 
 Apply in this order when choosing or configuring a provider for any
 capability:
 
-1. **Is there a local model that meets the quality bar for this capability
-   today?** If yes, it is the default. (Per `PROJECT_VISION.md` §2.2, this
-   is non-negotiable — the question is "is the bar met," not "is cloud
-   better.")
-2. **Does the task have a hard latency or throughput requirement the local
-   M4 cannot meet** (e.g., batch-generating hundreds of images faster than
-   local diffusion can produce them)? If yes, a cloud adapter may be
-   selected **explicitly**, by config, for that run — never silently
-   substituted as a new default.
-3. **Is the capability inherently networked** (publishing to YouTube,
-   pulling trending-topic research from a live API)? Then a cloud call is
-   expected and not subject to the local-first rule — but it must still be
-   isolated behind a `Provider`/`Publisher` port so it remains swappable and
-   testable with a fake/mock adapter.
-4. **Never let cost or developer convenience alone justify defaulting to
-   cloud.** "Cloud is easier to set up" is not a valid reason to violate
-   §2.2 of `PROJECT_VISION.md` — if local setup friction is the real
-   blocker, fix the setup tooling (`make setup-f5` is the existing
-   precedent), not the default provider.
+1. **Use the approved defaults.** LLM and TTS default to xKiro; ideation
+   falls through xKiro → Codex CLI → Claude CLI. `allow_cloud_providers` is
+   enabled by default. This is the explicit 2026-08-24 amendment to
+   `PROJECT_VISION.md`, not an implicit convenience fallback.
+2. **Keep visual/render local-first.** Image generation, video generation and
+   composition stay local by default. A cloud provider for those capabilities
+   needs an explicit config path and, if it changes the default, a Vision
+   amendment.
+3. **Keep provider choice at the boundary.** A pipeline or domain caller must
+   use the provider port/registry and never branch on a concrete provider.
+4. **Do not restore retired local LLM paths incidentally.** Ollama, MLX-LM,
+   `local_stack`, and `ideation_local_provider` were removed. Reintroducing
+   any of them is an architecture change requiring a new written decision.

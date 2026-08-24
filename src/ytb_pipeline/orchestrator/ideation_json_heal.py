@@ -1,8 +1,8 @@
-"""Lớp heal JSON hỏng cho output LLM local (Ollama/Qwen).
+"""Lớp heal JSON hỏng cho output LLM.
 
-Claude/Codex hiếm khi trả JSON hỏng cú pháp; Qwen local dễ trả unescaped
-quote hoặc ký tự lạc bên trong string hơn (xem amendment 2026-07-23 trong
-docs/TOOL_UPGRADE_PLAN.md cho phép Ollama sinh kịch bản). `json_from_llm`
+Claude/Codex hiếm khi trả JSON hỏng cú pháp; một số model free qua xKiro dễ
+trả unescaped quote hoặc ký tự lạc bên trong string hơn (amendment 2026-07-23
+trong docs/TOOL_UPGRADE_PLAN.md, mở rộng 2026-08-24 cho xKiro). `json_from_llm`
 trong ideation_script_fix.py gọi `heal_json` làm phương án CUỐI CÙNG, chỉ khi
 `json.loads`/`raw_decode` chuẩn đã thất bại — không thay đổi hành vi cho
 response đã hợp lệ (Claude/Codex không bị ảnh hưởng).

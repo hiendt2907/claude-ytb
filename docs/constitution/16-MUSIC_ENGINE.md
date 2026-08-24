@@ -223,7 +223,7 @@ implementations, no ducking filter wired into `render/compose.py` or
 2. **Royalty-free library provider first** — fastest path to a working
    feature; curate ~20 license-cleared loops tagged by `Mood`, ship
    `library_index.json`.
-3. **Mood mapping** — keyword table + LLM fallback (Ollama/Qwen3, local).
+3. **Mood mapping** — keyword table + LLM fallback (xKiro by default).
 4. **Duration matching + ducking filters** — pure FFmpeg, testable without
    any model dependency.
 5. **Render Engine integration** — Music Engine outputs one `MusicTrack` per

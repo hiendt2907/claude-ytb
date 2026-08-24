@@ -98,9 +98,10 @@ def json_from_llm(text: str) -> dict:
             try:
                 value, end = decoder.raw_decode(raw[start:])
             except json.JSONDecodeError:
-                # Qwen/Ollama local dễ trả unescaped quote hơn Claude/Codex —
-                # heal_json là phương án cuối trước khi báo lỗi (xem
-                # docs/TOOL_UPGRADE_PLAN.md amendment 2026-07-23).
+                # Một số model free qua xKiro (vd bọc markdown ```json, unescaped
+                # quote) dễ trả JSON hỏng cú pháp hơn Claude/Codex — heal_json là
+                # phương án cuối trước khi báo lỗi (xem docs/TOOL_UPGRADE_PLAN.md
+                # amendment 2026-07-23, mở rộng 2026-08-24 cho xKiro).
                 return _heal_or_reraise(raw[start:], exc)
             trailing = raw[start + end:].strip()
             # Một số CLI response kết thúc object bằng thêm một dấu `}`.
@@ -117,7 +118,7 @@ def _heal_or_reraise(candidate: str, original: json.JSONDecodeError) -> dict:
         healed = heal_json(candidate)
     except ValueError:
         raise original from None
-    # Tín hiệu chất lượng: heal_json chạy nghĩa là Qwen/Ollama trả JSON hỏng cú
+    # Tín hiệu chất lượng: heal_json chạy nghĩa là LLM provider trả JSON hỏng cú
     # pháp — cần thấy được để phát hiện sớm nếu tần suất tăng (xem finding
     # review 2026-07-23 về observability của lớp heal).
     print(
@@ -163,8 +164,11 @@ def trim_to_sentence(text: str, limit: int) -> str:
 
 
 def short_narration_chars(payload: dict) -> int:
-    return sum(len(section.get("voiceover") or section.get("narration", "") or "")
-               for section in payload.get("sections", []) or [])
+    return sum(
+        len(section.get("voiceover") or section.get("narration", "") or "")
+        for section in payload.get("sections", []) or []
+        if isinstance(section, dict)
+    )
 
 
 def validate_expected_video_type(
@@ -287,6 +291,8 @@ def normalize_short_narration(
 
     changed = False
     for section in sections:
+        if not isinstance(section, dict):
+            continue
         narration = section.get("voiceover") or section.get("narration", "")
         if isinstance(narration, str):
             cleaned = strip_short_greeting(narration)
@@ -299,11 +305,22 @@ def normalize_short_narration(
     if total > SHORT_MAX_CHARS:
         ratio = SHORT_TARGET_CHARS / total
         remaining = SHORT_TARGET_CHARS
+        strategy = candidate.get("strategy")
+        hook = strategy.get("hook") if isinstance(strategy, dict) else None
+        core_answer = str(hook.get("core_answer", "")).strip() if isinstance(hook, dict) else ""
         for idx, section in enumerate(sections):
+            if not isinstance(section, dict):
+                continue
             narration = str(section.get("voiceover") or section.get("narration", ""))
             left = len(sections) - idx
-            budget = max(120, min(len(narration), remaining - 80 * (left - 1)))
-            proportional = max(120, int(len(narration) * ratio))
+            required_prefix = (
+                core_answer
+                if section.get("purpose") == "core_answer" and narration.startswith(core_answer)
+                else ""
+            )
+            minimum = max(120, len(required_prefix))
+            budget = max(minimum, min(len(narration), remaining - 80 * (left - 1)))
+            proportional = max(minimum, int(len(narration) * ratio))
             budget = min(budget, proportional)
             section["voiceover"] = trim_to_sentence(narration, budget)
             section["narration"] = section["voiceover"]
@@ -433,6 +450,7 @@ async def validate_or_repair_script(
     last_qa_output: dict | None = None
     long_extension_attempted = False
     short_expansion_attempted = False
+    identity_repair_attempted = False
     report_path = script_path.parent.parent / "assets" / "quality_reports" / "ideation_errors.jsonl"
 
     for attempt in range(1, max_attempts + 1):
@@ -455,6 +473,13 @@ async def validate_or_repair_script(
                 json.dumps(current, ensure_ascii=False, indent=2),
             )
         try:
+            wording_meta = current.get("_wording_engine")
+            if isinstance(wording_meta, dict) and not wording_meta.get("encoding_valid", True):
+                flags = ", ".join(str(flag) for flag in wording_meta.get("flags", ()))
+                raise ValueError(
+                    "Wording Engine encoding flag: narration thiếu dấu tiếng Việt"
+                    + (f" ({flags})" if flags else ".")
+                )
             contract_result = validate_script_payload(current)
             if not contract_result.publishable:
                 findings = "; ".join(
@@ -562,6 +587,54 @@ async def validate_or_repair_script(
                     validation_error=None,
                     qa=last_qa_output,
                 )
+                # A duplicate identity is a bounded repair: preserve every
+                # section and ask Qwen only for a new title/topic pair. This
+                # avoids paying for a full script regeneration while keeping
+                # the semantic-dedup gate authoritative.
+                if (
+                    not identity_repair_attempted
+                    and any(
+                        str(v.get("rule")) == "series_dedup"
+                        for v in (last_qa_output or {}).get("violations", [])
+                    )
+                ):
+                    identity_repair_attempted = True
+                    repair_prompt = (
+                        "Return ONLY JSON with keys title and topic.\n"
+                        "Change only the title and topic of this video so neither is"
+                        " identical or near-duplicate to any blocked topic below."
+                        " Keep the same mechanism, evidence, and video intent; do not"
+                        " rewrite narration or invent a different mechanism.\n"
+                        f"Current title: {current.get('title', '')}\n"
+                        f"Current topic: {current.get('topic', '')}\n"
+                        f"Blocked topics: {json.dumps(done_topics, ensure_ascii=False)}"
+                    )
+                    if console_prefix:
+                        print(f"{console_prefix} repair: title/topic only for series dedup", flush=True)
+                    if log_path:
+                        append_local_start_log(log_path, "IDENTITY_REPAIR_PROMPT", repair_prompt)
+                    repair_text = await provider.complete(
+                        repair_prompt,
+                        system="You are a precise JSON editor. Output valid JSON only.",
+                        max_tokens=256,
+                        temperature=0.1,
+                        json_output=True,
+                        response_schema={
+                            "type": "object",
+                            "properties": {
+                                "title": {"type": "string"},
+                                "topic": {"type": "string"},
+                            },
+                            "required": ["title", "topic"],
+                            "additionalProperties": False,
+                        },
+                    )
+                    identity = json_from_llm(repair_text)
+                    for key in ("title", "topic"):
+                        value = identity.get(key)
+                        if isinstance(value, str) and value.strip():
+                            current[key] = value.strip()
+                    continue
             else:
                 last_qa_output = {"passed": False, "violations": [{"rule": "qa_agent", "detail": result.error}]}
                 if log_path:

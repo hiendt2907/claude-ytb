@@ -9,6 +9,22 @@ from pathlib import Path
 
 import pytest
 
+
+@pytest.fixture(autouse=True)
+def _isolate_batch_state(tmp_path, monkeypatch):
+    """Unit/E2E tests must never mutate operational batch state."""
+    from ytb_pipeline.orchestrator import batch_cli
+
+    ledger_path = tmp_path / "ledger.md"
+    auto_state_path = tmp_path / "auto_state.json"
+    monkeypatch.setattr(batch_cli, "LEDGER_PATH", ledger_path)
+    monkeypatch.setattr(batch_cli, "WORKER_STATE_PATH", tmp_path / "batch_workers.json")
+    monkeypatch.setattr(batch_cli, "AUTO_STATE_PATH", auto_state_path)
+    ledger_path.write_text("| Ngày | Slug | Tiêu đề | Stage | Status | URL / ghi chú |\n", encoding="utf-8")
+    auto_state_path.write_text(
+        '{"shorts_funnel_batch_test": {"long_videos": [], "short_videos": []}}', encoding="utf-8"
+    )
+
 from ytb_pipeline.ideation.generator import CHARS_PER_MIN
 
 

@@ -35,4 +35,25 @@ def test_contract_is_the_single_source_for_hook_deadline_and_prompt_budget():
     assert contract.answer_start_target_sec == 4.0
     assert contract.answer_start_deadline_sec == 5.0
     assert contract.situation_max_chars == 120
-    assert contract.safe_character_bounds(chars_per_minute=2000.0, segment_count=6) == (2200, 2800)
+    assert contract.safe_character_bounds(chars_per_minute=2000.0, segment_count=6) == (2400, 2566)
+
+
+def test_xkiro_safe_character_window_never_estimates_past_audio_contract_ceiling():
+    """The generator target must be safe before an xKiro TTS call is paid for."""
+    from ytb_pipeline.content_contract import (
+        XKIRO_CHARS_PER_MIN,
+        contract_for,
+        estimate_duration_sec,
+    )
+
+    contract = contract_for("short")
+    minimum, maximum = contract.safe_character_bounds(
+        chars_per_minute=XKIRO_CHARS_PER_MIN,
+        segment_count=contract.minimum_sections,
+    )
+    lower, upper = contract.audio_runtime_bounds_sec(
+        segment_count=contract.minimum_sections,
+    )
+
+    assert lower <= estimate_duration_sec(minimum, chars_per_minute=XKIRO_CHARS_PER_MIN)
+    assert estimate_duration_sec(maximum, chars_per_minute=XKIRO_CHARS_PER_MIN) <= upper

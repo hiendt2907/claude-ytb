@@ -1,5 +1,10 @@
 # 29 — Migration Plan
 
+> **Historical-plan note (2026-08-24):** Any phase text that proposes an
+> Ollama/MLX local LLM migration is superseded for operations. The completed
+> LLM policy is xKiro default with xKiro → Codex CLI → Claude CLI ideation
+> fallback; retain older phase notes only as a record of the migration path.
+
 ## Purpose
 
 This document is the concrete, sequenced plan to move `claude-ytb` from its

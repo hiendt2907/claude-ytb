@@ -1,5 +1,10 @@
 # 36 — AI GOVERNANCE
 
+> **Runtime policy amendment (2026-08-24):** xKiro is the default LLM and
+> voice provider; ideation falls back xKiro → Codex CLI → Claude CLI. Any
+> Ollama/Qwen/F5 default statements below are historical target-state context,
+> not current operating configuration. Local visual/render policy is unchanged.
+
 ## Purpose
 
 `02-PRINCIPLES.md` and `05-WORKFLOW.md` already establish quality gates and
@@ -187,10 +192,9 @@ to fail the same gate again, wasting compute while looking productive.
 
 ### Deterministic Seeds
 
-Local inference via Ollama supports an explicit `seed` parameter alongside
-`temperature=0.0` (`10-LLM_ENGINE.md`'s `build_llm_options(ctx)` is extended
-to accept and pass through a `seed` field). Setting both for any call that
-needs reproducibility (regression tests, governance audits) makes "re-run
+When an active provider supports an explicit seed, pair it with
+`temperature=0.0` for calls that need reproducibility (regression tests,
+governance audits). This makes "re-run
 this exact call" a meaningful operation rather than an approximation —
 without `temperature=0.0`, even a fixed seed leaves sampling randomness in
 play.
@@ -207,9 +211,9 @@ identical request" without ambiguity.
 
 ### Model Pinning
 
-Config specifies a fully-qualified model identifier — `qwen2.5-coder:7b-instruct-q4_K_M`,
-never a bare `qwen2.5-coder` alias that could silently resolve to a
-different quantization or checkpoint after a local Ollama model update.
+Config specifies a fully-qualified model identifier — for example the exact
+xKiro model ID — never a bare alias that could silently resolve to a different
+provider-side model revision.
 This is the same reasoning `02-PRINCIPLES.md`'s general pinning guidance
 already states for dependencies, applied here to model weights — an
 unpinned model reference is a reproducibility hazard exactly like an
@@ -237,8 +241,8 @@ behavior rather than trusted blindly.
 
 There is no traceability today. `claude_cli.py`'s subprocess output (per
 ADR-002, `31-ADR.md`) is ephemeral — consumed in-process and discarded; no
-`AITrace` table exists; no prompt hash is computed; no seed is currently
-passed to Ollama calls. This section is target-state specification, not a
+`AITrace` table exists; no prompt hash is computed; no provider-neutral seed
+contract is currently enforced. This section is target-state specification, not a
 description of current behavior, consistent with the rest of this
 document's forward-looking sections.
 
@@ -248,12 +252,10 @@ document's forward-looking sections.
 
 ### Local Inference
 
-Ollama (LLM), F5-TTS (voice), Flux (image) — when these are the active
-providers (default per ADR-010, `31-ADR.md`), no project content (script
-text, character descriptions, research findings) leaves the machine. This
-is the governance-relevant consequence of the local-first architecture
-decision, not a separate mechanism — privacy here is a property of where
-compute happens, not an additional access-control layer bolted on top.
+xKiro is the default LLM and TTS provider, so script text and prompts sent to
+those stages leave the machine. Flux and other local visual/render providers
+retain the local-first privacy property. F5-TTS remains a local opt-in option;
+when it is selected, its request data likewise stays on the machine.
 
 ### Cloud Inference
 

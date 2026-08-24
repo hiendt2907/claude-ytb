@@ -1,5 +1,12 @@
 # 31 — ARCHITECTURE DECISION RECORDS
 
+> **Supersession notice (2026-08-24):** ADR-002, ADR-003, and ADR-010 preserve
+> the historical local-first LLM/TTS rationale. Their operational defaults are
+> superseded for LLM and voice by the dated amendment in `PROJECT_VISION.md`:
+> xKiro is default, with ideation fallback xKiro → Codex CLI → Claude CLI.
+> They remain historical records only; visual/render local-first decisions are
+> unaffected.
+
 ## Purpose
 
 This document records the *why* behind decisions already encoded as fact in

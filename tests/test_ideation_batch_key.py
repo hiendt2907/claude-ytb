@@ -2,8 +2,18 @@ from __future__ import annotations
 
 import argparse
 import json
+from types import SimpleNamespace
+
+import pytest
 
 from ytb_pipeline.content_contract import CONTRACT_VERSION, contract_for
+
+
+@pytest.fixture(autouse=True)
+def _preflight_pass_for_queue_metadata_tests(monkeypatch):
+    from ytb_pipeline.orchestrator import ideation_state
+
+    monkeypatch.setattr(ideation_state, "preflight_script", lambda _path: SimpleNamespace(passed=True, failures=()))
 
 
 def _sections(video_type: str) -> list[dict]:
@@ -96,7 +106,6 @@ def test_write_local_batch_item_honors_explicit_batch_key(tmp_path, monkeypatch)
             youtube_publish_at = ""
 
     monkeypatch.setattr(ideation_state, "_cli", lambda: CLI)
-
     script = tmp_path / "week1-short.json"
     ideation_state.write_local_batch_item(
         script,
@@ -124,6 +133,7 @@ def test_new_explicit_funnel_batch_defaults_to_one_long_and_two_shorts_daily(tmp
 
     class CLI:
         AUTO_STATE_PATH = state
+        ROOT = tmp_path
 
         @staticmethod
         def update_ledger(*_args, **_kwargs):
@@ -219,6 +229,88 @@ def test_short_batch_item_requires_a_complete_long_form_funnel(tmp_path, monkeyp
         )
 
     assert json.loads(state.read_text(encoding="utf-8")) == {}
+
+
+def test_short_can_explicitly_reference_a_completed_external_long(tmp_path, monkeypatch):
+    """Phase dry-runs may reference a verified Long outside a fresh batch."""
+    from ytb_pipeline.orchestrator import ideation_state
+
+    state = tmp_path / "auto_state.json"
+    state.write_text(json.dumps({
+        "shorts_funnel_batch_phase1": {"status": "pending", "long_videos": [], "short_videos": []},
+    }), encoding="utf-8")
+
+    class CLI:
+        AUTO_STATE_PATH = state
+        ROOT = tmp_path
+
+        @staticmethod
+        def done_slugs():
+            return {"external-long"}
+
+        @staticmethod
+        def update_ledger(*_args, **_kwargs):
+            return None
+
+        class settings:
+            dry_run = True
+            youtube_publish_at = ""
+
+    monkeypatch.setattr(ideation_state, "_cli", lambda: CLI)
+    source = tmp_path / "scripts" / "archive" / "external-long.json"
+    source.parent.mkdir(parents=True)
+    source.write_text(json.dumps({
+        "video_type": "long",
+        "sections": [{"purpose": "explanation", "voiceover": "Nguồn Long hợp lệ."}],
+    }), encoding="utf-8")
+    payload = _valid_payload("short")
+    payload["strategy"].update({
+        "long_form_slug": "external-long", "cta_target": "external-long", "source_long_slug": "external-long",
+    })
+    ideation_state.write_local_batch_item(
+        tmp_path / "phase1-short.json", payload,
+        argparse.Namespace(
+            type_of_vid="short", batch_key="shorts_funnel_batch_phase1",
+            long_form_slug="external-long", playlist="series", cta_target="external-long",
+            allow_external_long=True,
+        ),
+    )
+
+    batch = json.loads(state.read_text(encoding="utf-8"))["shorts_funnel_batch_phase1"]
+    assert batch["short_videos"][0]["long_form_slug"] == "external-long"
+
+
+def test_external_long_source_context_reads_archive_only_when_explicit(tmp_path, monkeypatch):
+    from ytb_pipeline.orchestrator import ideation_cmd
+
+    scripts_dir = tmp_path / "scripts"
+    archived = scripts_dir / "archive" / "external-long.json"
+    archived.parent.mkdir(parents=True)
+    archived.write_text(
+        '{"video_type":"long","sections":[{"purpose":"explanation","voiceover":"Nguồn."}]}',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(ideation_cmd, "_cli", lambda: SimpleNamespace(done_slugs=lambda: {"external-long"}))
+
+    assert ideation_cmd.resolve_short_source_long_path(
+        scripts_dir, "external-long", allow_external_long=True
+    ) == archived
+    with pytest.raises(SystemExit, match="cùng --batch-key"):
+        ideation_cmd.resolve_short_source_long_path(scripts_dir, "external-long", allow_external_long=False)
+
+
+@pytest.mark.parametrize("archive_payload", ["{not json}", "[]", '{"video_type":"short","sections":[{}]}'])
+def test_external_long_source_context_rejects_non_long_or_malformed_archive(tmp_path, monkeypatch, archive_payload):
+    from ytb_pipeline.orchestrator import ideation_cmd
+
+    scripts_dir = tmp_path / "scripts"
+    archived = scripts_dir / "archive" / "external-long.json"
+    archived.parent.mkdir(parents=True)
+    archived.write_text(archive_payload, encoding="utf-8")
+    monkeypatch.setattr(ideation_cmd, "_cli", lambda: SimpleNamespace(done_slugs=lambda: {"external-long"}))
+
+    with pytest.raises(SystemExit, match="source archive"):
+        ideation_cmd.resolve_short_source_long_path(scripts_dir, "external-long", allow_external_long=True)
 
 
 def test_strategy_short_marks_a_new_batch_v1_and_persists_its_format(tmp_path, monkeypatch):

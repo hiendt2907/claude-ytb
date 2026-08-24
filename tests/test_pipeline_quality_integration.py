@@ -72,7 +72,7 @@ def _script() -> Script:
     # enough narration to clear content_contract's Short audio-runtime
     # floor without exceeding its ceiling (~60-90s at the calibrated f5
     # chars/minute rate, content_contract.py::F5_CHARS_PER_MIN).
-    filler = "Sự mơ hồ của bước đầu khiến ta ngần ngại bắt tay vào việc. " * 8
+    filler = "Sự mơ hồ của bước đầu khiến ta ngần ngại bắt tay vào việc. " * 7
     return Script(
         topic="Trì hoãn",
         title="Não né việc khó",
@@ -131,7 +131,7 @@ def _prepare_run(monkeypatch, tmp_path, audio_result):
     monkeypatch.setattr(
         pipeline,
         "run_audio_quality_gate",
-        lambda voice, *, cache_dir, stt_adapter=None: audio_result,
+        lambda voice, *, cache_dir, stt_adapter=None, require_transcript=False: audio_result,
     )
     monkeypatch.setattr(
         pipeline,
@@ -303,7 +303,7 @@ def test_strict_post_render_qa_failure_preserves_render_checkpoint(monkeypatch, 
     # blank for the other, non-publish tests in this file, so this test
     # supplies its own strict-QA-compliant Script/metadata instead of
     # mutating the shared fixture).
-    filler = "Một bước nhỏ mỗi ngày giúp giảm sự mơ hồ khi bắt đầu. " * 8
+    filler = "Một bước nhỏ mỗi ngày giúp giảm sự mơ hồ khi bắt đầu. " * 7
     strict_script = Script(
         topic="Trì hoãn",
         title="Não né việc khó",
@@ -403,7 +403,7 @@ def test_pipeline_passes_an_explicit_local_stt_path_to_the_audio_gate(monkeypatc
     model_dir.mkdir()
     captured = {}
 
-    def _gate(_voice, *, cache_dir, stt_adapter):
+    def _gate(_voice, *, cache_dir, stt_adapter, require_transcript=False):
         captured["adapter"] = stt_adapter
         return audio_result
 

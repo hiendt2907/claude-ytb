@@ -6,7 +6,7 @@ import pytest
 def test_loader_hydrates_optional_strategy_without_breaking_legacy_scripts(tmp_path):
     from ytb_pipeline.ideation.generator import load_script
 
-    narration = "a" * 2_300
+    narration = "a" * 1_900
     source = tmp_path / "strategy-short.json"
     source.write_text(
         """{
@@ -121,7 +121,7 @@ def test_loader_rejects_a_short_when_its_answer_cannot_start_by_deadline(write_s
     payload = make_script(
         [
             {"purpose": "situation", "voiceover": "x" * 180},
-            {"purpose": "core_answer", "voiceover": "Đó là câu trả lời. " + "x" * 2_100},
+            {"purpose": "core_answer", "voiceover": "Đó là câu trả lời. " + "x" * 1_400},
         ]
     )
     payload["strategy"] = {

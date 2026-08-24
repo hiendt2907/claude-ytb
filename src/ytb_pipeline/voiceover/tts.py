@@ -6,6 +6,7 @@ Hai provider, chọn qua settings.tts_provider:
 """
 
 import asyncio
+import hashlib
 import json
 import re
 import subprocess
@@ -16,6 +17,7 @@ from pathlib import Path
 import edge_tts
 
 from ..config.settings import settings
+from ..content_contract import contract_for
 from ..pkg.models import Script, Segment, Voiceover
 
 AUDIO_DIR = Path("assets/audio")
@@ -23,6 +25,15 @@ VOICE_CONFIG_PATH = Path(__file__).resolve().parents[1] / "config" / "voice_prof
 
 SENTENCE_PUNCT = ".!?…"
 CLAUSE_PUNCT = ",;:"
+# F5's acoustic model already produces natural Vietnamese pacing.  Applying
+# ``atempo`` near 2x made the transcript gate recover only ~1% of a Long and
+# is unpleasant for people too.  Keep post-processing within a small, audible
+# range; contrast comes from pauses/pitch, not time-warping the voice.
+MAX_F5_TEMPO = 1.18
+# F5 has substantial per-inference overhead.  Sending every comma clause as a
+# separate request makes a three-minute script fan out into dozens of tiny jobs
+# (including two-character fragments), which is slow and harms prosody.
+F5_MIN_INFERENCE_CHARS = 160
 
 
 @dataclass(frozen=True)
@@ -41,7 +52,15 @@ class VoiceProfile:
 
 
 def _load_voice_config() -> dict:
-    return json.loads(VOICE_CONFIG_PATH.read_text(encoding="utf-8"))
+    config = json.loads(VOICE_CONFIG_PATH.read_text(encoding="utf-8"))
+    for name, values in config.get("profiles", {}).items():
+        tempo = float(values.get("f5_tempo", 1.0))
+        if not 0.95 <= tempo <= MAX_F5_TEMPO:
+            raise ValueError(
+                f"Voice profile {name!r} has unsafe F5 tempo {tempo}; "
+                f"must be 0.95-{MAX_F5_TEMPO}."
+            )
+    return config
 
 
 _VOICE_CONFIG = _load_voice_config()
@@ -81,9 +100,27 @@ def synthesize(script: Script) -> Voiceover:
     else:
         voiced = _synth_all_edge_parallel(script, slug, profile)
 
+    total = sum(s.duration_sec for s in voiced)
+    # Provider timing can undershoot the audio contract by a fraction of a
+    # second even when the script budget is valid. Heal only a tiny boundary
+    # gap with silence; never hide a substantive runtime defect.
+    lower, _ = contract_for(script.video_type).audio_runtime_bounds_sec(
+        segment_count=len(voiced)
+    )
+    if total < lower and lower - total <= 2.0:
+        gap = lower - total
+        # Renderers compose the individual segment files, not only the merged
+        # audio.  Pad the last segment before merging so voiceover, render, and
+        # final-video timelines stay in the same contract.
+        last = voiced[-1]
+        if last.audio_path is None:
+            raise ValueError("Không thể pad runtime: segment cuối thiếu audio_path.")
+        _pad_audio(last.audio_path, gap)
+        voiced[-1] = replace(last, duration_sec=last.duration_sec + gap)
+        total = lower
+
     combined = AUDIO_DIR / f"{slug}_{profile.name}.mp3"
     _concat_audio([s.audio_path for s in voiced], combined)
-    total = sum(s.duration_sec for s in voiced)
 
     enriched = replace(script, segments=tuple(voiced))
     return replace(
@@ -111,7 +148,7 @@ def _synth_all_edge_parallel(script: Script, slug: str, profile: VoiceProfile) -
 
     for i, seg in enumerate(script.segments):
         segment_profile = _segment_profile(seg, profile, i, len(script.segments))
-        seg_path = _segment_audio_path(slug, segment_profile, i)
+        seg_path = _segment_audio_path(slug, segment_profile, i, narration=seg.narration, voice=script.voice)
         dur = _probe_duration_or_zero(seg_path) if seg_path.exists() else 0.0
         if dur > 0:
             voiced[i] = replace(seg, audio_path=seg_path, duration_sec=dur)
@@ -142,7 +179,7 @@ def _synth_all_f5(script: Script, slug: str, profile: VoiceProfile) -> list[Segm
     cached: list[Segment] = []
     for i, seg in enumerate(script.segments):
         segment_profile = _segment_profile(seg, profile, i, len(script.segments))
-        seg_path = _segment_audio_path(slug, segment_profile, i)
+        seg_path = _segment_audio_path(slug, segment_profile, i, narration=seg.narration, voice=script.voice)
         dur = _probe_duration_or_zero(seg_path) if seg_path.exists() else 0.0
         if dur <= 0:
             cached = []
@@ -161,11 +198,16 @@ def _synth_all_f5(script: Script, slug: str, profile: VoiceProfile) -> list[Segm
         segment_profile = _segment_profile(seg, profile, i, len(script.segments))
         segment_profiles.append(segment_profile)
         narration = _prepare_narration(seg.narration)
-        pieces = _split_for_pacing(narration, segment_profile.comma_sec, segment_profile.sentence_sec) \
-            or [(narration, 0.0)]
+        pacing_pieces = _split_for_pacing(
+            narration, segment_profile.comma_sec, segment_profile.sentence_sec
+        ) or [(narration, 0.0)]
+        # Unlike Edge TTS, F5 must not infer each comma clause independently.
+        # Preserve text and the pause at each grouped boundary while sending
+        # sufficiently substantial utterances to the acoustic model.
+        pieces = _coalesce_f5_pieces(pacing_pieces)
         items: list[tuple[str, float, Path]] = []
         for j, (piece, pause) in enumerate(pieces):
-            wav = AUDIO_DIR / f"{slug}_{profile.name}_{i:02d}.p{j:02d}.f5.wav"
+            wav = _f5_piece_audio_path(AUDIO_DIR, slug, profile.name, i, j, piece)
             jobs.append({"text": piece, "out": str(wav)})
             items.append((piece, pause, wav))
         seg_pieces.append(items)
@@ -177,7 +219,7 @@ def _synth_all_f5(script: Script, slug: str, profile: VoiceProfile) -> list[Segm
     voiced: list[Segment] = []
     for i, seg in enumerate(script.segments):
         segment_profile = segment_profiles[i]
-        seg_path = _segment_audio_path(slug, segment_profile, i)
+        seg_path = _segment_audio_path(slug, segment_profile, i, narration=seg.narration, voice=script.voice)
         parts: list[Path] = []
         tmp: list[Path] = []
         for j, (_piece, pause, wav) in enumerate(seg_pieces[i]):
@@ -214,19 +256,36 @@ def _synth_all_f5(script: Script, slug: str, profile: VoiceProfile) -> list[Segm
     return voiced
 
 
-def _segment_audio_path(slug: str, profile: VoiceProfile, index: int) -> Path:
-    # Changing F5 tempo must not resume a segment rendered at an older speed.
-    # An explicit Edge rate override must also keep cached audio distinct.
-    f5_cache_key = (
-        f"_f5x{profile.f5_tempo:.2f}p{profile.pitch_semitones:+.1f}"
-        f"g{profile.gain_db:+.1f}b{profile.pause_before:.2f}a{profile.pause_after:.2f}"
-        if settings.tts_provider == "f5" else ""
-    )
-    edge_cache_key = (
-        f"_edge{settings.edge_tts_rate_override.replace('+', 'p').replace('-', 'm').rstrip('%')}"
-        if settings.tts_provider == "edge" and settings.edge_tts_rate_override else ""
-    )
-    return AUDIO_DIR / f"{slug}_{profile.name}{f5_cache_key}{edge_cache_key}_{index:02d}.mp3"
+def _segment_audio_path(
+    slug: str,
+    profile: VoiceProfile,
+    index: int,
+    *,
+    narration: str,
+    voice: str,
+) -> Path:
+    """Return a content-addressed audio-cache path for every TTS provider."""
+    from .f5_provider import F5_DEVICE, F5_INFERENCE_SPEED
+
+    payload = {
+        "narration": _prepare_narration(narration),
+        "voice": voice,
+        "provider": settings.tts_provider,
+        "model": getattr(settings, "xkiro_model", "") if settings.tts_provider == "xkiro" else "",
+        "profile": vars(profile),
+        "edge_rate_override": settings.edge_tts_rate_override,
+        "f5_device": F5_DEVICE,
+        "f5_speed": F5_INFERENCE_SPEED,
+    }
+    digest = hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()[:16]
+    if settings.tts_provider == "edge":
+        rate = settings.edge_tts_rate_override or profile.edge_rate
+        rate_label = f"edge{'p' if _edge_rate_pct(rate) >= 0 else 'm'}{abs(_edge_rate_pct(rate))}"
+    elif settings.tts_provider == "f5":
+        rate_label = f"f5x{profile.f5_tempo:.2f}s{F5_INFERENCE_SPEED:.3f}"
+    else:
+        rate_label = settings.tts_provider
+    return AUDIO_DIR / f"{slug}_{profile.name}_{index:02d}_{rate_label}_{digest}.mp3"
 
 
 def _edge_rate_pct(edge_rate: str) -> int:
@@ -339,6 +398,62 @@ def _split_for_pacing(text: str, comma_sec: float,
     if out:
         out[-1] = (out[-1][0], 0.0)  # cụm cuối: nghỉ ở mức segment, không ở đây
     return out
+
+
+def _coalesce_f5_pieces(
+    pieces: list[tuple[str, float]], *, min_chars: int = F5_MIN_INFERENCE_CHARS,
+    max_chars: int = 300,
+) -> list[tuple[str, float]]:
+    """Group pacing clauses into efficient, bounded F5 inference requests.
+
+    F5 retains punctuation within a grouped utterance, so its native prosody
+    handles internal commas/sentences.  Only the pause belonging to the final
+    clause of a group is inserted externally.  The function is deterministic,
+    keeps every word, and never exceeds the provider's text limit.
+    """
+    if min_chars <= 0 or max_chars < min_chars:
+        raise ValueError("F5 coalescing requires 0 < min_chars <= max_chars.")
+
+    grouped: list[tuple[str, float]] = []
+    current_text = ""
+    current_pause = 0.0
+    for text, pause in pieces:
+        text = text.strip()
+        if not text:
+            continue
+        candidate = f"{current_text} {text}".strip() if current_text else text
+        if current_text and len(candidate) > max_chars:
+            grouped.append((current_text, current_pause))
+            current_text, current_pause = text, pause
+        else:
+            current_text, current_pause = candidate, pause
+        if len(current_text) >= min_chars:
+            grouped.append((current_text, current_pause))
+            current_text, current_pause = "", 0.0
+    if current_text:
+        grouped.append((current_text, current_pause))
+    if grouped:
+        grouped[-1] = (grouped[-1][0], 0.0)
+    return grouped
+
+
+def _f5_piece_audio_path(
+    audio_dir: Path, slug: str, profile_name: str, segment_index: int,
+    piece_index: int, text: str, *, inference_speed: float | None = None,
+    inference_device: str | None = None,
+) -> Path:
+    """Return a resumable F5 cache path bound to text, calibration, and backend."""
+    if inference_speed is None or inference_device is None:
+        from .f5_provider import F5_DEVICE, F5_INFERENCE_SPEED
+        if inference_device is None:
+            inference_device = F5_DEVICE
+        if inference_speed is None:
+            inference_speed = F5_INFERENCE_SPEED
+    digest_input = f"{inference_device}\\0{float(inference_speed):.3f}\\0{text}".encode("utf-8")
+    digest = hashlib.sha256(digest_input).hexdigest()[:12]
+    return audio_dir / (
+        f"{slug}_{profile_name}_{segment_index:02d}.p{piece_index:02d}.{digest}.f5.wav"
+    )
 
 
 def _synth_segment(text: str, voice: str, out_mp3: Path, profile: VoiceProfile | None = None) -> None:
@@ -485,10 +600,23 @@ def _concat_audio(parts: list[Path], out: Path) -> None:
     listfile.write_text("".join(f"file '{p.resolve()}'\n" for p in parts))
     subprocess.run(
         ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(listfile),
-         "-c", "copy", str(out)],
+         "-af", "loudnorm=I=-16:TP=-1.5:LRA=11", "-ar", "44100", "-ac", "2",
+         "-b:a", "192k", str(out)],
         capture_output=True, check=True,
     )
     listfile.unlink(missing_ok=True)
+
+
+def _pad_audio(path: Path, seconds: float) -> None:
+    padded = path.with_suffix(".padded.mp3")
+    subprocess.run(
+        ["ffmpeg", "-y", "-i", str(path), "-f", "lavfi", "-t", f"{seconds:.3f}",
+         "-i", "anullsrc=r=44100:cl=stereo", "-filter_complex",
+         "[0:a][1:a]concat=n=2:v=0:a=1", "-ar", "44100", "-ac", "2",
+         "-b:a", "192k", str(padded)],
+        capture_output=True, check=True,
+    )
+    padded.replace(path)
 
 
 def _slugify(text: str) -> str:

@@ -18,11 +18,19 @@ import shutil
 import subprocess
 from typing import Any, Callable, Mapping, Protocol
 
+from ..config.settings import settings
+from ..content_contract import contract_for
+
 from ..pkg.models import Voiceover
 
 _CACHE_VERSION = 3
 TRANSCRIPT_SIMILARITY_ALGORITHM = "sequence-matcher-no-autojunk-v1"
 _WORD_RE = re.compile(r"[\wÀ-ỹ]+", re.UNICODE)
+# Measured with the local Faster-Whisper small model against natural-tempo F5
+# Vietnamese speech.  0.82 tolerates predictable ASR spelling substitutions;
+# an omitted/mismatched narration remains far below it (the 2x-tempo failure
+# was 0.98%).
+LOCAL_TTS_TRANSCRIPT_SIMILARITY_THRESHOLD = 0.82
 
 
 @dataclass(frozen=True)
@@ -87,8 +95,22 @@ class FasterWhisperSttAdapter:
         if self.cpu_threads is not None:
             model_kwargs["cpu_threads"] = self.cpu_threads
         model = WhisperModel(str(self.model_path), **model_kwargs)
-        segments, _info = model.transcribe(str(audio_path), vad_filter=True)
-        return " ".join(segment.text.strip() for segment in segments if segment.text.strip())
+        options = {
+            "language": "vi",
+            "vad_filter": True,
+            "condition_on_previous_text": False,
+            "initial_prompt": "Đây là lời thoại tiếng Việt về tâm lý học và hành vi con người.",
+        }
+        segments, _info = model.transcribe(str(audio_path), **options)
+        text = " ".join(segment.text.strip() for segment in segments if segment.text.strip())
+        # Very quiet or heavily paused narration can be removed entirely by
+        # VAD. Retry the same local model without VAD before declaring a real
+        # transcript mismatch; this is deterministic and never calls an LLM.
+        if not text:
+            options["vad_filter"] = False
+            segments, _info = model.transcribe(str(audio_path), **options)
+            text = " ".join(segment.text.strip() for segment in segments if segment.text.strip())
+        return text
 
     def cache_context(self) -> dict[str, object]:
         """Local model identity for cache invalidation, without reading model bytes.
@@ -155,8 +177,9 @@ def run_audio_quality_gate(
     stt_adapter: TranscriptAdapter | None = None,
     cache_dir: Path | None = None,
     duration_tolerance_sec: float = 30.0,
-    transcript_similarity_threshold: float = 0.94,
+    transcript_similarity_threshold: float = LOCAL_TTS_TRANSCRIPT_SIMILARITY_THRESHOLD,
     max_silence_ratio: float = 0.65,
+    require_transcript: bool = False,
 ) -> AudioQualityResult:
     """Analyze an audio file with deterministic local checks and optional local STT.
 
@@ -176,6 +199,7 @@ def run_audio_quality_gate(
         duration_tolerance_sec=duration_tolerance_sec,
         transcript_similarity_threshold=transcript_similarity_threshold,
         max_silence_ratio=max_silence_ratio,
+        require_transcript=require_transcript,
     )
     cache_key = quality_cache_key(voiceover, cache_context=cache_context)
     cached = _load_cached(cache_dir, cache_key, cache_context=cache_context)
@@ -234,6 +258,7 @@ def run_audio_quality_gate(
         adapter,
         availability,
         similarity_threshold=transcript_similarity_threshold,
+        require_transcript=require_transcript,
     )
     return _finish(cache_dir, cache_key, issues, metrics, cache_context=cache_context)
 
@@ -288,13 +313,15 @@ def _append_transcript_issues(
     status: SttAvailability,
     *,
     similarity_threshold: float,
+    require_transcript: bool,
 ) -> None:
     transcript_metrics: dict[str, object] = {"adapter": status.adapter, "available": status.available}
     metrics["transcript"] = transcript_metrics
     if not status.available:
         transcript_metrics["reason"] = status.reason
         issues.append(_issue(
-            "STT_UNAVAILABLE", "warning", f"Không chạy transcript diff: {status.reason}",
+            "STT_UNAVAILABLE", "error" if require_transcript else "warning",
+            f"Không chạy transcript diff: {status.reason}",
             target="local_stt", action="configure_local_stt",
         ))
         return
@@ -303,7 +330,8 @@ def _append_transcript_issues(
     except (OSError, RuntimeError, ValueError) as exc:
         transcript_metrics["reason"] = str(exc)
         issues.append(_issue(
-            "STT_FAILED", "warning", f"Local STT không tạo được transcript: {exc}",
+            "STT_FAILED", "error" if require_transcript else "warning",
+            f"Local STT không tạo được transcript: {exc}",
             target="local_stt", action="repair_local_stt_setup",
         ))
         return
@@ -390,6 +418,9 @@ def _save_cached(
 
 
 def _target_duration(voiceover: Voiceover) -> float | None:
+    if settings.e2e_test:
+        lower, upper = contract_for(voiceover.video_type).viewer_runtime_bounds_sec
+        return (lower + upper) / 2
     if voiceover.target_minutes is not None and voiceover.target_minutes > 0:
         return voiceover.target_minutes * 60
     if voiceover.duration_sec > 0:
@@ -419,6 +450,7 @@ def _gate_cache_context(
     duration_tolerance_sec: float,
     transcript_similarity_threshold: float,
     max_silence_ratio: float,
+    require_transcript: bool,
 ) -> dict[str, object]:
     custom_context = getattr(adapter, "cache_context", None)
     stt_context: object
@@ -437,6 +469,7 @@ def _gate_cache_context(
             "duration_tolerance_sec": duration_tolerance_sec,
             "transcript_similarity_threshold": transcript_similarity_threshold,
             "max_silence_ratio": max_silence_ratio,
+            "require_transcript": require_transcript,
         },
         "stt": stt_context,
     }

@@ -23,6 +23,8 @@ giữa batch), job được bỏ qua (`JOB i/n skip (đã có) <out>`) — cho p
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 import json
 import os
 import re
@@ -59,8 +61,48 @@ def _inference_seed(manifest: dict) -> int:
     return seed
 
 
+def _inference_speed(manifest: dict) -> float:
+    """Return the bounded F5 duration-calibration speed from the manifest.
+
+    This is an acoustic-model control, not the final playback tempo.  The
+    latter remains constrained in the main pipeline to 0.95–1.18.
+    """
+    raw_speed = manifest.get("inference_speed", 0.30)
+    if isinstance(raw_speed, bool):
+        raise ValueError("inference_speed phải là số thực")
+    try:
+        speed = float(raw_speed)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("inference_speed phải là số thực") from exc
+    if not 0.30 <= speed <= 1.0:
+        raise ValueError("inference_speed phải nằm trong 0.30..1.0")
+    return speed
+
+
+def _inference_device(manifest: dict) -> str:
+    """Return the only supported local F5 inference backends.
+
+    Manifests are an external process boundary, so do not trust the provider
+    config alone here.  Missing legacy manifests retain the production MPS
+    default; all other values fail closed rather than falling back to another
+    backend.
+    """
+    raw_device = manifest.get("device", "mps")
+    if not isinstance(raw_device, str):
+        raise ValueError("device phải là 'mps' hoặc 'cpu'")
+    device = raw_device.strip().lower()
+    if device not in {"mps", "cpu"}:
+        raise ValueError("device phải là 'mps' hoặc 'cpu'")
+    return device
+
+
 def _validate_daemon_request_speed(request: dict, manifest: dict) -> None:
-    """Reject daemon jobs calibrated for a different acoustic speed."""
+    """Reject daemon jobs calibrated for a different acoustic speed.
+
+    Cached F5 pieces are keyed by inference speed, so accepting a stale daemon
+    would silently produce audio that cannot match the caller's cache key or
+    duration contract.
+    """
     if "inference_speed" not in request:
         raise ValueError("Daemon request thiếu inference_speed.")
     requested = _inference_speed(request)
@@ -69,6 +111,34 @@ def _validate_daemon_request_speed(request: dict, manifest: dict) -> None:
         raise ValueError(
             f"Daemon inference_speed không khớp: request={requested:.2f}, daemon={expected:.2f}."
         )
+
+
+def _validate_daemon_request_device(request: dict, manifest: dict) -> None:
+    """Reject a client whose selected backend differs from the resident daemon."""
+    if "device" not in request:
+        raise ValueError("Daemon request thiếu device.")
+    requested = _inference_device(request)
+    expected = _inference_device(manifest)
+    if requested != expected:
+        raise ValueError(
+            f"Daemon device không khớp: request={requested}, daemon={expected}."
+        )
+
+
+def _configure_f5_inference_executor(device: str, utils_infer=None) -> None:
+    """Serialize F5's own nested inference batches on the MPS backend only.
+
+    F5's ``infer_batch_process`` otherwise submits each auto-split text piece
+    to a default ``ThreadPoolExecutor`` concurrently.  Its MPS model is not
+    safe for that nested concurrency.  This does not lock independent worker
+    processes (batch lanes) and does not affect CPU inference.
+    """
+    if device != "mps":
+        return
+    if utils_infer is None:
+        from f5_tts.infer import utils_infer
+
+    utils_infer.ThreadPoolExecutor = partial(ThreadPoolExecutor, max_workers=1)
 
 
 def _is_valid_wav(path: Path) -> bool:
@@ -130,14 +200,16 @@ def _concat_wavs(parts: list[Path], out: Path) -> None:
 
 def _load_tts(manifest: dict):
     """Load the model once; a daemon keeps this object resident across videos."""
+    device = _inference_device(manifest)
+    _configure_f5_inference_executor(device)
     from f5_tts.api import F5TTS
 
-    print(f"[f5-batch] nạp model {manifest['model']} ({manifest['device']})…", flush=True)
+    print(f"[f5-batch] nạp model {manifest['model']} ({device})…", flush=True)
     tts = F5TTS(
         model=manifest["model"],
         ckpt_file=manifest["ckpt"],
         vocab_file=manifest["vocab"],
-        device=manifest["device"],
+        device=device,
     )
     print("[f5-batch] model sẵn sàng", flush=True)
     return tts
@@ -149,6 +221,7 @@ def _run_jobs(tts, manifest: dict, emit=print) -> int:
     ref_audio = manifest["ref_audio"]
     ref_text = manifest["ref_text"]
     inference_seed = _inference_seed(manifest)
+    inference_speed = _inference_speed(manifest)
 
     emit(f"[f5-batch] nhận {len(jobs)} job", flush=True)
 
@@ -170,7 +243,7 @@ def _run_jobs(tts, manifest: dict, emit=print) -> int:
             tts.infer(ref_file=ref_audio, ref_text=ref_text,
                       gen_text=chunks[0] if chunks else job["text"],
                       file_wave=str(out), remove_silence=False,
-                      seed=inference_seed)
+                      seed=inference_seed, speed=inference_speed)
         else:
             parts: list[Path] = []
             try:
@@ -178,7 +251,8 @@ def _run_jobs(tts, manifest: dict, emit=print) -> int:
                     part = out.with_name(f"{out.stem}.c{k:02d}.wav")
                     tts.infer(ref_file=ref_audio, ref_text=ref_text,
                               gen_text=chunk, file_wave=str(part),
-                              remove_silence=False, seed=inference_seed)
+                              remove_silence=False, seed=inference_seed,
+                              speed=inference_speed)
                     parts.append(part)
                 _concat_wavs(parts, out)
             finally:
@@ -218,6 +292,7 @@ def _serve(socket_path: Path, manifest: dict) -> int:
 
                 try:
                     _validate_daemon_request_speed(request, manifest)
+                    _validate_daemon_request_device(request, manifest)
                     code = _run_jobs(tts, {**manifest, "jobs": request["jobs"]}, emit=emit)
                     if code:
                         stream.write(json.dumps({"event": "error", "detail": f"job worker exit {code}"}).encode("utf-8") + b"\n")

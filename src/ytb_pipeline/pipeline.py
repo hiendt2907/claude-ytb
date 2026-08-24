@@ -227,7 +227,15 @@ def load_or_create_project(script_source: str, checkpoint: CheckpointManager) ->
         )
     else:
         metadata = dict(existing.metadata)
-        if metadata.get("script_sha256") != script_sha256 or metadata.get("ruleset_id") != script_ruleset_id:
+        if (
+            metadata.get("script_sha256") != script_sha256
+            or metadata.get("ruleset_id") != script_ruleset_id
+            # A legacy ruleset can reference audio rendered with an obsolete
+            # F5 tempo or a superseded QA policy.  It must never resume a
+            # DONE node simply because its on-disk script/checkpoint agree.
+            # Clear nodes so the input contract gate can reject it before TTS.
+            or script_ruleset_id != CONTRACT_VERSION
+        ):
             # No downstream artifact may survive a script or contract change.
             # This is intentionally broader than file-existence stale checks:
             # otherwise old narration/render could be uploaded with new metadata.
@@ -445,7 +453,7 @@ async def run_project(project: Project, checkpoint: CheckpointManager, through: 
             slug = _slugify(script.title)
             profile = _voice_profile(script)
             for i, seg in enumerate(script.segments):
-                seg_path = _segment_audio_path(slug, profile, i)
+                seg_path = _segment_audio_path(slug, profile, i, narration=seg.narration, voice=script.voice)
                 dur = _probe_duration_or_zero(seg_path) if seg_path.exists() else 0.0
                 voiced.append(replace(seg, audio_path=seg_path if seg_path.exists() else None, duration_sec=dur))
             total = _probe_duration_or_zero(audio_path) if audio_path.exists() else sum(s.duration_sec for s in voiced)
@@ -537,6 +545,7 @@ async def run_project(project: Project, checkpoint: CheckpointManager, through: 
                     cpu_threads=settings.quality_stt_cpu_threads,
                 ),
                 cache_dir=settings.quality_reports_dir / "audio_cache",
+                require_transcript=settings.e2e_test,
             )
             state["audio_quality"] = result
             output_data = _audio_quality_output(result)

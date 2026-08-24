@@ -1,4 +1,4 @@
-.PHONY: setup setup-f5 test clean listen listen-install listen-uninstall listen-logs update-install update-uninstall update-run update-logs
+.PHONY: setup setup-f5 test test-unit test-integration test-e2e clean listen listen-install listen-uninstall listen-logs update-install update-uninstall update-run update-logs
 
 # Cài đặt đầy đủ trên máy mới: ffmpeg, .venv, requirements, .env, thư mục runtime.
 setup:
@@ -10,6 +10,15 @@ setup-f5:
 
 test:
 	.venv/bin/pytest
+
+test-unit:
+	.venv/bin/pytest -m "not e2e and not integration and not slow"
+
+test-integration:
+	.venv/bin/pytest -m integration
+
+test-e2e:
+	.venv/bin/pytest -m e2e
 
 clean:
 	rm -rf assets/output/* assets/audio/*.mp3 .pytest_cache .coverage htmlcov

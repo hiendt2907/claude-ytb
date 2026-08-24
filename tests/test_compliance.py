@@ -61,8 +61,8 @@ def test_load_script_rejects_failed_compliance(write_script):
 
 def test_load_script_normalizes_non_list_emphasis(write_script):
     data = make_script([
-        {"caption": "c1", "narration": "x" * int(CHARS_PER_MIN / 2)},
-        {"caption": "c2", "narration": "y" * int(CHARS_PER_MIN / 2)},
+        {"caption": "c1", "narration": "x" * (int(CHARS_PER_MIN / 2) + 5)},
+        {"caption": "c2", "narration": "y" * (int(CHARS_PER_MIN / 2) + 5)},
     ])
     data["sections"][0]["emphasis"] = True
     data["sections"][1]["emphasis"] = "cơ chế"
@@ -79,7 +79,7 @@ def test_load_script_accepts_structured_claude_schema(write_script):
         {
             "caption": "Hook",
             "voiceover": "Đừng cố kỷ luật hơn trước khi hiểu vì sao não né việc khó. "
-            * 40,
+            * 29,
             "visual_intent": "Một người trì hoãn trước laptop.",
             "pexels_query": "person procrastinating at laptop",
             "time_goal": 5,

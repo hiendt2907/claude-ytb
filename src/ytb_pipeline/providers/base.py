@@ -105,6 +105,7 @@ class LLMProvider(Protocol):
         max_tokens: int = 4096,
         temperature: float = 0.7,
         json_output: bool = False,
+        response_schema: dict | None = None,
     ) -> str:
         """Return completion text."""
         ...

@@ -1,8 +1,13 @@
-"""Khâu 3 (biến thể AI) — dựng video bằng Pexels footage + overlay caption.
+"""Khâu 3 (biến thể AI) — dựng video bằng B-roll footage thật + overlay caption.
 
-Mặc định và production path đều dùng Pexels/stock `.mp4` thật theo từng segment,
-cắt theo beat và ghép đúng duration audio. Pillow chỉ còn phục vụ thumbnail/overlay,
-không còn là nguồn render video local.
+Mặc định và production path đều dùng B-roll `.mp4` thật theo từng segment, cắt
+theo beat và ghép đúng duration audio. LOCAL-ONLY theo mặc định: mọi B-roll lấy
+từ asset catalog/cache local đã có sẵn (xem `render/stock.py`) — KHÔNG gọi
+Pexels online, KHÔNG cần `PEXELS_API_KEY`, trừ khi operator tự bật rõ
+`BROLL_ALLOW_DOWNLOADS=true`. "Pexels" trong tên biến (`broll_strategy`,
+`video_provider`) chỉ mô tả NGUỒN GỐC license của asset, không phải một lệnh
+gọi mạng bắt buộc. Pillow chỉ còn phục vụ thumbnail/overlay, không còn là
+nguồn render video local.
 
 Hỗ trợ 2 hướng (theo settings.orientation):
   - portrait  1080x1920  -> Short dọc (mặc định)

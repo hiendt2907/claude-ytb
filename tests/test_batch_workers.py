@@ -2,10 +2,18 @@ from __future__ import annotations
 
 import argparse
 import json
+from types import SimpleNamespace
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
+import pytest
+
 from ytb_pipeline.orchestrator import batch_cli as cli
+
+
+@pytest.fixture(autouse=True)
+def _bypass_preflight_for_worker_scheduling_tests(monkeypatch):
+    monkeypatch.setattr(cli, "preflight_script", lambda _path: SimpleNamespace(passed=True, failures=()))
 
 
 def test_select_pending_batch_returns_distinct_items_up_to_worker_limit():
@@ -153,6 +161,7 @@ def test_cmd_status_reports_active_worker_stage_elapsed_and_last_error(tmp_path,
     monkeypatch.setattr(cli, "WORKER_STATE_PATH", state_path)
     monkeypatch.setattr(cli, "load_queue", lambda: [])
     monkeypatch.setattr(cli, "done_slugs", lambda: set())
+    monkeypatch.setattr(cli, "batch_process_is_alive", lambda: True)
 
     cli.cmd_status(argparse.Namespace())
 
@@ -162,3 +171,43 @@ def test_cmd_status_reports_active_worker_stage_elapsed_and_last_error(tmp_path,
     assert "running-render" in output
     assert "elapsed=" in output
     assert "missing audio" in output
+
+
+def test_cmd_status_marks_running_worker_stale_when_no_batch_process_exists(tmp_path, monkeypatch, capsys):
+    state_path = tmp_path / "batch_workers.json"
+    state_path.write_text(json.dumps({
+        "1": {
+            "slug": "focus-loop",
+            "stage": "running-voiceover",
+            "started_at": "2026-07-15T10:00:00+07:00",
+            "last_error": "",
+        },
+    }), encoding="utf-8")
+    monkeypatch.setattr(cli, "WORKER_STATE_PATH", state_path)
+    monkeypatch.setattr(cli, "load_queue", lambda: [])
+    monkeypatch.setattr(cli, "done_slugs", lambda: set())
+    monkeypatch.setattr(cli, "batch_process_is_alive", lambda: False)
+
+    cli.cmd_status(argparse.Namespace())
+
+    assert "stale-no-process" in capsys.readouterr().out
+
+
+def test_cmd_status_marks_starting_worker_stale_when_no_batch_process_exists(tmp_path, monkeypatch, capsys):
+    state_path = tmp_path / "batch_workers.json"
+    state_path.write_text(json.dumps({
+        "1": {
+            "slug": "focus-loop",
+            "stage": "starting-render",
+            "started_at": "2026-07-15T10:00:00+07:00",
+            "last_error": "",
+        },
+    }), encoding="utf-8")
+    monkeypatch.setattr(cli, "WORKER_STATE_PATH", state_path)
+    monkeypatch.setattr(cli, "load_queue", lambda: [])
+    monkeypatch.setattr(cli, "done_slugs", lambda: set())
+    monkeypatch.setattr(cli, "batch_process_is_alive", lambda: False)
+
+    cli.cmd_status(argparse.Namespace())
+
+    assert "stale-no-process:starting-render" in capsys.readouterr().out

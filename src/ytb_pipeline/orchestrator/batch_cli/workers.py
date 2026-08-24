@@ -78,10 +78,18 @@ def _claim_next_staged():
         queue = cli.load_queue()
         done = cli.done_slugs()
         failed = cli.failed_slugs()
-        item = cli.next_pending(queue, done | failed | cli._claimed_slugs)
-        if item is not None:
+        excluded = done | failed | cli._claimed_slugs
+        for item in queue:
+            if item.slug in excluded:
+                continue
+            if item.long_form_slug and item.long_form_slug not in done:
+                continue
+            preflight = cli.preflight_script(cli.ROOT / "scripts" / f"{item.slug}.json")
+            if not preflight.passed:
+                continue
             cli._claimed_slugs.add(item.slug)
-        return item
+            return item
+        return None
 
 
 def _release_staged_claim(item) -> None:
@@ -118,7 +126,7 @@ def _run_f5_voiceover_lane(item, lane: int, socket_path: Path):
     return item, *result
 
 
-def _run_render_publish_lane(item, lane: int) -> None:
+def _run_render_publish_lane(item, lane: int, *, publish: bool) -> None:
     """Consume one completed voiceover while its paired F5 lane moves on."""
     cli = _cli()
     worker_id = f"render-{lane}"
@@ -131,6 +139,7 @@ def _run_render_publish_lane(item, lane: int) -> None:
                 queued,
                 worker_id=worker_id,
                 through="publish",
+                publish=publish,
                 initial_stage="starting-render",
             ),
         )
@@ -195,7 +204,7 @@ def cmd_run_f5_staged(args: argparse.Namespace) -> None:
                         if cli._stop_requested:
                             cli._release_staged_claim(item)
                         elif ok:
-                            render = render_executors[lane].submit(cli._run_render_publish_lane, item, lane)
+                            render = render_executors[lane].submit(cli._run_render_publish_lane, item, lane, publish=True)
                             render_futures[render] = lane
                         else:
                             cli._record_stage_failure(item, output, worker_id=f"tts-{lane}")
@@ -219,6 +228,9 @@ def cmd_run_f5_staged(args: argparse.Namespace) -> None:
 def cmd_run(args: argparse.Namespace) -> None:
     cli = _cli()
     through = getattr(args, "through", "publish")
+    # argparse always supplies this flag.  The True fallback preserves direct
+    # programmatic callers from before the CLI safety boundary was introduced.
+    publish = bool(getattr(args, "publish", False))
     batch_key = str(getattr(args, "batch_key", "") or "").strip() or None
     if batch_key is not None:
         try:
@@ -230,18 +242,21 @@ def cmd_run(args: argparse.Namespace) -> None:
     if getattr(args, "schedule", False):
         cli.schedule_pending_videos(args)
     worker_count = min(cli.MAX_BATCH_WORKERS, max(1, getattr(args, "workers", 1)))
-    if args.loop and worker_count == 2 and cli.settings.tts_provider == "f5" and batch_key is None:
+    if (
+        args.loop and publish and worker_count == 2 and cli.settings.tts_provider == "f5"
+        and batch_key is None and bool(getattr(args, "f5_staged", False))
+    ):
         cli.cmd_run_f5_staged(args)
         return
     # Render-only runs are smoke tests, not terminal queue completion.  Keep a
     # per-invocation set so --loop reaches every item once without marking any
     # video published/done or rerendering the first item forever.
-    completed_render_slugs: set[str] | None = set() if through == "render" else None
+    completed_render_slugs: set[str] | None = set() if through == "render" or not publish else None
     slots = worker_count if args.loop else 1
     with ThreadPoolExecutor(max_workers=slots, thread_name_prefix="ytb-batch") as executor:
         running = {
             executor.submit(
-                cli.process_next, worker_id=worker_id, through=through, batch_key=batch_key,
+                cli.process_next, worker_id=worker_id, through=through, batch_key=batch_key, publish=publish,
                 completed_render_slugs=completed_render_slugs,
             ): worker_id
             for worker_id in range(1, slots + 1)
@@ -260,7 +275,7 @@ def cmd_run(args: argparse.Namespace) -> None:
                     continue
                 if args.loop and processed and not cli._stop_requested:
                     running[executor.submit(
-                        cli.process_next, worker_id=worker_id, through=through, batch_key=batch_key,
+                        cli.process_next, worker_id=worker_id, through=through, batch_key=batch_key, publish=publish,
                         completed_render_slugs=completed_render_slugs,
                     )] = worker_id
 

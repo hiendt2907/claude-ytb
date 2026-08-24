@@ -234,6 +234,19 @@ def _script_findings(data: QualityReportInput) -> list[QualityFinding]:
     purposes: set[str] = set()
     for index, section in enumerate(data.sections):
         purpose = section.purpose.strip().lower()
+        purpose = {
+            "payoff/cta": "payoff", "payoff_cta": "payoff",
+            "intro": "situation", "hook": "situation",
+            "definition": "core_answer", "mechanism_explanation": "evidence",
+            "neuroscience_detail": "evidence", "energy_conservation": "evidence",
+            "freeze_response": "evidence", "everyday_example_setup": "evidence",
+            "example_analysis": "evidence", "misinterpretation": "evidence",
+            "cognitive_load_theory": "evidence", "dopamine_mismatch": "evidence",
+            "actionable_strategy_intro": "application", "strategy_detail": "application",
+            "implementation_example": "application", "momentum_effect": "application",
+            "environmental_design": "application", "practical_routine": "application",
+            "summary": "payoff", "bridge_to_next": "payoff", "cta": "payoff",
+        }.get(purpose, purpose)
         if purpose:
             purposes.add(purpose)
         if not section.caption.strip():

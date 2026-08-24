@@ -71,12 +71,23 @@ def test_batch_manifest_forwards_the_duration_calibration(monkeypatch, tmp_path)
 def test_f5_segment_cache_path_changes_with_acoustic_speed(monkeypatch):
     monkeypatch.setattr(tts.settings, "tts_provider", "f5")
     monkeypatch.setattr(f5_provider, "F5_INFERENCE_SPEED", 0.30)
-    slow = tts._segment_audio_path("video", tts.VOICE_KNOWLEDGE, 0)
+    slow = tts._segment_audio_path("video", tts.VOICE_KNOWLEDGE, 0, narration="nội dung", voice="vi-VN")
 
     monkeypatch.setattr(f5_provider, "F5_INFERENCE_SPEED", 0.85)
-    fast = tts._segment_audio_path("video", tts.VOICE_KNOWLEDGE, 0)
+    fast = tts._segment_audio_path("video", tts.VOICE_KNOWLEDGE, 0, narration="nội dung", voice="vi-VN")
 
     assert slow != fast
+
+
+def test_f5_segment_cache_path_keeps_sub_centisecond_speed_distinct(monkeypatch):
+    monkeypatch.setattr(tts.settings, "tts_provider", "f5")
+    monkeypatch.setattr(f5_provider, "F5_INFERENCE_SPEED", 0.300)
+    first = tts._segment_audio_path("video", tts.VOICE_KNOWLEDGE, 0, narration="nội dung", voice="vi-VN")
+
+    monkeypatch.setattr(f5_provider, "F5_INFERENCE_SPEED", 0.304)
+    second = tts._segment_audio_path("video", tts.VOICE_KNOWLEDGE, 0, narration="nội dung", voice="vi-VN")
+
+    assert first != second
 
 
 def test_worker_legacy_manifest_defaults_to_the_calibrated_speed():

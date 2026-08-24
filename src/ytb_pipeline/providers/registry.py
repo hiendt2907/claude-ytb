@@ -90,7 +90,7 @@ def get_video_provider(name: str | None = None) -> VideoProvider:
 
 
 def get_llm_provider(name: str | None = None) -> LLMProvider:
-    """Trả provider theo tên, hoặc settings.llm_provider làm mặc định ("claude")."""
+    """Trả provider theo tên, hoặc xKiro mặc định từ settings."""
     from . import llm  # noqa: F401  — đảm bảo đã đăng ký
 
     return llm_registry.get(name or settings.llm_provider)

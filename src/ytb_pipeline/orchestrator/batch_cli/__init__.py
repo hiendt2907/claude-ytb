@@ -103,6 +103,7 @@ from ..queue_manager import (
     tail_text,
     update_ledger,
 )
+from ..preflight import format_preflight_result, preflight_script
 from ..state_io import locked_json_update
 
 from .commands import (
@@ -127,6 +128,7 @@ from .process_control import (
     _install_signal_handlers,
     _pid_alive,
     _terminate_tracked_batch_tree,
+    batch_process_is_alive,
     check_not_already_running,
     remove_pid_file,
     write_pid_file,
@@ -169,6 +171,18 @@ _stop_requested = False
 _recovery_code_streak: dict[str, int] = {}
 
 
+def cmd_preflight(args) -> None:
+    """Check scripts offline before queue admission or a batch run."""
+    paths = [ROOT / "scripts" / f"{slug}.json" for slug in getattr(args, "slugs", [])]
+    if not paths:
+        paths = [ROOT / "scripts" / f"{item.slug}.json" for item in load_queue()]
+    results = [preflight_script(path) for path in paths]
+    for result in results:
+        print(format_preflight_result(result))
+    if any(not result.passed for result in results):
+        raise SystemExit(1)
+
+
 def main(argv: list[str] | None = None) -> None:
     cmd_funcs = {
         "start": cmd_start,
@@ -188,6 +202,7 @@ def main(argv: list[str] | None = None) -> None:
         "doctor": cmd_doctor,
         "auth": cmd_auth,
         "benchmark-local": cmd_benchmark_local,
+        "preflight": cmd_preflight,
     }
     parser = build_parser(doc=__doc__, cmd_funcs=cmd_funcs)
 
