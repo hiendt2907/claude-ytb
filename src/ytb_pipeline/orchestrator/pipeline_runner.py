@@ -367,6 +367,39 @@ def check_schedule_drift(verified_publish_at: str | None, expected_publish_at: s
     return actual != expected
 
 
+def _persist_published_auto_state(
+    item: QueueItem,
+    video_id: str,
+    *,
+    batch_key: str | None = None,
+    auto_state_path: Path | None = None,
+) -> None:
+    """Persist the verified YouTube identity back into the originating queue item."""
+    cli = _cli()
+    path = Path(auto_state_path) if auto_state_path is not None else Path(cli.AUTO_STATE_PATH)
+    with cli.locked_json_update(path) as data:
+        keys = [batch_key] if batch_key is not None else list(data)
+        matches: list[dict] = []
+        for key in keys:
+            batch = data.get(key)
+            if not isinstance(batch, dict):
+                continue
+            for group in ("short_videos", "long_videos"):
+                for video in batch.get(group, []):
+                    if isinstance(video, dict) and video.get("slug") == item.slug:
+                        matches.append(video)
+        if len(matches) != 1:
+            raise ValueError(
+                f"Không thể cập nhật publish state cho '{item.slug}': "
+                f"tìm thấy {len(matches)} queue item."
+            )
+        matches[0].update({
+            "shorts_status": "published",
+            "youtube_id": video_id,
+            "youtube_url": f"https://youtu.be/{video_id}",
+        })
+
+
 def finalize_published_item(
     item: QueueItem,
     output: str,
@@ -376,6 +409,7 @@ def finalize_published_item(
     position: int | None = None,
     total: int | None = None,
     batch_key: str | None = None,
+    auto_state_path: Path | None = None,
 ) -> bool:
     """Verify a successful publish and persist its final ledger state.
 
@@ -428,6 +462,19 @@ def finalize_published_item(
         cli.emit_warning(
             f"Video '{item.slug}' (https://youtu.be/{video_id}) lệch lịch publish: thật={verified.get('publish_at')} "
             f"vs kế hoạch={item.publish_at} trong auto_state.json. KHÔNG tự sửa lịch — cần Claude xác nhận với user."
+        )
+    try:
+        _persist_published_auto_state(
+            item, video_id, batch_key=batch_key, auto_state_path=auto_state_path
+        )
+    except Exception as exc:  # noqa: BLE001 -- verified ledger is the anti-duplicate authority
+        # The upload cannot be rolled back.  Losing the done ledger row here
+        # would make the next batch run upload a duplicate, whereas auto_state
+        # is recoverable observability/resume data.
+        cli.emit_warning(
+            f"Video '{item.slug}' đã được YouTube API xác minh https://youtu.be/{video_id} "
+            f"nhưng không cập nhật được auto_state: {exc}. "
+            "Vẫn ghi ledger done|ok để chặn publish trùng; cần reconcile state thủ công."
         )
     cli.update_ledger(
         item.slug, verified.get("title", ""), "done", "ok",
@@ -538,6 +585,7 @@ def process_next(
         finalize_published_item(
             item, output, ledger_path=ledger_path, worker_id=worker_id,
             position=position, total=len(queue), batch_key=batch_key,
+            auto_state_path=queue_path,
         )
         return True
     finally:

@@ -159,6 +159,10 @@ class VideoIdea:
 class Script(VideoIdea):
     """VideoIdea + kịch bản đã chia đoạn."""
 
+    # Runtime-only identity injected from Project.project_id before production.
+    # It keeps generated artifacts addressable by the queue slug even if the
+    # editorial title later changes; it is not part of the ideation JSON.
+    project_id: str = ""
     body: str = ""
     segments: tuple[Segment, ...] = ()
     thumbnail_brief: ThumbnailBrief | None = None

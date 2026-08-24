@@ -64,9 +64,14 @@ def make_script(sections, *, target_minutes=None, compliance=None, **fields) -> 
     return data
 
 
-def chars_for_minutes(minutes: float) -> str:
-    """Chuỗi narration theo tốc độ của TTS provider đang được cấu hình."""
-    return "x" * int(chars_per_min_for_provider() * minutes)
+def chars_for_minutes(minutes: float, *, video_type: str | None = None) -> str:
+    """Chuỗi narration theo tốc độ của TTS provider đang được cấu hình.
+
+    `video_type` phải khớp loại video mà fixture đang dựng: Long có nhịp đọc
+    riêng, nên dựng narration Long bằng rate của Short sẽ sinh thiếu ký tự và
+    cổng độ dài chặn oan.
+    """
+    return "x" * int(chars_per_min_for_provider(video_type=video_type) * minutes)
 
 
 @pytest.fixture

@@ -463,6 +463,27 @@ def test_verify_youtube_video_applies_short_transport_timeout(monkeypatch):
     assert youtube._http.http.timeout == cli.YOUTUBE_VERIFY_TIMEOUT_SEC
 
 
+def test_cmd_verify_resolves_a_published_slug_from_the_ledger(monkeypatch, tmp_path, capsys):
+    """Operators may pass the pipeline slug, but the API only accepts an ID."""
+    from ytb_pipeline.publish import uploader
+
+    ledger = tmp_path / "ledger.md"
+    ledger.write_text("# test\n", encoding="utf-8")
+    monkeypatch.setattr(cli, "LEDGER_PATH", ledger)
+    monkeypatch.setattr(
+        uploader,
+        "_published_url_for_slug",
+        lambda slug, ledger_path=None: "https://youtu.be/AbC_123-xYz" if slug == "known-slug" else None,
+    )
+    seen: list[str] = []
+    monkeypatch.setattr(cli, "verify_youtube_video", lambda video_id: seen.append(video_id) or {"exists": True})
+
+    cli.cmd_verify(argparse.Namespace(youtube_id="known-slug"))
+
+    assert seen == ["AbC_123-xYz"]
+    assert '"exists": true' in capsys.readouterr().out
+
+
 # ── check_schedule_drift ──────────────────────────────────────────────────────
 def test_check_schedule_drift_detects_mismatch():
     # Lệch 1 ngày — đúng tình huống thật đã gặp với video #2 batch này.
@@ -615,6 +636,90 @@ def test_process_next_happy_path(auto_state_file, ledger_file, monkeypatch, _cap
     assert "b-video" in content and "done | ok" in content
     assert "https://youtu.be/NEWID12345" in content
     assert _capture_telegram == []  # đúng kế hoạch, không lệch -> không cảnh báo
+
+
+def test_finalize_published_item_updates_auto_state_after_api_verification(
+    auto_state_file, ledger_file, monkeypatch
+):
+    monkeypatch.setattr(cli, "AUTO_STATE_PATH", auto_state_file)
+    monkeypatch.setattr(
+        cli,
+        "verify_youtube_video",
+        lambda _video_id: {
+            "exists": True,
+            "title": "A",
+            "privacy_status": "private",
+            "publish_at": "2026-06-23T06:00:00Z",
+        },
+    )
+    item = cli.QueueItem(5, "a-video", "2026-06-23T06:00:00+0700", "queued")
+
+    assert cli.finalize_published_item(
+        item,
+        "✓ Đã upload: https://youtu.be/AbC_123-xYz",
+        ledger_path=ledger_file,
+        batch_key="shorts_funnel_batch_2026-06-22",
+    ) is True
+
+    state = json.loads(auto_state_file.read_text(encoding="utf-8"))
+    entry = next(video for video in state["shorts_funnel_batch_2026-06-22"]["long_videos"] if video["slug"] == "a-video")
+    assert {key: entry[key] for key in ("shorts_status", "youtube_id", "youtube_url")} == {
+        "shorts_status": "published",
+        "youtube_id": "AbC_123-xYz",
+        "youtube_url": "https://youtu.be/AbC_123-xYz",
+    }
+
+
+def test_finalize_published_item_keeps_ledger_done_when_state_persist_fails(
+    ledger_file, monkeypatch
+):
+    """A verified upload must never become pending again because state telemetry fails."""
+    from ytb_pipeline.orchestrator import pipeline_runner
+
+    item = cli.QueueItem(5, "a-video", "2026-06-23T06:00:00+0700", "queued")
+    monkeypatch.setattr(
+        cli,
+        "verify_youtube_video",
+        lambda _video_id: {"exists": True, "title": "A", "privacy_status": "private", "publish_at": None},
+    )
+    monkeypatch.setattr(
+        pipeline_runner,
+        "_persist_published_auto_state",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("queue item disappeared")),
+    )
+
+    assert cli.finalize_published_item(
+        item,
+        "✓ Đã upload: https://youtu.be/AbC_123-xYz",
+        ledger_path=ledger_file,
+    ) is True
+    assert "a-video" in cli.done_slugs(ledger_file)
+
+
+def test_finalize_published_item_warns_when_state_persist_fails(
+    ledger_file, monkeypatch, _capture_telegram
+):
+    from ytb_pipeline.orchestrator import pipeline_runner
+
+    item = cli.QueueItem(5, "a-video", "2026-06-23T06:00:00+0700", "queued")
+    monkeypatch.setattr(
+        cli,
+        "verify_youtube_video",
+        lambda _video_id: {"exists": True, "title": "A", "privacy_status": "private", "publish_at": None},
+    )
+    monkeypatch.setattr(
+        pipeline_runner,
+        "_persist_published_auto_state",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("queue item disappeared")),
+    )
+
+    cli.finalize_published_item(
+        item,
+        "✓ Đã upload: https://youtu.be/AbC_123-xYz",
+        ledger_path=ledger_file,
+    )
+
+    assert any("không cập nhật được auto_state" in message for message in _capture_telegram)
 
 
 def test_process_next_returns_false_when_queue_empty(auto_state_file, ledger_file):
@@ -1399,15 +1504,17 @@ def test_staged_f5_runner_hands_audio_to_render_consumer_and_keeps_lanes_distinc
         def stop(self):
             pass
 
-    def claim():
+    def claim(*, batch_key=None):
+        assert batch_key is None
         return items.pop(0) if items else None
 
     def fake_voice(item, lane, socket_path):
         produced.append((item.slug, lane, socket_path.name))
         return item, True, "audio complete"
 
-    def fake_render(item, lane, *, publish):
+    def fake_render(item, lane, *, publish, batch_key=None):
         assert publish is True
+        assert batch_key is None
         consumed.append((item.slug, lane))
         cli._release_staged_claim(item)
 
@@ -1422,6 +1529,24 @@ def test_staged_f5_runner_hands_audio_to_render_consumer_and_keeps_lanes_distinc
     assert {slug for slug, _lane, _socket in produced} == {"one", "two", "three"}
     assert {slug for slug, _lane in consumed} == {"one", "two", "three"}
     assert all(socket == f"lane-{lane}.sock" for _slug, lane, socket in produced)
+
+
+def test_staged_render_lane_passes_batch_key_to_publish_finalizer(monkeypatch):
+    item = cli.QueueItem(1, "one", "", "queued")
+    captured = {}
+    monkeypatch.setattr(cli, "run_with_retry", lambda *_args, **_kwargs: (True, "https://youtu.be/AbC_123-xYz"))
+    monkeypatch.setattr(cli, "_release_staged_claim", lambda _item: None)
+    monkeypatch.setattr(
+        cli,
+        "finalize_published_item",
+        lambda _item, _output, **kwargs: captured.update(kwargs),
+    )
+
+    cli._run_render_publish_lane(
+        item, 1, publish=True, batch_key="shorts_funnel_batch_phase1"
+    )
+
+    assert captured["batch_key"] == "shorts_funnel_batch_phase1"
 
 
 def test_schedule_pending_videos_assigns_publish_at_without_overwriting_done_or_existing(
@@ -1575,6 +1700,28 @@ def test_cmd_retry_finds_short_video(tmp_path, monkeypatch, capsys):
 
     assert captured["slug"] == "short-video"
     assert "Thành công" in capsys.readouterr().out
+
+
+def test_cmd_retry_publish_finalizes_verified_upload(auto_state_file, ledger_file, monkeypatch):
+    monkeypatch.setattr(cli, "AUTO_STATE_PATH", auto_state_file)
+    monkeypatch.setattr(cli, "LEDGER_PATH", ledger_file)
+    monkeypatch.setattr(
+        cli,
+        "run_with_retry",
+        lambda *_args, **_kwargs: (True, "✓ Đã upload: https://youtu.be/AbC_123-xYz"),
+    )
+    monkeypatch.setattr(
+        cli,
+        "verify_youtube_video",
+        lambda _video_id: {"exists": True, "title": "A", "privacy_status": "private", "publish_at": None},
+    )
+
+    cli.cmd_retry(argparse.Namespace(slug="a-video", publish=True))
+
+    assert "a-video" in cli.done_slugs(ledger_file)
+    state = json.loads(auto_state_file.read_text(encoding="utf-8"))
+    entry = next(video for video in state["shorts_funnel_batch_2026-06-22"]["long_videos"] if video["slug"] == "a-video")
+    assert entry["youtube_id"] == "AbC_123-xYz"
 
 
 def test_cmd_stop_no_pid_file(tmp_path, monkeypatch, capsys):

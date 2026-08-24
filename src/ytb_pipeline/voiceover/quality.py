@@ -23,8 +23,15 @@ from ..content_contract import contract_for
 
 from ..pkg.models import Voiceover
 
-_CACHE_VERSION = 3
+# Bump whenever a check's verdict logic changes, or a cached pass/fail decided
+# by the old rules is replayed forever.  v4: the duration target moved from
+# `target_minutes * 60` to the contract's own audio window.
+# Bump whenever a detector's verdict logic changes, or cached verdicts from the
+# old logic keep blocking runs the new logic would pass.  v6: an adjacent
+# repeat is only a TTS artifact when the script did not author it.
+_CACHE_VERSION = 6
 TRANSCRIPT_SIMILARITY_ALGORITHM = "sequence-matcher-no-autojunk-v1"
+_SENTENCE_SPLIT_RE = re.compile(r"[.!?;:\n]+")
 _WORD_RE = re.compile(r"[\wÀ-ỹ]+", re.UNICODE)
 # Measured with the local Faster-Whisper small model against natural-tempo F5
 # Vietnamese speech.  0.82 tolerates predictable ASR spelling substitutions;
@@ -228,7 +235,9 @@ def run_audio_quality_gate(
             "AUDIO_DURATION_UNAVAILABLE", "error", "Không đo được thời lượng audio bằng công cụ local.",
             target="audio_path", action="repair_or_reencode_audio",
         ))
-    elif target_duration is not None and abs(actual_duration - target_duration) > duration_tolerance_sec:
+    elif target_duration is not None and abs(actual_duration - target_duration) > _duration_tolerance(
+        voiceover, duration_tolerance_sec
+    ):
         issues.append(_issue(
             "DURATION_TARGET_DEVIATION", "error",
             f"Audio lệch mục tiêu {abs(actual_duration - target_duration):.1f}s (audio={actual_duration:.1f}s, target={target_duration:.1f}s).",
@@ -345,7 +354,12 @@ def _append_transcript_issues(
             f"Transcript local khớp script {similarity:.0%}, dưới ngưỡng {similarity_threshold:.0%}.",
             target="audio_or_segment", action="resynthesise_mismatched_segment",
         ))
+    # Only a repetition the script never authored is a TTS artifact.  Comparing
+    # against the script keeps Whisper's unreliable punctuation from deciding
+    # whether "gọi là X. X là..." was a stutter or a definition.
     repeated = _adjacent_repeated_phrase(transcript)
+    if repeated and f"{repeated} {repeated}" in _normalised_words(expected):
+        repeated = None
     if repeated:
         transcript_metrics["repeated_phrase"] = repeated
         issues.append(_issue(
@@ -417,16 +431,50 @@ def _save_cached(
     path.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True), encoding="utf-8")
 
 
+def audio_duration_target_sec(
+    video_type: str, *, segment_count: int
+) -> tuple[float, float]:
+    """Centre and tolerance of the contract's own audio window.
+
+    The voiceover node validates the same file against `audio_runtime_bounds_sec`,
+    so this gate must accept exactly that window.  Deriving the centre from
+    `target_minutes * 60` instead compared an audio measurement against a
+    viewer-domain number that excludes transition loss: for a 36-section Long the
+    two windows overlapped by 16s out of 180s, and every script planned to the
+    middle of the contract was rejected here after its TTS had been paid for.
+    """
+    lower, upper = contract_for(video_type).audio_runtime_bounds_sec(
+        segment_count=segment_count,
+    )
+    return (lower + upper) / 2, (upper - lower) / 2
+
+
 def _target_duration(voiceover: Voiceover) -> float | None:
-    if settings.e2e_test:
-        lower, upper = contract_for(voiceover.video_type).viewer_runtime_bounds_sec
-        return (lower + upper) / 2
+    segment_count = len(voiceover.segments)
+    if segment_count > 0:
+        return audio_duration_target_sec(
+            voiceover.video_type, segment_count=segment_count,
+        )[0]
     if voiceover.target_minutes is not None and voiceover.target_minutes > 0:
         return voiceover.target_minutes * 60
     if voiceover.duration_sec > 0:
         return voiceover.duration_sec
-    segment_total = sum(segment.duration_sec for segment in voiceover.segments)
-    return segment_total if segment_total > 0 else None
+    return None
+
+
+def _duration_tolerance(voiceover: Voiceover, fallback_sec: float) -> float:
+    """Widen a caller's flat tolerance to at least the contract window.
+
+    A caller may still tighten the gate below the contract, but it must never be
+    narrower than what the voiceover node already accepted.
+    """
+    segment_count = len(voiceover.segments)
+    if segment_count <= 0:
+        return fallback_sec
+    return max(
+        fallback_sec,
+        audio_duration_target_sec(voiceover.video_type, segment_count=segment_count)[1],
+    )
 
 
 def _sha256_file(path: Path | None) -> str:
@@ -530,10 +578,29 @@ def _normalise_words(text: str) -> str:
     return " ".join(_WORD_RE.findall(text.casefold()))
 
 
+def _normalised_words(text: str) -> str:
+    """Punctuation-free word stream, so a script phrase matches a transcript one."""
+    return " ".join(_WORD_RE.findall(text.casefold()))
+
+
 def _adjacent_repeated_phrase(transcript: str) -> str | None:
-    words = _WORD_RE.findall(transcript.casefold())
-    for size in range(min(12, len(words) // 2), 2, -1):
-        for start in range(0, len(words) - (size * 2) + 1):
-            if words[start:start + size] == words[start + size:start + (size * 2)]:
-                return " ".join(words[start:start + size])
+    """Find speech duplicated back to back, without flagging normal exposition.
+
+    Two artifacts matter: a stutter repeats a phrase inside one sentence, and a
+    duplicated TTS segment repeats a whole sentence.  Scanning the raw word
+    stream caught both but also flagged "...gọi là chi phí chìm. Chi phí chìm là
+    tiền..." — naming a term and then defining it — because stripping
+    punctuation erases the boundary that tells the two apart.
+    """
+    sentences = [part.strip() for part in _SENTENCE_SPLIT_RE.split(transcript) if part.strip()]
+    for sentence in sentences:
+        words = _WORD_RE.findall(sentence.casefold())
+        for size in range(min(12, len(words) // 2), 2, -1):
+            for start in range(0, len(words) - (size * 2) + 1):
+                if words[start:start + size] == words[start + size:start + (size * 2)]:
+                    return " ".join(words[start:start + size])
+    for first, second in zip(sentences, sentences[1:]):
+        words = _WORD_RE.findall(first.casefold())
+        if len(words) > 2 and words == _WORD_RE.findall(second.casefold()):
+            return " ".join(words)
     return None

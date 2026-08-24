@@ -270,3 +270,19 @@ async def test_xkiro_llm_raises_on_empty_content(monkeypatch):
 
     with pytest.raises(ProviderUnavailableError):
         await XkiroLLMProvider().complete("test")
+
+
+async def test_request_timeout_scales_with_the_requested_output_size(monkeypatch):
+    """A Long asks for 14k tokens; a flat 60s budget could never deliver it.
+
+    Production 2026-08-24: every model in the cascade "failed" with a read
+    timeout while generating a 13k-character Long, so the run wasted 4 minutes
+    and fell through to a CLI provider that cannot enforce the JSON schema.
+    """
+    from ytb_pipeline.providers.llm import xkiro_provider
+
+    short_budget = xkiro_provider.request_timeout_for(max_tokens=4096)
+    long_budget = xkiro_provider.request_timeout_for(max_tokens=14000)
+
+    assert short_budget >= xkiro_provider._REQUEST_TIMEOUT_S
+    assert long_budget > short_budget * 2

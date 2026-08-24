@@ -32,13 +32,16 @@ from ..pkg.models import (
 # Các mục verify bắt buộc trong khối `compliance` của mỗi file kịch bản.
 _COMPLIANCE_FIELDS = ("community", "copyright", "accuracy", "advertiser", "coppa", "notes")
 
-def chars_per_min_for_provider(provider: str | None = None) -> float:
+def chars_per_min_for_provider(
+    provider: str | None = None, *, video_type: str | None = None
+) -> float:
     """Tốc độ planning theo provider đang được chọn.
 
     F5 giữ nhịp tự nhiên ở tempo an toàn cho STT; Edge gửi rate trực tiếp cho
-    provider. Mọi output vẫn bị kiểm tra lại bằng duration đo từ file audio.
+    provider. `video_type` chọn nhịp riêng của Long khi đã đo được. Mọi output
+    vẫn bị kiểm tra lại bằng duration đo từ file audio.
     """
-    return _contract_chars_per_min(provider or settings.tts_provider)
+    return _contract_chars_per_min(provider or settings.tts_provider, video_type=video_type)
 
 
 # Compatibility export for older callers.  It must match the configured voice
@@ -64,11 +67,18 @@ VOICE_PROFILES = ("knowledge", "inspiring")
 _WEAK_PEXELS_QUERIES = {"", "video", "stock footage", "broll", "background", "abstract"}
 
 
-def estimate_minutes(segments, *, tts_provider: str | None = None) -> float:
-    """Ước lượng planning theo provider; không thay thế duration audio thực."""
+def estimate_minutes(
+    segments, *, tts_provider: str | None = None, video_type: str | None = None
+) -> float:
+    """Ước lượng planning theo provider; không thay thế duration audio thực.
+
+    `video_type` chọn nhịp đọc riêng của Long — một Long đọc liền mạch nên
+    nhanh hơn Short cùng số ký tự.
+    """
     chars = sum(len(seg.narration) for seg in segments)
     return estimate_duration_sec(
-        chars, chars_per_minute=chars_per_min_for_provider(tts_provider)
+        chars,
+        chars_per_minute=chars_per_min_for_provider(tts_provider, video_type=video_type),
     ) / 60
 
 
@@ -329,7 +339,7 @@ def _validate_length(segments, target_minutes, name: str, *, renderer_aware: boo
             f"Kịch bản {name}: 'target_minutes' phải trong khoảng "
             f"[{LONG_MIN_MINUTES}, {LONG_MAX_MINUTES}] phút cho video dài (ngang)."
         )
-    est_sec = estimate_minutes(segments) * 60
+    est_sec = estimate_minutes(segments, video_type=video_type) * 60
     try:
         contract.validate_audio_runtime(
             est_sec, segment_count=len(segments) if renderer_aware else 1
@@ -345,7 +355,9 @@ def _validate_length(segments, target_minutes, name: str, *, renderer_aware: boo
         contract.transition_loss_sec(len(segments)) if renderer_aware else 0.0
     )
     if est_sec < required_target_sec:
-        chars_can = int(required_target_sec / 60 * chars_per_min_for_provider())
+        chars_can = int(
+            required_target_sec / 60 * chars_per_min_for_provider(video_type=video_type)
+        )
         raise ValueError(
             f"Kịch bản {name}: nội dung quá mỏng — audio ước lượng ~{est_sec / 60:.1f} phút nhưng "
             f"mục tiêu {target_minutes:.0f} phút. Viết chi tiết & sâu hơn (cần ~"

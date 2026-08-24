@@ -38,7 +38,7 @@ def _make_script(*, target_minutes=None, narration_segments=None, topic="chu de 
     compliance = ComplianceCheck(passed=compliance_passed)
     if narration_segments is None:
         if target_minutes is not None:
-            first = GREETING + " " + chars_for_minutes(target_minutes)
+            first = GREETING + " " + chars_for_minutes(target_minutes, video_type="long")
         else:
             first = chars_for_minutes(1.0)
         narration_segments = [first]
@@ -211,7 +211,7 @@ async def test_qa_agent_rejects_long_over_fifteen_minutes():
         segments=(
             Segment(
                 caption="Mở đầu",
-                narration=GREETING + " " + chars_for_minutes(15.1),
+                narration=GREETING + " " + chars_for_minutes(15.1, video_type="long"),
             ),
         ),
     )
@@ -528,12 +528,16 @@ async def test_qa_agent_does_not_apply_legacy_stickman_gate():
 
 async def test_qa_agent_accepts_stickman_visual_gag_structure():
     agent = QAAgent()
-    unit = (
+    story = (
         "Người que mở cửa quá tự tin, nhưng tay nắm rơi xuống sàn ngay trước mặt. "
         "Nó cúi nhặt thì bỗng cái cửa tự chạy lùi lại, càng đuổi càng xa. "
         "Cả hành lang đứng hình, cuối cùng hóa ra cái cửa cũng có chân và cú chốt là nó tự khóa người que bên ngoài. "
         "Nó nhận ra càng cố giấu xấu hổ thì càng quên mất lý do mình mở cửa. "
     )
+    # This acceptance fixture must remain inside the active provider's Short
+    # duration contract instead of assuming xKiro's current CPM forever.
+    target_per_beat = len(chars_for_minutes(1.2)) // 4
+    unit = (story + "Người que hít một hơi, quan sát lại cánh cửa kỳ lạ rồi thử một cách khác. " * 8)[:target_per_beat]
     script = Script(
         topic="giải trí người que",
         title="Người Que Và Cánh Cửa Biết Chạy",

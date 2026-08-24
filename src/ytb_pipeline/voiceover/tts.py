@@ -91,7 +91,7 @@ def synthesize(script: Script) -> Voiceover:
     Trả Voiceover làm giàu từ script (replace) — không mutate bản gốc.
     """
     AUDIO_DIR.mkdir(parents=True, exist_ok=True)
-    slug = _slugify(script.title)
+    slug = _artifact_slug(script)
     profile = _voice_profile(script)
 
     # F5 local: nạp model 1 lần, sinh CẢ TẬP trong 1 process (đường nhanh).
@@ -623,6 +623,13 @@ def _slugify(text: str) -> str:
     import re
     import unicodedata
 
+    # NFKD does not decompose Vietnamese Đ/đ, so map them before ASCII folding.
+    text = text.replace("Đ", "D").replace("đ", "d")
     text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
     text = re.sub(r"[^\w\s-]", "", text).strip().lower()
     return re.sub(r"[\s_-]+", "-", text) or "video"
+
+
+def _artifact_slug(script: Script) -> str:
+    """Prefer the immutable queue/project slug over an editable title."""
+    return _slugify(script.project_id or script.title)

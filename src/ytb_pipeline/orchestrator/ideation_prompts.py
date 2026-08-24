@@ -11,6 +11,7 @@ import re
 
 from ..config.settings import settings
 from ..content_contract import CONTRACT_VERSION, chars_per_min_for_provider, contract_for
+from ..ideation.generation_schema import SECTION_PURPOSES
 
 SHORT_CONTRACT = contract_for("short")
 LONG_CONTRACT = contract_for("long")
@@ -22,7 +23,17 @@ SHORT_ANSWER_START_TARGET_SEC = SHORT_CONTRACT.answer_start_target_sec or 4.0
 
 # Ideation and loader must plan with the same active TTS profile.  F5 is the
 # production default, while Edge remains a valid deterministic development path.
-PLANNING_CHARS_PER_MIN = chars_per_min_for_provider(settings.tts_provider)
+PLANNING_CHARS_PER_MIN = chars_per_min_for_provider(settings.tts_provider, video_type="short")
+# A Long is one continuous read and runs faster than a Short of the same
+# character count, so its budget must be planned at its own measured rate.
+LONG_PLANNING_CHARS_PER_MIN = chars_per_min_for_provider(
+    settings.tts_provider, video_type="long",
+)
+# Derived from the active TTS rate, never a fixed literal: the same character
+# count starts the answer at a different second on each provider.
+SHORT_SITUATION_MAX_CHARS = SHORT_CONTRACT.situation_char_budget(
+    chars_per_minute=PLANNING_CHARS_PER_MIN,
+)
 SHORT_TARGET_CHARS = int(PLANNING_CHARS_PER_MIN * 1.25)
 SHORT_MIN_CHARS, SHORT_MAX_CHARS = SHORT_CONTRACT.audio_runtime_bounds_sec(
     segment_count=SHORT_CONTRACT.minimum_sections
@@ -35,15 +46,17 @@ SHORT_SAFE_MIN_CHARS, SHORT_SAFE_MAX_CHARS = SHORT_CONTRACT.safe_character_bound
 LONG_MIN_CHARS, LONG_MAX_CHARS = LONG_CONTRACT.audio_runtime_bounds_sec(
     segment_count=LONG_CONTRACT.minimum_sections
 )
-LONG_MIN_CHARS = int(PLANNING_CHARS_PER_MIN * LONG_MIN_CHARS / 60)
-LONG_MAX_CHARS = int(PLANNING_CHARS_PER_MIN * LONG_MAX_CHARS / 60)
+LONG_MIN_CHARS = int(LONG_PLANNING_CHARS_PER_MIN * LONG_MIN_CHARS / 60)
+LONG_MAX_CHARS = int(LONG_PLANNING_CHARS_PER_MIN * LONG_MAX_CHARS / 60)
 LONG_SAFE_MIN_CHARS, LONG_SAFE_MAX_CHARS = LONG_CONTRACT.safe_character_bounds(
-    chars_per_minute=PLANNING_CHARS_PER_MIN, segment_count=LONG_CONTRACT.minimum_sections
+    chars_per_minute=LONG_PLANNING_CHARS_PER_MIN, segment_count=LONG_CONTRACT.minimum_sections
 )
 
 CHANNEL_EDITORIAL_BRIEF = """Kênh là "1 Cốc Café 6h", theo ngách "phát triển bản thân THẬT, không self-help": giải thích một cơ chế tâm lý, hành vi hoặc mental model trong mỗi tập bằng tình huống đời thường cụ thể. Khán giả phải hiểu vì sao hành vi xảy ra, giới hạn của cơ chế và một bước áp dụng ít rào cản; không dùng khẩu hiệu, mẹo chữa nhanh hoặc lời hứa tuyệt đối. Short là phễu cho long-form cùng cơ chế, không phải clip độc lập chỉ để lấy view."""
 
-STRATEGY_V1_CONTRACT = """Every newly generated Short MUST include a strategy object. strategy contains format_id, core_mechanism, audience_problem, angle, long_form_slug, playlist, cta_target, and hook. hook contains situation, core_answer, open_loop, answer_by_sec. Use format_id="core_answer_first_v1" unless explicit analytics feedback says another tested format won. The Short must show the situation in the first segment, put the exact core_answer in a section whose purpose is "core_answer", and set answer_by_sec to 5 or less. Every section must include purpose: situation, core_answer, evidence, application, or payoff. Do not delay the core answer with a greeting, a generic question, or an abstract definition. The core_answer should be a careful explanation, not an absolute diagnosis or a dopamine cliché."""
+SECTION_PURPOSES_LIST = ", ".join(SECTION_PURPOSES)
+
+STRATEGY_V1_CONTRACT = f"""Every newly generated Short MUST include a strategy object. strategy contains format_id, core_mechanism, audience_problem, angle, long_form_slug, playlist, cta_target, and hook. hook contains situation, core_answer, open_loop, answer_by_sec. Use format_id="core_answer_first_v1" unless explicit analytics feedback says another tested format won. The Short must show the situation in the first segment, put the exact core_answer in a section whose purpose is "core_answer", and set answer_by_sec to 5 or less. Every section must include purpose, one of exactly: {SECTION_PURPOSES_LIST}. Do not delay the core answer with a greeting, a generic question, or an abstract definition. The core_answer should be a careful explanation, not an absolute diagnosis or a dopamine cliché."""
 
 PERSONAL_FINANCE_PSYCHOLOGY_PROFILE = "personal_finance_psychology"
 _PERSONAL_FINANCE_MARKERS = ("tài chính", "tài chánh", "tiền bạc", "personal finance")
@@ -94,8 +107,8 @@ Timing estimates use the active TTS provider's calibrated Vietnamese narration r
 
 Non-negotiable editorial rules:
 1. Set root JSON field `ruleset_id` to EXACTLY `{CONTRACT_VERSION}`. Every spoken sentence must directly serve the declared title and topic. Keep one coherent causal mechanism per video. Never import an example, mechanism, scene, CTA, or conclusion from another topic. Describe it naturally in Vietnamese; do not contort normal wording to satisfy a removed phrase-scanner.
-2. For a Short without target_minutes, narration must be {SHORT_MIN_CHARS}-{SHORT_MAX_CHARS} Vietnamese characters for 1.0-1.5 minutes. Aim for {SHORT_SAFE_MIN_CHARS:,}-{SHORT_SAFE_MAX_CHARS:,} characters. Use six sections: situation ≤120 characters; core_answer 120–220; evidence 550–700; concrete example 550–700; application 500–650; payoff/CTA 200–350. Silently count the combined voiceover before responding and expand evidence, example, or application — never the hook — if under {SHORT_SAFE_MIN_CHARS:,}. For strategy-v1, the first `situation` is visual setup only, must include a concrete tension marker, and the `core_answer` must be section two. Its very first sentence must exactly equal hook.core_answer. `answer_by_sec` means when that sentence STARTS, not when the explanatory section ends. Keep the situation short enough that the answer is estimated to begin by {SHORT_ANSWER_START_TARGET_SEC:.0f}s, leaving safety before the hard 5s gate.
-3. For a Long, set target_minutes to EXACTLY {LONG_MIN_MINUTES} and write {LONG_SAFE_MIN_CHARS:,}-{LONG_SAFE_MAX_CHARS:,} Vietnamese characters, within the validator's absolute {LONG_MIN_CHARS}-{LONG_MAX_CHARS} character range for a {LONG_MIN_MINUTES}-{LONG_MAX_MINUTES} minute Long. The pipeline measures planning duration as total_characters / {PLANNING_CHARS_PER_MIN:.0f} and verifies the actual audio stays {LONG_MIN_MINUTES}-{LONG_MAX_MINUTES} minutes. Build depth from the same mechanism: causal explanation, supported evidence, exact-topic example, application, and next-episode bridge; never stretch runtime with repeated phrasing.
+2. For a Short without target_minutes, narration must be {SHORT_MIN_CHARS}-{SHORT_MAX_CHARS} Vietnamese characters for 1.0-1.5 minutes. Aim for {SHORT_SAFE_MIN_CHARS:,}-{SHORT_SAFE_MAX_CHARS:,} characters. Use six sections: situation ≤{SHORT_SITUATION_MAX_CHARS} characters; core_answer 120–220; evidence 550–700; concrete example 550–700; application 500–650; payoff/CTA 200–350. Silently count the combined voiceover before responding and expand evidence, example, or application — never the hook — if under {SHORT_SAFE_MIN_CHARS:,}. For strategy-v1, the first `situation` is visual setup only, must include a concrete tension marker, and the `core_answer` must be section two. Its very first sentence must exactly equal hook.core_answer. `answer_by_sec` means when that sentence STARTS, not when the explanatory section ends. Keep the situation short enough that the answer is estimated to begin by {SHORT_ANSWER_START_TARGET_SEC:.0f}s, leaving safety before the hard 5s gate.
+3. For a Long, set target_minutes to EXACTLY {LONG_MIN_MINUTES} and write {LONG_SAFE_MIN_CHARS:,}-{LONG_SAFE_MAX_CHARS:,} Vietnamese characters, within the validator's absolute {LONG_MIN_CHARS}-{LONG_MAX_CHARS} character range for a {LONG_MIN_MINUTES}-{LONG_MAX_MINUTES} minute Long. The pipeline measures planning duration as total_characters / {LONG_PLANNING_CHARS_PER_MIN:.0f} and verifies the actual audio stays {LONG_MIN_MINUTES}-{LONG_MAX_MINUTES} minutes. Build depth from the same mechanism: causal explanation, supported evidence, exact-topic example, application, and next-episode bridge; never stretch runtime with repeated phrasing. A Long may use richer section purposes than a Short, but it MUST still contain at least one section of each purpose the release gate requires: situation, core_answer, evidence, application, payoff. Open with a `situation` section that sets the concrete scene, and state the mechanism plainly in a `core_answer` section early — do not bury it.
 4. Open a Short with a concrete conflict, consequence, or question; do not greet or read the title. Open a Long with "Mến chào các bạn," then its title and a topic-specific hook. In the first 28 spoken words after the greeting, the hook MUST contain either a concrete question or one explicit tension marker: "nhưng", "thật ra", "đừng", "không phải", "vì sao", or "sai lầm". Each section must add information, explain why, and use visuals that match its spoken narration. For EVERY section, `time_goal` is required and MUST be a positive JSON number in minutes (never 0/null/string/timestamp/range); use values such as 0.5, 0.75, or 1.0. Section time_goal values must sum approximately to the declared target duration. Use one optional retention beat in both Shorts and Longs: choose its natural position after the viewer has received a concrete insight (for a Short, usually the final third; for a Long, usually after an explanatory or application payoff). It should briefly state the specific value the viewer has just received and invite a lightweight next action such as liking or following/subscribing. Make it value-first, topic-specific, and conversational; do not use a fixed sentence, put it in every section, or interrupt the hook/explanation. The final narration section of BOTH Shorts and Longs must include: (a) one direct, specific action the viewer can do immediately, starting that sentence with exactly "Hãy " and naming the object, action, and a concrete time or scope; (b) a natural, brief invitation to like the video; and (c) a natural, brief invitation to subscribe to the channel for future videos. These like-and-subscribe invitations are a channel-growth requirement, not optional filler, and must fit the topic and tone without sounding repetitive or manipulative. For a Short with a funnel target, the long-form bridge CTA must remain present alongside the like and subscribe invitations. A question inviting a comment may follow, but never replace the action or the like-and-subscribe invitations.
 5. Write knowledge, not slogans: explain the mechanism when it genuinely helps, use a concrete example that belongs to this exact topic, and give an immediately usable application. Keep those elements explicit in the narration, but choose natural wording; do not rely on fixed labels or template phrases. Do not drift into generic self-help, comedy, or unrelated advice. Channel topic compass: {CHANNEL_EDITORIAL_BRIEF}
 6. Verify every factual, numerical, medical, financial, legal, or research claim before including it. Omit any claim whose source cannot be named in the compliance notes; never invent statistics, studies, authors, or certainty.
@@ -336,8 +349,8 @@ def local_script_prompt(
         "Make the visual_contradiction immediately legible, name a concrete subject and one emotion, and use a headline of 4 words or fewer (never the full title).\n"
         "compliance.passed must be true and include community/copyright/accuracy/"
         "advertiser/coppa/notes."
-        "For a strategy-v1 Short, use exactly six sections and this voiceover budget: situation <=120; core_answer 120-220; evidence 550-700; concrete example 550-700; application 500-650; payoff/CTA 200-350 characters. "
-        "Make `situation` the first section with voiceover under 120 characters and a concrete tension marker (nhưng, thật ra, đừng, không phải, or vì sao); "
+        "For a strategy-v1 Short, use exactly six sections and this voiceover budget: situation <=" + str(SHORT_SITUATION_MAX_CHARS) + "; core_answer 120-220; evidence 550-700; concrete example 550-700; application 500-650; payoff/CTA 200-350 characters. "
+        "Make `situation` the first section with voiceover under " + str(SHORT_SITUATION_MAX_CHARS) + " characters and a concrete tension marker (nhưng, thật ra, đừng, không phải, or vì sao); "
         "make `core_answer` the next section and begin its voiceover with the exact strategy.hook.core_answer. "
         "This immediate answer contract is mandatory.\n"
     )

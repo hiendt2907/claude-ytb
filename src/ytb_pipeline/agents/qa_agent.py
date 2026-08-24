@@ -146,7 +146,7 @@ def _check_length(script: Any) -> list[dict[str, str]]:
     contract = contract_for(video_type)
     est_sec = estimate_duration_sec(
         sum(len(_narration_of(segment)) for segment in segments),
-        chars_per_minute=chars_per_min_for_provider(),
+        chars_per_minute=chars_per_min_for_provider(video_type=video_type),
     )
 
     if target_minutes is not None:

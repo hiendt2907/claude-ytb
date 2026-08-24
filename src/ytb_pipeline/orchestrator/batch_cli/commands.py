@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 import subprocess
 from datetime import datetime
@@ -40,7 +41,22 @@ def cmd_status(args: argparse.Namespace) -> None:
 
 
 def cmd_verify(args: argparse.Namespace) -> None:
-    result = _cli().verify_youtube_video(args.youtube_id)
+    cli = _cli()
+    identifier = args.youtube_id.strip()
+    if re.fullmatch(r"[A-Za-z0-9_-]{11}", identifier) is None:
+        # `verify` is normally used after a batch failure, when operators have
+        # the durable queue slug rather than a transient upload log/ID.
+        from ...publish.uploader import _published_url_for_slug
+
+        url = _published_url_for_slug(identifier, ledger_path=cli.LEDGER_PATH)
+        resolved_id = cli.extract_claimed_video_id(url or "")
+        if resolved_id is None:
+            raise SystemExit(
+                f"'{identifier}' không phải YouTube ID 11 ký tự và không có URL publish "
+                "đã xác minh trong ledger."
+            )
+        identifier = resolved_id
+    result = cli.verify_youtube_video(identifier)
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 
@@ -67,6 +83,16 @@ def cmd_retry(args: argparse.Namespace) -> None:
             "retry này (hoặc `ytb batch run`) để tiếp tục đúng video."
         )
         return
+    if ok and publish:
+        # A retry that really uploaded must use the same API verification +
+        # ledger/state finalization path as `batch run`, otherwise it would be
+        # selected as pending and uploaded again on the next loop.
+        ok = cli.finalize_published_item(
+            item,
+            _output,
+            ledger_path=cli.LEDGER_PATH,
+            auto_state_path=cli.AUTO_STATE_PATH,
+        )
     print("✓ Thành công" if ok else "✗ Thất bại — xem assets/batch_cli_warnings.log")
 
 

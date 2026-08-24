@@ -27,6 +27,41 @@ def _script() -> Script:
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize("provider", ["edge", "f5"])
+def test_synthesize_uses_project_slug_for_edge_and_f5_artifacts(
+    monkeypatch, tmp_path, provider
+):
+    script = Script(
+        **{**vars(_script()), "project_id": "queue-slug"}
+    )
+    monkeypatch.setattr(settings, "tts_provider", provider)
+    captured: list[str] = []
+    voiced = [
+        Segment(
+            caption="c",
+            narration="đoạn một",
+            audio_path=tmp_path / "segment.mp3",
+            duration_sec=61.0,
+        )
+    ]
+    monkeypatch.setattr(tts, "_concat_audio", lambda _parts, _out: None)
+    if provider == "edge":
+        monkeypatch.setattr(
+            tts, "_synth_all_edge_parallel",
+            lambda _script, slug, _profile: captured.append(slug) or voiced,
+        )
+    else:
+        monkeypatch.setattr(
+            tts, "_synth_all_f5",
+            lambda _script, slug, _profile: captured.append(slug) or voiced,
+        )
+
+    tts.synthesize(script)
+
+    assert captured == ["queue-slug"]
+
+
+@pytest.mark.unit
 def test_synthesize_skips_segment_with_existing_valid_audio(monkeypatch, tmp_path):
     script = _script()
     slug = tts._slugify(script.title)

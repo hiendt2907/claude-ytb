@@ -7,6 +7,7 @@ from urllib.request import Request
 import pytest
 
 from ytb_pipeline.pkg.models import Script, Segment
+from ytb_pipeline.voiceover.tts import _slugify
 
 
 def _script() -> Script:
@@ -55,6 +56,24 @@ def test_xkiro_provider_registers_and_satisfies_voice_protocol():
     assert isinstance(provider, XkiroVoiceProvider)
     assert isinstance(provider, VoiceProvider)
     assert provider.name == "xkiro"
+
+
+def test_artifact_slug_preserves_vietnamese_d_and_uses_project_id(tmp_path):
+    """New pipeline artifacts must be addressable by their project slug, not title."""
+    from ytb_pipeline.providers.voice.xkiro_provider import XkiroVoiceProvider
+
+    script = Script(
+        topic="t",
+        title="Đã đổi tiêu đề",
+        description="d",
+        project_id="slug-da-duyet",
+        segments=(Segment(caption="c", narration="Một câu."),),
+    )
+
+    assert _slugify("Đã đến") == "da-den"
+    assert XkiroVoiceProvider()._segment_path(script, script.segments[0], 0, tmp_path).name.startswith(
+        "slug-da-duyet_xkiro_"
+    )
 
 
 @pytest.mark.unit

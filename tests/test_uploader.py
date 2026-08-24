@@ -303,6 +303,7 @@ def test_post_cta_comment_posts_link_and_reminds_manual_pin(monkeypatch, capsys)
     video = _video(strategy=_strategy())
     uploader._post_cta_comment(Youtube(), "VIDEO123", video)
 
+    assert captured["part"] == "snippet"
     body = captured["body"]
     assert body["snippet"]["videoId"] == "VIDEO123"
     assert "https://youtu.be/target1" in body["snippet"]["topLevelComment"]["snippet"]["textOriginal"]
@@ -328,3 +329,25 @@ def test_post_cta_comment_failure_does_not_raise(monkeypatch, capsys):
     uploader._post_cta_comment(Youtube(), "VIDEO123", video)  # không raise
 
     assert "Không đăng được comment CTA" in capsys.readouterr().out
+
+
+def test_post_cta_comment_failure_emits_durable_warning(monkeypatch):
+    monkeypatch.setattr(
+        uploader, "_published_url_for_slug", lambda _slug, ledger_path=None: "https://youtu.be/target1"
+    )
+    warnings: list[str] = []
+    monkeypatch.setattr(uploader, "emit_warning", lambda message: warnings.append(message))
+
+    class CommentThreads:
+        def insert(self, **_kwargs):
+            raise RuntimeError("missing scope")
+
+    class Youtube:
+        def commentThreads(self):
+            return CommentThreads()
+
+    uploader._post_cta_comment(Youtube(), "VIDEO123", _video(strategy=_strategy()))
+
+    assert len(warnings) == 1
+    assert "VIDEO123" in warnings[0]
+    assert "CTA" in warnings[0]

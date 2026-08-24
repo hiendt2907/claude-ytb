@@ -50,7 +50,7 @@ class XkiroVoiceProvider:
             )
 
         output_dir.mkdir(parents=True, exist_ok=True)
-        slug = _slugify(script.title)
+        slug = self._artifact_slug(script)
         default_profile = _voice_profile(script)
         voiced: list[Segment] = []
         for index, segment in enumerate(script.segments):
@@ -112,7 +112,12 @@ class XkiroVoiceProvider:
             sort_keys=True,
         )
         digest = hashlib.sha256(cache_key.encode("utf-8")).hexdigest()[:12]
-        return output_dir / f"{_slugify(script.title)}_xkiro_{index:02d}_{digest}.mp3"
+        return output_dir / f"{self._artifact_slug(script)}_xkiro_{index:02d}_{digest}.mp3"
+
+    @staticmethod
+    def _artifact_slug(script: Script) -> str:
+        """Prefer the pipeline's stable project slug over an editable title."""
+        return _slugify(script.project_id or script.title)
 
     @staticmethod
     def _existing_duration(path: Path) -> float:

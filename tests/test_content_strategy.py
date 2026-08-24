@@ -116,13 +116,15 @@ def test_hook_timing_rejects_a_core_answer_that_starts_after_the_declared_deadli
 
 
 def test_loader_rejects_a_short_when_its_answer_cannot_start_by_deadline(write_script):
-    from conftest import make_script
+    from conftest import chars_for_minutes, make_script
     from ytb_pipeline.ideation.generator import load_script
 
     payload = make_script(
         [
-            {"purpose": "situation", "voiceover": "x" * 180},
-            {"purpose": "core_answer", "voiceover": "Đó là câu trả lời. " + "x" * 900},
+            # Keep the answer deliberately after 5s while the whole Short
+            # stays valid for every calibrated TTS provider.
+            {"purpose": "situation", "voiceover": chars_for_minutes(0.15)},
+            {"purpose": "core_answer", "voiceover": "Đó là câu trả lời. " + chars_for_minutes(1.1)},
         ]
     )
     payload["strategy"] = {

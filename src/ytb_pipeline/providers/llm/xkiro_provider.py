@@ -18,6 +18,16 @@ from ...config.settings import settings
 from ..errors import ProviderUnavailableError
 
 _REQUEST_TIMEOUT_S = 60.0
+# Slowest sustained generation rate we are willing to wait through.  A flat
+# 60s budget was sized for Short-scale requests; a Long asks for ~14k tokens
+# and every model in the cascade reported a read timeout, which the caller
+# then mistook for four separate model failures.
+_MIN_OUTPUT_TOKENS_PER_SEC = 40.0
+
+
+def request_timeout_for(*, max_tokens: int) -> float:
+    """Read budget that grows with the size of the answer being asked for."""
+    return max(_REQUEST_TIMEOUT_S, max_tokens / _MIN_OUTPUT_TOKENS_PER_SEC)
 
 
 class _ResponseFormatUnsupportedError(RuntimeError):
@@ -141,7 +151,9 @@ class XkiroLLMProvider:
             method="POST",
         )
         try:
-            with urllib_request.urlopen(request, timeout=_REQUEST_TIMEOUT_S) as response:
+            with urllib_request.urlopen(
+                request, timeout=request_timeout_for(max_tokens=max_tokens),
+            ) as response:
                 body = json.loads(response.read().decode("utf-8"))
         except urllib_error.HTTPError as exc:
             if exc.code == 400 and response_format is not None:

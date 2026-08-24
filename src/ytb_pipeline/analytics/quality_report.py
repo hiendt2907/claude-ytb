@@ -19,6 +19,9 @@ Severity = Literal["error", "warning", "info"]
 ReportStatus = Literal["pass", "needs_review", "blocked"]
 
 _SEVERITY_ORDER = {"error": 0, "warning": 1, "info": 2}
+# Subsets of `SECTION_PURPOSES`, the closed enum the generation schema enforces.
+# Keeping both sides in one vocabulary is what stops the gate from demanding a
+# purpose the model was never allowed to emit.
 _REQUIRED_PURPOSES = {
     "short": ("situation", "core_answer", "application", "payoff"),
     "long": ("situation", "core_answer", "evidence", "application", "payoff"),

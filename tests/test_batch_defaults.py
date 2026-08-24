@@ -292,10 +292,16 @@ def test_short_prompt_uses_a_safe_length_buffer_and_immediate_answer_contract():
         }
     )
 
-    from ytb_pipeline.orchestrator.ideation_prompts import SHORT_SAFE_MAX_CHARS, SHORT_SAFE_MIN_CHARS
+    from ytb_pipeline.orchestrator.ideation_prompts import (
+        SHORT_SAFE_MAX_CHARS,
+        SHORT_SAFE_MIN_CHARS,
+        SHORT_SITUATION_MAX_CHARS,
+    )
 
     assert f"{SHORT_SAFE_MIN_CHARS:,}-{SHORT_SAFE_MAX_CHARS:,}" in prompt
-    assert "120 characters" in prompt
+    # The hook budget must track the active narration rate; a fixed literal here
+    # told the model it could spend 120 characters that xKiro cannot afford.
+    assert f"{SHORT_SITUATION_MAX_CHARS} characters" in prompt
     assert "concrete tension marker" in prompt
     assert "exactly six sections" in prompt
     assert "immediate answer contract" in prompt

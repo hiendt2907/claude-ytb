@@ -6,6 +6,10 @@ from typing import Any
 
 from ..content_contract import CONTRACT_VERSION, contract_for
 
+# The one vocabulary the prompt teaches, the schema enforces, and the
+# pre-publish quality gate checks against.
+SECTION_PURPOSES = ("situation", "core_answer", "evidence", "application", "payoff")
+
 
 def script_generation_schema(video_type: str | None = None) -> dict[str, Any]:
     """Return the reusable envelope schema for both Short and Long scripts.
@@ -30,7 +34,11 @@ def script_generation_schema(video_type: str | None = None) -> dict[str, Any]:
     section = {
         "type": "object",
         "properties": {
-            "purpose": {"type": "string"},
+            # Closed vocabulary so structured output enforces what the prompt
+            # only stated in prose.  A 36-section Long invented 15 free-form
+            # purposes, and the pre-publish gate — which demands the canonical
+            # five — blocked it after render for a missing "core_answer".
+            "purpose": {"type": "string", "enum": list(SECTION_PURPOSES)},
             "time_goal": {"type": "number"},
             "voiceover": {"type": "string"},
             "narration": {"type": "string"},

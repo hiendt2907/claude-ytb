@@ -521,6 +521,10 @@ async def run_project(project: Project, checkpoint: CheckpointManager, through: 
         script = state.get("script")
         if script is None:
             script = load_script(_node_script_path(current))
+        # Keep the immutable editorial Script, but enrich this production copy
+        # with the checkpoint/queue slug so artifact names remain stable when a
+        # title is edited.
+        script = replace(script, project_id=current.project_id)
         voice = get_voice_provider()
         print("[2/4] Voiceover ▶  đang tạo audio...")
         voiceover = await voice.synthesise(script, Path("assets/audio"))

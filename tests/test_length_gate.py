@@ -56,16 +56,16 @@ def test_video_dai_mong_bi_chan(write_script):
 
 
 def test_video_dai_12_phut_du_day_thi_qua(write_script):
-    sections = _section("Mến chào các bạn, " + chars_for_minutes(12.25 / 24))
-    sections += _section(chars_for_minutes(12.25 / 24)) * 23
+    sections = _section("Mến chào các bạn, " + chars_for_minutes(12.25 / 24, video_type="long"))
+    sections += _section(chars_for_minutes(12.25 / 24, video_type="long")) * 23
     path = write_script(make_script(sections, target_minutes=12))
     script = load_script(path)
     assert estimate_minutes(script.segments) >= 12
 
 
 def test_video_dai_it_section_bi_chan_du_no_du_ky_tu(write_script):
-    sections = _section("Mến chào các bạn, " + chars_for_minutes(12.25 / 6))
-    sections += _section(chars_for_minutes(12.25 / 6)) * 5
+    sections = _section("Mến chào các bạn, " + chars_for_minutes(12.25 / 6, video_type="long"))
+    sections += _section(chars_for_minutes(12.25 / 6, video_type="long")) * 5
     path = write_script(make_script(sections, target_minutes=12))
 
     with pytest.raises(ValueError, match="ít nhất 24 section"):
@@ -73,7 +73,7 @@ def test_video_dai_it_section_bi_chan_du_no_du_ky_tu(write_script):
 
 
 def test_video_dai_vuot_15_phut_bi_chan(write_script):
-    narration = "Mến chào các bạn, " + chars_for_minutes(15.1)
+    narration = "Mến chào các bạn, " + chars_for_minutes(15.1, video_type="long")
     path = write_script(make_script(_section(narration), target_minutes=12))
 
     with pytest.raises(ValueError, match="quá dài"):

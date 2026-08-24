@@ -23,19 +23,33 @@ CONTRACT_VERSION = "2026-07-28.1"
 # 145.975 seconds, or 1,346.55 cpm; use the rounded 1,347 cpm planning rate.
 # Measured audio remains the runtime authority at the voiceover boundary.
 F5_CHARS_PER_MIN = 1347.0
-# Provisional xKiro calibration: one production Short measured on 2026-08-24
-# spoke 1,398 prepared Vietnamese characters in 81.34 seconds (≈1,031 CPM).
-# This must be replaced with the conservative p25 from a five-or-more sample
-# calibration; xKiro must not inherit F5's separately measured rate.
+# Measured xKiro calibration, 2026-08-24.  A Short spoke 1,398 prepared
+# characters in 81.34s (1,031 cpm); a Long spoke 13,282 in 718.6s (1,109 cpm).
+# The 7.6% gap is systematic, not noise: a Long is one continuous read while a
+# Short spends proportionally more time in inter-phrase silence.  Planning a
+# Long at the Short rate produced 718.6s against a 730s floor and failed at the
+# voiceover boundary, so the two formats keep separate rates.
+#
+# These are central estimates, deliberately NOT a conservative low percentile.
+# A low rate over-estimates runtime, so the generator writes too few characters
+# and the audio undershoots the floor — which is exactly the failure above.
+# Neither direction is safe; accuracy plus proportional margin is what protects
+# the contract.  Both rates are n=1 and want a five-sample recalibration.
 XKIRO_CHARS_PER_MIN = 1030.0
+XKIRO_LONG_CHARS_PER_MIN = 1109.0
 # The current knowledge profile requests Edge at +96%.  An isolated Long E2E
 # run measured 4,316 prepared Vietnamese characters in 161.4 seconds, or
 # 1,604 CPM rounded.  Planning must follow the active profile, while measured
 # audio remains the final runtime authority.
 EDGE_CHARS_PER_MIN = 1_604.0
 TRANSITION_OVERLAP_SEC = 0.4
-SAFE_LOWER_RUNTIME_MARGIN_SEC = 10.0
-SAFE_UPPER_RUNTIME_MARGIN_SEC = 15.0
+# Proportional, not a fixed second-count.  A flat 10s was 16% of the Short floor
+# but only 1.4% of the Long floor, so Long planning had effectively no buffer
+# against narration-rate error.  A fraction keeps the same protection at both
+# scales.  5%/6% covers the residual rate uncertainty while leaving a usable
+# writing window inside the narrower Long contract.
+SAFE_LOWER_RUNTIME_MARGIN_RATIO = 0.05
+SAFE_UPPER_RUNTIME_MARGIN_RATIO = 0.06
 
 
 @dataclass(frozen=True)
@@ -45,7 +59,23 @@ class ContentContract:
     minimum_sections: int
     answer_start_target_sec: float | None = None
     answer_start_deadline_sec: float | None = None
-    situation_max_chars: int | None = None
+
+    def situation_char_budget(self, *, chars_per_minute: float) -> int:
+        """Longest opening hook that still starts the answer by the target.
+
+        This replaces a static 120-character literal that had been calibrated
+        against Edge (1,604 cpm).  At the slower xKiro rate the same 120
+        characters take 6.99s, so a model obeying the prompt was still rejected
+        by `_validate_short_strategy_structure` at the hard 5s gate.  Deriving
+        the budget from the active rate keeps the prompt and the gate in sync
+        for every provider, and aiming at the target (not the deadline) keeps
+        headroom for provider variation.
+        """
+        if chars_per_minute <= 0:
+            raise ValueError("chars_per_minute phải > 0.")
+        if self.answer_start_target_sec is None:
+            raise ValueError(f"Contract '{self.video_type}' không có answer_start_target_sec.")
+        return int(chars_per_minute * self.answer_start_target_sec / 60)
 
     def transition_loss_sec(self, segment_count: int) -> float:
         """Known overlap removed by the renderer for this number of sections."""
@@ -67,8 +97,8 @@ class ContentContract:
         # The prompt target must leave enough runtime headroom for natural
         # provider variation.  The values are deliberately named so a future
         # calibration can adjust them without reintroducing magic numbers.
-        safe_lower = min(upper, lower + SAFE_LOWER_RUNTIME_MARGIN_SEC)
-        safe_upper = max(safe_lower, upper - SAFE_UPPER_RUNTIME_MARGIN_SEC)
+        safe_lower = min(upper, lower * (1 + SAFE_LOWER_RUNTIME_MARGIN_RATIO))
+        safe_upper = max(safe_lower, upper * (1 - SAFE_UPPER_RUNTIME_MARGIN_RATIO))
         return int(chars_per_minute * safe_lower / 60), int(chars_per_minute * safe_upper / 60)
 
     def validate_audio_runtime(self, duration_sec: float, *, segment_count: int) -> None:
@@ -103,7 +133,6 @@ _CONTRACTS = {
         minimum_sections=6,
         answer_start_target_sec=4.0,
         answer_start_deadline_sec=5.0,
-        situation_max_chars=120,
     ),
     "long": ContentContract(
         video_type="long",
@@ -120,10 +149,17 @@ def contract_for(video_type: str) -> ContentContract:
         raise ValueError(f"video_type không hợp lệ cho content contract: {video_type!r}") from exc
 
 
-def chars_per_min_for_provider(provider: str) -> float:
-    """Calibrated planning rate; measured audio remains the runtime authority."""
+def chars_per_min_for_provider(provider: str, *, video_type: str | None = None) -> float:
+    """Calibrated planning rate; measured audio remains the runtime authority.
+
+    `video_type` selects a format-specific rate where one has been measured.  A
+    Long is a single continuous read, so it runs faster than a Short of the same
+    character count; planning both at one rate is what broke the Long floor.
+    """
     normalized = provider.strip().lower()
     if normalized == "xkiro":
+        if (video_type or "").strip().lower() == "long":
+            return XKIRO_LONG_CHARS_PER_MIN
         return XKIRO_CHARS_PER_MIN
     return F5_CHARS_PER_MIN if normalized == "f5" else EDGE_CHARS_PER_MIN
 

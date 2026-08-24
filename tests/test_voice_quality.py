@@ -61,8 +61,12 @@ def test_cache_key_changes_when_audio_or_script_changes(tmp_path):
 
 
 def test_gate_reports_duration_deviation_and_stt_unavailable(monkeypatch, tmp_path):
+    # The gate now measures against the contract's own audio window, the same
+    # one the voiceover node enforces, instead of `target_minutes * 60`.  A
+    # single-segment Short accepts 60-90s, so the deviation has to be real:
+    # 30s is half the contract floor.
     voiceover = _voiceover(tmp_path, target_minutes=2.0)
-    monkeypatch.setattr(quality, "probe_audio_duration", lambda _path: 60.0)
+    monkeypatch.setattr(quality, "probe_audio_duration", lambda _path: 30.0)
     monkeypatch.setattr(quality, "analyze_local_audio", lambda _path, _duration: {})
 
     result = quality.run_audio_quality_gate(
@@ -360,3 +364,52 @@ def test_faster_whisper_adapter_runtime_changes_cache_context(tmp_path):
     )
 
     assert cpu_int8.cache_context() != cpu_float32.cache_context()
+
+
+def test_adjacent_repeat_ignores_a_term_defined_across_a_sentence_boundary():
+    """Naming a term then defining it is exposition, not a TTS stutter.
+
+    Production 2026-08-24: "...thường được gọi là chi phí chìm. Chi phí chìm là
+    tiền, thời gian..." blocked a rendered Long, because the detector strips
+    punctuation and so could not tell a sentence boundary from a duplicated
+    audio segment — the artifact it exists to catch.
+    """
+    definition = "Cơ chế đó thường được gọi là chi phí chìm. Chi phí chìm là tiền và thời gian đã bỏ ra."
+    stutter = "Cơ chế đó là chi phí chìm chi phí chìm và bạn không lấy lại được."
+
+    assert quality._adjacent_repeated_phrase(definition) is None
+    assert quality._adjacent_repeated_phrase(stutter) == "chi phí chìm"
+
+
+def test_repeat_gate_only_flags_a_repetition_the_script_did_not_author(monkeypatch, tmp_path):
+    """The rule exists to catch a duplicated TTS segment, not authored repetition.
+
+    Production 2026-08-24: the script names a term then defines it — "...gọi là
+    chi phí chìm. Chi phí chìm là tiền..." — so the audio says it twice on
+    purpose.  Judging the transcript alone made Whisper's punctuation the
+    arbiter of a TTS defect, and blocked a correct 14-minute Long twice.
+    """
+    narration = "Cơ chế đó thường được gọi là chi phí chìm. Chi phí chìm là tiền đã bỏ ra."
+    voiceover = _voiceover(tmp_path, narration=narration)
+    monkeypatch.setattr(quality, "probe_audio_duration", lambda _path: 75.0)
+    monkeypatch.setattr(quality, "analyze_local_audio", lambda _path, _duration: {"mean_volume_db": -19.0})
+
+    # Whisper drops the sentence stop, so the transcript looks like a stutter.
+    authored = quality.run_audio_quality_gate(
+        voiceover,
+        stt_adapter=_TranscriptStt(
+            "Cơ chế đó thường được gọi là chi phí chìm chi phí chìm là tiền đã bỏ ra."
+        ),
+        cache_dir=tmp_path / "authored",
+    )
+    # The same phrase, but the script never said it twice: a real TTS duplicate.
+    invented = quality.run_audio_quality_gate(
+        _voiceover(tmp_path, narration="Cơ chế đó thường được gọi là chi phí chìm."),
+        stt_adapter=_TranscriptStt(
+            "Cơ chế đó thường được gọi là chi phí chìm chi phí chìm."
+        ),
+        cache_dir=tmp_path / "invented",
+    )
+
+    assert "TRANSCRIPT_REPEAT" not in [i.code for i in authored.issues]
+    assert "TRANSCRIPT_REPEAT" in [i.code for i in invented.issues]

@@ -11,7 +11,13 @@ from ytb_pipeline.content_contract import CONTRACT_VERSION
 
 
 def _payload() -> dict:
-    narration = "Một bước nhỏ và rõ ràng giúp bạn bắt đầu công việc đang bị trì hoãn. " * 4
+    from ytb_pipeline.ideation.generator import chars_per_min_for_provider
+
+    # A runnable fixture must use the selected provider's timing contract,
+    # otherwise an Edge/F5 calibration makes this unrelated local-only test red.
+    per_section = int(chars_per_min_for_provider() * 1.2 / 6)
+    phrase = "Một bước nhỏ và rõ ràng giúp bạn bắt đầu công việc đang bị trì hoãn. "
+    narration = (phrase * (-(-per_section // len(phrase))))[:per_section]
     sections = [
         {
             "purpose": "situation" if index == 0 else ("core_answer" if index == 1 else "application"),

@@ -31,6 +31,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from ..config.settings import settings
+from ..orchestrator.queue_manager import emit_warning
 from ..pkg.models import PublishResult, RenderedVideo
 from ..platform.metadata import MetadataAdapter
 from .validation import validate_monetization_ready
@@ -286,6 +287,10 @@ def _post_cta_comment(youtube, youtube_id: str, video: RenderedVideo) -> None:  
         print("  [Action Required] Đã tự động đăng comment. Sếp nhớ mở Studio ghim tay nhé!")
     except Exception as exc:  # noqa: BLE001
         print(f"  ⚠ Không đăng được comment CTA (không chặn publish): {exc}")
+        emit_warning(
+            f"CTA comment lỗi cho video https://youtu.be/{youtube_id} (target={target_slug}): {exc}. "
+            "Publish vẫn thành công; cần kiểm tra scope/quota và đăng lại comment nếu cần."
+        )
 
 
 def _dry_run(video: RenderedVideo) -> PublishResult:

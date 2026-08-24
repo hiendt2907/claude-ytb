@@ -6,7 +6,16 @@ tự sinh đa dạng. Short vào hook thẳng, cấm mở bằng lời chào.
 
 import pytest
 
-from ytb_pipeline.ideation.generator import CHARS_PER_MIN, GREETING_PREFIX, load_script
+from ytb_pipeline.ideation.generator import (
+    CHARS_PER_MIN,
+    GREETING_PREFIX,
+    chars_per_min_for_provider,
+    load_script,
+)
+
+# A Long reads faster than a Short, so a Long fixture must be sized at the
+# Long rate or the length gate rejects it for being too thin.
+LONG_CHARS_PER_MIN = chars_per_min_for_provider(video_type="long")
 
 from conftest import make_script
 
@@ -14,7 +23,7 @@ from conftest import make_script
 def _long_body(text: str) -> str:
     """Nối thêm cho đủ độ dày ~12 phút để không vướng cổng độ dài."""
     filler = " Chi tiết cụ thể có cơ chế và ví dụ thực tế. "
-    needed = int(CHARS_PER_MIN * 12.1) - len(text)
+    needed = int(LONG_CHARS_PER_MIN * 12.1) - len(text)
     return text + (filler * (-(-needed // len(filler))))[:needed]
 
 

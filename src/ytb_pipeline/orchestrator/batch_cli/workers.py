@@ -71,11 +71,11 @@ def select_pending_batch(queue: list, blocked_slugs: set, *, worker_count: int) 
     return selected
 
 
-def _claim_next_staged():
+def _claim_next_staged(*, batch_key: str | None = None):
     """Reserve one pending video until its render/upload consumer finalizes it."""
     cli = _cli()
     with cli._queue_claim_lock:
-        queue = cli.load_queue()
+        queue = cli.load_queue(batch_key=batch_key)
         done = cli.done_slugs()
         failed = cli.failed_slugs()
         excluded = done | failed | cli._claimed_slugs
@@ -126,7 +126,9 @@ def _run_f5_voiceover_lane(item, lane: int, socket_path: Path):
     return item, *result
 
 
-def _run_render_publish_lane(item, lane: int, *, publish: bool) -> None:
+def _run_render_publish_lane(
+    item, lane: int, *, publish: bool, batch_key: str | None = None
+) -> None:
     """Consume one completed voiceover while its paired F5 lane moves on."""
     cli = _cli()
     worker_id = f"render-{lane}"
@@ -148,12 +150,14 @@ def _run_render_publish_lane(item, lane: int, *, publish: bool) -> None:
         if not ok:
             cli._record_stage_failure(item, output, worker_id=worker_id)
             return
-        cli.finalize_published_item(item, output, worker_id=worker_id)
+        cli.finalize_published_item(
+            item, output, worker_id=worker_id, batch_key=batch_key
+        )
     finally:
         cli._release_staged_claim(item)
 
 
-def cmd_run_f5_staged(args: argparse.Namespace) -> None:
+def cmd_run_f5_staged(args: argparse.Namespace, *, batch_key: str | None = None) -> None:
     """Run two persistent F5 producers and one render/upload consumer per lane.
 
     A lane is intentionally not a full pipeline worker.  When its voiceover
@@ -173,7 +177,7 @@ def cmd_run_f5_staged(args: argparse.Namespace) -> None:
     def schedule_voice(lane: int) -> bool:
         if cli._stop_requested:
             return False
-        item = cli._claim_next_staged()
+        item = cli._claim_next_staged(batch_key=batch_key)
         if item is None:
             return False
         future = voice_executor.submit(cli._run_f5_voiceover_lane, item, lane, pool.socket_for(lane))
@@ -204,7 +208,13 @@ def cmd_run_f5_staged(args: argparse.Namespace) -> None:
                         if cli._stop_requested:
                             cli._release_staged_claim(item)
                         elif ok:
-                            render = render_executors[lane].submit(cli._run_render_publish_lane, item, lane, publish=True)
+                            render = render_executors[lane].submit(
+                                cli._run_render_publish_lane,
+                                item,
+                                lane,
+                                publish=True,
+                                batch_key=batch_key,
+                            )
                             render_futures[render] = lane
                         else:
                             cli._record_stage_failure(item, output, worker_id=f"tts-{lane}")
@@ -244,9 +254,9 @@ def cmd_run(args: argparse.Namespace) -> None:
     worker_count = min(cli.MAX_BATCH_WORKERS, max(1, getattr(args, "workers", 1)))
     if (
         args.loop and publish and worker_count == 2 and cli.settings.tts_provider == "f5"
-        and batch_key is None and bool(getattr(args, "f5_staged", False))
+        and bool(getattr(args, "f5_staged", False))
     ):
-        cli.cmd_run_f5_staged(args)
+        cli.cmd_run_f5_staged(args, batch_key=batch_key)
         return
     # Render-only runs are smoke tests, not terminal queue completion.  Keep a
     # per-invocation set so --loop reaches every item once without marking any

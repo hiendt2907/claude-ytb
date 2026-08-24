@@ -94,7 +94,11 @@ def _validate_runtime(script: Any, failures: list[PreflightFailure]) -> None:
         return
     estimated = estimate_duration_sec(
         sum(len(segment.narration) for segment in script.segments),
-        chars_per_minute=chars_per_min_for_provider(settings.tts_provider),
+        # Same format-specific rate the prompt planned with, so admission and
+        # generation cannot disagree about how long a script will speak.
+        chars_per_minute=chars_per_min_for_provider(
+            settings.tts_provider, video_type=script.video_type,
+        ),
     )
     try:
         contract_for(script.video_type).validate_audio_runtime(estimated, segment_count=len(script.segments))

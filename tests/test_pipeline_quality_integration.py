@@ -114,7 +114,7 @@ def _voiceover(tmp_path: Path) -> Voiceover:
     return Voiceover(**vars(replace(_script(), segments=segments)), audio_path=audio, duration_sec=8.0)
 
 
-def _prepare_run(monkeypatch, tmp_path, audio_result):
+def _prepare_run(monkeypatch, tmp_path, audio_result, voice_scripts=None):
     script = _script()
     voiceover = _voiceover(tmp_path)
     video_path = tmp_path / "video.mp4"
@@ -124,6 +124,8 @@ def _prepare_run(monkeypatch, tmp_path, audio_result):
 
     class VoiceProvider:
         async def synthesise(self, _script, _output_dir):
+            if voice_scripts is not None:
+                voice_scripts.append(_script)
             return voiceover
 
     class RenderProvider:
@@ -169,6 +171,18 @@ def test_report_mode_runs_audio_gate_and_writes_local_post_render_reports(monkey
     assert Path(output["quality_report_markdown"]).exists()
     assert Path(output["quality_repair_brief"]).exists()
     assert result.nodes["audio_quality"].output_data["cache_key"] == "audio-key"
+
+
+def test_voice_provider_receives_project_id_as_artifact_slug(monkeypatch, tmp_path):
+    audio_result = SimpleNamespace(
+        passed=True, issues=(), cache_key="audio-key", cached=False, metrics={}, repair_payload={},
+    )
+    received_scripts = []
+    project, checkpoint, _ = _prepare_run(monkeypatch, tmp_path, audio_result, received_scripts)
+
+    asyncio.run(pipeline.run_project(project, checkpoint, through="voiceover"))
+
+    assert received_scripts[0].project_id == "nao-ne-viec-kho"
 
 
 @pytest.mark.parametrize("mode", ["report", "strict"])

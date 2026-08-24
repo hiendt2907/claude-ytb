@@ -254,13 +254,16 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
 
     p_verify = _sub(
         sub, "verify",
-        help="Xác minh 1 youtube_id có thật qua API (không tin stdout)",
+        help="Xác minh YouTube ID hoặc slug đã publish qua API (không tin stdout)",
         description="Gọi YouTube Data API videos().list() để lấy trạng thái THẬT của 1 "
         "video (title, privacyStatus, publishAt). Dùng khi nghi ngờ pipeline tự báo sai ID "
         "trong stdout (đã từng gặp thật trong batch này).",
-        epilog="Ví dụ:\n  ytb batch verify b917RPp2o7o\n",
+        epilog="Ví dụ:\n  ytb batch verify b917RPp2o7o\n  ytb batch verify slug-da-publish\n",
     )
-    p_verify.add_argument("youtube_id", help="ID video trên YouTube (phần sau youtu.be/)")
+    p_verify.add_argument(
+        "youtube_id",
+        help="YouTube ID 11 ký tự, hoặc slug đã có URL done|ok trong ledger",
+    )
     p_verify.set_defaults(func=cmd_funcs["verify"])
 
     p_retry = _sub(
