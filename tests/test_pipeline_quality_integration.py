@@ -469,3 +469,60 @@ def test_pipeline_passes_explicit_local_stt_runtime_to_the_audio_gate(monkeypatc
         captured["adapter"].compute_type,
         captured["adapter"].cpu_threads,
     ) == ("cpu", "int8", 4)
+
+
+def test_a_gate_fix_unblocks_a_stale_failed_verdict_on_resume_without_batch_reset(
+    monkeypatch, tmp_path,
+):
+    """A fixed detector must self-heal a stale FAILED verdict via a normal resume.
+
+    Production 2026-08-24: a Long was blocked by a since-fixed `TRANSCRIPT_REPEAT`
+    false positive. Under live time pressure this looked like a permanently
+    frozen checkpoint verdict needing `ytb batch reset` (which discards the whole
+    project, not just the stale audio_quality snapshot). This test proves that
+    reading was wrong: `load_or_create_project` -> `_reset_stale_nodes` already
+    puts a DONE `audio_quality` back to PENDING whenever `render` has not
+    completed, so a plain `python -m ytb_pipeline` retry re-evaluates the gate
+    with current code — no `ytb batch reset` required. The project_id must equal
+    the script's filename stem, exactly as every real caller constructs it
+    (`ideation_state.py`, `python -m ytb_pipeline scripts/<slug>.json`); a
+    mismatched id here silently takes `load_or_create_project`'s "no existing
+    checkpoint" branch and proves nothing about resume.
+    """
+    failing = SimpleNamespace(
+        passed=False,
+        issues=(SimpleNamespace(code="TRANSCRIPT_REPEAT", message="Transcript lặp liền câu/ý: 'x'."),),
+        cache_key="audio-key-old-logic", cached=False, metrics={}, repair_payload={},
+    )
+    project, checkpoint, rendered_calls = _prepare_run(monkeypatch, tmp_path, failing)
+    slug = Path(project.script_path).stem
+    project = replace(
+        project,
+        project_id=slug,
+        metadata={
+            "script_sha256": pipeline._script_sha256(Path(project.script_path)),
+            "ruleset_id": pipeline._script_ruleset_id(Path(project.script_path)),
+        },
+    )
+    monkeypatch.setattr(pipeline.settings, "quality_gate_mode", "report")
+
+    with pytest.raises(Exception, match="Audio quality gate chặn render"):
+        asyncio.run(pipeline.run_project(project, checkpoint, through="render"))
+    assert rendered_calls == []
+    assert checkpoint.load(slug).nodes["render"].status == NodeStatus.FAILED
+
+    # The detector is fixed; nothing about the script or audio changed.
+    fixed = SimpleNamespace(
+        passed=True, issues=(), cache_key="audio-key-new-logic", cached=False, metrics={}, repair_payload={},
+    )
+    monkeypatch.setattr(pipeline, "run_audio_quality_gate",
+        lambda voice, *, cache_dir, stt_adapter=None, require_transcript=False: fixed)
+
+    resumed = pipeline.load_or_create_project(project.script_path, checkpoint)
+    assert resumed.nodes["audio_quality"].status == NodeStatus.PENDING
+    assert resumed.nodes["voiceover"].status == NodeStatus.DONE  # TTS not repaid
+
+    final = asyncio.run(pipeline.run_project(resumed, checkpoint, through="render"))
+
+    assert rendered_calls != []
+    assert final.nodes["audio_quality"].output_data["quality_status"] == "pass"
