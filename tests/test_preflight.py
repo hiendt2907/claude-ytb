@@ -318,3 +318,54 @@ def test_preflight_rejects_a_script_missing_a_release_gate_purpose(tmp_path):
     result = preflight_script(path)
 
     assert "script.required_purpose.payoff" in {failure.code for failure in result.failures}
+
+
+def test_preflight_accepts_scene_characters_instead_of_visual_asset_when_auto_generating(tmp_path):
+    """profiles with visual_generation enabled declare WHO is on screen, not a
+    filename; preflight must not resurrect the old fixed-asset requirement
+    (script_contract, run earlier in the same preflight pass, already
+    validates scene_characters)."""
+    from ytb_pipeline.content_profiles import load_content_profile
+    from ytb_pipeline.orchestrator.preflight import preflight_script
+
+    profile = load_content_profile("ban-so-6")
+    assert profile.visual_generation is not None and profile.visual_generation.enabled
+
+    payload = {
+        "ruleset_id": "2026-07-28.1",
+        "profile_id": "ban-so-6",
+        "profile_version": profile.version,
+        "slug": "auto-visual-preflight",
+        "topic": "t",
+        "title": "t",
+        "description": "d",
+        "tags": ["a"],
+        "video_type": "short",
+        "voice_profile": "knowledge",
+        "thumbnail_brief": {
+            "visual_contradiction": "a", "subject": "b", "emotion": "c", "headline": "d",
+        },
+        "sections": [
+            {
+                "purpose": purpose, "time_goal": 0.2,
+                "voiceover": f"Đoạn {index} đủ dài để tính là một section thật sự trong kịch bản này.",
+                "visual_intent": "Minh sitting at a table", "caption": "c",
+                "speaker_id": "minh", "scene_characters": ["minh"],
+                "hook": None, "transition": None, "payoff": None, "emphasis": None,
+            }
+            for index, purpose in enumerate(("situation", "core_answer", "application", "payoff"))
+        ],
+        "compliance": {
+            "passed": True, "community": "PASS", "copyright": "PASS",
+            "accuracy": "PASS", "advertiser": "PASS", "coppa": "PASS", "notes": "n",
+        },
+        "continuity": {
+            "episode_summary": "x", "character_changes": {}, "threads_opened": [], "threads_closed": [],
+        },
+    }
+    path = tmp_path / "auto-visual-preflight.json"
+    path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+    result = preflight_script(path)
+
+    assert "asset.profile_missing" not in {failure.code for failure in result.failures}

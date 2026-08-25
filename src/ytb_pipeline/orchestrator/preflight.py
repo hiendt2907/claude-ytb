@@ -210,10 +210,23 @@ def _validate_local_assets(
     payload: dict[str, Any], failures: list[PreflightFailure], profile: ContentProfile
 ) -> None:
     if profile.narrative_mode == "character_story":
+        auto_visuals = profile.visual_generation is not None and profile.visual_generation.enabled
         for index, section in enumerate(payload.get("sections", ())):
             if not isinstance(section, dict):
                 continue
             relative = str(section.get("visual_asset") or "").strip()
+            if not relative:
+                # Auto-generate profile: scene_characters thay visual_asset,
+                # đã được _validate_schema (script_contract) kiểm ở bước
+                # trước trong preflight_script — không kiểm trùng ở đây.
+                if auto_visuals:
+                    continue
+                failures.append(PreflightFailure(
+                    "asset.profile_missing",
+                    f"Không tìm thấy visual asset của profile cho section {index + 1}: '{relative}'.",
+                    f"sections[{index}].visual_asset",
+                ))
+                continue
             try:
                 profile.visual_asset_path(relative)
             except (OSError, ValueError):
