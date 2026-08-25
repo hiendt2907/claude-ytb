@@ -172,3 +172,83 @@ def test_retry_rejects_a_failed_preflight_before_running_pipeline(monkeypatch):
     monkeypatch.setattr(cli, "run_with_retry", lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("must not run")))
 
     cli.cmd_retry(SimpleNamespace(slug="bad", publish=True))
+
+
+def _long_payload() -> dict:
+    """A Long fixture at the Long narration rate, mirroring `_payload` for Short."""
+    from ytb_pipeline.content_contract import contract_for
+    from ytb_pipeline.ideation.generator import chars_per_min_for_provider
+
+    contract = contract_for("long")
+    rate = chars_per_min_for_provider(video_type="long")
+    minimum, _maximum = contract.safe_character_bounds(
+        chars_per_minute=rate, segment_count=contract.minimum_sections,
+    )
+    per_section = -(-int(minimum * 1.02) // contract.minimum_sections)
+    phrase = "Một cơ chế quen thuộc khiến bạn giữ lại lựa chọn đã không còn phù hợp. "
+    narration = (phrase * (-(-per_section // len(phrase))))[:per_section]
+    payload = _payload()
+    payload.update({
+        "video_type": "long",
+        "target_minutes": int(contract.viewer_runtime_bounds_sec[0] / 60),
+        "sections": [
+            {
+                "purpose": "situation" if i == 0 else ("core_answer" if i == 1 else "evidence"),
+                "voiceover": narration,
+                "visual_intent": "Người ngồi trước bàn làm việc.",
+                "pexels_query": "office task list",
+                "time_goal": 0.5,
+            }
+            for i in range(contract.minimum_sections)
+        ],
+    })
+    payload.pop("strategy", None)
+    return payload
+
+
+def test_preflight_admits_a_mixed_long_and_short_batch_under_one_global_setting(
+    tmp_path, monkeypatch,
+):
+    """A funnel batch holds one Long plus its Shorts, so one ambient value cannot gate both.
+
+    `build_env` already hands each queue item its own `ORIENTATION`
+    (`pipeline_runner.py`), so the render is correct per video. Judging admission
+    against the single ambient `settings.orientation` instead rejected whichever
+    format did not match it, which is why `ytb batch run --loop` could never be
+    used on a real Long+Short batch and every cluster had to be run by hand.
+    """
+    from ytb_pipeline.config.settings import settings
+    from ytb_pipeline.orchestrator.preflight import preflight_script
+
+    asset = tmp_path / "office.mp4"
+    asset.write_bytes(b"local-video")
+    catalog = tmp_path / "catalog.json"
+    _write_catalog(catalog, asset)
+    monkeypatch.setattr(settings, "asset_catalog_path", catalog)
+
+    short_path = tmp_path / "short.json"
+    short_path.write_text(json.dumps(_payload()), encoding="utf-8")
+    long_path = tmp_path / "long.json"
+    long_path.write_text(json.dumps(_long_payload()), encoding="utf-8")
+
+    for ambient in ("portrait", "landscape"):
+        monkeypatch.setattr(settings, "orientation", ambient)
+        for path in (short_path, long_path):
+            result = preflight_script(path)
+            codes = [failure.code for failure in result.failures]
+            assert "orientation.matches_video_type" not in codes, (
+                f"ambient={ambient} rejected {path.name}: {codes}"
+            )
+
+
+def test_orientation_check_still_flags_a_format_it_cannot_map():
+    """Unit-level: the schema rejects an unknown video_type first, so this guard
+    is only reachable if that upstream contract ever loosens. Keep it honest
+    rather than asserting through a path `validate_script_payload` already closes.
+    """
+    from ytb_pipeline.orchestrator.preflight import _validate_orientation
+
+    failures: list = []
+    _validate_orientation(SimpleNamespace(video_type="vertical-ish"), failures)
+
+    assert [f.code for f in failures] == ["orientation.matches_video_type"]

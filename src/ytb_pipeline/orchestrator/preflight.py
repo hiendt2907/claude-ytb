@@ -15,6 +15,8 @@ from ..ideation.script_contract import validate_script_payload
 from ..providers.registry import get_voice_provider
 from ..render.asset_catalog import AssetCatalog
 
+# Orientation is a property of the video format, not of ambient config.
+_ORIENTATION_BY_VIDEO_TYPE = {"short": "portrait", "long": "landscape"}
 MIN_FREE_DISK_BYTES = 10 * 1024**3
 
 
@@ -107,13 +109,21 @@ def _validate_runtime(script: Any, failures: list[PreflightFailure]) -> None:
 
 
 def _validate_orientation(script: Any, failures: list[PreflightFailure]) -> None:
+    """Check the script declares a format whose orientation is derivable.
+
+    Deliberately NOT compared against `settings.orientation`: a funnel batch holds
+    a landscape Long and its portrait Shorts together, and `build_env` already
+    gives each queue item its own `ORIENTATION` before spawning the pipeline.
+    Gating admission on the single ambient value rejected whichever format did
+    not match it, so a real mixed batch could never run under `--loop`.
+    """
     if script is None:
         return
-    expected = {"short": "portrait", "long": "landscape"}.get(script.video_type)
-    if expected is None or settings.orientation != expected:
+    if script.video_type not in _ORIENTATION_BY_VIDEO_TYPE:
         failures.append(PreflightFailure(
             "orientation.matches_video_type",
-            f"{script.video_type} cần orientation={expected}; cấu hình hiện tại là {settings.orientation}.",
+            f"video_type '{script.video_type}' không xác định được orientation; "
+            f"phải là một trong {sorted(_ORIENTATION_BY_VIDEO_TYPE)}.",
         ))
 
 
