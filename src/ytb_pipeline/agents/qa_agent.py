@@ -232,7 +232,66 @@ def _script_video_type(script: Any) -> str:
     return "long" if _get(script, "target_minutes") is not None else "short"
 
 
+# Neo phải là một khoảnh khắc CỤ THỂ, không phải một buổi chung chung: "sáu
+# giờ bảy" khác "những buổi sáng". Vì thế mốc thời gian chỉ tính khi đi kèm một
+# con số. Không dùng để "đếm từ khoá hay" — chỉ để phân biệt một cảnh có neo
+# với một câu trừu tượng.
+_STORY_MOMENT_MARKERS = (
+    "giờ", "phút", "rưỡi", "sáng", "trưa", "chiều", "tối", "đêm", "hôm",
+)
+_STORY_NUMBER_WORDS = frozenset({
+    "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín", "mười",
+    "mươi", "rưỡi", "kém",
+})
+# Dấu hiệu có thứ để mất: nghĩa vụ chưa xong, thời hạn, hoặc một sự dở dang.
+_STORY_STAKE_MARKERS = (
+    "phải", "chưa", "vẫn", "còn", "sắp", "kịp", "hạn", "trễ", "muộn",
+    "trước khi", "nhưng", "quên", "lỡ",
+)
+
+
+def _story_words(text: str) -> list[str]:
+    return re.findall(r"[^\W_]+", text.lower(), flags=re.UNICODE)
+
+
+def _check_story_hook(script: Any, profile: Any) -> list[dict[str, str]]:
+    """Cổng mở đầu cho profile kể chuyện.
+
+    Một cảnh mở mạnh không cần nghịch lý — nó cần hai thứ: NEO (người xem biết
+    mình đang ở đâu, lúc nào, với ai) và THỨ ĐỂ MẤT (một nghĩa vụ chưa xong,
+    một thời hạn). Luật cũ đòi từ khoá nghịch lý nên loại thẳng mọi mở đầu bằng
+    cảnh, dù đó chính là điều làm series khác với video khuyên bảo.
+    """
+    segments = _segments_of(script)
+    if not segments:
+        return []
+    first = _narration_of(segments[0]).strip()
+    words = _story_words(first)
+    cast = {name for name in profile.voice_cast if name != "narrator"}
+    word_set = set(words)
+    has_clock = any(marker in word_set for marker in _STORY_MOMENT_MARKERS) and (
+        bool(_STORY_NUMBER_WORDS & word_set) or any(character.isdigit() for character in first)
+    )
+    has_anchor = bool(cast & word_set) or has_clock
+    lowered = first.lower()
+    has_stake = any(marker in words for marker in _STORY_STAKE_MARKERS) or any(
+        marker in lowered for marker in _STORY_STAKE_MARKERS if " " in marker
+    )
+    if len(words) >= 8 and has_anchor and has_stake:
+        return []
+    return [_repair(
+        "hook",
+        "Cảnh mở đầu chưa neo được khoảnh khắc hoặc chưa có gì để mất.",
+        "Mở bằng một mốc cụ thể (giờ, nơi chốn, tên nhân vật) rồi nêu ngay việc "
+        "đang dở hoặc thời hạn đang đến, ví dụ: 'Sáu giờ bảy, Minh mở laptop. "
+        "Tám rưỡi phải gửi bản đề xuất.'",
+    )]
+
+
 def _check_hook_strength(script: Any) -> list[dict[str, str]]:
+    profile = _content_profile(script)
+    if profile is not None and profile.narrative_mode == "character_story":
+        return _check_story_hook(script, profile)
     segments = _segments_of(script)
     if not segments:
         return []
