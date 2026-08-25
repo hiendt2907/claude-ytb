@@ -615,14 +615,22 @@ async def validate_or_repair_script(
             if log_path:
                 append_local_start_log(log_path, "LONG_EXTENSION_RESPONSE", extension_text)
             extension_profile = _explicit_profile(current)
-            current = append_long_extension(
-                current,
-                json_from_llm(extension_text),
-                max_sections=(
-                    extension_profile.format_for("long").max_sections
-                    if extension_profile is not None else None
-                ),
-            )
+            # Một lần vá hỏng là một lần vá THẤT BẠI, không phải lý do làm sập
+            # cả lệnh batch: JSON lỗi từ bước extend từng thoát ra ngoài dưới
+            # dạng traceback và giết luôn tiến trình, mất cả candidate đang có.
+            try:
+                current = append_long_extension(
+                    current,
+                    json_from_llm(extension_text),
+                    max_sections=(
+                        extension_profile.format_for("long").max_sections
+                        if extension_profile is not None else None
+                    ),
+                )
+            except (ValueError, json.JSONDecodeError) as exc:
+                last_validation_error = f"Long extension không dùng được: {exc}"
+                if log_path:
+                    append_local_start_log(log_path, "LONG_EXTENSION_FAILED", last_validation_error)
             long_extension_attempted = True
             continue
 
@@ -652,7 +660,12 @@ async def validate_or_repair_script(
             )
             if log_path:
                 append_local_start_log(log_path, "SHORT_EXPANSION_RESPONSE", expansion_text)
-            current = apply_short_expansion(current, json_from_llm(expansion_text))
+            try:
+                current = apply_short_expansion(current, json_from_llm(expansion_text))
+            except (ValueError, json.JSONDecodeError) as exc:
+                last_validation_error = f"Short expansion không dùng được: {exc}"
+                if log_path:
+                    append_local_start_log(log_path, "SHORT_EXPANSION_FAILED", last_validation_error)
             short_expansion_attempted = True
             continue
 
