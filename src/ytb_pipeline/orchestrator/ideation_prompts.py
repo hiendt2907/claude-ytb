@@ -345,20 +345,36 @@ def local_script_prompt(
     editorial_brief = (
         content_profile.prompt_text("editorial") if content_profile else CHANNEL_EDITORIAL_BRIEF
     )
+    # Ngân sách MỖI SECTION, suy ra từ tổng và số section cho phép.  Short đã có
+    # bảng này; Long thì không, nên model chọn đúng số section rồi viết mỗi
+    # section dài bằng một beat của Short — 16 section x 146 ký tự cho một Long
+    # cần 5.822. Nêu rõ phép chia là đòn bẩy còn thiếu.
+    def _per_section(total_chars: int, sections: int) -> int:
+        return int(total_chars / max(1, sections))
+
+    long_per_section = (
+        f"With {long_sections} sections that is about "
+        f"{_per_section(long_safe[0], long_sections):,} characters each; with "
+        f"{long_max_sections} sections about "
+        f"{_per_section(long_safe[0], long_max_sections):,} each. "
+        "Count the combined voiceover before responding and lengthen scenes — "
+        "never duplicate one — if the total falls short"
+    ) if type_of_vid == "long" else ""
+
     target = (
         (
             (
                 f'"video_type": "long", "target_minutes": {LONG_MIN_MINUTES} (declare EXACTLY {LONG_MIN_MINUTES}), total narration '
                 f'{LONG_SAFE_MIN_CHARS}-{LONG_SAFE_MAX_CHARS} Vietnamese characters ({LONG_MIN_MINUTES}-{LONG_MAX_MINUTES} min at '
                 f'{PLANNING_CHARS_PER_MIN:.0f} chars/min; actual audio must stay inside that range), and '
-                f'{LONG_CONTRACT.minimum_sections}-{long_max_sections} rich sections'
+                f'{LONG_CONTRACT.minimum_sections}-{long_max_sections} rich sections. {long_per_section}'
             )
             if content_profile is None
             else (
                 f'"video_type": "long", "target_minutes": {long_minutes[0]:g}, total narration '
                 f'{long_safe[0]}-{long_safe[1]} Vietnamese characters ({long_minutes[0]:g}-{long_minutes[1]:g} min at '
                 f'{long_rate:.0f} chars/min; actual audio must stay inside that range), and '
-                f'{long_sections}-{long_max_sections} rich sections'
+                f'{long_sections}-{long_max_sections} rich sections. {long_per_section}'
             )
         )
         if type_of_vid == "long"
