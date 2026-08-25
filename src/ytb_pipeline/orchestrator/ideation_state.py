@@ -14,6 +14,7 @@ from datetime import datetime
 from pathlib import Path
 
 from ..content_contract import CONTRACT_VERSION
+from ..content_profiles import load_content_profile
 from ..ideation.series import slugify
 from ..ideation.script_contract import validate_script_payload
 from .external_long import completed_external_long_source
@@ -124,6 +125,9 @@ def write_local_batch_item(script_path: Path, payload: dict, args: argparse.Name
     `batch_key` cho phép tạo batch mới độc lập thay vì vô tình trộn vào batch
     legacy mới nhất. Không có key thì giữ nguyên hành vi tương thích cũ.
     """
+    profile = load_content_profile(
+        str(payload.get("profile_id") or getattr(args, "profile_id", "") or "") or None
+    )
     contract = validate_script_payload(payload)
     if not contract.publishable:
         details = "; ".join(f"{item.path}: {item.message}" for item in contract.findings)
@@ -183,7 +187,11 @@ def write_local_batch_item(script_path: Path, payload: dict, args: argparse.Name
         # relationship contract is activated by the explicit batch boundary,
         # so existing callers remain compatible while every new scheduled
         # funnel batch is fail-fast.
-        if args.type_of_vid == "short" and explicit_key:
+        if (
+            args.type_of_vid == "short"
+            and explicit_key
+            and profile.content_rules.require_short_source_trace
+        ):
             missing = [field for field, value in funnel.items() if not value]
             if missing:
                 raise SystemExit(
@@ -211,7 +219,9 @@ def write_local_batch_item(script_path: Path, payload: dict, args: argparse.Name
             "slug": script_path.stem,
             "topic": payload.get("topic", payload.get("title", script_path.stem)),
             "orientation": "landscape" if args.type_of_vid == "long" else "portrait",
-            "render_provider": "ai",
+            "profile_id": profile.profile_id,
+            "profile_version": profile.version,
+            "render_provider": profile.providers.render,
             "dry_run": cli.settings.dry_run,
             # Ideation can propose a bundle but must never silently commit a
             # YouTube schedule.  `ytb batch run --schedule` is the single

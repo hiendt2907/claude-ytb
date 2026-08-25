@@ -12,6 +12,7 @@ import hashlib
 import json
 import subprocess
 import time
+from contextvars import ContextVar
 from dataclasses import replace
 from pathlib import Path
 from urllib import error as urllib_error
@@ -19,6 +20,7 @@ from urllib import request as urllib_request
 
 from ...config.settings import settings
 from ...content_contract import contract_for
+from ...content_profiles import load_content_profile
 from ...pkg.models import Script, Segment, Voiceover
 from ...voiceover.tts import (
     _concat_audio,
@@ -33,6 +35,9 @@ from ...voiceover.tts import (
     _voice_profile,
 )
 from ..errors import ProviderUnavailableError
+
+
+_REQUEST_VOICE: ContextVar[str | None] = ContextVar("xkiro_request_voice", default=None)
 
 
 class XkiroVoiceProvider:
@@ -55,17 +60,26 @@ class XkiroVoiceProvider:
         voiced: list[Segment] = []
         for index, segment in enumerate(script.segments):
             profile = _segment_profile(segment, default_profile, index, len(script.segments))
-            segment_path = self._segment_path(script, segment, index, output_dir, profile=profile)
+            voice_id = self._voice_for_segment(script, segment)
+            segment_path = self._segment_path(
+                script, segment, index, output_dir, profile=profile, voice_id=voice_id
+            )
             duration = self._existing_duration(segment_path)
             if duration <= 0:
-                await self._synthesise_segment(segment.narration, profile, segment_path, index)
+                await self._synthesise_segment(
+                    segment.narration, profile, segment_path, index, voice_id=voice_id
+                )
                 duration = _probe_duration(segment_path)
             voiced.append(
                 replace(segment, audio_path=segment_path, duration_sec=duration)
             )
 
         total = sum(segment.duration_sec for segment in voiced)
-        lower, _ = contract_for(script.video_type).audio_runtime_bounds_sec(
+        content_profile = (
+            load_content_profile(script.content_profile_id)
+            if script.content_profile_version else None
+        )
+        lower, _ = contract_for(script.video_type, content_profile).audio_runtime_bounds_sec(
             segment_count=len(voiced)
         )
         if total < lower and lower - total <= 2.0:
@@ -94,17 +108,19 @@ class XkiroVoiceProvider:
         output_dir: Path,
         *,
         profile=None,
+        voice_id: str | None = None,
     ) -> Path:
         profile = profile or _segment_profile(
             segment, _voice_profile(script), index, len(script.segments)
         )
         prepared = _prepare_narration(segment.narration)
+        voice_id = voice_id or self._voice_for_segment(script, segment)
         cache_key = json.dumps(
             {
                 "provider": self.name,
                 "endpoint": settings.xkiro_tts_url,
                 "model": settings.xkiro_model,
-                "voice": settings.xkiro_voice,
+                "voice": voice_id,
                 "text": prepared,
                 "profile": vars(profile),
             },
@@ -113,6 +129,19 @@ class XkiroVoiceProvider:
         )
         digest = hashlib.sha256(cache_key.encode("utf-8")).hexdigest()[:12]
         return output_dir / f"{self._artifact_slug(script)}_xkiro_{index:02d}_{digest}.mp3"
+
+    @staticmethod
+    def _voice_for_segment(script: Script, segment: Segment) -> str:
+        """Resolve a cast voice from immutable script/profile identity."""
+        if not script.content_profile_version:
+            return settings.xkiro_voice
+        profile = load_content_profile(script.content_profile_id)
+        if script.content_profile_version and script.content_profile_version != profile.version:
+            raise ValueError(
+                f"Content profile '{profile.profile_id}' đã đổi version; "
+                "không được tái dùng TTS cache của script cũ."
+            )
+        return profile.voice_for(segment.speaker_id)
 
     @staticmethod
     def _artifact_slug(script: Script) -> str:
@@ -128,7 +157,9 @@ class XkiroVoiceProvider:
         except (subprocess.CalledProcessError, KeyError, ValueError):
             return 0.0
 
-    async def _synthesise_segment(self, narration: str, profile, output: Path, index: int) -> None:
+    async def _synthesise_segment(
+        self, narration: str, profile, output: Path, index: int, *, voice_id: str
+    ) -> None:
         prepared = _prepare_narration(narration)
         pieces = _split_for_pacing(prepared, profile.comma_sec, profile.sentence_sec)
         if not pieces:
@@ -145,7 +176,11 @@ class XkiroVoiceProvider:
             for piece_index, (text, pause) in enumerate(pieces):
                 fetched = output.with_name(f"{output.stem}.p{piece_index:02d}.raw.mp3")
                 normalized = output.with_name(f"{output.stem}.p{piece_index:02d}.mp3")
-                audio = await asyncio.to_thread(self._request_audio, text)
+                token = _REQUEST_VOICE.set(voice_id)
+                try:
+                    audio = await asyncio.to_thread(self._request_audio, text)
+                finally:
+                    _REQUEST_VOICE.reset(token)
                 if not audio:
                     raise RuntimeError(f"xKiro trả audio rỗng cho segment {index + 1}.")
                 fetched.write_bytes(audio)
@@ -173,11 +208,12 @@ class XkiroVoiceProvider:
                 path.unlink(missing_ok=True)
 
     def _request_audio(self, text: str) -> bytes:
+        voice_id = _REQUEST_VOICE.get() or settings.xkiro_voice
         payload = json.dumps(
             {
                 "model": settings.xkiro_model,
                 "input": text,
-                "voice": settings.xkiro_voice,
+                "voice": voice_id,
                 "response_format": "mp3",
                 "stream": False,
             }

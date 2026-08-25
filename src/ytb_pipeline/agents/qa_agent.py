@@ -19,6 +19,7 @@ from typing import Any
 
 from ..ideation import series as series_mod
 from ..content_contract import contract_for, estimate_duration_sec
+from ..content_profiles import load_content_profile
 from ..ideation.generator import GREETING_PREFIX, chars_per_min_for_provider
 from ..config.settings import settings
 from .base import AgentResult, AgentStatus
@@ -121,6 +122,12 @@ def _segments_of(script: Any) -> list[Any]:
     return list(_get(script, "segments", ()) or ())
 
 
+def _content_profile(script: Any):
+    if not _get(script, "content_profile_version", ""):
+        return None
+    return load_content_profile(_get(script, "content_profile_id", "") or None)
+
+
 def _narration_of(segment: Any) -> str:
     return _get(segment, "narration", "") or ""
 
@@ -143,10 +150,14 @@ def _check_length(script: Any) -> list[dict[str, str]]:
 
     target_minutes = _get(script, "target_minutes")
     video_type = "long" if target_minutes is not None else "short"
-    contract = contract_for(video_type)
+    profile = _content_profile(script)
+    contract = contract_for(video_type, profile)
     est_sec = estimate_duration_sec(
         sum(len(_narration_of(segment)) for segment in segments),
-        chars_per_minute=chars_per_min_for_provider(video_type=video_type),
+        chars_per_minute=chars_per_min_for_provider(
+            profile.providers.tts if profile else settings.tts_provider,
+            video_type=video_type,
+        ),
     )
 
     if target_minutes is not None:
@@ -182,7 +193,9 @@ def _check_intro(script: Any) -> list[dict[str, str]]:
     is_long = _get(script, "target_minutes") is not None
     starts_with_greeting = first.startswith(GREETING_PREFIX)
 
-    if is_long and not starts_with_greeting and not settings.e2e_test:
+    profile = _content_profile(script)
+    needs_channel_greeting = profile is None or profile.narrative_mode == "mechanism_explainer"
+    if is_long and needs_channel_greeting and not starts_with_greeting and not settings.e2e_test:
         return [{
             "rule": "intro",
             "detail": f"Video dài phải mở đầu bằng \"{GREETING_PREFIX}\".",
@@ -419,6 +432,9 @@ def _segment_query(segment: Any) -> str:
 
 
 def _check_pexels_queries(script: Any) -> list[dict[str, str]]:
+    profile = _content_profile(script)
+    if profile is not None and not profile.content_rules.require_pexels_query:
+        return []
     weak = {"", "video", "stock footage", "broll", "background", "abstract"}
     violations: list[dict[str, str]] = []
     for index, segment in enumerate(_segments_of(script), start=1):

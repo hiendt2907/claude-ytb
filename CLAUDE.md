@@ -56,6 +56,13 @@ amendment ghi rõ ngày + lý do trong chính file đó):
 
 ## Kiến trúc (Architecture Rules)
 
+- **Một DAG, N content profile.** Mỗi chủ đề sống trong một thư mục
+  `profiles/<profile_id>/` tự chứa `profile.json`, prompt biên tập, voice cast,
+  asset và memory/continuity. Queue item mang `profile_id`; subprocess resolve
+  cấu hình profile trước khi chạy DAG chung. Content profile (nội dung được kể
+  thế nào) hoàn toàn khác PlatformProfile (đăng lên đâu). Không hardcode tên
+  chủ đề, nhân vật, giọng hay renderer trong pipeline.
+
 - **Clean + Hexagonal.** Dependency luôn hướng vào trong: Interface →
   Application → Domain. Domain layer (frozen dataclasses) không phụ thuộc
   gì bên ngoài — không Pillow, không FFmpeg, không SDK Google hay SDK provider
@@ -159,6 +166,9 @@ buộc:
   xKiro trước, sau đó Codex CLI rồi Claude CLI khi xKiro không khả dụng hoặc
   lỗi. Không thêm lại Ollama, MLX-LM, `local_stack`, hoặc một local ideation
   provider mà không có amendment mới trong `PROJECT_VISION.md`.
+- **Voice cast theo content profile.** `Segment.speaker_id` chỉ là identity;
+  xKiro tra voice qua `voice_cast` của profile và đưa voice vào content-hash
+  cache. Script cũ không khai báo profile/speaker vẫn dùng narrator/default.
 - **Local-first cho visual/render.** Flux, video generation và render vẫn ưu
   tiên local theo §2 của `PROJECT_VISION.md`. F5 và các TTS local còn là lựa
   chọn config rõ ràng, không phải default.

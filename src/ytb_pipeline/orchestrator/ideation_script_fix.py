@@ -15,22 +15,23 @@ from urllib.parse import urlparse
 
 from ..agents.base import AgentStatus
 from ..agents.qa_agent import QAAgent
+from ..content_contract import chars_per_min_for_provider, contract_for
 from ..ideation.generator import load_script
+from ..content_profiles import ContentProfile, load_content_profile
 from ..ideation.script_contract import validate_script_payload
 from .state_io import atomic_write_json
 from .ideation_error_engine import record_ideation_failure
 from .ideation_json_heal import heal_json
 from .ideation_prompts import (
-    SCRIPT_GENERATION_SYSTEM_PROMPT,
     LONG_SAFE_MIN_CHARS,
     LONG_SAFE_MAX_CHARS,
     SHORT_MAX_CHARS,
     SHORT_MIN_CHARS,
-    SHORT_SAFE_MIN_CHARS,
     SHORT_TARGET_CHARS,
     ledger_topics,
     long_extension_prompt,
     short_expansion_prompt,
+    script_generation_system_prompt,
     PERSONAL_FINANCE_PSYCHOLOGY_PROFILE,
 )
 
@@ -45,6 +46,41 @@ class IdeationQualityFailure(RuntimeError):
 
 _EVIDENCE_SOURCE_TYPES = {"primary", "peer_reviewed", "official"}
 _EVIDENCE_FIELDS = ("claim", "source_title", "publisher", "published_year", "url", "source_type")
+
+
+def _explicit_profile(payload: dict) -> ContentProfile | None:
+    profile_id = str(payload.get("profile_id") or "").strip()
+    return load_content_profile(profile_id) if profile_id else None
+
+
+def repair_system_prompt(payload: dict) -> str:
+    """Follow-up LLM calls inherit the same editorial profile as generation."""
+    return script_generation_system_prompt(_explicit_profile(payload))
+
+
+def _repair_character_bounds(
+    payload: dict, video_type: str
+) -> tuple[int, int, int]:
+    """Return absolute min/max and safe midpoint for this script's profile."""
+    profile = _explicit_profile(payload)
+    if profile is None:
+        if video_type == "short":
+            return SHORT_MIN_CHARS, SHORT_MAX_CHARS, SHORT_TARGET_CHARS
+        return LONG_SAFE_MIN_CHARS, LONG_SAFE_MAX_CHARS, (
+            LONG_SAFE_MIN_CHARS + LONG_SAFE_MAX_CHARS
+        ) // 2
+    format_profile = profile.format_for(video_type)
+    contract = contract_for(video_type, profile)
+    rate = chars_per_min_for_provider(profile.providers.tts, video_type=video_type)
+    lower_sec, upper_sec = contract.audio_runtime_bounds_sec(
+        segment_count=format_profile.min_sections
+    )
+    absolute_min = int(rate * lower_sec / 60)
+    absolute_max = int(rate * upper_sec / 60)
+    safe_min, safe_max = contract.safe_character_bounds(
+        chars_per_minute=rate, segment_count=format_profile.min_sections
+    )
+    return absolute_min, absolute_max, (safe_min + safe_max) // 2
 
 
 def validate_financial_evidence_register(payload: dict, *, required: bool) -> None:
@@ -301,10 +337,13 @@ def normalize_short_narration(
                 section["narration"] = cleaned
                 changed = True
 
+    short_min_chars, short_max_chars, short_target_chars = _repair_character_bounds(
+        candidate, "short"
+    )
     total = short_narration_chars(candidate)
-    if total > SHORT_MAX_CHARS:
-        ratio = SHORT_TARGET_CHARS / total
-        remaining = SHORT_TARGET_CHARS
+    if total > short_max_chars:
+        ratio = short_target_chars / total
+        remaining = short_target_chars
         strategy = candidate.get("strategy")
         hook = strategy.get("hook") if isinstance(strategy, dict) else None
         core_answer = str(hook.get("core_answer", "")).strip() if isinstance(hook, dict) else ""
@@ -330,7 +369,7 @@ def normalize_short_narration(
     # A boundary trim must be atomic: a sentence boundary can cut more than the
     # numeric budget.  Never replace a merely-overlong script with an undersized
     # one; let the editorial repair see the intact source instead.
-    if total < SHORT_MIN_CHARS:
+    if total < short_min_chars:
         return payload, None
     # Script thiếu độ dài phải đi qua vòng repair LLM bên dưới caller. Không được
     # bơm câu mẫu: nó có thể đúng độ dài nhưng sai hoàn toàn title/topic.
@@ -346,9 +385,12 @@ def normalize_long_overflow(payload: dict, expected_video_type: str | None = Non
         return payload, None
     sections = [s for s in payload.get("sections", []) or [] if isinstance(s, dict)]
     total = short_narration_chars(payload)
-    if total <= LONG_SAFE_MAX_CHARS or len(sections) < 3:
+    _long_min_chars, long_max_chars, _long_target_chars = _repair_character_bounds(
+        payload, "long"
+    )
+    if total <= long_max_chars or len(sections) < 3:
         return payload, None
-    excess = total - LONG_SAFE_MAX_CHARS
+    excess = total - long_max_chars
     candidates = sections[1:-1]
     for section in sorted(candidates, key=lambda item: len(str(item.get("voiceover") or item.get("narration") or "")), reverse=True):
         if excess <= 0:
@@ -493,7 +535,13 @@ async def validate_or_repair_script(
                     expected_video_type=expected_video_type,
                     script_name=script_path.name,
                 )
-            if expected_video_type == "short":
+            content_profile = load_content_profile(
+                str(current.get("profile_id") or "") or None
+            )
+            if (
+                expected_video_type == "short"
+                and content_profile.content_rules.require_short_source_trace
+            ):
                 validate_short_strategy_v1(current, source_long_context=source_long_context)
             validate_financial_evidence_register(
                 current, required=requires_financial_evidence
@@ -522,7 +570,10 @@ async def validate_or_repair_script(
             and last_validation_error
             and "nội dung quá mỏng" in last_validation_error
         ):
-            missing_chars = max(1, LONG_SAFE_MIN_CHARS - short_narration_chars(current))
+            long_min_chars, _long_max_chars, _long_target_chars = _repair_character_bounds(
+                current, "long"
+            )
+            missing_chars = max(1, long_min_chars - short_narration_chars(current))
             extension_request = long_extension_prompt(current, missing_chars)
             if console_prefix:
                 print(f"{console_prefix} extend: asking LLM for missing long-form sections", flush=True)
@@ -530,7 +581,7 @@ async def validate_or_repair_script(
                 append_local_start_log(log_path, "LONG_EXTENSION_PROMPT", extension_request)
             extension_text = await provider.complete(
                 extension_request,
-                system=SCRIPT_GENERATION_SYSTEM_PROMPT,
+                system=repair_system_prompt(current),
                 max_tokens=8192,
                 temperature=0.2,
                 json_output=True,
@@ -549,7 +600,10 @@ async def validate_or_repair_script(
             and last_validation_error
             and "quá ngắn" in last_validation_error
         ):
-            missing_chars = max(1, SHORT_SAFE_MIN_CHARS - short_narration_chars(current))
+            short_min_chars, _short_max_chars, _short_target_chars = _repair_character_bounds(
+                current, "short"
+            )
+            missing_chars = max(1, short_min_chars - short_narration_chars(current))
             expansion_request = short_expansion_prompt(current, missing_chars)
             if console_prefix:
                 print(f"{console_prefix} extend: asking LLM for bounded Short additions", flush=True)
@@ -557,7 +611,7 @@ async def validate_or_repair_script(
                 append_local_start_log(log_path, "SHORT_EXPANSION_PROMPT", expansion_request)
             expansion_text = await provider.complete(
                 expansion_request,
-                system=SCRIPT_GENERATION_SYSTEM_PROMPT,
+                system=repair_system_prompt(current),
                 max_tokens=2048,
                 temperature=0.2,
                 json_output=True,

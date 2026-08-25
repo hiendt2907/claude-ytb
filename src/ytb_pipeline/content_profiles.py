@@ -1,0 +1,398 @@
+"""Load topic-scoped content profiles from self-contained directories.
+
+A content profile owns editorial rules, format contracts, provider choices,
+voice cast, and local render assets for one topic.  The workflow/DAG remains
+shared.  This is deliberately separate from ``platform.profiles``: a content
+profile answers *what/how we tell*, while a platform profile answers *where we
+publish*.
+"""
+
+from __future__ import annotations
+
+import json
+import hashlib
+import re
+from dataclasses import dataclass
+from math import isfinite
+from pathlib import Path
+from typing import Any, Mapping
+
+
+_PROFILE_ID = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
+class ContentProfileError(ValueError):
+    """A profile directory is missing, unsafe, or violates its schema."""
+
+
+@dataclass(frozen=True)
+class FormatProfile:
+    viewer_min_sec: float
+    viewer_max_sec: float
+    min_sections: int
+    max_sections: int
+
+    def __post_init__(self) -> None:
+        if self.viewer_min_sec <= 0 or self.viewer_max_sec <= self.viewer_min_sec:
+            raise ContentProfileError("Format cần viewer_min_sec < viewer_max_sec và đều dương.")
+        if self.min_sections < 1:
+            raise ContentProfileError("Format cần ít nhất một section.")
+        if self.max_sections < self.min_sections:
+            raise ContentProfileError("Format cần max_sections >= min_sections.")
+
+    @property
+    def viewer_runtime_bounds_sec(self) -> tuple[float, float]:
+        return self.viewer_min_sec, self.viewer_max_sec
+
+
+@dataclass(frozen=True)
+class ProviderProfile:
+    llm: str
+    tts: str
+    render: str
+    broll_strategy: str
+    broll_allow_downloads: bool
+
+
+@dataclass(frozen=True)
+class ContentRules:
+    require_pexels_query: bool
+    require_short_source_trace: bool
+
+
+@dataclass(frozen=True)
+class RenderProfile:
+    assets_dir_name: str
+    show_captions: bool
+    inter_segment_gap_sec: float
+    transition_overlap_sec: float
+    scene_assets: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if not isfinite(self.inter_segment_gap_sec) or not 0 <= self.inter_segment_gap_sec <= 2:
+            raise ContentProfileError("render.inter_segment_gap_sec phải nằm trong [0, 2].")
+        if not isfinite(self.transition_overlap_sec) or not 0 <= self.transition_overlap_sec <= 2:
+            raise ContentProfileError("render.transition_overlap_sec phải nằm trong [0, 2].")
+
+
+@dataclass(frozen=True)
+class ContentProfile:
+    profile_id: str
+    version: str
+    display_name: str
+    topic: str
+    narrative_mode: str
+    root: Path
+    prompts: Mapping[str, str]
+    formats: Mapping[str, FormatProfile]
+    providers: ProviderProfile
+    voice_cast: Mapping[str, str]
+    content_rules: ContentRules
+    render: RenderProfile
+
+    def format_for(self, video_type: str) -> FormatProfile:
+        try:
+            return self.formats[video_type.strip().lower()]
+        except (AttributeError, KeyError) as exc:
+            raise ContentProfileError(
+                f"Profile '{self.profile_id}' không hỗ trợ format {video_type!r}."
+            ) from exc
+
+    def prompt_text(self, name: str) -> str:
+        try:
+            relative = self.prompts[name]
+        except KeyError as exc:
+            raise ContentProfileError(
+                f"Profile '{self.profile_id}' thiếu prompt '{name}'."
+            ) from exc
+        path = _safe_child(self.root, relative, field=f"prompts.{name}")
+        try:
+            return path.read_text(encoding="utf-8").strip()
+        except OSError as exc:
+            raise ContentProfileError(f"Không đọc được prompt profile: {path}") from exc
+
+    def voice_for(self, speaker_id: str) -> str:
+        normalized = (speaker_id or "narrator").strip().lower()
+        try:
+            return self.voice_cast[normalized]
+        except KeyError as exc:
+            raise ContentProfileError(
+                f"Profile '{self.profile_id}' không khai báo voice cho speaker '{normalized}'."
+            ) from exc
+
+    @property
+    def assets_dir(self) -> Path:
+        return _safe_child(self.root, self.render.assets_dir_name, field="render.assets_dir")
+
+    @property
+    def visual_asset_names(self) -> tuple[str, ...]:
+        if self.render.scene_assets:
+            return self.render.scene_assets
+        if not self.assets_dir.is_dir():
+            return ()
+        return tuple(sorted(
+            path.name for path in self.assets_dir.iterdir()
+            if path.is_file() and not path.name.startswith(".")
+        ))
+
+    def visual_asset_path(self, relative: str) -> Path:
+        relative = relative.strip()
+        if self.render.scene_assets and relative not in self.render.scene_assets:
+            raise ContentProfileError(
+                f"visual_asset {relative!r} không nằm trong render.scene_assets "
+                f"của profile '{self.profile_id}'."
+            )
+        path = _safe_child(self.assets_dir, relative, field="sections.visual_asset")
+        if not relative or not path.is_file():
+            raise ContentProfileError(f"Không tìm thấy visual_asset: {path}")
+        return path
+
+
+def profiles_root(profiles_dir: Path | str | None = None) -> Path:
+    if profiles_dir is None:
+        from .config.settings import settings
+
+        profiles_dir = settings.content_profiles_dir
+    path = Path(profiles_dir)
+    return path if path.is_absolute() else _PROJECT_ROOT / path
+
+
+def load_content_profile(
+    profile_id: str | None = None, *, profiles_dir: Path | str | None = None
+) -> ContentProfile:
+    if profile_id is None:
+        from .config.settings import settings
+
+        profile_id = settings.content_profile_id
+    profile_id = str(profile_id).strip()
+    if not _PROFILE_ID.fullmatch(profile_id):
+        raise ContentProfileError(f"Content profile id không hợp lệ: {profile_id!r}.")
+
+    root = profiles_root(profiles_dir).resolve()
+    folder = (root / profile_id).resolve()
+    if folder.parent != root:
+        raise ContentProfileError(f"Content profile id không hợp lệ: {profile_id!r}.")
+    config_path = _safe_child(folder, "profile.json", field="profile.json")
+    try:
+        raw = json.loads(config_path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise ContentProfileError(f"Không tìm thấy content profile '{profile_id}': {config_path}") from exc
+    except json.JSONDecodeError as exc:
+        raise ContentProfileError(f"profile.json không phải JSON hợp lệ: {config_path}") from exc
+    if not isinstance(raw, dict):
+        raise ContentProfileError(f"profile.json phải là object: {config_path}")
+    if raw.get("profile_id") != profile_id:
+        raise ContentProfileError(
+            f"profile_id trong {config_path} phải khớp tên thư mục '{profile_id}'."
+        )
+    if raw.get("schema_version") != 1:
+        raise ContentProfileError(f"Profile '{profile_id}' cần schema_version=1.")
+
+    prompts = _string_map(raw.get("prompts"), "prompts")
+    formats_raw = _mapping(raw.get("formats"), "formats")
+    formats = {
+        name: _format_profile(value, f"formats.{name}")
+        for name, value in formats_raw.items()
+        if name in {"short", "long"}
+    }
+    if set(formats) != {"short", "long"}:
+        raise ContentProfileError(f"Profile '{profile_id}' phải khai báo short và long.")
+    providers_raw = _mapping(raw.get("providers"), "providers")
+    rules_raw = _mapping(raw.get("content_rules"), "content_rules")
+    render_raw = _mapping(raw.get("render"), "render")
+    voice_cast = _string_map(raw.get("voice_cast"), "voice_cast")
+    if "narrator" not in voice_cast:
+        raise ContentProfileError(f"Profile '{profile_id}' phải có voice_cast.narrator.")
+
+    profile = ContentProfile(
+        profile_id=profile_id,
+        version=_required_text(raw, "version"),
+        display_name=_required_text(raw, "display_name"),
+        topic=_required_text(raw, "topic"),
+        narrative_mode=_required_text(raw, "narrative_mode"),
+        root=folder,
+        prompts=prompts,
+        formats=formats,
+        providers=ProviderProfile(
+            llm=_required_text(providers_raw, "llm", prefix="providers"),
+            tts=_required_text(providers_raw, "tts", prefix="providers"),
+            render=_required_text(providers_raw, "render", prefix="providers"),
+            broll_strategy=_required_text(
+                providers_raw, "broll_strategy", prefix="providers"
+            ),
+            broll_allow_downloads=_exact_bool(
+                providers_raw, "broll_allow_downloads", prefix="providers"
+            ),
+        ),
+        voice_cast=voice_cast,
+        content_rules=ContentRules(
+            require_pexels_query=_exact_bool(
+                rules_raw, "require_pexels_query", prefix="content_rules"
+            ),
+            require_short_source_trace=_exact_bool(
+                rules_raw, "require_short_source_trace", prefix="content_rules"
+            ),
+        ),
+        render=RenderProfile(
+            assets_dir_name=_required_text(render_raw, "assets_dir", prefix="render"),
+            show_captions=_exact_bool(render_raw, "show_captions", prefix="render"),
+            inter_segment_gap_sec=_finite_number(
+                render_raw, "inter_segment_gap_sec", prefix="render"
+            ),
+            transition_overlap_sec=_finite_number(
+                render_raw, "transition_overlap_sec", prefix="render"
+            ),
+            scene_assets=_string_tuple(render_raw.get("scene_assets", ()), "render.scene_assets"),
+        ),
+    )
+    if (
+        profile.narrative_mode == "character_story"
+        and profile.render.inter_segment_gap_sec < profile.render.transition_overlap_sec
+    ):
+        raise ContentProfileError(
+            "Story profile cần inter_segment_gap_sec >= transition_overlap_sec "
+            "để lời thoại hai nhân vật không chồng lên nhau."
+        )
+    for name in prompts:
+        profile.prompt_text(name)
+    if not profile.assets_dir.is_dir():
+        raise ContentProfileError(
+            f"Profile '{profile_id}' thiếu thư mục asset: {profile.assets_dir}"
+        )
+    for asset_name in profile.render.scene_assets:
+        profile.visual_asset_path(asset_name)
+    return profile
+
+
+def profile_fingerprint(profile: ContentProfile) -> str:
+    """Hash every profile input that can change narration, voice, or render."""
+    paths = [profile.root / "profile.json"]
+    paths.extend(
+        _safe_child(profile.root, relative, field=f"prompts.{name}")
+        for name, relative in profile.prompts.items()
+    )
+    paths.extend(profile.visual_asset_path(name) for name in profile.visual_asset_names)
+    digest = hashlib.sha256()
+    for path in sorted(paths, key=lambda item: item.relative_to(profile.root).as_posix()):
+        relative = path.relative_to(profile.root).as_posix().encode("utf-8")
+        digest.update(len(relative).to_bytes(4, "big"))
+        digest.update(relative)
+        digest.update(hashlib.sha256(path.read_bytes()).digest())
+    return digest.hexdigest()
+
+
+def profile_environment(profile: ContentProfile) -> dict[str, str]:
+    """Environment overlay consumed by one isolated pipeline subprocess."""
+    short = profile.format_for("short")
+    long = profile.format_for("long")
+    return {
+        "CONTENT_PROFILE_ID": profile.profile_id,
+        "CONTENT_PROFILES_DIR": str(profile.root.parent),
+        "LLM_PROVIDER": profile.providers.llm,
+        "TTS_PROVIDER": profile.providers.tts,
+        "RENDER_PROVIDER": profile.providers.render,
+        "BROLL_STRATEGY": profile.providers.broll_strategy,
+        # Compatibility capability used by doctor; story rendering never calls
+        # VideoProvider because BROLL_STRATEGY=none and RenderProvider=story.
+        "VIDEO_PROVIDER": "pexels",
+        "BROLL_ALLOW_DOWNLOADS": str(profile.providers.broll_allow_downloads).lower(),
+        "SHOW_CAPTIONS": str(profile.render.show_captions).lower(),
+        "PROFILE_INTER_SEGMENT_GAP_SEC": str(profile.render.inter_segment_gap_sec),
+        "PROFILE_TRANSITION_OVERLAP_SEC": str(profile.render.transition_overlap_sec),
+        "XKIRO_VOICE": profile.voice_for("narrator"),
+        "SHORT_VIEWER_MIN_SEC": str(short.viewer_min_sec),
+        "SHORT_VIEWER_MAX_SEC": str(short.viewer_max_sec),
+        "SHORT_MIN_SECTIONS": str(short.min_sections),
+        "SHORT_MAX_SECTIONS": str(short.max_sections),
+        "LONG_VIEWER_MIN_SEC": str(long.viewer_min_sec),
+        "LONG_VIEWER_MAX_SEC": str(long.viewer_max_sec),
+        "LONG_MIN_SECTIONS": str(long.min_sections),
+        "LONG_MAX_SECTIONS": str(long.max_sections),
+    }
+
+
+def _safe_child(root: Path, relative: str, *, field: str) -> Path:
+    path = (root / relative).resolve()
+    if path != root and root not in path.parents:
+        raise ContentProfileError(f"{field} không được đi ra ngoài thư mục profile.")
+    return path
+
+
+def _mapping(value: Any, field: str) -> Mapping[str, Any]:
+    if not isinstance(value, dict):
+        raise ContentProfileError(f"{field} phải là object.")
+    return value
+
+
+def _string_map(value: Any, field: str) -> Mapping[str, str]:
+    mapping = _mapping(value, field)
+    result = {str(key).strip(): str(item).strip() for key, item in mapping.items()}
+    if not result or not all(result) or not all(result.values()):
+        raise ContentProfileError(f"{field} không được rỗng.")
+    return result
+
+
+def _required_text(mapping: Mapping[str, Any], field: str, *, prefix: str = "") -> str:
+    raw = mapping.get(field)
+    if not isinstance(raw, str) or not raw.strip():
+        path = f"{prefix}.{field}" if prefix else field
+        raise ContentProfileError(f"Profile thiếu field {path}.")
+    return raw.strip()
+
+
+def _exact_bool(
+    mapping: Mapping[str, Any], field: str, *, prefix: str = "", default: bool = False
+) -> bool:
+    raw = mapping.get(field, default)
+    if type(raw) is not bool:
+        path = f"{prefix}.{field}" if prefix else field
+        raise ContentProfileError(f"{path} phải là JSON boolean.")
+    return raw
+
+
+def _finite_number(
+    mapping: Mapping[str, Any], field: str, *, prefix: str = "", default: float = 0.0
+) -> float:
+    raw = mapping.get(field, default)
+    if isinstance(raw, bool) or not isinstance(raw, (int, float)) or not isfinite(float(raw)):
+        path = f"{prefix}.{field}" if prefix else field
+        raise ContentProfileError(f"{path} phải là số hữu hạn.")
+    return float(raw)
+
+
+def _positive_int(mapping: Mapping[str, Any], field: str, *, path: str) -> int:
+    raw = mapping.get(field)
+    if isinstance(raw, bool) or not isinstance(raw, int) or raw < 1:
+        raise ContentProfileError(f"{path}.{field} phải là số nguyên dương.")
+    return raw
+
+
+def _string_tuple(value: Any, field: str) -> tuple[str, ...]:
+    if value in (None, ()):
+        return ()
+    if not isinstance(value, list) or not all(
+        isinstance(item, str) and item.strip() for item in value
+    ):
+        raise ContentProfileError(f"{field} phải là array string không rỗng.")
+    result = tuple(item.strip() for item in value)
+    if len(set(result)) != len(result):
+        raise ContentProfileError(f"{field} không được chứa tên trùng.")
+    return result
+
+
+def _format_profile(value: Any, field: str) -> FormatProfile:
+    mapping = _mapping(value, field)
+    try:
+        return FormatProfile(
+            viewer_min_sec=_finite_number(mapping, "viewer_min_sec", prefix=field),
+            viewer_max_sec=_finite_number(mapping, "viewer_max_sec", prefix=field),
+            min_sections=_positive_int(mapping, "min_sections", path=field),
+            max_sections=(
+                _positive_int(mapping, "max_sections", path=field)
+                if "max_sections" in mapping
+                else _positive_int(mapping, "min_sections", path=field)
+            ),
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ContentProfileError(f"{field} thiếu hoặc sai kiểu.") from exc

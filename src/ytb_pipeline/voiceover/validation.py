@@ -8,6 +8,7 @@ import subprocess
 from pathlib import Path
 
 from ..content_contract import contract_for
+from ..content_profiles import load_content_profile
 from ..pkg.models import Voiceover
 
 _STAGE_DIRECTION_PATTERNS = (
@@ -38,7 +39,14 @@ def validate_hook_timing(voiceover: Voiceover) -> None:
         elapsed_before_answer += segment.duration_sec
     if answer_segment is None:
         raise ValueError("Hook strategy thiếu segment purpose='core_answer'.")
-    deadline = contract_for("short").answer_start_deadline_sec or strategy.hook.answer_by_sec
+    profile = (
+        load_content_profile(voiceover.content_profile_id)
+        if voiceover.content_profile_version else None
+    )
+    deadline = (
+        contract_for("short", profile).answer_start_deadline_sec
+        or strategy.hook.answer_by_sec
+    )
     if elapsed_before_answer > deadline:
         raise ValueError(
             "Core answer bắt đầu ở "
@@ -82,7 +90,11 @@ def validate_audio(
             f"> {max_duration_drift_sec:.2f}s."
         )
 
-    contract_for(voiceover.video_type).validate_audio_runtime(
+    profile = (
+        load_content_profile(voiceover.content_profile_id)
+        if voiceover.content_profile_version else None
+    )
+    contract_for(voiceover.video_type, profile).validate_audio_runtime(
         actual_duration,
         segment_count=len(voiceover.segments) if voiceover.ruleset_id else 1,
     )

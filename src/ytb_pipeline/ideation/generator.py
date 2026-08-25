@@ -11,6 +11,7 @@ import re
 from pathlib import Path
 
 from ..config.settings import settings
+from ..content_profiles import ContentProfile, load_content_profile
 from ..content_contract import (
     CONTRACT_VERSION,
     EDGE_CHARS_PER_MIN,
@@ -99,6 +100,20 @@ def load_script(source: str | Path) -> Script:
         raise FileNotFoundError(f"Không tìm thấy kịch bản: {path}")
 
     data = json.loads(path.read_text(encoding="utf-8"))
+    explicit_profile = bool(str(data.get("profile_id") or "").strip())
+    profile_id = str(data.get("profile_id") or settings.content_profile_id).strip()
+    content_profile = load_content_profile(profile_id)
+    active_profile = content_profile if explicit_profile else None
+    declared_profile_version = str(data.get("profile_version") or "").strip()
+    if explicit_profile and not declared_profile_version:
+        raise ValueError(
+            f"Kịch bản {path.name}: script có profile_id phải khai báo profile_version."
+        )
+    if declared_profile_version and declared_profile_version != content_profile.version:
+        raise ValueError(
+            f"Kịch bản {path.name}: profile_version={declared_profile_version!r} "
+            f"không khớp profile '{profile_id}' version={content_profile.version!r}."
+        )
 
     for required in ("title", "sections"):
         if not data.get(required):
@@ -114,20 +129,52 @@ def load_script(source: str | Path) -> Script:
                      if _section_voiceover(s).strip())
     if not segments:
         raise ValueError(f"Kịch bản {path.name} không có đoạn narration hợp lệ.")
+    if active_profile is not None:
+        format_profile = active_profile.format_for(video_type)
+        if len(segments) < format_profile.min_sections:
+            raise ValueError(
+                f"Kịch bản {path.name}: profile cần ít nhất "
+                f"{format_profile.min_sections} section."
+            )
+        if len(segments) > format_profile.max_sections:
+            raise ValueError(
+                f"Kịch bản {path.name}: profile cho phép tối đa "
+                f"{format_profile.max_sections} section."
+            )
 
     current_ruleset = str(data.get("ruleset_id", "")).strip() == CONTRACT_VERSION
-    _validate_length(segments, target_minutes, path.name, renderer_aware=current_ruleset)
-    _validate_long_structure(segments, target_minutes, path.name)
-    _validate_intro(segments, target_minutes, path.name)
-    _validate_pexels_queries(segments, path.name)
-    if video_type == "short":
-        _validate_short_hook_contract(segments, strategy, path.name)
+    _validate_length(
+        segments, target_minutes, path.name,
+        renderer_aware=current_ruleset, content_profile=active_profile,
+    )
+    _validate_long_structure(
+        segments, target_minutes, path.name, content_profile=active_profile
+    )
+    _validate_intro(
+        segments, target_minutes, path.name, content_profile=active_profile
+    )
+    _validate_pexels_queries(
+        segments,
+        path.name,
+        required=(
+            current_ruleset
+            and (active_profile is None or active_profile.content_rules.require_pexels_query)
+        ),
+    )
+    if video_type == "short" and (
+        active_profile is None or active_profile.content_rules.require_short_source_trace
+    ):
+        _validate_short_hook_contract(
+            segments, strategy, path.name, content_profile=active_profile
+        )
 
     idea = VideoIdea(
         topic=data.get("topic", data["title"]),
         title=data["title"],
         description=data.get("description", ""),
         tags=tuple(data.get("tags", ())),
+        content_profile_id=content_profile.profile_id,
+        content_profile_version=content_profile.version if explicit_profile else "",
         video_type=video_type,
         voice_profile=_normalize_voice_profile(data.get("voice_profile")),
         target_minutes=target_minutes,
@@ -263,6 +310,8 @@ def _segment_from_raw(raw: dict, name: str) -> Segment:
         transition_text=str(raw.get("transition_text", legacy_transition_text)).strip(),
         payoff=str(raw.get("payoff", "")).strip(),
         purpose=str(raw.get("purpose", "")).strip(),
+        speaker_id=str(raw.get("speaker_id") or "narrator").strip().lower(),
+        visual_asset=str(raw.get("visual_asset") or "").strip(),
         voice_style=str(raw.get("voice_style", raw.get("acting", ""))).strip(),
         voice_tempo=_optional_float(raw.get("voice_tempo"), name, "voice_tempo"),
         voice_pitch=_optional_float(raw.get("voice_pitch"), name, "voice_pitch"),
@@ -306,9 +355,15 @@ def _normalize_time_goal(raw, name: str) -> float | None:
     return value
 
 
-def _validate_pexels_queries(segments: tuple[Segment, ...], name: str) -> None:
+def _validate_pexels_queries(
+    segments: tuple[Segment, ...], name: str, *, required: bool = False
+) -> None:
     for index, seg in enumerate(segments, start=1):
         if not seg.pexels_query:
+            if required:
+                raise ValueError(
+                    f"Kịch bản {name}: section {index} thiếu pexels_query."
+                )
             continue
         query = seg.pexels_query.strip().lower()
         if query in _WEAK_PEXELS_QUERIES or len(query.split()) < 2:
@@ -318,7 +373,10 @@ def _validate_pexels_queries(segments: tuple[Segment, ...], name: str) -> None:
             )
 
 
-def _validate_length(segments, target_minutes, name: str, *, renderer_aware: bool = False) -> None:
+def _validate_length(
+    segments, target_minutes, name: str, *, renderer_aware: bool = False,
+    content_profile: ContentProfile | None = None,
+) -> None:
     """Ép độ dài cho video dài (ngang).
 
     Kịch bản khai báo `target_minutes` (video ngang BẮT BUỘC có) -> fail-fast nếu
@@ -330,16 +388,20 @@ def _validate_length(segments, target_minutes, name: str, *, renderer_aware: boo
     lượng ngắn hơn 1 phút hoặc dài hơn 1.5 phút.
     """
     video_type = "short" if target_minutes is None else "long"
-    contract = contract_for(video_type)
+    contract = contract_for(video_type, content_profile)
+    long_lower, long_upper = contract_for("long", content_profile).viewer_runtime_bounds_sec
     if target_minutes is not None and (
         not isinstance(target_minutes, (int, float))
-        or not (LONG_MIN_MINUTES <= target_minutes <= LONG_MAX_MINUTES)
+        or not (long_lower / 60 <= target_minutes <= long_upper / 60)
     ):
         raise ValueError(
             f"Kịch bản {name}: 'target_minutes' phải trong khoảng "
-            f"[{LONG_MIN_MINUTES}, {LONG_MAX_MINUTES}] phút cho video dài (ngang)."
+            f"[{long_lower / 60:g}, {long_upper / 60:g}] phút cho video dài (ngang)."
         )
-    est_sec = estimate_minutes(segments, video_type=video_type) * 60
+    tts_provider = content_profile.providers.tts if content_profile is not None else None
+    est_sec = estimate_minutes(
+        segments, tts_provider=tts_provider, video_type=video_type
+    ) * 60
     try:
         contract.validate_audio_runtime(
             est_sec, segment_count=len(segments) if renderer_aware else 1
@@ -356,7 +418,8 @@ def _validate_length(segments, target_minutes, name: str, *, renderer_aware: boo
     )
     if est_sec < required_target_sec:
         chars_can = int(
-            required_target_sec / 60 * chars_per_min_for_provider(video_type=video_type)
+            required_target_sec / 60
+            * chars_per_min_for_provider(tts_provider, video_type=video_type)
         )
         raise ValueError(
             f"Kịch bản {name}: nội dung quá mỏng — audio ước lượng ~{est_sec / 60:.1f} phút nhưng "
@@ -367,7 +430,8 @@ def _validate_length(segments, target_minutes, name: str, *, renderer_aware: boo
 
 
 def _validate_short_hook_contract(
-    segments: tuple[Segment, ...], strategy: ContentStrategy | None, name: str
+    segments: tuple[Segment, ...], strategy: ContentStrategy | None, name: str,
+    *, content_profile: ContentProfile | None = None,
 ) -> None:
     """Pre-TTS guard for the tested Short hook.
 
@@ -389,8 +453,13 @@ def _validate_short_hook_contract(
     narration = " ".join(answer_segment.narration.split())
     if not narration.startswith(answer):
         raise ValueError(f"Kịch bản {name}: core_answer phải mở đầu narration của section core_answer.")
-    contract = contract_for("short")
-    estimated_start_sec = len(situation.narration) / chars_per_min_for_provider() * 60
+    contract = contract_for("short", content_profile)
+    tts_provider = content_profile.providers.tts if content_profile is not None else None
+    estimated_start_sec = (
+        len(situation.narration)
+        / chars_per_min_for_provider(tts_provider, video_type="short")
+        * 60
+    )
     if estimated_start_sec > (contract.answer_start_deadline_sec or strategy.hook.answer_by_sec):
         raise ValueError(
             f"Kịch bản {name}: core_answer không thể bắt đầu trước "
@@ -398,16 +467,23 @@ def _validate_short_hook_contract(
         )
 
 
-def _validate_long_structure(segments, target_minutes, name: str) -> None:
+def _validate_long_structure(
+    segments, target_minutes, name: str,
+    *, content_profile: ContentProfile | None = None,
+) -> None:
     """Long-form needs editorial beats, not a few oversized narration blocks."""
-    if target_minutes is not None and len(segments) < contract_for("long").minimum_sections:
+    minimum = contract_for("long", content_profile).minimum_sections
+    if target_minutes is not None and len(segments) < minimum:
         raise ValueError(
-            f"Kịch bản {name}: video dài cần ít nhất {LONG_MIN_SECTIONS} section "
+            f"Kịch bản {name}: video dài cần ít nhất {minimum} section "
             "để có nhịp hình, diễn giải và ứng dụng rõ ràng."
         )
 
 
-def _validate_intro(segments, target_minutes, name: str) -> None:
+def _validate_intro(
+    segments, target_minutes, name: str,
+    *, content_profile: ContentProfile | None = None,
+) -> None:
     """Cổng mở đầu (mục 1b): video DÀI phải mở bằng lời chào; SHORT thì KHÔNG.
 
     Video dài (có `target_minutes`): segment đầu PHẢI bắt đầu bằng cụm cố định
@@ -422,7 +498,10 @@ def _validate_intro(segments, target_minutes, name: str) -> None:
 
     # E2E profile prioritizes a natural retention hook; production keeps the
     # established long-form greeting contract unchanged.
-    if is_long and not starts_with_greeting and not settings.e2e_test:
+    needs_channel_greeting = (
+        content_profile is None or content_profile.narrative_mode == "mechanism_explainer"
+    )
+    if is_long and needs_channel_greeting and not starts_with_greeting and not settings.e2e_test:
         raise ValueError(
             f"Kịch bản {name}: video dài phải mở đầu bằng cụm cố định "
             f"\"{GREETING_PREFIX}\" rồi đọc tiêu đề + câu móc (xem mục 1b). "

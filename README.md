@@ -82,6 +82,14 @@ make setup-f5            # cài .venv-tts (Python 3.12) + tải model_last.pt
 Cần `python3.12` (`brew install python@3.12` nếu chưa có). Sau khi xong, đặt
 `TTS_PROVIDER=f5` trong `.env`.
 
+## Nhiều chủ đề trên một pipeline
+
+Mỗi chủ đề là một thư mục trong `profiles/`. Chọn bằng
+`ytb batch start --profile <profile-id>`; queue giữ `profile_id`, còn
+`ytb batch run` dùng lại DAG/checkpoint/publish chung nhưng resolve prompt,
+format, giọng và renderer theo từng item. Xem `profiles/README.md`; hai profile
+mẫu là `one-cup-cafe-6h` (B-roll local) và `ban-so-6` (series nhân vật 3 giọng).
+
 ## Bộ lệnh CLI (`ytb`)
 
 Toàn bộ pipeline điều khiển qua lệnh `ytb`. Cài symlink để gõ từ bất kỳ đâu:

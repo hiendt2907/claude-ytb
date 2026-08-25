@@ -452,9 +452,16 @@ def audio_duration_target_sec(
 def _target_duration(voiceover: Voiceover) -> float | None:
     segment_count = len(voiceover.segments)
     if segment_count > 0:
-        return audio_duration_target_sec(
-            voiceover.video_type, segment_count=segment_count,
-        )[0]
+        from ..content_profiles import load_content_profile
+
+        profile = (
+            load_content_profile(voiceover.content_profile_id)
+            if voiceover.content_profile_version else None
+        )
+        lower, upper = contract_for(
+            voiceover.video_type, profile
+        ).audio_runtime_bounds_sec(segment_count=segment_count)
+        return (lower + upper) / 2
     if voiceover.target_minutes is not None and voiceover.target_minutes > 0:
         return voiceover.target_minutes * 60
     if voiceover.duration_sec > 0:
@@ -471,10 +478,16 @@ def _duration_tolerance(voiceover: Voiceover, fallback_sec: float) -> float:
     segment_count = len(voiceover.segments)
     if segment_count <= 0:
         return fallback_sec
-    return max(
-        fallback_sec,
-        audio_duration_target_sec(voiceover.video_type, segment_count=segment_count)[1],
+    from ..content_profiles import load_content_profile
+
+    profile = (
+        load_content_profile(voiceover.content_profile_id)
+        if voiceover.content_profile_version else None
     )
+    lower, upper = contract_for(
+        voiceover.video_type, profile
+    ).audio_runtime_bounds_sec(segment_count=segment_count)
+    return max(fallback_sec, (upper - lower) / 2)
 
 
 def _sha256_file(path: Path | None) -> str:

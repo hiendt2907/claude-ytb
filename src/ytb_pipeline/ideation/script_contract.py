@@ -14,6 +14,7 @@ from math import isfinite
 from typing import Any, Literal, Mapping
 
 from ..content_contract import CONTRACT_VERSION, contract_for
+from ..content_profiles import ContentProfile, ContentProfileError, load_content_profile
 
 
 Profile = Literal["current", "legacy"]
@@ -60,6 +61,30 @@ def validate_script_payload(payload: Mapping[str, Any] | object) -> ScriptContra
         )
 
     findings: list[ScriptContractFinding] = []
+    content_profile = None
+    declared_profile_id = _text(payload.get("profile_id"))
+    if declared_profile_id:
+        try:
+            content_profile = load_content_profile(declared_profile_id)
+        except ContentProfileError as exc:
+            _add(findings, "profile.valid", "profile_id", str(exc))
+            return ScriptContractResult("current", False, tuple(findings))
+    declared_version = _text(payload.get("profile_version"))
+    if content_profile is not None:
+        if not declared_version:
+            _add(
+                findings,
+                "profile.version_required",
+                "profile_version",
+                "Script có profile_id phải khai báo profile_version.",
+            )
+        elif declared_version != content_profile.version:
+            _add(
+                findings,
+                "profile.version_matches",
+                "profile_version",
+                f"profile_version phải là {content_profile.version!r}.",
+            )
     video_type = _text(payload.get("video_type")).lower()
     if video_type not in ("short", "long"):
         _add(
@@ -69,14 +94,23 @@ def validate_script_payload(payload: Mapping[str, Any] | object) -> ScriptContra
             "video_type phải là 'short' hoặc 'long'.",
         )
         _validate_thumbnail(payload.get("thumbnail_brief"), findings)
-        _validate_sections(payload.get("sections"), findings, None)
+        _validate_sections(payload.get("sections"), findings, None, content_profile)
         return ScriptContractResult("current", False, tuple(findings))
 
-    contract = contract_for(video_type)
-    _validate_target(payload, video_type, findings)
+    contract = contract_for(video_type, content_profile)
+    _validate_target(payload, video_type, findings, content_profile)
     _validate_thumbnail(payload.get("thumbnail_brief"), findings)
-    sections = _validate_sections(payload.get("sections"), findings, contract.minimum_sections)
-    if video_type == "short":
+    sections = _validate_sections(
+        payload.get("sections"), findings, contract.minimum_sections, content_profile,
+        maximum_sections=(
+            content_profile.format_for(video_type).max_sections
+            if content_profile is not None else None
+        ),
+    )
+    if video_type == "short" and (
+        content_profile is None
+        or content_profile.content_rules.require_short_source_trace
+    ):
         _validate_short_strategy(payload.get("strategy"), sections, findings)
 
     return ScriptContractResult("current", not findings, tuple(findings))
@@ -101,7 +135,8 @@ def _legacy_result(path: str, message: str) -> ScriptContractResult:
 
 
 def _validate_target(
-    payload: Mapping[str, Any], video_type: str, findings: list[ScriptContractFinding]
+    payload: Mapping[str, Any], video_type: str, findings: list[ScriptContractFinding],
+    content_profile: ContentProfile | None = None,
 ) -> None:
     target = payload.get("target_minutes")
     if video_type == "short":
@@ -122,7 +157,7 @@ def _validate_target(
             "Long phải có target_minutes là số dương.",
         )
         return
-    lower_sec, upper_sec = contract_for("long").viewer_runtime_bounds_sec
+    lower_sec, upper_sec = contract_for("long", content_profile).viewer_runtime_bounds_sec
     if not lower_sec / 60 <= float(target) <= upper_sec / 60:
         _add(
             findings,
@@ -152,7 +187,9 @@ def _validate_thumbnail(raw: object, findings: list[ScriptContractFinding]) -> N
 
 
 def _validate_sections(
-    raw: object, findings: list[ScriptContractFinding], minimum_sections: int | None
+    raw: object, findings: list[ScriptContractFinding], minimum_sections: int | None,
+    content_profile: ContentProfile | None = None,
+    maximum_sections: int | None = None,
 ) -> tuple[Mapping[str, Any], ...]:
     if not isinstance(raw, list):
         _add(findings, "sections.required", "sections", "sections phải là một mảng.")
@@ -163,6 +200,13 @@ def _validate_sections(
             "sections.minimum_count",
             "sections",
             f"Cần ít nhất {minimum_sections} section theo content contract.",
+        )
+    if maximum_sections is not None and len(raw) > maximum_sections:
+        _add(
+            findings,
+            "sections.maximum_count",
+            "sections",
+            f"Không được vượt quá {maximum_sections} section theo content profile.",
         )
 
     sections: list[Mapping[str, Any]] = []
@@ -182,7 +226,12 @@ def _validate_sections(
                 path,
                 "voiceover hoặc narration không được để trống.",
             )
-        for field in ("purpose", "visual_intent", "pexels_query"):
+        required_fields = ["purpose", "visual_intent"]
+        if content_profile is None or content_profile.content_rules.require_pexels_query:
+            required_fields.append("pexels_query")
+        if content_profile is not None and content_profile.narrative_mode == "character_story":
+            required_fields.extend(("speaker_id", "visual_asset"))
+        for field in required_fields:
             if not _text(section.get(field)):
                 _add(
                     findings,
@@ -190,6 +239,18 @@ def _validate_sections(
                     f"{path}.{field}",
                     f"{field} không được để trống.",
                 )
+        if (
+            content_profile is not None
+            and content_profile.narrative_mode == "character_story"
+            and _text(section.get("speaker_id"))
+            and _text(section.get("speaker_id")).lower() not in content_profile.voice_cast
+        ):
+            _add(
+                findings,
+                f"{path}.speaker_id.in_voice_cast",
+                f"{path}.speaker_id",
+                f"speaker_id phải thuộc voice_cast: {sorted(content_profile.voice_cast)}.",
+            )
         if not _positive_number(section.get("time_goal")):
             _add(
                 findings,

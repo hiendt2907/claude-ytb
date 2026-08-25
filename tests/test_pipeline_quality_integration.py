@@ -185,6 +185,42 @@ def test_voice_provider_receives_project_id_as_artifact_slug(monkeypatch, tmp_pa
     assert received_scripts[0].project_id == "nao-ne-viec-kho"
 
 
+def test_resumed_voiceover_keeps_project_id_for_renderer(monkeypatch, tmp_path):
+    audio_result = SimpleNamespace(
+        passed=True, issues=(), cache_key="audio-key", cached=False, metrics={}, repair_payload={},
+    )
+    project, checkpoint, rendered_calls = _prepare_run(monkeypatch, tmp_path, audio_result)
+    voice = _voiceover(tmp_path)
+    project = replace(project, project_id=Path(project.script_path).stem)
+    project = replace(project, metadata={
+        "script_sha256": pipeline._script_sha256(Path(project.script_path)),
+        "ruleset_id": pipeline._script_ruleset_id(Path(project.script_path)),
+        **pipeline._script_profile(Path(project.script_path)),
+    })
+    project = checkpoint.mark_done(
+        project,
+        "voiceover",
+        str(voice.audio_path),
+        {
+            "duration_sec": voice.duration_sec,
+            "segments": [
+                {
+                    "index": index,
+                    "audio_path": str(segment.audio_path),
+                    "duration_sec": segment.duration_sec,
+                }
+                for index, segment in enumerate(voice.segments)
+            ],
+        },
+    )
+    checkpoint.save(project)
+
+    resumed = pipeline.load_or_create_project(project.script_path, checkpoint)
+    asyncio.run(pipeline.run_project(resumed, checkpoint, through="render"))
+
+    assert rendered_calls[0].project_id == "approved"
+
+
 @pytest.mark.parametrize("mode", ["report", "strict"])
 def test_failed_audio_gate_blocks_render_in_every_mode(monkeypatch, tmp_path, mode):
     """A real audio-content defect always blocks render — not just in strict.
@@ -502,6 +538,7 @@ def test_a_gate_fix_unblocks_a_stale_failed_verdict_on_resume_without_batch_rese
         metadata={
             "script_sha256": pipeline._script_sha256(Path(project.script_path)),
             "ruleset_id": pipeline._script_ruleset_id(Path(project.script_path)),
+            **pipeline._script_profile(Path(project.script_path)),
         },
     )
     monkeypatch.setattr(pipeline.settings, "quality_gate_mode", "report")

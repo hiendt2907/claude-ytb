@@ -9,8 +9,12 @@ these values so a video cannot pass one stage and fail another by design.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from .config.settings import settings
+
+if TYPE_CHECKING:
+    from .content_profiles import ContentProfile
 
 
 CONTRACT_VERSION = "2026-07-28.1"
@@ -59,6 +63,8 @@ class ContentContract:
     minimum_sections: int
     answer_start_target_sec: float | None = None
     answer_start_deadline_sec: float | None = None
+    transition_overlap_sec: float = TRANSITION_OVERLAP_SEC
+    inter_segment_gap_sec: float = 0.0
 
     def situation_char_budget(self, *, chars_per_minute: float) -> int:
         """Longest opening hook that still starts the answer by the target.
@@ -79,7 +85,9 @@ class ContentContract:
 
     def transition_loss_sec(self, segment_count: int) -> float:
         """Known overlap removed by the renderer for this number of sections."""
-        return max(0, segment_count - 1) * TRANSITION_OVERLAP_SEC
+        return max(0, segment_count - 1) * (
+            self.transition_overlap_sec - self.inter_segment_gap_sec
+        )
 
     def audio_runtime_bounds_sec(self, *, segment_count: int) -> tuple[float, float]:
         """Audio range that yields the stated viewer-visible final duration."""
@@ -123,7 +131,9 @@ class ContentContract:
             raise ValueError(f"{label} quá dài {upper:.0f}s: {qualifier}{duration_sec:.1f}s.")
 
 
-def _build_contract(video_type: str) -> ContentContract:
+def _build_contract(
+    video_type: str, content_profile: "ContentProfile | None" = None
+) -> ContentContract:
     """Dựng contract từ settings TẠI THỜI ĐIỂM GỌI, không đóng băng lúc import.
 
     Cửa sổ runtime là một tham số vận hành, không phải hằng số biên dịch: định
@@ -136,32 +146,66 @@ def _build_contract(video_type: str) -> ContentContract:
         # E2E renderers can lose up to ~2s to transition overlap; keep the
         # operator's floor while letting the bounded test profile verify the
         # complete downstream path without regenerating content.
-        lower = settings.short_viewer_min_sec - 2.0 if settings.e2e_test else settings.short_viewer_min_sec
+        profile_format = content_profile.format_for("short") if content_profile else None
+        configured_lower = (
+            profile_format.viewer_min_sec if profile_format else settings.short_viewer_min_sec
+        )
+        configured_upper = (
+            profile_format.viewer_max_sec if profile_format else settings.short_viewer_max_sec
+        )
+        lower = configured_lower - 2.0 if settings.e2e_test else configured_lower
         return ContentContract(
             video_type="short",
-            viewer_runtime_bounds_sec=(lower, settings.short_viewer_max_sec),
-            minimum_sections=settings.short_min_sections,
+            viewer_runtime_bounds_sec=(lower, configured_upper),
+            minimum_sections=(
+                profile_format.min_sections if profile_format else settings.short_min_sections
+            ),
             answer_start_target_sec=4.0,
             answer_start_deadline_sec=5.0,
+            transition_overlap_sec=(
+                content_profile.render.transition_overlap_sec
+                if content_profile else TRANSITION_OVERLAP_SEC
+            ),
+            inter_segment_gap_sec=(
+                content_profile.render.inter_segment_gap_sec if content_profile else 0.0
+            ),
         )
+    profile_format = content_profile.format_for("long") if content_profile else None
     return ContentContract(
         video_type="long",
         viewer_runtime_bounds_sec=(
             (180.0, 240.0) if settings.e2e_test
-            else (settings.long_viewer_min_sec, settings.long_viewer_max_sec)
+            else (
+                (profile_format.viewer_min_sec, profile_format.viewer_max_sec)
+                if profile_format
+                else (settings.long_viewer_min_sec, settings.long_viewer_max_sec)
+            )
         ),
-        minimum_sections=8 if settings.e2e_test else settings.long_min_sections,
+        minimum_sections=(
+            8 if settings.e2e_test
+            else profile_format.min_sections if profile_format
+            else settings.long_min_sections
+        ),
+        transition_overlap_sec=(
+            content_profile.render.transition_overlap_sec
+            if content_profile else TRANSITION_OVERLAP_SEC
+        ),
+        inter_segment_gap_sec=(
+            content_profile.render.inter_segment_gap_sec if content_profile else 0.0
+        ),
     )
 
 
-def contract_for(video_type: str) -> ContentContract:
+def contract_for(
+    video_type: str, content_profile: "ContentProfile | None" = None
+) -> ContentContract:
     try:
         normalized = video_type.strip().lower()
     except AttributeError as exc:
         raise ValueError(f"video_type không hợp lệ cho content contract: {video_type!r}") from exc
     if normalized not in ("short", "long"):
         raise ValueError(f"video_type không hợp lệ cho content contract: {video_type!r}")
-    return _build_contract(normalized)
+    return _build_contract(normalized, content_profile)
 
 
 def chars_per_min_for_provider(provider: str, *, video_type: str | None = None) -> float:

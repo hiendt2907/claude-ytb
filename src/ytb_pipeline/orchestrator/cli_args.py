@@ -94,6 +94,10 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
     )
     p_start.add_argument("--num-of-vid", "-n", type=int, default=None, help="Số video cần viết kịch bản (hỏi interactive nếu bỏ qua)")
     p_start.add_argument(
+        "--profile", dest="profile_id", default=None,
+        help="Content profile theo tên thư mục trong profiles/ (mặc định CONTENT_PROFILE_ID).",
+    )
+    p_start.add_argument(
         "--type-of-vid", choices=["long", "short"], default="long",
         help="long = video dài ngang 12-15 phút, short = dọc 1-1.5 phút (mặc định long)",
     )

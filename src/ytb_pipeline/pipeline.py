@@ -32,6 +32,7 @@ from .analytics.quality_report import (
 from .agents.base import AgentStatus
 from .agents.qa_agent import QAAgent
 from .content_contract import CONTRACT_VERSION
+from .content_profiles import load_content_profile, profile_fingerprint
 from .ideation.generator import load_script
 from .ideation.script_contract import validate_script_payload
 from .project.checkpoint import CheckpointManager
@@ -218,18 +219,25 @@ def load_or_create_project(script_source: str, checkpoint: CheckpointManager) ->
     path = _resolve(script_source)
     script_sha256 = _script_sha256(path)
     script_ruleset_id = _script_ruleset_id(path)
+    script_profile = _script_profile(path)
     existing = checkpoint.load(path.stem)
     if existing is None:
         project = Project(
             project_id=path.stem,
             script_path=str(path),
-            metadata={"script_sha256": script_sha256, "ruleset_id": script_ruleset_id},
+            metadata={
+                "script_sha256": script_sha256,
+                "ruleset_id": script_ruleset_id,
+                **script_profile,
+            },
         )
     else:
         metadata = dict(existing.metadata)
         if (
             metadata.get("script_sha256") != script_sha256
             or metadata.get("ruleset_id") != script_ruleset_id
+            or metadata.get("content_profile_fingerprint")
+            != script_profile.get("content_profile_fingerprint")
             # A legacy ruleset can reference audio rendered with an obsolete
             # F5 tempo or a superseded QA policy.  It must never resume a
             # DONE node simply because its on-disk script/checkpoint agree.
@@ -239,10 +247,15 @@ def load_or_create_project(script_source: str, checkpoint: CheckpointManager) ->
             # No downstream artifact may survive a script or contract change.
             # This is intentionally broader than file-existence stale checks:
             # otherwise old narration/render could be uploaded with new metadata.
-            metadata.update({"script_sha256": script_sha256, "ruleset_id": script_ruleset_id})
+            metadata.update({
+                "script_sha256": script_sha256,
+                "ruleset_id": script_ruleset_id,
+                **script_profile,
+            })
             project = replace(existing, script_path=str(path), nodes={}, metadata=metadata)
         else:
-            project = replace(existing, script_path=str(path))
+            metadata.update(script_profile)
+            project = replace(existing, script_path=str(path), metadata=metadata)
     project = _reset_stale_nodes(project)
     checkpoint.save(project)
     return project
@@ -260,6 +273,21 @@ def _script_ruleset_id(path: Path) -> str:
     except json.JSONDecodeError as exc:
         raise ValueError(f"Kịch bản không phải JSON hợp lệ: {path}") from exc
     return str(raw.get("ruleset_id", "")).strip()
+
+
+def _script_profile(path: Path) -> dict[str, str]:
+    """Persist the profile identity beside checkpoints for audit/resume."""
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Kịch bản không phải JSON hợp lệ: {path}") from exc
+    profile_id = str(raw.get("profile_id") or settings.content_profile_id).strip()
+    profile = load_content_profile(profile_id)
+    return {
+        "content_profile_id": profile_id,
+        "content_profile_version": str(raw.get("profile_version") or "").strip(),
+        "content_profile_fingerprint": profile_fingerprint(profile),
+    }
 
 
 def _reset_stale_nodes(project: Project) -> Project:
@@ -430,7 +458,7 @@ async def run_project(project: Project, checkpoint: CheckpointManager, through: 
         ref = checkpoint.get_output(current, "voiceover")
         if not ref:
             raise ValueError("voiceover node chưa có output_ref để resume")
-        script = script_for(current)
+        script = replace(script_for(current), project_id=current.project_id)
         data = checkpoint.get_output_data(current, "voiceover")
         audio_path = Path(ref)
         voiced = []

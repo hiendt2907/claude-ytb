@@ -38,10 +38,10 @@ SCRIPT_LLM_MAX_TOKENS = int(os.environ.get("IDEATION_LLM_MAX_TOKENS", "14000"))
 
 from ..claude_cli import build_claude_cmd
 from ..ideation.series import slugify
+from ..content_profiles import load_content_profile
 from ..providers.registry import get_llm_provider
 from .ideation_provider_cascade import CascadeScriptProvider
 from .ideation_prompts import (
-    SCRIPT_GENERATION_SYSTEM_PROMPT,
     SHORT_MAX_CHARS,
     SHORT_MIN_CHARS,
     SHORT_TARGET_CHARS,
@@ -51,6 +51,7 @@ from .ideation_prompts import (
     is_personal_finance_psychology_request,
     local_script_prompt,
     repair_prompt,
+    script_generation_system_prompt,
 )
 from .ideation_script_fix import (
     IdeationQualityFailure,
@@ -303,6 +304,9 @@ def _validate_short_generation_request(args: argparse.Namespace) -> None:
     """Fail before an LLM call when a new Short cannot enter the v1 funnel."""
     if getattr(args, "type_of_vid", "") != "short":
         return
+    profile = getattr(args, "_content_profile", None)
+    if profile is not None and not profile.content_rules.require_short_source_trace:
+        return
     required = {
         "batch-key": str(getattr(args, "batch_key", "") or "").strip(),
         "long-form-slug": str(getattr(args, "long_form_slug", "") or "").strip(),
@@ -450,6 +454,12 @@ async def _cmd_start_local(args: argparse.Namespace) -> None:
     from ..analytics.feedback import AnalyticsStore
     cli = _cli()
     provider = getattr(args, "_provider", None) or get_llm_provider()
+    content_profile = getattr(args, "_content_profile", None) or load_content_profile(
+        getattr(args, "profile_id", None)
+    )
+    generation_profile = (
+        content_profile if getattr(args, "_profile_scoped", False) else None
+    )
     # Quality gates are provider-independent: a valid script must meet the
     # same channel standard whether it was drafted by Claude or Codex.
     strict_qa = getattr(args, "_strict_qa", True)
@@ -481,7 +491,7 @@ async def _cmd_start_local(args: argparse.Namespace) -> None:
     }
     source_long_context = None
     used_source_section_indexes: set[int] = set()
-    if args.type_of_vid == "short":
+    if args.type_of_vid == "short" and content_profile.content_rules.require_short_source_trace:
         source_long_context = load_short_source_long_context(
             resolve_short_source_long_path(
                 scripts_dir, funnel["long_form_slug"],
@@ -546,17 +556,20 @@ async def _cmd_start_local(args: argparse.Namespace) -> None:
             analytics_feedback,
             funnel,
             available_source_long_context,
+            content_profile=generation_profile,
         )
         print(f"{prefix} prompt: preparing request", flush=True)
         append_local_start_log(log_path, f"PROMPT {i}", prompt)
         print(f"{prefix} LLM: generating script JSON...", flush=True)
         text = await provider.complete(
             prompt,
-            system=SCRIPT_GENERATION_SYSTEM_PROMPT,
+            system=script_generation_system_prompt(generation_profile),
             max_tokens=SCRIPT_LLM_MAX_TOKENS,
             temperature=0.2,
             json_output=True,
-            response_schema=script_generation_schema(args.type_of_vid),
+            response_schema=script_generation_schema(
+                args.type_of_vid, content_profile=generation_profile
+            ),
         )
         append_local_start_log(log_path, f"RAW_LLM_RESPONSE {i}", text)
         print(f"{prefix} LLM: response received", flush=True)
@@ -565,6 +578,9 @@ async def _cmd_start_local(args: argparse.Namespace) -> None:
             # after Qwen and before validate_or_repair_script/QA.  It never
             # spends an additional LLM call.
             payload = process_and_sanitize(text)
+            if generation_profile is not None:
+                payload["profile_id"] = generation_profile.profile_id
+                payload["profile_version"] = generation_profile.version
             if available_source_long_context is not None:
                 payload = attach_preassigned_short_source_provenance(
                     payload, available_source_long_context
@@ -649,7 +665,7 @@ async def _cmd_start_local(args: argparse.Namespace) -> None:
             print(f"{prefix} rejected: QA terminal failure; generating a replacement candidate", flush=True)
             continue
         write_local_batch_item(script_path, payload, args)
-        if args.type_of_vid == "short":
+        if args.type_of_vid == "short" and content_profile.content_rules.require_short_source_trace:
             used_source_section_indexes.add(payload["strategy"]["source_section_index"])
         ledger_text += f"\n| local | {slug} | {payload.get('title', '')} | ideation | ok | LLM |\n"
         used_slugs.add(slug)
@@ -684,11 +700,20 @@ def cmd_start(args: argparse.Namespace) -> None:
             "Dùng `--llm claude` hoặc `--llm codex`."
         )
 
+    profile_scoped = hasattr(args, "profile_id")
+    content_profile = load_content_profile(getattr(args, "profile_id", None))
+    setattr(args, "_content_profile", content_profile)
+    setattr(args, "_profile_scoped", profile_scoped)
+    if profile_scoped:
+        setattr(args, "profile_id", content_profile.profile_id)
     _validate_short_generation_request(args)
 
     # requested_provider từ --llm, hoặc settings.llm_provider mặc định
     # (xkiro — cascade tự động sang Codex CLI rồi Claude CLI khi lỗi).
-    requested_provider = getattr(args, "llm_provider", None) or _cli().settings.llm_provider
+    requested_provider = (
+        getattr(args, "llm_provider", None)
+        or (content_profile.providers.llm if profile_scoped else _cli().settings.llm_provider)
+    )
     if requested_provider in {"claude", "codex", "xkiro"}:
         setattr(args, "_provider", _configured_script_provider(requested_provider))
         setattr(args, "_strict_qa", True)

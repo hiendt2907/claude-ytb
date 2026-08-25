@@ -96,10 +96,17 @@ def test_profile_loader_rejects_traversal_and_identity_mismatch(tmp_path):
         load_content_profile("ban-so-6", profiles_dir=tmp_path)
     with pytest.raises(ContentProfileError, match="không hợp lệ"):
         load_content_profile("../secrets", profiles_dir=tmp_path)
+    payload["profile_id"] = "ban-so-6"
+    payload_path.write_text(json.dumps(payload), encoding="utf-8")
+    profile = load_content_profile("ban-so-6", profiles_dir=tmp_path)
+    with pytest.raises(ContentProfileError, match="không được đi ra ngoài"):
+        profile.visual_asset_path("../profile.json")
 
 
 def test_builtin_topic_profiles_are_self_contained():
     from ytb_pipeline.content_profiles import load_content_profile
+    from ytb_pipeline.content_contract import contract_for
+    from ytb_pipeline.render.story import expected_story_duration_sec
 
     explainer = load_content_profile("one-cup-cafe-6h")
     story = load_content_profile("ban-so-6")
@@ -110,6 +117,20 @@ def test_builtin_topic_profiles_are_self_contained():
     assert story.content_rules.require_pexels_query is False
     assert story.voice_for("minh") != story.voice_for("an")
     assert "văn nói" in story.prompt_text("spoken_language").casefold()
+    assert story.render.transition_overlap_sec == pytest.approx(0.4)
+    assert contract_for("short", story).transition_loss_sec(9) == pytest.approx(0.0)
+    assert expected_story_duration_sec(story, [5.0] * 9) == pytest.approx(45.0)
+
+
+def test_story_system_prompt_includes_declared_series_memory():
+    from ytb_pipeline.content_profiles import load_content_profile
+    from ytb_pipeline.orchestrator.ideation_prompts import script_generation_system_prompt
+
+    system = script_generation_system_prompt(load_content_profile("ban-so-6"))
+
+    assert "29 tuổi" in system
+    assert "chỗ dột" in system
+    assert "Bảy lần mở laptop" in system
 
 
 def test_queue_loads_profile_and_legacy_item_uses_configured_default(tmp_path, monkeypatch):
@@ -126,6 +147,7 @@ def test_queue_loads_profile_and_legacy_item_uses_configured_default(tmp_path, m
                     "slug": "story",
                     "orientation": "landscape",
                     "profile_id": "ban-so-6",
+                    "profile_version": "1.0.0",
                 },
             ],
             "short_videos": [],
@@ -137,6 +159,7 @@ def test_queue_loads_profile_and_legacy_item_uses_configured_default(tmp_path, m
     items = load_queue(path, batch_key="shorts_funnel_batch_profiles")
 
     assert [item.profile_id for item in items] == ["one-cup-cafe-6h", "ban-so-6"]
+    assert [item.profile_version for item in items] == ["", "1.0.0"]
 
 
 def test_batch_environment_is_resolved_from_profile_not_hardcoded(tmp_path, monkeypatch):
@@ -156,6 +179,25 @@ def test_batch_environment_is_resolved_from_profile_not_hardcoded(tmp_path, monk
     assert env["BROLL_ALLOW_DOWNLOADS"] == "false"
     assert env["SHORT_VIEWER_MIN_SEC"] == "30.0"
     assert env["LONG_VIEWER_MAX_SEC"] == "420.0"
+
+
+def test_queue_and_explicit_script_profile_must_match(tmp_path):
+    from ytb_pipeline.orchestrator.pipeline_runner import validate_queue_profile_binding
+    from ytb_pipeline.orchestrator.queue_manager import QueueItem
+
+    path = tmp_path / "story.json"
+    path.write_text(json.dumps({
+        "profile_id": "ban-so-6", "profile_version": "1.0.0"
+    }), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="mismatch"):
+        validate_queue_profile_binding(
+            QueueItem(
+                1, "story", "", "queued", profile_id="one-cup-cafe-6h",
+                profile_version="1.0.0",
+            ),
+            path,
+        )
 
 
 def test_cli_accepts_profile_for_batch_start():
@@ -189,6 +231,34 @@ def test_profile_prompt_replaces_channel_hardcode_and_static_six_section_budget(
     assert "grounded Pexels queries" not in prompt
 
 
+def test_custom_story_idea_keeps_profile_voice_instead_of_old_knowledge_channel_rules():
+    from ytb_pipeline.content_profiles import load_content_profile
+    from ytb_pipeline.orchestrator.ideation_prompts import local_script_prompt
+
+    prompt = local_script_prompt(
+        1, 1, "short", "Minh ngại gửi bản nháp", "",
+        content_profile=load_content_profile("ban-so-6"),
+    )
+
+    assert "not entertainment" not in prompt
+    assert "knowledge Short" not in prompt
+    assert "Minh ngại gửi bản nháp" in prompt
+
+
+def test_story_prompt_lists_only_assets_available_in_the_profile():
+    from ytb_pipeline.content_profiles import load_content_profile
+    from ytb_pipeline.orchestrator.ideation_prompts import local_script_prompt
+
+    profile = load_content_profile("ban-so-6")
+    prompt = local_script_prompt(
+        1, 1, "short", "auto", "", content_profile=profile
+    )
+
+    assert "Use only these visual_asset filenames" in prompt
+    assert "opening.png" in prompt
+    assert "character-sheet.png" not in prompt
+
+
 def test_generation_schema_follows_profile_section_and_visual_contract(tmp_path):
     from ytb_pipeline.content_profiles import load_content_profile
     from ytb_pipeline.ideation.generation_schema import script_generation_schema
@@ -204,8 +274,147 @@ def test_generation_schema_follows_profile_section_and_visual_contract(tmp_path)
     assert sections["maxItems"] == 4
     assert "speaker_id" in sections["items"]["properties"]
     assert "visual_asset" in sections["items"]["properties"]
+    assert sections["items"]["properties"]["speaker_id"]["enum"] == [
+        "an", "minh", "narrator"
+    ]
     assert "pexels_query" not in required
     assert schema["properties"]["profile_id"]["const"] == "ban-so-6"
+
+
+def test_release_contract_fails_closed_on_profile_version_cast_and_section_cap():
+    from ytb_pipeline.ideation.script_contract import validate_script_payload
+
+    fixture = Path("profiles/ban-so-6/fixtures/episode-01-short.json")
+    payload = json.loads(fixture.read_text(encoding="utf-8"))
+
+    without_version = dict(payload)
+    without_version.pop("profile_version")
+    assert "profile.version_required" in {
+        finding.rule for finding in validate_script_payload(without_version).findings
+    }
+
+    bad_cast = json.loads(json.dumps(payload))
+    bad_cast["sections"][1]["speaker_id"] = "minhh"
+    assert "sections[1].speaker_id.in_voice_cast" in {
+        finding.rule for finding in validate_script_payload(bad_cast).findings
+    }
+
+    too_many = json.loads(json.dumps(payload))
+    while len(too_many["sections"]) <= 12:
+        too_many["sections"].append(dict(too_many["sections"][2]))
+    assert "sections.maximum_count" in {
+        finding.rule for finding in validate_script_payload(too_many).findings
+    }
+
+
+def test_loader_rejects_explicit_profile_without_version_and_too_many_sections(tmp_path):
+    from ytb_pipeline.ideation.generator import load_script
+
+    fixture = Path("profiles/ban-so-6/fixtures/episode-01-short.json")
+    payload = json.loads(fixture.read_text(encoding="utf-8"))
+    payload.pop("profile_version")
+    path = tmp_path / "missing-version.json"
+    path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    with pytest.raises(ValueError, match="profile_version"):
+        load_script(path)
+
+    payload["profile_version"] = "1.0.0"
+    while len(payload["sections"]) <= 12:
+        payload["sections"].append(dict(payload["sections"][2]))
+    path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    with pytest.raises(ValueError, match="tối đa 12"):
+        load_script(path)
+
+
+def test_profile_loader_rejects_string_booleans_nonfinite_numbers_and_dialogue_overlap(
+    tmp_path,
+):
+    from ytb_pipeline.content_profiles import ContentProfileError, load_content_profile
+
+    folder = _write_profile(tmp_path, "strict-profile")
+    config_path = folder / "profile.json"
+    base = json.loads(config_path.read_text(encoding="utf-8"))
+
+    invalid_cases = (
+        lambda raw: raw["render"].update({"show_captions": "false"}),
+        lambda raw: raw["render"].update({"inter_segment_gap_sec": float("nan")}),
+        lambda raw: raw["render"].update(
+            {"inter_segment_gap_sec": 0.1, "transition_overlap_sec": 0.4}
+        ),
+    )
+    for mutate in invalid_cases:
+        raw = json.loads(json.dumps(base))
+        mutate(raw)
+        config_path.write_text(json.dumps(raw), encoding="utf-8")
+        with pytest.raises(ContentProfileError):
+            load_content_profile("strict-profile", profiles_dir=tmp_path)
+
+
+def test_profile_loader_uses_profile_tts_for_runtime_estimation(monkeypatch):
+    from ytb_pipeline.content_profiles import load_content_profile
+    from ytb_pipeline.ideation import generator
+    from ytb_pipeline.pkg.models import Segment
+
+    profile = load_content_profile("ban-so-6")
+    calls: list[tuple[str | None, str | None]] = []
+
+    def calibrated(provider=None, *, video_type=None):
+        calls.append((provider, video_type))
+        return 1030.0
+
+    monkeypatch.setattr(generator, "chars_per_min_for_provider", calibrated)
+    segments = tuple(Segment("", "x" * 190) for _ in range(4))
+
+    generator._validate_length(
+        segments,
+        None,
+        "profile.json",
+        renderer_aware=True,
+        content_profile=profile,
+    )
+
+    assert calls == [("xkiro", "short")]
+
+
+def test_story_short_normalizer_derives_budget_from_declared_profile():
+    from ytb_pipeline.content_contract import chars_per_min_for_provider, contract_for
+    from ytb_pipeline.content_profiles import load_content_profile
+    from ytb_pipeline.orchestrator.ideation_script_fix import (
+        normalize_short_narration,
+        short_narration_chars,
+    )
+
+    profile = load_content_profile("ban-so-6")
+    payload = {
+        "profile_id": profile.profile_id,
+        "profile_version": profile.version,
+        "video_type": "short",
+        "sections": [
+            {"purpose": purpose, "voiceover": "Một câu kể tự nhiên. " * 12}
+            for purpose in ("situation", "core_answer", "application", "payoff")
+        ],
+    }
+    absolute_max = int(
+        chars_per_min_for_provider(profile.providers.tts, video_type="short")
+        * contract_for("short", profile).audio_runtime_bounds_sec(segment_count=4)[1]
+        / 60
+    )
+
+    fixed, note = normalize_short_narration(payload, expected_video_type="short")
+
+    assert note is not None
+    assert short_narration_chars(fixed) <= absolute_max
+
+
+def test_repair_followup_uses_declared_profile_system_prompt():
+    from ytb_pipeline.orchestrator.ideation_script_fix import repair_system_prompt
+
+    system = repair_system_prompt({
+        "profile_id": "ban-so-6", "profile_version": "1.0.0"
+    })
+
+    assert "Bàn số 6" in system
+    assert "chỗ dột" in system
 
 
 def test_story_script_loads_profile_speaker_and_visual_asset(tmp_path, write_script, monkeypatch):

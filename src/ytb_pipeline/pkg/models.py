@@ -90,6 +90,8 @@ class Segment:
     purpose: str = ""         # situation | core_answer | evidence | application | payoff
     audio_path: Path | None = None
     duration_sec: float = 0.0
+    speaker_id: str = "narrator"  # lookup qua voice_cast của content profile
+    visual_asset: str = ""    # path tương đối trong <profile>/assets cho story render
 
 
 @dataclass(frozen=True)
@@ -153,6 +155,8 @@ class VideoIdea:
     compliance: ComplianceCheck | None = None
     strategy: ContentStrategy | None = None
     ruleset_id: str = ""
+    content_profile_id: str = "one-cup-cafe-6h"
+    content_profile_version: str = ""
 
 
 @dataclass(frozen=True)

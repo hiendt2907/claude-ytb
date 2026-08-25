@@ -11,9 +11,10 @@ from typing import Any
 from ..analytics.quality_report import missing_required_purposes
 from ..config.settings import settings
 from ..content_contract import chars_per_min_for_provider, contract_for, estimate_duration_sec
+from ..content_profiles import ContentProfile, ContentProfileError, load_content_profile
 from ..ideation.generator import load_script
 from ..ideation.script_contract import validate_script_payload
-from ..providers.registry import get_voice_provider
+from ..providers.registry import get_render_provider, get_voice_provider
 from ..render.asset_catalog import AssetCatalog
 
 # Orientation is a property of the video format, not of ambient config.
@@ -51,11 +52,27 @@ def preflight_script(script_path: Path | str) -> PreflightResult:
     _validate_runtime(script, failures)
     _validate_required_purposes(script, failures)
     _validate_orientation(script, failures)
-    _validate_tts(failures)
-    _validate_local_assets(payload, failures)
+    profile = _resolve_profile(payload, failures)
+    if profile is not None:
+        _validate_tts(failures, profile)
+        _validate_render(failures, profile)
+        _validate_local_assets(payload, failures, profile)
     _validate_thumbnail(payload, failures)
     _validate_disk(failures)
     return PreflightResult(path, tuple(failures))
+
+
+def _resolve_profile(
+    payload: dict[str, Any], failures: list[PreflightFailure]
+) -> ContentProfile | None:
+    try:
+        return load_content_profile(
+            str(payload.get("profile_id") or settings.content_profile_id)
+        )
+    except ContentProfileError as exc:
+        if not any(failure.code == "profile.valid" for failure in failures):
+            failures.append(PreflightFailure("profile.valid", str(exc), "profile_id"))
+        return None
 
 
 def format_preflight_result(result: PreflightResult) -> str:
@@ -101,11 +118,21 @@ def _validate_runtime(script: Any, failures: list[PreflightFailure]) -> None:
         # Same format-specific rate the prompt planned with, so admission and
         # generation cannot disagree about how long a script will speak.
         chars_per_minute=chars_per_min_for_provider(
-            settings.tts_provider, video_type=script.video_type,
+            (
+                load_content_profile(script.content_profile_id).providers.tts
+                if script.content_profile_version else settings.tts_provider
+            ),
+            video_type=script.video_type,
         ),
     )
     try:
-        contract_for(script.video_type).validate_audio_runtime(estimated, segment_count=len(script.segments))
+        profile = (
+            load_content_profile(script.content_profile_id)
+            if script.content_profile_version else None
+        )
+        contract_for(script.video_type, profile).validate_audio_runtime(
+            estimated, segment_count=len(script.segments)
+        )
     except ValueError as exc:
         failures.append(PreflightFailure("duration.estimated", str(exc)))
 
@@ -149,18 +176,57 @@ def _validate_orientation(script: Any, failures: list[PreflightFailure]) -> None
         ))
 
 
-def _validate_tts(failures: list[PreflightFailure]) -> None:
-    provider = get_voice_provider(settings.tts_provider)
+def _validate_tts(
+    failures: list[PreflightFailure], profile: ContentProfile
+) -> None:
+    try:
+        provider = get_voice_provider(profile.providers.tts)
+    except ValueError as exc:
+        failures.append(PreflightFailure("tts.available", str(exc)))
+        return
     if not provider.is_available():
         failures.append(PreflightFailure(
             "tts.available",
-            f"TTS provider '{settings.tts_provider}' chưa sẵn sàng.",
+            f"TTS provider '{profile.providers.tts}' chưa sẵn sàng.",
         ))
 
 
-def _validate_local_assets(payload: dict[str, Any], failures: list[PreflightFailure]) -> None:
+def _validate_render(
+    failures: list[PreflightFailure], profile: ContentProfile
+) -> None:
+    try:
+        provider = get_render_provider(profile.providers.render)
+    except ValueError as exc:
+        failures.append(PreflightFailure("render.available", str(exc)))
+        return
+    if not provider.is_available():
+        failures.append(PreflightFailure(
+            "render.available",
+            f"Render provider '{profile.providers.render}' chưa sẵn sàng.",
+        ))
+
+
+def _validate_local_assets(
+    payload: dict[str, Any], failures: list[PreflightFailure], profile: ContentProfile
+) -> None:
+    if profile.narrative_mode == "character_story":
+        for index, section in enumerate(payload.get("sections", ())):
+            if not isinstance(section, dict):
+                continue
+            relative = str(section.get("visual_asset") or "").strip()
+            try:
+                profile.visual_asset_path(relative)
+            except (OSError, ValueError):
+                failures.append(PreflightFailure(
+                    "asset.profile_missing",
+                    f"Không tìm thấy visual asset của profile cho section {index + 1}: '{relative}'.",
+                    f"sections[{index}].visual_asset",
+                ))
+        return
     catalog = AssetCatalog()
-    orientation = settings.orientation
+    orientation = _ORIENTATION_BY_VIDEO_TYPE.get(
+        str(payload.get("video_type") or "").strip().lower(), settings.orientation
+    )
     assets = catalog.assets_readonly()
     for index, section in enumerate(payload.get("sections", ())):
         if not isinstance(section, dict):

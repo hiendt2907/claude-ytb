@@ -12,6 +12,7 @@ module nào.
 from __future__ import annotations
 
 import os
+import json
 import re
 import subprocess
 import sys
@@ -20,6 +21,7 @@ from datetime import datetime
 from pathlib import Path
 
 from ..publish.youtube_auth import ReauthRequiredError
+from ..content_profiles import load_content_profile, profile_environment
 from .queue_manager import PIPELINE_LOG_DIR, QueueItem
 from .recovery_contract import RecoveryPlan, recovery_for_failure
 from .recovery_report import write_recovery_report
@@ -112,14 +114,12 @@ def build_env(item: QueueItem, *, publish: bool = False) -> dict:
     """Env bắt buộc cho mỗi lần chạy pipeline — TELEGRAM_APPROVAL=false để tránh
     đụng getUpdates với listener daemon (nguyên nhân lỗi 409 thực tế đã gặp)."""
     env = os.environ.copy()
+    profile = load_content_profile(item.profile_id or None)
+    env.update(profile_environment(profile))
     env.update(
         {
             "TELEGRAM_APPROVAL": "false",
-            "RENDER_PROVIDER": "ai",
             "ALLOW_CLOUD_PROVIDERS": "true",
-            "BROLL_STRATEGY": "pexels",
-            "VIDEO_PROVIDER": "pexels",
-            "BROLL_ALLOW_DOWNLOADS": "false",
             "E2E_TEST": "false",
             "ORIENTATION": item.orientation,
             "DRY_RUN": "false" if publish else "true",
@@ -127,6 +127,33 @@ def build_env(item: QueueItem, *, publish: bool = False) -> dict:
         }
     )
     return env
+
+
+def validate_queue_profile_binding(item: QueueItem, script_path: Path) -> None:
+    """Fail before subprocess when queue and explicit script profiles diverge."""
+    try:
+        raw = json.loads(script_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"Không đọc được script để kiểm profile: {script_path}: {exc}") from exc
+    if not isinstance(raw, dict):
+        raise ValueError(f"Script phải là JSON object: {script_path}")
+    script_profile_id = str(raw.get("profile_id") or "").strip()
+    if not script_profile_id:
+        return  # Legacy script compatibility; input gate applies global contract.
+    script_profile_version = str(raw.get("profile_version") or "").strip()
+    if not item.profile_version:
+        raise ValueError(
+            f"Queue item '{item.slug}' thiếu profile_version cho profile explicit."
+        )
+    if (item.profile_id, item.profile_version) != (
+        script_profile_id,
+        script_profile_version,
+    ):
+        raise ValueError(
+            f"Queue/script profile mismatch cho '{item.slug}': "
+            f"queue={item.profile_id}@{item.profile_version}, "
+            f"script={script_profile_id}@{script_profile_version}."
+        )
 
 
 def log_path_for(slug: str, log_dir: Path = PIPELINE_LOG_DIR) -> Path:
@@ -164,6 +191,7 @@ def run_pipeline_once(
     """
     cli = _cli()
     script_path = script_path or (cli.ROOT / "scripts" / f"{item.slug}.json")
+    validate_queue_profile_binding(item, script_path)
     log_path = cli.log_path_for(item.slug)
     log_path.parent.mkdir(parents=True, exist_ok=True)
 

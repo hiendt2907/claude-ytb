@@ -55,6 +55,8 @@ class QueueItem:
     format_id: str = ""
     angle: str = ""
     dry_run: bool = False
+    profile_id: str = ""
+    profile_version: str = ""
 
 
 def load_queue(auto_state_path: Path | None = None, batch_key: str | None = None) -> list[QueueItem]:
@@ -71,6 +73,8 @@ def load_queue(auto_state_path: Path | None = None, batch_key: str | None = None
         ("long", sorted(batch.get("long_videos", []), key=lambda video: int(video.get("day", 0))))
         , ("short", sorted(batch.get("short_videos", []), key=lambda video: int(video.get("day", 0))))
     )
+    from ..config.settings import settings
+
     items = [
         QueueItem(
             int(v["day"]),
@@ -88,6 +92,8 @@ def load_queue(auto_state_path: Path | None = None, batch_key: str | None = None
             v.get("format_id", ""),
             v.get("angle", ""),
             bool(v.get("dry_run", False)),
+            str(v.get("profile_id") or settings.content_profile_id),
+            str(v.get("profile_version") or ""),
         )
         for _kind, videos in grouped_videos
         for v in videos

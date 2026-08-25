@@ -41,7 +41,11 @@ def test_load_or_create_project_resumes_existing_done_nodes(tmp_path):
     existing = Project(
         project_id="vid-x",
         script_path=str(script),
-        metadata={"script_sha256": script_sha, "ruleset_id": pipeline.CONTRACT_VERSION},
+        metadata={
+            "script_sha256": script_sha,
+            "ruleset_id": pipeline.CONTRACT_VERSION,
+            **pipeline._script_profile(script),
+        },
     )
     existing = checkpoint.mark_done(existing, "ideation", str(script))
     checkpoint.save(existing)
@@ -86,6 +90,29 @@ def test_script_change_invalidates_all_downstream_artifacts(tmp_path):
 
     assert refreshed.nodes == {}
     assert refreshed.metadata["script_sha256"] == pipeline._script_sha256(script)
+
+
+def test_profile_fingerprint_change_invalidates_all_downstream_artifacts(tmp_path, monkeypatch):
+    checkpoint = CheckpointManager(tmp_path / "projects")
+    script = _script_file(tmp_path)
+    fingerprints = iter(("profile-a", "profile-b"))
+    monkeypatch.setattr(
+        pipeline,
+        "_script_profile",
+        lambda _path: {
+            "content_profile_id": "ban-so-6",
+            "content_profile_version": "1.0.0",
+            "content_profile_fingerprint": next(fingerprints),
+        },
+    )
+    project = pipeline.load_or_create_project(str(script), checkpoint)
+    project = checkpoint.mark_done(project, "voiceover", str(tmp_path / "old.mp3"))
+    checkpoint.save(project)
+
+    refreshed = pipeline.load_or_create_project(str(script), checkpoint)
+
+    assert refreshed.nodes == {}
+    assert refreshed.metadata["content_profile_fingerprint"] == "profile-b"
 
 
 # ── _reset_stale_nodes ────────────────────────────────────────────────────────

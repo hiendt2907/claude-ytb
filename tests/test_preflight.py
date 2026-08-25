@@ -138,6 +138,42 @@ def test_preflight_reports_multiple_failures_in_one_run(tmp_path, monkeypatch):
     assert "asset.local_missing" in codes
 
 
+def test_preflight_reports_invalid_profile_instead_of_raising(tmp_path):
+    from ytb_pipeline.orchestrator.preflight import preflight_script
+
+    payload = _payload()
+    payload["profile_id"] = "bad/profile"
+    payload["profile_version"] = "1.0.0"
+    path = tmp_path / "bad-profile.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = preflight_script(path)
+
+    assert result.passed is False
+    assert "profile.valid" in {failure.code for failure in result.failures}
+
+
+def test_preflight_rejects_unavailable_render_before_tts(tmp_path, monkeypatch):
+    from ytb_pipeline.orchestrator import preflight
+
+    payload = json.loads(
+        Path("profiles/ban-so-6/fixtures/episode-01-short.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    path = tmp_path / "story.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    class Unavailable:
+        def is_available(self):
+            return False
+
+    monkeypatch.setattr(preflight, "get_render_provider", lambda _name: Unavailable())
+    result = preflight.preflight_script(path)
+
+    assert "render.available" in {failure.code for failure in result.failures}
+
+
 def test_process_next_records_preflight_error_before_running_pipeline(tmp_path, monkeypatch):
     from ytb_pipeline.orchestrator import batch_cli as cli
 

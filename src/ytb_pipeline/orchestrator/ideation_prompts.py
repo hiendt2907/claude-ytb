@@ -8,11 +8,15 @@ from __future__ import annotations
 
 import json
 import re
+from typing import TYPE_CHECKING
 
 from ..analytics.quality_report import REQUIRED_PURPOSES_BY_VIDEO_TYPE
 from ..config.settings import settings
 from ..content_contract import CONTRACT_VERSION, chars_per_min_for_provider, contract_for
 from ..ideation.generation_schema import SECTION_PURPOSES
+
+if TYPE_CHECKING:
+    from ..content_profiles import ContentProfile
 
 SHORT_CONTRACT = contract_for("short")
 LONG_CONTRACT = contract_for("long")
@@ -145,6 +149,66 @@ Non-negotiable editorial rules:
 Before responding, silently audit title/topic-to-narration coherence sentence by sentence, the character contract, factual support, one mechanism, visual alignment, and the required JSON schema. If any check fails, rewrite the script before returning it."""
 
 
+def script_generation_system_prompt(
+    content_profile: "ContentProfile | None" = None,
+) -> str:
+    """Build a profile-scoped system contract without changing pipeline code.
+
+    The historical constant remains the compatibility path for callers that do
+    not yet declare a profile. New batch generation always supplies one.
+    """
+    if content_profile is None:
+        return SCRIPT_GENERATION_SYSTEM_PROMPT
+    short = content_profile.format_for("short")
+    long = content_profile.format_for("long")
+    short_contract = contract_for("short", content_profile)
+    long_contract = contract_for("long", content_profile)
+    short_rate = chars_per_min_for_provider(
+        content_profile.providers.tts, video_type="short"
+    )
+    long_rate = chars_per_min_for_provider(
+        content_profile.providers.tts, video_type="long"
+    )
+    short_chars = short_contract.safe_character_bounds(
+        chars_per_minute=short_rate, segment_count=short.min_sections
+    )
+    long_chars = long_contract.safe_character_bounds(
+        chars_per_minute=long_rate, segment_count=long.min_sections
+    )
+    prompt_rules = "\n\n".join(
+        content_profile.prompt_text(name) for name in content_profile.prompts
+    )
+    narrative_contract = (
+        "Every section must include speaker_id and visual_asset. Dialogue must react "
+        "to the previous line and sound natural when spoken. Do not require strategy "
+        "or Pexels fields."
+        if content_profile.narrative_mode == "character_story"
+        else f"For Shorts, strategy-v1 is mandatory: {STRATEGY_V1_CONTRACT}"
+    )
+    return f"""You are the senior editorial writer for content profile
+`{content_profile.profile_id}` version `{content_profile.version}`.
+Return exactly one valid JSON object and no markdown. Set ruleset_id to
+`{CONTRACT_VERSION}`, profile_id to `{content_profile.profile_id}`, and
+profile_version to `{content_profile.version}`.
+
+Profile editorial contract:
+{prompt_rules}
+
+Format contract:
+- Short: {short.viewer_min_sec:g}-{short.viewer_max_sec:g}s, {short.min_sections}-{short.max_sections} sections, aim for {short_chars[0]}-{short_chars[1]} Vietnamese narration characters.
+- Long: {long.viewer_min_sec / 60:g}-{long.viewer_max_sec / 60:g} minutes, {long.min_sections}-{long.max_sections} sections, aim for {long_chars[0]}-{long_chars[1]} Vietnamese narration characters.
+- Every section needs a positive numeric time_goal, purpose, voiceover, and visual_intent.
+- Required purposes across the script: situation, core_answer, application, payoff; use evidence when a factual claim needs support.
+
+Narrative contract:
+{narrative_contract}
+
+Use original, safe, advertiser-friendly Vietnamese. Verify or omit factual
+claims. Include a complete thumbnail_brief and compliance object. Silently
+audit semantic continuity, spoken naturalness, timing, and JSON schema before
+responding."""
+
+
 def build_resume_prompt(remaining: int, type_of_vid: str, type_of_rules: str, existing_slugs: list[str]) -> str:
     """Prompt resume — nói rõ đã có bao nhiêu, cần thêm bao nhiêu, KHÔNG viết lại cũ."""
     vid_label = "Video dài (ngang, 12-15 phút)" if type_of_vid == "long" else "Short (dọc, 1-1.5 phút)"
@@ -250,21 +314,59 @@ def local_script_prompt(
     analytics_feedback: list[str] | None = None,
     funnel: dict[str, str] | None = None,
     source_long_context: dict | None = None,
+    *,
+    content_profile: "ContentProfile | None" = None,
 ) -> str:
     """Prompt sinh 1 script JSON qua local/structured LLM (khác luồng Claude skill)."""
-    long_max_sections = int(LONG_CONTRACT.minimum_sections * 1.5)
+    short_contract = contract_for("short", content_profile)
+    long_contract = contract_for("long", content_profile)
+    short_format = content_profile.format_for("short") if content_profile else None
+    long_format = content_profile.format_for("long") if content_profile else None
+    short_sections = short_format.min_sections if short_format else SHORT_PROMPT_SECTIONS
+    short_max_sections = short_format.max_sections if short_format else short_sections
+    long_max_sections = (
+        long_format.max_sections if long_format else int(LONG_CONTRACT.minimum_sections * 1.5)
+    )
+    tts_provider = content_profile.providers.tts if content_profile else settings.tts_provider
+    short_rate = chars_per_min_for_provider(tts_provider, video_type="short")
+    long_rate = chars_per_min_for_provider(tts_provider, video_type="long")
+    short_safe = short_contract.safe_character_bounds(
+        chars_per_minute=short_rate, segment_count=short_sections
+    )
+    short_absolute_seconds = short_contract.audio_runtime_bounds_sec(
+        segment_count=short_sections
+    )
+    short_absolute = tuple(int(short_rate * seconds / 60) for seconds in short_absolute_seconds)
+    long_sections = long_format.min_sections if long_format else LONG_CONTRACT.minimum_sections
+    long_safe = long_contract.safe_character_bounds(
+        chars_per_minute=long_rate, segment_count=long_sections
+    )
+    long_minutes = tuple(value / 60 for value in long_contract.viewer_runtime_bounds_sec)
+    editorial_brief = (
+        content_profile.prompt_text("editorial") if content_profile else CHANNEL_EDITORIAL_BRIEF
+    )
     target = (
         (
-            f'"video_type": "long", "target_minutes": {LONG_MIN_MINUTES} (declare EXACTLY {LONG_MIN_MINUTES}), total narration '
-            f'{LONG_SAFE_MIN_CHARS}-{LONG_SAFE_MAX_CHARS} Vietnamese characters ({LONG_MIN_MINUTES}-{LONG_MAX_MINUTES} min at '
-            f'{PLANNING_CHARS_PER_MIN:.0f} chars/min; actual audio must stay inside that range), and '
-            f'{LONG_CONTRACT.minimum_sections}-{long_max_sections} rich sections'
+            (
+                f'"video_type": "long", "target_minutes": {LONG_MIN_MINUTES} (declare EXACTLY {LONG_MIN_MINUTES}), total narration '
+                f'{LONG_SAFE_MIN_CHARS}-{LONG_SAFE_MAX_CHARS} Vietnamese characters ({LONG_MIN_MINUTES}-{LONG_MAX_MINUTES} min at '
+                f'{PLANNING_CHARS_PER_MIN:.0f} chars/min; actual audio must stay inside that range), and '
+                f'{LONG_CONTRACT.minimum_sections}-{long_max_sections} rich sections'
+            )
+            if content_profile is None
+            else (
+                f'"video_type": "long", "target_minutes": {long_minutes[0]:g}, total narration '
+                f'{long_safe[0]}-{long_safe[1]} Vietnamese characters ({long_minutes[0]:g}-{long_minutes[1]:g} min at '
+                f'{long_rate:.0f} chars/min; actual audio must stay inside that range), and '
+                f'{long_sections}-{long_max_sections} rich sections'
+            )
         )
         if type_of_vid == "long"
         else (
             '"video_type": "short", no target_minutes, and total narration '
-            f'{SHORT_SAFE_MIN_CHARS:,}-{SHORT_SAFE_MAX_CHARS:,} Vietnamese characters (safe target inside the '
-            f'absolute {SHORT_MIN_CHARS}-{SHORT_MAX_CHARS} range) for a {SHORT_MIN_MINUTES:.2f}-{SHORT_MAX_MINUTES:.2f} minute Short'
+            f'{short_safe[0]:,}-{short_safe[1]:,} Vietnamese characters (safe target inside the '
+            f'absolute {short_absolute[0]}-{short_absolute[1]} range) for a '
+            f'{short_contract.viewer_runtime_bounds_sec[0]:g}-{short_contract.viewer_runtime_bounds_sec[1]:g} second Short'
         )
     )
     generated_summaries = generated_summaries or []
@@ -317,26 +419,57 @@ def local_script_prompt(
         )
     format_name = "long-form video" if type_of_vid == "long" else "Short"
     target_minutes_field = (
-        f'"target_minutes" is required for a Long and must be the JSON number {LONG_MIN_MINUTES}.'
+        f'"target_minutes" is required for a Long and must be the JSON number {long_minutes[0]:g}.'
         if type_of_vid == "long"
         else 'Do not include "target_minutes" for a Short.'
     )
-    custom_rules = "" if type_of_rules == "auto" else (
-        "\nCustom idea rules:\n"
-        "- The user's idea overrides the default channel niche and old ledger topics.\n"
-        "- Use the ledger ONLY as a blacklist of topics/titles to avoid, not as inspiration.\n"
-        "- Current channel scope is sharing/knowledge, not entertainment. Do NOT write comedy, "
-        "comedy, punchline structure, or gag narration for this channel.\n"
-        f"- Write a clear Vietnamese knowledge {format_name}: concrete everyday example, mechanism, "
-        "application step, and grounded Pexels queries for real stock footage.\n"
-        "- The narration must contain a concrete everyday example and an actionable application in natural Vietnamese; do not use fixed labels or template phrases.\n"
+    pexels_rule = (
+            "- Add grounded Pexels queries for real stock footage.\n"
+        if content_profile is None or content_profile.content_rules.require_pexels_query
+        else ""
+    )
+    if type_of_rules == "auto":
+        custom_rules = ""
+    elif content_profile is not None:
+        custom_rules = (
+            "\nCustom idea rules:\n"
+            "- The user's idea selects the episode/topic, while every declared profile rule, "
+            "character fact, continuity fact, and format contract still applies.\n"
+            "- Use the ledger ONLY as a blacklist of topics/titles to avoid, not as inspiration.\n"
+            f"- Requested idea: {type_of_rules}\n"
+            f"{pexels_rule}"
+            "- Keep narration natural in Vietnamese and derive the insight from this exact scene.\n"
+        )
+    else:
+        custom_rules = (
+            "\nCustom idea rules:\n"
+            "- The user's idea overrides the default channel niche and old ledger topics.\n"
+            "- Use the ledger ONLY as a blacklist of topics/titles to avoid, not as inspiration.\n"
+            "- Current channel scope is sharing/knowledge, not entertainment. Do NOT write comedy, "
+            "punchline structure, or gag narration for this channel.\n"
+            f"- Write a clear Vietnamese knowledge {format_name}: concrete everyday example, "
+            "mechanism, and an application step.\n"
+            f"{pexels_rule}"
+            "- The narration must contain a concrete everyday example and an actionable application "
+            "in natural Vietnamese; do not use fixed labels or template phrases.\n"
+        )
+    requires_strategy = (
+        type_of_vid == "short"
+        and (
+            content_profile is None
+            or content_profile.content_rules.require_short_source_trace
+        )
     )
     strategy_instruction = (
         f"\nStrategy-v1 contract:\n{STRATEGY_V1_CONTRACT}\n"
-        if type_of_vid == "short"
-        else "\nFor a Long, omit strategy; its single mechanism and series bridge belong in the narration.\n"
+        if requires_strategy
+        else (
+            "\nFor a Long, omit strategy; its single mechanism and series bridge belong in the narration.\n"
+            if type_of_vid == "long"
+            else "\nFor this character-story Short, omit strategy; conflict, choice and consequence belong in the scene.\n"
+        )
     )
-    strategy_schema = '"strategy", ' if type_of_vid == "short" else ""
+    strategy_schema = '"strategy", ' if requires_strategy else ""
     financial_source_contract = personal_finance_source_contract(type_of_rules)
     financial_schema = '"editorial_profile", "evidence_register", ' if financial_source_contract else ""
     uniqueness_instruction = (
@@ -346,10 +479,35 @@ def local_script_prompt(
         "This must be a NEW concept inside the current batch. Do not reuse any slug, title, "
         "topic, scene setup, or punchline already listed below.\n"
     )
+    profile_fields = (
+        f'profile_id (exactly "{content_profile.profile_id}"), '
+        f'profile_version (exactly "{content_profile.version}"), '
+        if content_profile else ""
+    )
+    section_fields = (
+        "Each section also needs speaker_id and visual_asset; visual_asset is a filename under the profile assets directory. "
+        if content_profile and content_profile.narrative_mode == "character_story"
+        else "Each section also needs pexels_query. "
+    )
+    short_instruction = "" if type_of_vid != "short" else (
+        f"Use exactly {short_sections} sections for this Short. Make `situation` first and "
+        f"keep it under {short_contract.situation_char_budget(chars_per_minute=short_rate)} characters with a concrete tension marker; "
+        "make `core_answer` the next section and begin with the exact strategy.hook.core_answer. "
+        "This immediate answer contract is mandatory.\n"
+        if requires_strategy
+        else f"Use exactly {short_sections} sections for this Short unless the profile allows a story beat expansion up to {short_max_sections}. Follow the profile's spoken-language and continuity rules.\n"
+    )
+    visual_asset_instruction = ""
+    if content_profile and content_profile.narrative_mode == "character_story":
+        names = ", ".join(content_profile.visual_asset_names)
+        visual_asset_instruction = (
+            "Use only these visual_asset filenames; never invent a path or filename: "
+            f"{names or '<no scene assets configured>'}.\n"
+        )
     return (
         "You are writing a Vietnamese YouTube script JSON for a local-first pipeline.\n"
         f"Video {index}/{total}. Type: {type_of_vid}. Requirement: {topic}\n"
-        f"Channel topic compass:\n{CHANNEL_EDITORIAL_BRIEF}\n"
+        f"Content profile editorial compass:\n{editorial_brief}\n"
         f"{strategy_instruction}"
         f"Length contract: {target}.\n"
         f"{funnel_instruction}"
@@ -365,19 +523,19 @@ def local_script_prompt(
         "Blocked historical titles/topics:\n"
         f"{blocked_titles or '- none'}\n\n"
         "Return ONLY one JSON object with keys: slug, topic, title, description, tags, "
+        f"{profile_fields}"
         f"video_type, target_minutes, voice_profile, \"thumbnail_brief\", {financial_schema}{strategy_schema}sections, compliance. video_type is only long or short. "
         f"{target_minutes_field} "
         "voice_profile is knowledge or inspiring. Each section needs time_goal as a positive JSON number of minutes (never 0/null/string/timestamp/range), purpose, voiceover, "
-        "visual_intent, pexels_query, caption, hook, transition, payoff, emphasis. "
+        "visual_intent, caption, hook, transition, payoff, emphasis. "
+        f"{section_fields}"
+        f"{visual_asset_instruction}"
         "Use these canonical fields only; the pipeline reads voiceover and pexels_query directly.\n"
         "thumbnail_brief is required for this newly generated script and has exactly four non-empty string fields: visual_contradiction, subject, emotion, headline. "
         "Make the visual_contradiction immediately legible, name a concrete subject and one emotion, and use a headline of 4 words or fewer (never the full title).\n"
         "compliance.passed must be true and include community/copyright/accuracy/"
         "advertiser/coppa/notes."
-        "For a strategy-v1 Short, use exactly six sections and this voiceover budget: situation <=" + str(SHORT_SITUATION_MAX_CHARS) + "; core_answer 120-220; evidence 550-700; concrete example 550-700; application 500-650; payoff/CTA 200-350 characters. "
-        "Make `situation` the first section with voiceover under " + str(SHORT_SITUATION_MAX_CHARS) + " characters and a concrete tension marker (nhưng, thật ra, đừng, không phải, or vì sao); "
-        "make `core_answer` the next section and begin its voiceover with the exact strategy.hook.core_answer. "
-        "This immediate answer contract is mandatory.\n"
+        f"{short_instruction}"
     )
 
 

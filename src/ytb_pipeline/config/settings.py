@@ -53,6 +53,11 @@ class Settings(BaseSettings):
     vieneu_tts_cmd: str = ""
     vixtts_cmd: str = ""
 
+    # Content profiles — mỗi chủ đề là một thư mục tự chứa prompt, contract,
+    # voice cast, provider policy và asset. PlatformProfile là khái niệm riêng.
+    content_profile_id: str = "one-cup-cafe-6h"
+    content_profiles_dir: Path = Field(default=Path("profiles"))
+
     # Telegram (cổng duyệt kịch bản)
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""
@@ -66,7 +71,7 @@ class Settings(BaseSettings):
     # false). Renderer "motion" (Pillow+FFmpeg hình học) đã bị GỠ KHỎI CODEBASE
     # 2026-08-24 — đây là sai lầm kiến trúc của một phiên trước, không dùng lại
     # trừ khi có amendment mới trong PROJECT_VISION.md.
-    render_provider: str = "ai"  # ai | slide
+    render_provider: str = "ai"  # ai | slide | story (profile-owned illustrations)
     image_provider: str = "pillow"  # dùng cho thumbnail/overlay; không dùng làm video chính
     # "pexels" ở đây là TÊN NGUỒN GỐC asset (video licensed từ Pexels), KHÔNG
     # đồng nghĩa "gọi Pexels API online" — với BROLL_ALLOW_DOWNLOADS=false

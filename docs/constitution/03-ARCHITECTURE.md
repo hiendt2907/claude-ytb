@@ -112,8 +112,21 @@ quality-gate decisions, no provider selection logic.
 | `VoiceProvider` | xKiro (cloud, default) · F5-TTS (local opt-in) · Edge-TTS / ElevenLabs (configured alternatives) |
 | `ImageProvider` | Flux local diffusion (default per v2) |
 | `VideoProvider` | Local image-to-video / animation pipeline (default) · Pexels stock (`stock.py`, explicit opt-in fallback only, never default) |
-| `RenderProvider` (composition strategy) | `compose.py` (slide/gradient strategy) · `compose_ai.py` (AI B-roll + beat-sync strategy) |
+| `RenderProvider` (composition strategy) | `compose.py` (slide/gradient strategy) · `compose_ai.py` (local Pexels-origin B-roll + beat-sync strategy) · `story.py` (profile-owned character illustrations + multi-voice timeline) |
 | `PublishProvider` | YouTube Data API (`uploader.py`) · Google Drive backup (`drive.py`) · (planned) TikTok, Instagram, Podcast RSS, Blog CMS adapters |
+
+### Content profile boundary (implemented 2026-08-25)
+
+`profiles/<profile_id>/` is the unit of topic configuration. It owns editorial
+prompts, format bounds, provider selection, voice cast, renderer timing, local
+assets, and optional series continuity. The shared queue stores `profile_id` on
+each item and `PipelineRunner.build_env()` resolves an isolated environment for
+that subprocess before the normal DAG starts. There is no profile-specific DAG.
+
+This is separate from `platform/profiles.py`: a content profile answers what
+and how to tell; a platform profile answers where and under which publishing
+constraints to deliver it. Adding a topic must be a data-directory operation,
+not a branch in pipeline/domain code.
 
 Each port is a small, focused interface (Interface Segregation per
 `02-PRINCIPLES.md`) — e.g. `VoiceProvider` exposes `synthesize(script:
