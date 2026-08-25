@@ -109,8 +109,10 @@ def _valid_short_script() -> dict:
     sections[2]["purpose"] = "evidence"
     sections[2]["narration"] = first_detail + " " + sections[2]["narration"]
     sections[3]["purpose"] = "evidence"
-    sections[4]["purpose"] = "evidence"
-    sections[5]["purpose"] = "application"
+    sections[4]["purpose"] = "application"
+    # The release gate requires a payoff section, so a fixture claiming to be a
+    # runnable Short must carry one.
+    sections[5]["purpose"] = "payoff"
     sections[-1]["narration"] += " Hãy đặt điện thoại ngoài bàn trong 10 phút tới."
     return {
         "ruleset_id": CONTRACT_VERSION,

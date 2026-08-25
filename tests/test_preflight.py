@@ -10,6 +10,11 @@ from types import SimpleNamespace
 from ytb_pipeline.content_contract import CONTRACT_VERSION
 
 
+_PURPOSE_BY_INDEX = (
+    "situation", "core_answer", "evidence", "application", "application", "payoff",
+)
+
+
 def _payload() -> dict:
     from ytb_pipeline.ideation.generator import chars_per_min_for_provider
 
@@ -20,7 +25,9 @@ def _payload() -> dict:
     narration = (phrase * (-(-per_section // len(phrase))))[:per_section]
     sections = [
         {
-            "purpose": "situation" if index == 0 else ("core_answer" if index == 1 else "application"),
+            # A "runnable" fixture must satisfy the release gate too, otherwise
+            # it proves admission passes a script that publish would reject.
+            "purpose": _PURPOSE_BY_INDEX[index],
             "voiceover": narration,
             "visual_intent": "Nhân viên văn phòng nhìn danh sách việc.",
             "pexels_query": "office task list",
@@ -252,3 +259,23 @@ def test_orientation_check_still_flags_a_format_it_cannot_map():
     _validate_orientation(SimpleNamespace(video_type="vertical-ish"), failures)
 
     assert [f.code for f in failures] == ["orientation.matches_video_type"]
+
+
+def test_preflight_rejects_a_script_missing_a_release_gate_purpose(tmp_path):
+    """Admission must reject exactly what the pre-publish gate rejects.
+
+    A Short without a `payoff` section used to pass preflight, pay for TTS and a
+    full render, and only then fail at publish.
+    """
+    from ytb_pipeline.orchestrator.preflight import preflight_script
+
+    payload = _payload()
+    for section in payload["sections"]:
+        if section["purpose"] == "payoff":
+            section["purpose"] = "application"
+    path = tmp_path / "no-payoff.json"
+    path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+    result = preflight_script(path)
+
+    assert "script.required_purpose.payoff" in {failure.code for failure in result.failures}

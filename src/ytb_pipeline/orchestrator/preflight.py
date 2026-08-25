@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ..analytics.quality_report import missing_required_purposes
 from ..config.settings import settings
 from ..content_contract import chars_per_min_for_provider, contract_for, estimate_duration_sec
 from ..ideation.generator import load_script
@@ -48,6 +49,7 @@ def preflight_script(script_path: Path | str) -> PreflightResult:
     _validate_schema(payload, failures)
     script = _load_script(path, failures)
     _validate_runtime(script, failures)
+    _validate_required_purposes(script, failures)
     _validate_orientation(script, failures)
     _validate_tts(failures)
     _validate_local_assets(payload, failures)
@@ -106,6 +108,26 @@ def _validate_runtime(script: Any, failures: list[PreflightFailure]) -> None:
         contract_for(script.video_type).validate_audio_runtime(estimated, segment_count=len(script.segments))
     except ValueError as exc:
         failures.append(PreflightFailure("duration.estimated", str(exc)))
+
+
+def _validate_required_purposes(script: Any, failures: list[PreflightFailure]) -> None:
+    """Reject offline what the pre-publish gate would reject after render.
+
+    The release gate requires a fixed set of section purposes, but admission did
+    not check them, so a Short missing `payoff` passed preflight, paid for TTS
+    and a full render, and only then failed at publish.  Admission and release
+    must reject the same script.
+    """
+    if script is None:
+        return
+    missing = missing_required_purposes(
+        script.video_type, (segment.purpose for segment in script.segments),
+    )
+    for purpose in missing:
+        failures.append(PreflightFailure(
+            f"script.required_purpose.{purpose}",
+            f"Kịch bản thiếu section purpose='{purpose}'; cổng trước publish sẽ chặn.",
+        ))
 
 
 def _validate_orientation(script: Any, failures: list[PreflightFailure]) -> None:

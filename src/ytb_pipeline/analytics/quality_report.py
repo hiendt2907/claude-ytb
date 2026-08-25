@@ -11,7 +11,7 @@ from dataclasses import asdict, dataclass
 import json
 from pathlib import Path
 import re
-from typing import Any, Literal, Mapping, Sequence
+from typing import Any, Iterable, Literal, Mapping, Sequence
 import unicodedata
 
 
@@ -26,6 +26,41 @@ _REQUIRED_PURPOSES = {
     "short": ("situation", "core_answer", "application", "payoff"),
     "long": ("situation", "core_answer", "evidence", "application", "payoff"),
 }
+_PURPOSE_ALIASES = {
+    "payoff/cta": "payoff", "payoff_cta": "payoff",
+    "intro": "situation", "hook": "situation",
+    "definition": "core_answer", "mechanism_explanation": "evidence",
+    "neuroscience_detail": "evidence", "energy_conservation": "evidence",
+    "freeze_response": "evidence", "everyday_example_setup": "evidence",
+    "example_analysis": "evidence", "misinterpretation": "evidence",
+    "cognitive_load_theory": "evidence", "dopamine_mismatch": "evidence",
+    "actionable_strategy_intro": "application", "strategy_detail": "application",
+    "implementation_example": "application", "momentum_effect": "application",
+    "environmental_design": "application", "practical_routine": "application",
+    "summary": "payoff", "bridge_to_next": "payoff", "cta": "payoff",
+}
+
+
+def normalise_purpose(purpose: str) -> str:
+    """Map a section purpose onto the closed release-gate vocabulary."""
+    normalised = (purpose or "").strip().lower()
+    return _PURPOSE_ALIASES.get(normalised, normalised)
+
+
+def missing_required_purposes(video_type: str, purposes: Iterable[str]) -> tuple[str, ...]:
+    """Required purposes absent from `purposes`; empty when the script is complete.
+
+    Exposed so admission (`preflight`) can reject offline exactly what the
+    release gate rejects after render.  Discovering a missing `payoff` only at
+    the pre-publish gate means the TTS and render bill has already been paid.
+    """
+    required = _REQUIRED_PURPOSES.get((video_type or "").strip().lower())
+    if required is None:
+        return ()
+    present = {normalise_purpose(item) for item in purposes}
+    return tuple(item for item in required if item not in present)
+
+
 _STOP_WORDS = frozenset({
     "a", "an", "ban", "bi", "cua", "co", "cho", "da", "dang", "de", "do", "duoc",
     "hay", "khi", "la", "lam", "ma", "mot", "nao", "nhung", "o", "roi", "sao", "su",
@@ -236,20 +271,7 @@ def _script_findings(data: QualityReportInput) -> list[QualityFinding]:
         return [_finding("script", "script.sections.present", "error", "Kịch bản phải có ít nhất một section.")]
     purposes: set[str] = set()
     for index, section in enumerate(data.sections):
-        purpose = section.purpose.strip().lower()
-        purpose = {
-            "payoff/cta": "payoff", "payoff_cta": "payoff",
-            "intro": "situation", "hook": "situation",
-            "definition": "core_answer", "mechanism_explanation": "evidence",
-            "neuroscience_detail": "evidence", "energy_conservation": "evidence",
-            "freeze_response": "evidence", "everyday_example_setup": "evidence",
-            "example_analysis": "evidence", "misinterpretation": "evidence",
-            "cognitive_load_theory": "evidence", "dopamine_mismatch": "evidence",
-            "actionable_strategy_intro": "application", "strategy_detail": "application",
-            "implementation_example": "application", "momentum_effect": "application",
-            "environmental_design": "application", "practical_routine": "application",
-            "summary": "payoff", "bridge_to_next": "payoff", "cta": "payoff",
-        }.get(purpose, purpose)
+        purpose = normalise_purpose(section.purpose)
         if purpose:
             purposes.add(purpose)
         if not section.caption.strip():
