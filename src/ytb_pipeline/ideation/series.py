@@ -22,6 +22,9 @@ from ..orchestrator.state_io import locked_json_update
 
 DAYS_TOTAL = 30
 PUBLISH_HOUR = 6           # giờ vàng brand "1 Cốc Café 6h"
+# Funnel theo CHANNEL_GROWTH_PLAN.md §3: mỗi ngày 1 Long + 2 Short cùng cơ chế,
+# mỗi Short dẫn về đúng Long của ngày đó.
+SHORT_HOURS = (11, 20)
 PUBLISH_TZ = "+0700"
 # 4 tiêu chí chấm ngách (mục B của skill). Trọng số bằng nhau, thang 1–5.
 NICHE_CRITERIA = ("search", "competition", "ypp", "brand")
@@ -129,6 +132,50 @@ def build_episodes(topics: list[str], started_at: str, *,
     ]
 
 
+def build_funnel_episodes(
+    clusters: list[dict],
+    started_at: str,
+    *,
+    long_hour: int = PUBLISH_HOUR,
+    short_hours: tuple[int, ...] = SHORT_HOURS,
+) -> list[dict]:
+    """Trải các cụm funnel thành danh sách tập phẳng, giữ liên kết Short -> Long.
+
+    Mỗi `cluster` là `{"long": <chủ đề Long>, "shorts": [<chủ đề Short>, ...]}`.
+    Long ra lúc `long_hour`, các Short ra lần lượt theo `short_hours` CÙNG NGÀY —
+    Short là phễu dẫn về Long, nên phải đứng sau Long trong ngày chứ không phải
+    một tập độc lập ngày khác.
+
+    `long_form_slug`/`cta_target` gắn sẵn ở đây để `ytb batch start --type-of-vid
+    short` nhận thẳng, và để `next_episode` biết Short nào phụ thuộc Long nào.
+    """
+    episodes: list[dict] = []
+    for day, cluster in enumerate(clusters, start=1):
+        long_topic = cluster["long"]
+        long_slug = slugify(long_topic)
+        episodes.append({
+            "day": day,
+            "slug": long_slug,
+            "topic": long_topic,
+            "video_type": "long",
+            "publish_at": publish_at(started_at, day, hour=long_hour),
+            "status": "queued",
+        })
+        for index, short_topic in enumerate(cluster.get("shorts", ())):
+            hour = short_hours[index % len(short_hours)]
+            episodes.append({
+                "day": day,
+                "slug": slugify(short_topic),
+                "topic": short_topic,
+                "video_type": "short",
+                "long_form_slug": long_slug,
+                "cta_target": long_slug,
+                "publish_at": publish_at(started_at, day, hour=hour),
+                "status": "queued",
+            })
+    return episodes
+
+
 def build_series(*, niche: str, reason: str, research: dict, topics: list[str],
                  started_at: str, days_total: int = DAYS_TOTAL,
                  hour: int = PUBLISH_HOUR, slot: str = "morning") -> dict:
@@ -163,10 +210,23 @@ def next_episode(series_block: dict) -> dict | None:
     """
     if series_block.get("status") != "active":
         return None
-    queued = [e for e in series_block.get("episodes", ()) if e.get("status") == "queued"]
+    episodes = list(series_block.get("episodes", ()))
+    done = {e.get("slug") for e in episodes if e.get("status") == "done"}
+    queued = [e for e in episodes if e.get("status") == "queued"]
     if not queued:
         return None
-    return min(queued, key=lambda e: e.get("day", 0))
+
+    # A Short is a funnel into its Long, so it cannot be produced before that
+    # Long has published — the same rule `process_next` enforces on the queue.
+    # A cluster whose Long is gone (rejected, removed) must not stall the rest.
+    def ready(episode: dict) -> bool:
+        parent = episode.get("long_form_slug")
+        return not parent or parent in done
+
+    runnable = [e for e in queued if ready(e)]
+    if not runnable:
+        return None
+    return min(runnable, key=lambda e: (e.get("day", 0), e.get("video_type") != "long"))
 
 
 def mark_episode_done(series_block: dict, slug: str) -> dict:
