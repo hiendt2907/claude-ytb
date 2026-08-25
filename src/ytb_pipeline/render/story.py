@@ -17,10 +17,16 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 
+import hashlib
+
 from ..config.settings import settings
 from ..content_profiles import ContentProfile, load_content_profile
 from ..pkg.models import RenderedVideo, Segment, Voiceover
 from ..voiceover.tts import _slugify
+
+# Kích thước sinh ảnh — kích thước SDXL native đã kiểm chứng cho nhận dạng ổn
+# định, KHÔNG phải kích thước render cuối (1920x1080/1080x1920). _story_frame
+# đã fit/crop bất kỳ ảnh nguồn nào vào khung cuối, nên không cần khớp.
 
 PORTRAIT = (1080, 1920)
 LANDSCAPE = (1920, 1080)
@@ -68,9 +74,13 @@ def render_story_video(voiceover: Voiceover, output_dir: Path) -> RenderedVideo:
             # Một section Long dài ~450 ký tự: chia thành nhiều thẻ caption thay
             # vì để một tấm chữ đứng yên suốt cả section.
             cards = _segment_cards(segment, profile, dims)
+            # Resolve MỘT lần cho cả section: mọi thẻ caption của cùng section
+            # dùng chung một tấm nền, và asset cố định/generate+cache đều đắt
+            # hơn việc gọi lại nhiều lần trong vòng lặp thẻ.
+            image_path = resolve_scene_image(segment, profile, dims)
             for card_index, (text, seek, length) in enumerate(cards):
                 frame = work / f"frame-{index:03d}-{card_index:02d}.jpg"
-                _story_frame(segment, profile, dims, caption=text).save(frame, quality=92)
+                _story_frame(segment, profile, dims, image_path, caption=text).save(frame, quality=92)
                 if first_frame is None:
                     first_frame = frame
                 clip = work / f"clip-{index:03d}-{card_index:02d}.mp4"
@@ -183,6 +193,73 @@ def _asset_path(profile: ContentProfile, relative: str) -> Path:
     return profile.visual_asset_path(relative)
 
 
+_SDXL_GENERATION_DIMS = {LANDSCAPE: (1344, 768), PORTRAIT: (832, 1216)}
+
+
+def _generation_cache_key(
+    segment: Segment, profile: ContentProfile, dims: tuple[int, int]
+) -> str:
+    """Nội dung nào làm ảnh khác đi phải làm hash khác đi — không hơn không kém.
+
+    profile_fingerprint đã bao gồm ảnh neo nhận dạng + duo reference, nên đổi
+    ảnh neo tự động invalidate cache mà không cần liệt kê lại ở đây.
+    """
+    vg = profile.visual_generation
+    payload = "\x1f".join((
+        profile.profile_id, profile.version,
+        f"{dims[0]}x{dims[1]}",
+        ",".join(sorted(segment.scene_characters)),
+        segment.visual_intent.strip(),
+        vg.style_prompt, vg.negative_prompt,
+        str(vg.steps), str(vg.cfg), str(vg.solo_weight), str(vg.duo_weight), str(vg.duo_denoise),
+    ))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def resolve_scene_image(
+    segment: Segment, profile: ContentProfile, dims: tuple[int, int],
+    *, cache_dir: Path | None = None, provider=None,
+) -> Path:
+    """Ảnh cho MỘT section: asset cố định nếu có, không thì auto-generate + cache.
+
+    Fail-closed theo chủ đích: nếu ComfyUI không phản hồi, lỗi của provider
+    (`ProviderUnavailableError`) được để nguyên bay lên — KHÔNG âm thầm rơi về
+    asset khác. Cache là write-through: file chỉ xuất hiện sau khi provider
+    trả về THÀNH CÔNG, nên một lần fail không để lại file rỗng/hỏng.
+    """
+    if segment.visual_asset:
+        return _asset_path(profile, segment.visual_asset)
+
+    vg = profile.visual_generation
+    if vg is None or not vg.enabled:
+        raise ValueError(
+            f"Section thiếu visual_asset và profile '{profile.profile_id}' "
+            "không bật visual_generation — không có ảnh nào để dùng."
+        )
+
+    cache_dir = cache_dir or (settings.assets_dir / "generated_visuals" / profile.profile_id)
+    cache_dir = Path(cache_dir)
+    key = _generation_cache_key(segment, profile, dims)
+    cached = cache_dir / f"{key}.png"
+    if cached.is_file():
+        return cached
+
+    if provider is None:
+        from ..providers.image.comfyui_story_provider import ComfyUIStoryProvider
+        provider = ComfyUIStoryProvider()
+
+    gen_width, gen_height = _SDXL_GENERATION_DIMS[dims]
+    seed = int(key[:16], 16) % (2**32)
+    provider.generate_scene(
+        profile,
+        characters_present=tuple(segment.scene_characters),
+        prompt=segment.visual_intent.strip(),
+        width=gen_width, height=gen_height, seed=seed,
+        output_path=cached,
+    )
+    return cached
+
+
 _CAPTION_MAX_CHARS = {PORTRAIT: 30, LANDSCAPE: 52}
 
 
@@ -209,10 +286,10 @@ def _segment_cards(
 
 
 def _story_frame(
-    segment: Segment, profile: ContentProfile, dims: tuple[int, int],
+    segment: Segment, profile: ContentProfile, dims: tuple[int, int], image_path: Path,
     *, caption: str = "",
 ) -> Image.Image:
-    source = Image.open(_asset_path(profile, segment.visual_asset)).convert("RGB")
+    source = Image.open(image_path).convert("RGB")
     background = ImageOps.fit(source, dims, method=Image.Resampling.LANCZOS)
     background = background.filter(ImageFilter.GaussianBlur(radius=22))
     background = Image.blend(background, Image.new("RGB", dims, "#111218"), 0.30)

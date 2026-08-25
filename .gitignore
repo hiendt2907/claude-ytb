@@ -19,6 +19,7 @@ data/ledger.backup.*.md
 scripts/*.json
 
 assets/output/
+assets/generated_visuals/
 assets/audio/*.mp3
 assets/audio/*.wav
 assets/quality_reports/

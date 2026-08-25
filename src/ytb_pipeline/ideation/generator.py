@@ -319,6 +319,7 @@ def _segment_from_raw(raw: dict, name: str) -> Segment:
         purpose=str(raw.get("purpose", "")).strip(),
         speaker_id=str(raw.get("speaker_id") or "narrator").strip().lower(),
         visual_asset=str(raw.get("visual_asset") or "").strip(),
+        scene_characters=_normalize_scene_characters(raw.get("scene_characters")),
         voice_style=str(raw.get("voice_style", raw.get("acting", ""))).strip(),
         voice_tempo=_optional_float(raw.get("voice_tempo"), name, "voice_tempo"),
         voice_pitch=_optional_float(raw.get("voice_pitch"), name, "voice_pitch"),
@@ -543,6 +544,24 @@ def _validate_compliance(raw: dict | None, name: str) -> ComplianceCheck:
         passed=True,
         **{f: str(raw.get(f, "")) for f in _COMPLIANCE_FIELDS},
     )
+
+
+def _normalize_scene_characters(raw) -> tuple[str, ...]:
+    """Nhân vật xuất hiện trong khung hình, dùng khi auto-generate ảnh.
+
+    Không validate ở đây theo cast của profile — validate đó thuộc về
+    script_contract (đã có content_profile trong tay), giữ hàm này thuần.
+    """
+    if raw is None or isinstance(raw, bool):
+        return ()
+    if isinstance(raw, str):
+        value = raw.strip().lower()
+        return (value,) if value else ()
+    if isinstance(raw, (list, tuple)):
+        return tuple(
+            dict.fromkeys(str(item).strip().lower() for item in raw if str(item).strip())
+        )
+    return ()
 
 
 def _normalize_emphasis(raw) -> tuple[str, ...]:

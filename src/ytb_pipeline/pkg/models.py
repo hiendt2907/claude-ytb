@@ -92,6 +92,10 @@ class Segment:
     duration_sec: float = 0.0
     speaker_id: str = "narrator"  # lookup qua voice_cast của content profile
     visual_asset: str = ""    # path tương đối trong <profile>/assets cho story render
+    scene_characters: tuple[str, ...] = ()  # nhân vật (voice_cast, trừ narrator)
+                                             # XUẤT HIỆN TRONG KHUNG HÌNH; dùng khi
+                                             # profile.visual_generation.enabled thay
+                                             # cho visual_asset cố định
 
 
 @dataclass(frozen=True)

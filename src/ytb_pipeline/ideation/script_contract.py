@@ -223,6 +223,30 @@ def _check_duplicate_sections(raw: list, findings: list[ScriptContractFinding]) 
         )
 
 
+def _validate_scene_characters(
+    raw: Any, content_profile: ContentProfile, path: str, findings: list[ScriptContractFinding],
+) -> None:
+    """scene_characters phải TỒN TẠI (rỗng hợp lệ = cảnh không người) và mỗi
+    tên phải thuộc cast của profile, khác narrator, không lặp, tối đa 2."""
+    if raw is None:
+        _add(findings, f"{path}.scene_characters.required", f"{path}.scene_characters", "scene_characters không được thiếu (dùng [] nếu cảnh không có nhân vật).")
+        return
+    if not isinstance(raw, list) or not all(isinstance(item, str) for item in raw):
+        _add(findings, f"{path}.scene_characters.type", f"{path}.scene_characters", "scene_characters phải là mảng chuỗi.")
+        return
+    if len(raw) > 2:
+        _add(findings, f"{path}.scene_characters.max", f"{path}.scene_characters", "scene_characters tối đa 2 nhân vật trong một khung hình.")
+    if len(set(raw)) != len(raw):
+        _add(findings, f"{path}.scene_characters.duplicate", f"{path}.scene_characters", "scene_characters không được lặp tên.")
+    cast = {name for name in content_profile.voice_cast if name != "narrator"}
+    for name in raw:
+        if name not in cast:
+            _add(
+                findings, f"{path}.scene_characters.unknown", f"{path}.scene_characters",
+                f"'{name}' không nằm trong voice_cast của profile '{content_profile.profile_id}'.",
+            )
+
+
 def _validate_sections(
     raw: object, findings: list[ScriptContractFinding], minimum_sections: int | None,
     content_profile: ContentProfile | None = None,
@@ -268,8 +292,16 @@ def _validate_sections(
         required_fields = ["purpose", "visual_intent"]
         if content_profile is None or content_profile.content_rules.require_pexels_query:
             required_fields.append("pexels_query")
+        auto_visuals = (
+            content_profile is not None
+            and content_profile.narrative_mode == "character_story"
+            and content_profile.visual_generation is not None
+            and content_profile.visual_generation.enabled
+        )
         if content_profile is not None and content_profile.narrative_mode == "character_story":
-            required_fields.extend(("speaker_id", "visual_asset"))
+            required_fields.append("speaker_id")
+            if not auto_visuals:
+                required_fields.append("visual_asset")
         for field in required_fields:
             if not _text(section.get(field)):
                 _add(
@@ -278,6 +310,8 @@ def _validate_sections(
                     f"{path}.{field}",
                     f"{field} không được để trống.",
                 )
+        if auto_visuals:
+            _validate_scene_characters(section.get("scene_characters"), content_profile, path, findings)
         if (
             content_profile is not None
             and content_profile.narrative_mode == "character_story"

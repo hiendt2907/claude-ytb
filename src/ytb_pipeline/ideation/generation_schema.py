@@ -72,11 +72,27 @@ def script_generation_schema(
     if content_profile is None or content_profile.content_rules.require_pexels_query:
         section["required"].append("pexels_query")
     if content_profile is not None and content_profile.narrative_mode == "character_story":
-        section["required"].extend(("speaker_id", "visual_asset"))
+        section["required"].append("speaker_id")
         section["properties"]["speaker_id"] = {
             "type": "string",
             "enum": sorted(content_profile.voice_cast),
         }
+        cast_ids = sorted(name for name in content_profile.voice_cast if name != "narrator")
+        vg = content_profile.visual_generation
+        if vg is not None and vg.enabled:
+            # Auto-generate mode: the model names who is ON SCREEN, not a
+            # filename. `visual_asset` stays optional so an operator can still
+            # pin a fixed asset for one section without disabling generation
+            # for the whole episode.
+            section["required"].append("scene_characters")
+            section["properties"]["scene_characters"] = {
+                "type": "array",
+                "items": {"type": "string", "enum": cast_ids},
+                "maxItems": 2,
+                "uniqueItems": True,
+            }
+        else:
+            section["required"].append("visual_asset")
     required = [
         "ruleset_id", "slug", "topic", "title", "description", "tags",
         "video_type", "voice_profile", "thumbnail_brief", "sections", "compliance",
