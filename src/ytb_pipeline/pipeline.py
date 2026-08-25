@@ -390,6 +390,35 @@ def _rendered_output_data(video: RenderedVideo) -> dict:
     }
 
 
+def _record_continuity(current: Project, result: PublishResult) -> None:
+    """Ghi tập vừa lên sóng vào continuity ledger của profile.
+
+    Chỉ chạy sau khi upload thật thành công: một dry-run không làm thay đổi
+    lịch sử series. Lỗi ghi ledger KHÔNG được đánh hỏng một video đã publish —
+    video đã ra ngoài rồi, còn ledger thì sửa tay được.
+    """
+    from .ideation.continuity import ContinuityError, record_published_episode
+
+    try:
+        payload = json.loads(Path(_node_script_path(current)).read_text(encoding="utf-8"))
+        profile = load_content_profile(
+            str(payload.get("profile_id") or "").strip() or None
+        )
+        changed = record_published_episode(
+            profile,
+            payload,
+            slug=str(payload.get("slug") or current.project_id),
+            title=str(payload.get("title") or ""),
+            published_at=settings.youtube_publish_at or "",
+            url=result.url or "",
+        )
+    except (OSError, ValueError, ContinuityError) as exc:
+        print(f"  ⚠ Không ghi được continuity ledger (không chặn publish): {exc}")
+        return
+    if changed:
+        print(f"  ✓ Đã ghi tập vào continuity ledger của profile '{profile.profile_id}'")
+
+
 def _publish_results_output_data(results: dict[str, PublishResult]) -> dict:
     return {
         "platforms": {
@@ -651,6 +680,9 @@ async def run_project(project: Project, checkpoint: CheckpointManager, through: 
                 _cleanup_after_success(result)
             except Exception as exc:  # noqa: BLE001
                 print(f"  ⚠ Đưa lên Drive thất bại (giữ bản local): {exc}")
+
+        if result.uploaded:
+            _record_continuity(current, result)
 
         state["result"] = result
         return result.url or str(result.video_path), _publish_results_output_data(publish_results)

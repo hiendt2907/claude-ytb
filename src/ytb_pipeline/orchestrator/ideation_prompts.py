@@ -503,6 +503,15 @@ def local_script_prompt(
         visual_asset_instruction = (
             "Use only these visual_asset filenames; never invent a path or filename: "
             f"{names or '<no scene assets configured>'}.\n"
+            # Ledger được ghi từ chính tuyên bố này sau khi tập lên sóng, nên nó
+            # phải mô tả tập NÀY, không phải tóm tắt lại series.
+            "Also return a `continuity` object recording what THIS episode changed, "
+            "so the next episode can be written on top of it: episode_summary (one "
+            "sentence naming the choice made and its consequence), character_changes "
+            "(object mapping a cast id to what changed for that character; use {} if "
+            "nothing changed), threads_opened and threads_closed (arrays of short "
+            "Vietnamese sentences; use [] when empty). Do not restate the series "
+            "premise and do not invent events outside this episode.\n"
         )
     return (
         "You are writing a Vietnamese YouTube script JSON for a local-first pipeline.\n"

@@ -116,6 +116,26 @@ def script_generation_schema(
             "profile_version": {"type": "string", "const": content_profile.version},
         })
         required.extend(("profile_id", "profile_version"))
+    if content_profile is not None and content_profile.narrative_mode == "character_story":
+        # Ghi bởi chính tập vừa viết: model đang biết tập này thay đổi những gì.
+        # Hỏi lại sau khi publish sẽ là bịa. Ledger chỉ chép lại tuyên bố này.
+        properties["continuity"] = {
+            "type": "object",
+            "properties": {
+                "episode_summary": {"type": "string"},
+                "character_changes": {
+                    "type": "object",
+                    "additionalProperties": {"type": "string"},
+                },
+                "threads_opened": {"type": "array", "items": {"type": "string"}},
+                "threads_closed": {"type": "array", "items": {"type": "string"}},
+            },
+            "required": [
+                "episode_summary", "character_changes", "threads_opened", "threads_closed",
+            ],
+            "additionalProperties": False,
+        }
+        required.append("continuity")
     return {
         "type": "object",
         "properties": properties,
