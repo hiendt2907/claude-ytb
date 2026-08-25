@@ -512,6 +512,14 @@ def local_script_prompt(
             "nothing changed), threads_opened and threads_closed (arrays of short "
             "Vietnamese sentences; use [] when empty). Do not restate the series "
             "premise and do not invent events outside this episode.\n"
+            # Hai luật này trước đây chỉ tồn tại ở cổng QA, nên model chỉ biết
+            # sau khi đã bị từ chối một lượt sinh.
+            "Never prefix a line with the speaker name (write \"Cậu mở hộp thư "
+            "lần thứ mấy rồi?\", not \"An: Cậu mở hộp thư...\") — speaker_id "
+            "already routes the voice and the prefix gets read aloud. "
+            "End the final section on a concrete bounded action a viewer could "
+            "copy — name a real quantity such as twenty minutes, three lines, "
+            "one page — shown through what a character actually does.\n"
         )
     return (
         "You are writing a Vietnamese YouTube script JSON for a local-first pipeline.\n"

@@ -81,6 +81,7 @@ class QAAgent:
                 if _get(script, "ruleset_id", ""):
                     violations.extend(_check_release_schema(script))
                 violations.extend(_check_stage_direction_leak(script))
+                violations.extend(_check_speaker_prefix_leak(script))
                 violations.extend(_check_knowledge_examples(script))
                 violations.extend(_check_immediate_action(script))
                 violations.extend(_check_final_payoff(script))
@@ -431,6 +432,29 @@ def _check_stage_direction_leak(script: Any) -> list[dict[str, str]]:
     return violations
 
 
+def _check_speaker_prefix_leak(script: Any) -> list[dict[str, str]]:
+    """Tên nhân vật đứng đầu lời đọc sẽ bị TTS đọc thành tiếng.
+
+    `speaker_id` đã định tuyến giọng rồi, nên "An: Cậu đã mở..." vừa thừa vừa
+    phá nhịp. Chỉ chặn dạng tiền tố "<tên>:" — gọi tên nhân vật trong câu là
+    lời thoại bình thường.
+    """
+    profile = _content_profile(script)
+    if profile is None or profile.narrative_mode != "character_story":
+        return []
+    cast = {name for name in profile.voice_cast if name != "narrator"}
+    violations: list[dict[str, str]] = []
+    for index, segment in enumerate(_segments_of(script), start=1):
+        head = _narration_of(segment).strip().split(":", 1)[0].strip().lower()
+        if head and head in cast:
+            violations.append(_repair(
+                "speaker_prefix",
+                f"Section {index} mở đầu bằng tên người nói ('{head}:'); TTS sẽ đọc cả tên.",
+                "Bỏ tiền tố tên khỏi voiceover; giọng đã được chọn qua speaker_id.",
+            ))
+    return violations
+
+
 def _check_knowledge_examples(script: Any) -> list[dict[str, str]]:
     # Example quality is semantic/editorial, not a fixed keyword or label contract.
     # Leave that judgment to the upstream script generation/review model rather than
@@ -438,9 +462,31 @@ def _check_knowledge_examples(script: Any) -> list[dict[str, str]]:
     return []
 
 
+# Một hành động cụ thể trong truyện được nhận ra bằng phạm vi đo được: một
+# lượng thời gian, một số lần. "Làm việc kế tiếp trong hai mươi phút" là thứ
+# người xem sao chép được; "cảm thấy nhẹ nhõm hơn" thì không.
+_STORY_BOUNDED_ACTION_UNITS = ("phút", "giây", "tiếng", "trang", "dòng", "lần", "bước", "câu")
+
+
+def _has_bounded_action(text: str) -> bool:
+    words = _story_words(text)
+    if not any(unit in words for unit in _STORY_BOUNDED_ACTION_UNITS):
+        return False
+    return bool(_STORY_NUMBER_WORDS & set(words)) or any(c.isdigit() for c in text)
+
+
 def _check_immediate_action(script: Any) -> list[dict[str, str]]:
     final_text = _narration_of(_segments_of(script)[-1]).lower() if _segments_of(script) else ""
     if any(hint in final_text for hint in _IMMEDIATE_ACTION_HINTS):
+        return []
+    profile = _content_profile(script)
+    if (
+        profile is not None
+        and profile.narrative_mode == "character_story"
+        and _has_bounded_action(final_text)
+    ):
+        # Truyện kiếm được phần chốt bằng cách CHO THẤY hành động, không bằng
+        # cách ra lệnh. Bắt buộc chữ "Hãy" là quy ước của kênh giải thích.
         return []
     return [_repair(
         "immediate_action",

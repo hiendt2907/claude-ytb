@@ -81,3 +81,78 @@ def test_shipped_story_fixture_passes_the_gate():
     script = _script(payload["sections"][0]["voiceover"])
 
     assert qa_agent._check_hook_strength(script) == []
+
+
+# ---------------------------------------------------------------------------
+# Two more explainer-shaped gates that a story cannot satisfy on their terms.
+# ---------------------------------------------------------------------------
+
+def _story_script(sections):
+    return SimpleNamespace(
+        video_type="short",
+        target_minutes=None,
+        content_profile_id="ban-so-6",
+        content_profile_version="1.0.0",
+        segments=tuple(
+            SimpleNamespace(narration=text, purpose=purpose, speaker_id=speaker)
+            for purpose, speaker, text in sections
+        ),
+    )
+
+
+def test_story_ending_counts_a_bounded_action_the_character_performs():
+    """A story earns its takeaway by showing it, not by issuing an order.
+
+    `_check_immediate_action` demanded the literal "Hãy ", which is an
+    explainer convention; a scene that ends on a concrete, bounded action is
+    the story equivalent and must pass.
+    """
+    script = _story_script([
+        ("situation", "narrator", "Bảy giờ, Minh mở hộp thư lần thứ tư. Vẫn phải chờ."),
+        ("payoff", "narrator", "Minh úp điện thoại xuống và làm việc kế tiếp trong hai mươi phút."),
+    ])
+
+    assert qa_agent._check_immediate_action(script) == []
+
+
+def test_story_ending_without_any_concrete_action_is_still_rejected():
+    script = _story_script([
+        ("situation", "narrator", "Bảy giờ, Minh mở hộp thư lần thứ tư. Vẫn phải chờ."),
+        ("payoff", "narrator", "Buổi sáng trôi qua và Minh cảm thấy nhẹ nhõm hơn một chút."),
+    ])
+
+    assert [v["rule"] for v in qa_agent._check_immediate_action(script)] == ["immediate_action"]
+
+
+def test_explainer_still_requires_an_imperative():
+    script = SimpleNamespace(
+        video_type="short", target_minutes=None,
+        content_profile_id="one-cup-cafe-6h", content_profile_version="1.0.0",
+        segments=(SimpleNamespace(
+            narration="Bạn sẽ thấy dễ chịu hơn khi làm việc trong hai mươi phút.",
+            purpose="payoff",
+        ),),
+    )
+
+    assert [v["rule"] for v in qa_agent._check_immediate_action(script)] == ["immediate_action"]
+
+
+def test_speaker_name_prefix_in_narration_is_rejected():
+    """`speaker_id` already routes the voice; a spoken "An:" is read aloud."""
+    script = _story_script([
+        ("situation", "narrator", "Bảy giờ, Minh mở hộp thư lần thứ tư. Vẫn phải chờ."),
+        ("core_answer", "an", "An: Cậu đã mở hộp thư lần thứ mấy rồi?"),
+    ])
+
+    violations = qa_agent._check_speaker_prefix_leak(script)
+
+    assert [v["rule"] for v in violations] == ["speaker_prefix"]
+
+
+def test_narration_naming_a_character_normally_is_not_a_prefix_leak():
+    script = _story_script([
+        ("situation", "narrator", "Bảy giờ, Minh mở hộp thư lần thứ tư. Vẫn phải chờ."),
+        ("core_answer", "an", "Cậu đã mở hộp thư lần thứ mấy rồi, Minh?"),
+    ])
+
+    assert qa_agent._check_speaker_prefix_leak(script) == []
