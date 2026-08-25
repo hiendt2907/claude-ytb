@@ -245,7 +245,9 @@ def test_custom_story_idea_keeps_profile_voice_instead_of_old_knowledge_channel_
     assert "Minh ngại gửi bản nháp" in prompt
 
 
-def test_story_prompt_lists_only_assets_available_in_the_profile():
+def test_story_prompt_names_the_cast_for_scene_characters_when_auto_generating():
+    """ban-so-6 has visual_generation enabled: the model names WHO is on
+    screen (scene_characters), not a fixed filename."""
     from ytb_pipeline.content_profiles import load_content_profile
     from ytb_pipeline.orchestrator.ideation_prompts import local_script_prompt
 
@@ -254,9 +256,25 @@ def test_story_prompt_lists_only_assets_available_in_the_profile():
         1, 1, "short", "auto", "", content_profile=profile
     )
 
+    assert "scene_characters" in prompt
+    assert "'minh'" in prompt or "minh" in prompt
+    assert "Use only these visual_asset filenames" not in prompt
+
+
+def test_story_prompt_lists_only_assets_available_in_the_profile(tmp_path):
+    """A character_story profile WITHOUT auto-generation still gets the
+    fixed-filename whitelist instruction."""
+    from ytb_pipeline.content_profiles import load_content_profile
+    from ytb_pipeline.orchestrator.ideation_prompts import local_script_prompt
+    from tests.test_visual_generation_profile import _write_profile
+
+    _write_profile(tmp_path, "ban-so-6", visual_generation=None)
+    profile = load_content_profile("ban-so-6", profiles_dir=tmp_path)
+    prompt = local_script_prompt(
+        1, 1, "short", "auto", "", content_profile=profile
+    )
+
     assert "Use only these visual_asset filenames" in prompt
-    assert "opening.png" in prompt
-    assert "character-sheet.png" not in prompt
 
 
 def test_generation_schema_follows_profile_section_and_visual_contract(tmp_path):

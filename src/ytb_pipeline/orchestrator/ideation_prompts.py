@@ -178,13 +178,22 @@ def script_generation_system_prompt(
     prompt_rules = "\n\n".join(
         content_profile.prompt_text(name) for name in content_profile.prompts
     )
-    narrative_contract = (
-        "Every section must include speaker_id and visual_asset. Dialogue must react "
-        "to the previous line and sound natural when spoken. Do not require strategy "
-        "or Pexels fields."
-        if content_profile.narrative_mode == "character_story"
-        else f"For Shorts, strategy-v1 is mandatory: {STRATEGY_V1_CONTRACT}"
-    )
+    vg = content_profile.visual_generation
+    if content_profile.narrative_mode == "character_story":
+        visual_field_rule = (
+            "Every section must include speaker_id and scene_characters (array of "
+            f"cast ids visible in frame, from {sorted(n for n in content_profile.voice_cast if n != 'narrator')}, "
+            "at most 2, [] for an establishing/prop shot with nobody visible — never "
+            "invent visual_asset)."
+            if vg is not None and vg.enabled
+            else "Every section must include speaker_id and visual_asset."
+        )
+        narrative_contract = (
+            f"{visual_field_rule} Dialogue must react to the previous line and sound "
+            "natural when spoken. Do not require strategy or Pexels fields."
+        )
+    else:
+        narrative_contract = f"For Shorts, strategy-v1 is mandatory: {STRATEGY_V1_CONTRACT}"
     return f"""You are the senior editorial writer for content profile
 `{content_profile.profile_id}` version `{content_profile.version}`.
 Return exactly one valid JSON object and no markdown. Set ruleset_id to
@@ -500,11 +509,19 @@ def local_script_prompt(
         f'profile_version (exactly "{content_profile.version}"), '
         if content_profile else ""
     )
-    section_fields = (
-        "Each section also needs speaker_id and visual_asset; visual_asset is a filename under the profile assets directory. "
-        if content_profile and content_profile.narrative_mode == "character_story"
-        else "Each section also needs pexels_query. "
+    auto_visuals = bool(
+        content_profile and content_profile.visual_generation and content_profile.visual_generation.enabled
     )
+    if content_profile and content_profile.narrative_mode == "character_story":
+        cast_ids = sorted(name for name in content_profile.voice_cast if name != "narrator")
+        section_fields = (
+            f"Each section also needs speaker_id and scene_characters (array subset of {cast_ids}, "
+            "at most 2, listing who is VISIBLE in this frame; use [] for an establishing/prop shot). "
+            if auto_visuals
+            else "Each section also needs speaker_id and visual_asset; visual_asset is a filename under the profile assets directory. "
+        )
+    else:
+        section_fields = "Each section also needs pexels_query. "
     short_instruction = "" if type_of_vid != "short" else (
         f"Use exactly {short_sections} sections for this Short. Make `situation` first and "
         f"keep it under {short_contract.situation_char_budget(chars_per_minute=short_rate)} characters with a concrete tension marker; "
@@ -515,12 +532,22 @@ def local_script_prompt(
     )
     visual_asset_instruction = ""
     if content_profile and content_profile.narrative_mode == "character_story":
-        names = ", ".join(content_profile.visual_asset_names)
-        visual_asset_instruction = (
-            "Use only these visual_asset filenames; never invent a path or filename: "
-            f"{names or '<no scene assets configured>'}.\n"
-            # Ledger được ghi từ chính tuyên bố này sau khi tập lên sóng, nên nó
-            # phải mô tả tập NÀY, không phải tóm tắt lại series.
+        if auto_visuals:
+            cast_ids = sorted(name for name in content_profile.voice_cast if name != "narrator")
+            visual_asset_instruction = (
+                f"scene_characters lists who is on screen, from {cast_ids}, max 2 — "
+                "never a filename, never more than the two the profile can render together.\n"
+            )
+        else:
+            names = ", ".join(content_profile.visual_asset_names)
+            visual_asset_instruction = (
+                "Use only these visual_asset filenames; never invent a path or filename: "
+                f"{names or '<no scene assets configured>'}.\n"
+            )
+        # Ledger được ghi từ chính tuyên bố này sau khi tập lên sóng, nên nó phải
+        # mô tả tập NÀY, không phải tóm tắt lại series. Áp dụng cho mọi profile
+        # character_story, không phụ thuộc auto_visuals.
+        visual_asset_instruction += (
             "Also return a `continuity` object recording what THIS episode changed, "
             "so the next episode can be written on top of it: episode_summary (one "
             "sentence naming the choice made and its consequence), character_changes "
