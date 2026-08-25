@@ -112,7 +112,19 @@ dưới một tiến trình. Ngoài preflight, kiểm thêm bằng mắt: số k
 `safe_character_bounds`, đủ 5 purpose (`situation`, `core_answer`, `evidence`,
 `application`, `payoff`), `situation` dưới `situation_char_budget`.
 
-### 4c. Sản xuất + publish
+### 4c. Sinh ĐỦ CẢ CỤM trước khi chạy
+
+`--schedule` từ chối gán lịch khi cụm chưa đủ:
+
+```
+✗ Daily bundle yêu cầu Long '<slug>' có đúng 2 Shorts cùng Long trước khi schedule.
+```
+
+Đúng growth plan §3 ("chỉ lên lịch sau khi cả Long, hai Short, nguồn và QA đều
+hợp lệ"). Nên trình tự là: ideation Long → ideation Short 1 → ideation Short 2 →
+rồi MỚI `run`. Không chạy từng video một.
+
+### 4d. Sản xuất + publish
 
 ```bash
 bin/ytb batch run --publish --batch-key <BATCH_KEY>
@@ -120,7 +132,7 @@ bin/ytb batch run --publish --batch-key <BATCH_KEY>
 
 Mặc định upload **private**. Không truyền `--publish` = dry-run, không upload.
 
-### 4d. Lên lịch tự công khai (KHÔNG chuyển tay)
+### 4e. Lên lịch tự công khai (KHÔNG chuyển tay)
 
 Dùng `--schedule` để `publish_at` được gán trước khi upload; uploader tự đặt
 `privacyStatus=private` + `publishAt`, YouTube tự công khai đúng giờ:
@@ -145,7 +157,7 @@ sau QA gate. Đừng vá ideation để ghi thẳng `publish_at` — sẽ phá r
 > đăng lúc upload sẽ trượt. Chấp nhận được: CTA fail-soft, không chặn publish, chỉ
 > ghi cảnh báo. Nếu cần CTA chắc chắn, đăng bù sau khi Long đã tới giờ công khai.
 
-### 4e. Ghi sổ
+### 4f. Ghi sổ
 
 `ytb batch run` tự ghi ledger + `auto_state.json` (`shorts_status`, `youtube_id`,
 `youtube_url`). Sau khi tập xong, gọi `mark_episode_done(block, slug)` rồi
@@ -182,7 +194,8 @@ Lỗi một tập → ghi `status=error` + lý do, bỏ qua sang tập kế, kh�
 - [ ] Long dùng `--llm-provider codex`
 - [ ] `bin/ytb batch preflight <slug>` PASS trước khi chạy
 - [ ] Kiểm ký tự / 5 purpose / situation budget trước khi tốn TTS
-- [ ] `bin/ytb batch run --publish` → private
+- [ ] Sinh ĐỦ cụm (1 Long + 2 Short) trước khi chạy — `--schedule` từ chối cụm thiếu
+- [ ] `bin/ytb batch run --publish --loop` chạy trọn cụm
 - [ ] Dùng `--schedule` + `--long-publish-at`, KHÔNG chuyển public tay
 - [ ] Biết CTA comment sẽ trượt khi Long chưa tới giờ công khai (fail-soft)
 - [ ] `mark_episode_done` + `write_series` sau mỗi tập
