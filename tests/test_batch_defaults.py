@@ -303,7 +303,8 @@ def test_short_prompt_uses_a_safe_length_buffer_and_immediate_answer_contract():
     # told the model it could spend 120 characters that xKiro cannot afford.
     assert f"{SHORT_SITUATION_MAX_CHARS} characters" in prompt
     assert "concrete tension marker" in prompt
-    assert "exactly six sections" in prompt
+    assert "exactly six sections" not in prompt
+    assert "550-700" not in prompt
     assert "immediate answer contract" in prompt
 
 
