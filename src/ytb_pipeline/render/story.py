@@ -7,6 +7,7 @@ language is a cast of recurring characters rather than stock B-roll.
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 import tempfile
@@ -57,29 +58,35 @@ def render_story_video(voiceover: Voiceover, output_dir: Path) -> RenderedVideo:
     with tempfile.TemporaryDirectory(prefix=f"{slug}-story-", dir=output_dir) as raw_work:
         work = Path(raw_work)
         clips: list[Path] = []
+        durations: list[float] = []
         first_frame: Path | None = None
         for index, segment in enumerate(voiceover.segments):
-            frame = work / f"frame-{index:03d}.jpg"
-            _story_frame(segment, profile, dims).save(frame, quality=92)
-            if first_frame is None:
-                first_frame = frame
-            clip = work / f"clip-{index:03d}.mp4"
             gap = (
                 profile.render.inter_segment_gap_sec
                 if index < len(voiceover.segments) - 1 else 0.0
             )
-            _render_clip(ffmpeg, frame, segment, clip, gap=gap)
-            clips.append(clip)
+            # Một section Long dài ~450 ký tự: chia thành nhiều thẻ caption thay
+            # vì để một tấm chữ đứng yên suốt cả section.
+            cards = _segment_cards(segment, profile, dims)
+            for card_index, (text, seek, length) in enumerate(cards):
+                frame = work / f"frame-{index:03d}-{card_index:02d}.jpg"
+                _story_frame(segment, profile, dims, caption=text).save(frame, quality=92)
+                if first_frame is None:
+                    first_frame = frame
+                clip = work / f"clip-{index:03d}-{card_index:02d}.mp4"
+                card_gap = gap if card_index == len(cards) - 1 else 0.0
+                _render_clip(
+                    ffmpeg, frame, segment, clip,
+                    gap=card_gap, seek=seek, length=length,
+                )
+                clips.append(clip)
+                durations.append(length + card_gap)
         _compose_clips(
             ffmpeg,
             clips,
             video_path,
             work,
-            durations=[
-                segment.duration_sec
-                + (profile.render.inter_segment_gap_sec if i < len(clips) - 1 else 0.0)
-                for i, segment in enumerate(voiceover.segments)
-            ],
+            durations=durations,
             overlap=profile.render.transition_overlap_sec,
         )
         if first_frame is None:
@@ -109,63 +116,174 @@ def expected_story_duration_sec(
     )
 
 
+
+# Bảng màu thoại: danh tính người nói được truyền bằng MÀU, không bằng một nhãn
+# viết hoa kiểu kịch bản phim. Narrator giữ trắng ngà; các nhân vật lấy màu theo
+# thứ tự khai trong voice_cast nên thêm nhân vật là việc của profile, không phải
+# của renderer.
+_NARRATOR_COLOUR = (247, 244, 236)
+_CAST_COLOURS = (
+    (137, 214, 232),   # xanh băng
+    (240, 196, 132),   # hổ phách
+    (176, 222, 168),   # xanh lá nhạt
+    (232, 168, 190),   # hồng phấn
+)
+_SENTENCE_END = re.compile(r"(?<=[.!?…])\s+")
+
+
+def speaker_colour(profile: ContentProfile, speaker_id: str) -> tuple[int, int, int]:
+    """Màu chữ của một người nói; người lạ dùng màu narrator."""
+    normalised = (speaker_id or "narrator").strip().lower()
+    cast = [name for name in profile.voice_cast if name != "narrator"]
+    if normalised in cast:
+        return _CAST_COLOURS[cast.index(normalised) % len(_CAST_COLOURS)]
+    return _NARRATOR_COLOUR
+
+
+def caption_lines(narration: str, *, max_chars: int) -> list[str]:
+    """Chia lời đọc thành các thẻ caption, mỗi thẻ là một câu đọc được hết.
+
+    Một section của Long dài ~450 ký tự — không thể là MỘT tấm chữ đứng yên
+    suốt hai mươi lăm giây. Cắt theo câu, câu nào dài quá thì xuống dòng tiếp,
+    không bao giờ bỏ chữ.
+    """
+    text = " ".join((narration or "").split())
+    if not text:
+        return []
+    lines: list[str] = []
+    for sentence in _SENTENCE_END.split(text):
+        sentence = sentence.strip()
+        if not sentence:
+            continue
+        if len(sentence) <= max_chars:
+            lines.append(sentence)
+            continue
+        lines.extend(textwrap.wrap(sentence, width=max_chars, break_long_words=False))
+    return [line for line in lines if line]
+
+
+def line_durations(lines: list[str], *, total_sec: float) -> list[float]:
+    """Chia thời lượng đo được của segment cho từng thẻ theo số ký tự.
+
+    Xấp xỉ, không phải căn theo từng từ: tốc độ đọc trong một segment gần như
+    không đổi, và mọi thẻ cộng lại LUÔN đúng bằng audio thật nên hình không bao
+    giờ trôi khỏi tiếng.
+    """
+    if not lines or total_sec <= 0:
+        return []
+    weights = [max(1, len(line)) for line in lines]
+    total_weight = sum(weights)
+    durations = [total_sec * weight / total_weight for weight in weights]
+    # Bù sai số dồn vào thẻ cuối để tổng khớp tuyệt đối.
+    durations[-1] = total_sec - sum(durations[:-1])
+    return durations
+
+
 def _asset_path(profile: ContentProfile, relative: str) -> Path:
     return profile.visual_asset_path(relative)
 
 
-def _story_frame(
+_CAPTION_MAX_CHARS = {PORTRAIT: 30, LANDSCAPE: 52}
+
+
+def _segment_cards(
     segment: Segment, profile: ContentProfile, dims: tuple[int, int]
+) -> list[tuple[str, float, float]]:
+    """(text, seek, length) cho từng thẻ caption của một segment.
+
+    Không bật caption, hoặc lời đọc rỗng: một thẻ duy nhất không chữ, dài đúng
+    bằng audio — hình vẫn giữ nguyên hành vi cũ.
+    """
+    if not profile.render.show_captions:
+        return [("", 0.0, segment.duration_sec)]
+    lines = caption_lines(segment.narration, max_chars=_CAPTION_MAX_CHARS[dims])
+    if not lines:
+        return [("", 0.0, segment.duration_sec)]
+    lengths = line_durations(lines, total_sec=segment.duration_sec)
+    cards: list[tuple[str, float, float]] = []
+    seek = 0.0
+    for line, length in zip(lines, lengths):
+        cards.append((line, seek, length))
+        seek += length
+    return cards
+
+
+def _story_frame(
+    segment: Segment, profile: ContentProfile, dims: tuple[int, int],
+    *, caption: str = "",
 ) -> Image.Image:
     source = Image.open(_asset_path(profile, segment.visual_asset)).convert("RGB")
     background = ImageOps.fit(source, dims, method=Image.Resampling.LANCZOS)
     background = background.filter(ImageFilter.GaussianBlur(radius=22))
     background = Image.blend(background, Image.new("RGB", dims, "#111218"), 0.30)
+    # Vùng dành cho hình: từ mép trên tới nơi caption bắt đầu. Căn GIỮA vùng đó
+    # thay vì dán sát mép trên — một keyframe ngang đặt trong khung dọc từng để
+    # lại một mảng mờ trống chiếm gần nửa khung phía dưới.
+    top_margin = int(dims[1] * 0.04)
+    stage_bottom = int(dims[1] * (0.80 if dims == PORTRAIT else 0.84))
     foreground = ImageOps.contain(
         source,
-        (int(dims[0] * 0.94), int(dims[1] * (0.72 if dims == PORTRAIT else 0.88))),
+        (int(dims[0] * 0.94), stage_bottom - top_margin),
         method=Image.Resampling.LANCZOS,
     )
     x = (dims[0] - foreground.width) // 2
-    y = int(dims[1] * 0.04)
+    y = top_margin + (stage_bottom - top_margin - foreground.height) // 2
     background.paste(foreground, (x, y))
 
-    if profile.render.show_captions:
-        draw = ImageDraw.Draw(background, "RGBA")
-        band_top = int(dims[1] * (0.75 if dims == PORTRAIT else 0.72))
-        draw.rounded_rectangle(
-            (int(dims[0] * 0.055), band_top, int(dims[0] * 0.945), int(dims[1] * 0.95)),
-            radius=32,
-            fill=(8, 10, 16, 218),
-        )
-        label_font = _font(38 if dims == PORTRAIT else 32, bold=True)
-        body_font = _font(48 if dims == PORTRAIT else 38)
-        speaker = (segment.speaker_id or "narrator").upper()
-        draw.text(
-            (int(dims[0] * 0.09), band_top + 28), speaker,
-            font=label_font, fill=(232, 179, 108, 255),
-        )
-        caption = segment.caption.strip() or segment.narration.strip()
-        wrapped = "\n".join(textwrap.wrap(caption, width=34 if dims == PORTRAIT else 58)[:3])
-        draw.multiline_text(
-            (int(dims[0] * 0.09), band_top + 86), wrapped,
-            font=body_font, fill=(250, 248, 242, 255), spacing=12,
-        )
+    text = caption.strip()
+    if profile.render.show_captions and text:
+        _draw_caption(background, text, speaker_colour(profile, segment.speaker_id), dims)
     return background
 
 
+def _draw_caption(
+    image: Image.Image, text: str, colour: tuple[int, int, int], dims: tuple[int, int]
+) -> None:
+    """Vẽ đúng câu đang được đọc, căn giữa, viền đậm thay vì tấm nền lớn.
+
+    Bản cũ vẽ `Segment.caption` (mô tả HÌNH) dưới một nhãn NARRATOR viết hoa,
+    trên một tấm nền chiếm một phần tư khung: người xem đọc một ghi chú kịch bản
+    không liên quan gì đến câu đang nghe. Danh tính người nói giờ nằm ở màu chữ.
+    """
+    draw = ImageDraw.Draw(image, "RGBA")
+    portrait = dims == PORTRAIT
+    font = _font(56 if portrait else 46, bold=True)
+    wrapped = textwrap.wrap(text, width=_CAPTION_MAX_CHARS[dims], break_long_words=False)
+    box = draw.multiline_textbbox((0, 0), "\n".join(wrapped), font=font, spacing=14)
+    height = box[3] - box[1]
+    baseline = int(dims[1] * (0.86 if portrait else 0.88))
+    top = baseline - height
+
+    # Scrim mỏng ôm sát chữ, đủ để chữ sáng đọc được trên nền sáng.
+    pad = 26
+    draw.rounded_rectangle(
+        (int(dims[0] * 0.06), top - pad, int(dims[0] * 0.94), baseline + pad),
+        radius=20, fill=(10, 12, 18, 128),
+    )
+    draw.multiline_text(
+        (dims[0] // 2, top), "\n".join(wrapped), font=font, fill=(*colour, 255),
+        spacing=14, align="center", anchor="ma",
+        stroke_width=3, stroke_fill=(8, 10, 16, 220),
+    )
+
+
 def _render_clip(
-    ffmpeg: str, frame: Path, segment: Segment, output: Path, *, gap: float
+    ffmpeg: str, frame: Path, segment: Segment, output: Path, *,
+    gap: float, seek: float = 0.0, length: float | None = None,
 ) -> None:
     if segment.audio_path is None or not Path(segment.audio_path).is_file():
         raise FileNotFoundError("Story segment thiếu audio_path thật.")
     if segment.duration_sec <= 0:
         raise ValueError("Story segment cần duration_sec đo từ audio.")
-    duration = segment.duration_sec + gap
+    span = segment.duration_sec if length is None else length
+    duration = span + gap
     command = [
         ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
         "-loop", "1", "-framerate", "30", "-i", str(frame),
-        "-i", str(segment.audio_path),
     ]
+    if seek > 0:
+        command.extend(("-ss", f"{seek:.3f}"))
+    command.extend(("-i", str(segment.audio_path)))
     if gap > 0:
         command.extend(("-af", f"apad=pad_dur={gap:.3f}"))
     command.extend((
