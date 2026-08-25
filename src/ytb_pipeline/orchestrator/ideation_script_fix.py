@@ -411,16 +411,48 @@ def normalize_long_overflow(payload: dict, expected_video_type: str | None = Non
     return payload, f"trimmed long narration to {short_narration_chars(payload)} chars"
 
 
-def append_long_extension(payload: dict, extension: dict) -> dict:
-    """Insert new long-form sections before the existing conclusion without mutation."""
+def append_long_extension(
+    payload: dict, extension: dict, *, max_sections: int | None = None
+) -> dict:
+    """Insert new long-form sections before the existing conclusion without mutation.
+
+    `max_sections` là trần section của content profile. Bản cũ nối thẳng mọi
+    section mới, nên một Long quá mỏng được vá xong lại vượt trần và bị chính
+    vòng validate kế tiếp từ chối — sau hai lượt gọi LLM đã trả tiền.
+
+    Khi chạm trần, phần dư KHÔNG bị vứt: extension tồn tại để thêm ký tự, nên
+    lời đọc thừa được gộp vào section cuối cùng còn chỗ.
+    """
     sections = extension.get("sections")
     if not isinstance(sections, list) or not sections or not all(isinstance(item, dict) for item in sections):
         raise ValueError("Long extension phải trả về một mảng sections không rỗng.")
     current_sections = payload.get("sections")
     if not isinstance(current_sections, list) or len(current_sections) < 2:
         raise ValueError("Long cần ít nhất phần mở đầu và phần kết trước khi bổ sung.")
+
     enriched = deepcopy(payload)
-    enriched["sections"] = [*current_sections[:-1], *sections, current_sections[-1]]
+    body = list(deepcopy(current_sections[:-1]))
+    conclusion = deepcopy(current_sections[-1])
+    additions = deepcopy(sections)
+
+    room = None if max_sections is None else max(0, max_sections - len(body) - 1)
+    kept = additions if room is None else additions[:room]
+    overflow = [] if room is None else additions[room:]
+
+    merged = [*body, *kept, conclusion]
+    if overflow:
+        target = merged[len(body) + len(kept) - 1] if kept else merged[len(body) - 1]
+        spilled = " ".join(
+            str(section.get("voiceover") or section.get("narration") or "").strip()
+            for section in overflow
+        ).strip()
+        if spilled:
+            existing = str(target.get("voiceover") or target.get("narration") or "").strip()
+            target["voiceover"] = f"{existing} {spilled}".strip()
+            if "narration" in target:
+                target["narration"] = target["voiceover"]
+
+    enriched["sections"] = merged
     return enriched
 
 
@@ -588,7 +620,15 @@ async def validate_or_repair_script(
             )
             if log_path:
                 append_local_start_log(log_path, "LONG_EXTENSION_RESPONSE", extension_text)
-            current = append_long_extension(current, json_from_llm(extension_text))
+            extension_profile = _explicit_profile(current)
+            current = append_long_extension(
+                current,
+                json_from_llm(extension_text),
+                max_sections=(
+                    extension_profile.format_for("long").max_sections
+                    if extension_profile is not None else None
+                ),
+            )
             long_extension_attempted = True
             continue
 
