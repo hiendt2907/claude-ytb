@@ -222,3 +222,51 @@ def test_prompt_states_every_purpose_the_prepublish_gate_requires(video_type):
     named = " ".join(scoped)
     for purpose in _REQUIRED_PURPOSES[video_type]:
         assert purpose in named
+
+
+def test_short_runtime_window_is_configurable_without_editing_code(monkeypatch):
+    """Channel data moves the winning Short length, so the window must be a knob.
+
+    Measured 2026-08-25 over 60 published videos: <=40s averaged 755 views at
+    55.4% viewed and produced 8 of the channel's 16 subscribers, while the
+    hardcoded 60-90s band averaged 217 views at 18.4%. Retuning that band must
+    not require a code change and a redeploy each time the data moves.
+    """
+    from ytb_pipeline import content_contract
+    from ytb_pipeline.config.settings import settings
+
+    monkeypatch.setattr(settings, "short_viewer_min_sec", 30.0)
+    monkeypatch.setattr(settings, "short_viewer_max_sec", 45.0)
+
+    contract = content_contract.contract_for("short")
+
+    assert contract.viewer_runtime_bounds_sec == (30.0, 45.0)
+
+
+def test_long_runtime_window_is_configurable_too(monkeypatch):
+    from ytb_pipeline import content_contract
+    from ytb_pipeline.config.settings import settings
+
+    monkeypatch.setattr(settings, "long_viewer_min_sec", 300.0)
+    monkeypatch.setattr(settings, "long_viewer_max_sec", 420.0)
+
+    assert content_contract.contract_for("long").viewer_runtime_bounds_sec == (300.0, 420.0)
+
+
+def test_short_minimum_sections_is_configurable(monkeypatch):
+    """A 35s Short cannot carry the six beats a 75s one did."""
+    from ytb_pipeline import content_contract
+    from ytb_pipeline.config.settings import settings
+
+    monkeypatch.setattr(settings, "short_min_sections", 4)
+
+    assert content_contract.contract_for("short").minimum_sections == 4
+
+
+def test_contract_defaults_stay_put_until_the_operator_moves_them(monkeypatch):
+    """A running batch must not have its contract shift under it by surprise."""
+    from ytb_pipeline import content_contract
+
+    assert content_contract.contract_for("short").viewer_runtime_bounds_sec == (60.0, 90.0)
+    assert content_contract.contract_for("long").viewer_runtime_bounds_sec == (720.0, 900.0)
+    assert content_contract.contract_for("short").minimum_sections == 6

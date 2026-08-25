@@ -137,6 +137,18 @@ class Settings(BaseSettings):
     # since render is the most expensive step and render_quality would reject
     # bad audio at publish anyway. ``strict`` additionally blocks on a local QA
     # *tooling* crash (STT/cache failure); ``report`` only warns on that case.
+    # Cửa sổ runtime của từng định dạng — chỉnh qua env, KHÔNG sửa code.
+    # Định dạng thắng thay đổi theo dữ liệu kênh: đo 2026-08-25 trên 60 video,
+    # nhóm <=40s đạt 755 view / 55.4% xem hết / 8 trong 16 sub toàn kênh, trong
+    # khi dải 60-90s chỉ 217 view / 18.4%. Giữ mặc định cũ để batch đang chạy
+    # không bị đổi hợp đồng giữa chừng; đổi bằng SHORT_VIEWER_MIN_SEC/... khi
+    # muốn thử dải mới.
+    short_viewer_min_sec: float = 60.0
+    short_viewer_max_sec: float = 90.0
+    short_min_sections: int = 6
+    long_viewer_min_sec: float = 720.0
+    long_viewer_max_sec: float = 900.0
+    long_min_sections: int = 24
     quality_gate_mode: Literal["off", "report", "strict"] = "report"
     quality_reports_dir: Path = Field(default=Path("assets/quality_reports"))
     # Optional local Faster-Whisper model directory for post-TTS transcript QA.

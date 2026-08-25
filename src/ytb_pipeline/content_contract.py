@@ -123,30 +123,45 @@ class ContentContract:
             raise ValueError(f"{label} quá dài {upper:.0f}s: {qualifier}{duration_sec:.1f}s.")
 
 
-_CONTRACTS = {
-    "short": ContentContract(
-        video_type="short",
+def _build_contract(video_type: str) -> ContentContract:
+    """Dựng contract từ settings TẠI THỜI ĐIỂM GỌI, không đóng băng lúc import.
+
+    Cửa sổ runtime là một tham số vận hành, không phải hằng số biên dịch: định
+    dạng thắng đổi theo dữ liệu kênh, và mỗi lần chỉnh không được kéo theo một
+    lần sửa code. Dựng theo từng lời gọi cũng khiến `settings` được tôn trọng
+    thật — bản cũ đóng băng `_CONTRACTS` lúc import nên việc đổi settings lúc
+    chạy (kể cả monkeypatch trong test) hoàn toàn vô hiệu.
+    """
+    if video_type == "short":
         # E2E renderers can lose up to ~2s to transition overlap; keep the
-        # production 60s floor while allowing the bounded test profile to
-        # verify the complete downstream path without regenerating content.
-        viewer_runtime_bounds_sec=(58.0, 90.0) if settings.e2e_test else (60.0, 90.0),
-        minimum_sections=6,
-        answer_start_target_sec=4.0,
-        answer_start_deadline_sec=5.0,
-    ),
-    "long": ContentContract(
+        # operator's floor while letting the bounded test profile verify the
+        # complete downstream path without regenerating content.
+        lower = settings.short_viewer_min_sec - 2.0 if settings.e2e_test else settings.short_viewer_min_sec
+        return ContentContract(
+            video_type="short",
+            viewer_runtime_bounds_sec=(lower, settings.short_viewer_max_sec),
+            minimum_sections=settings.short_min_sections,
+            answer_start_target_sec=4.0,
+            answer_start_deadline_sec=5.0,
+        )
+    return ContentContract(
         video_type="long",
-        viewer_runtime_bounds_sec=(180.0, 240.0) if settings.e2e_test else (720.0, 900.0),
-        minimum_sections=8 if settings.e2e_test else 24,
-    ),
-}
+        viewer_runtime_bounds_sec=(
+            (180.0, 240.0) if settings.e2e_test
+            else (settings.long_viewer_min_sec, settings.long_viewer_max_sec)
+        ),
+        minimum_sections=8 if settings.e2e_test else settings.long_min_sections,
+    )
 
 
 def contract_for(video_type: str) -> ContentContract:
     try:
-        return _CONTRACTS[video_type.strip().lower()]
-    except (AttributeError, KeyError) as exc:
+        normalized = video_type.strip().lower()
+    except AttributeError as exc:
         raise ValueError(f"video_type không hợp lệ cho content contract: {video_type!r}") from exc
+    if normalized not in ("short", "long"):
+        raise ValueError(f"video_type không hợp lệ cho content contract: {video_type!r}")
+    return _build_contract(normalized)
 
 
 def chars_per_min_for_provider(provider: str, *, video_type: str | None = None) -> float:
