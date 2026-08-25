@@ -154,13 +154,26 @@ class XkiroLLMProvider:
             with urllib_request.urlopen(
                 request, timeout=request_timeout_for(max_tokens=max_tokens),
             ) as response:
-                body = json.loads(response.read().decode("utf-8"))
+                raw = response.read()
         except urllib_error.HTTPError as exc:
             if exc.code == 400 and response_format is not None:
                 raise _ResponseFormatUnsupportedError(
                     f"xKiro LLM ({model}) từ chối response_format={response_format['type']}."
                 ) from exc
             raise RuntimeError(f"xKiro LLM ({model}) trả HTTP {exc.code}.") from exc
+        try:
+            body = json.loads(raw.decode("utf-8", "replace"))
+        except json.JSONDecodeError as exc:
+            # HTTP 200 nhưng body không phải JSON hợp lệ — gặp thật với
+            # minimax-m2.7 (event-stream/gateway rỗng lẫn vào response
+            # non-streaming). Đây vẫn là MỘT model lỗi, không phải lỗi tích
+            # hợp: coi như RuntimeError để vòng cascade thử model kế tiếp,
+            # thay vì để JSONDecodeError thoát ra ngoài và giết cả tiến trình
+            # batch — đúng thứ đã xảy ra khi sinh Long ban-so-6.
+            snippet = raw.decode("utf-8", "replace")[:300]
+            raise RuntimeError(
+                f"xKiro LLM ({model}) trả HTTP 200 nhưng body không phải JSON hợp lệ: {snippet!r}"
+            ) from exc
 
         choices = body.get("choices") or []
         if not choices:

@@ -286,3 +286,77 @@ async def test_request_timeout_scales_with_the_requested_output_size(monkeypatch
 
     assert short_budget >= xkiro_provider._REQUEST_TIMEOUT_S
     assert long_budget > short_budget * 2
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_xkiro_llm_falls_back_when_a_model_returns_http_200_with_invalid_json(monkeypatch):
+    """A 200 response whose body isn't valid JSON must be treated like any
+    other model failure — try the next model — not crash the whole batch.
+
+    Hit for real generating a Long for ban-so-6: minimax-m2.7 returned a 200
+    whose body failed `json.loads` at character 11, and the bare
+    JSONDecodeError escaped every try/except up to `ytb batch start` itself.
+    """
+    from ytb_pipeline.config.settings import settings
+    from ytb_pipeline.providers.llm import xkiro_provider
+    from ytb_pipeline.providers.llm.xkiro_provider import XkiroLLMProvider
+
+    monkeypatch.setattr(settings, "xkiro_api_key", "test-key", raising=False)
+    monkeypatch.setattr(settings, "xkiro_llm_model", "model-a", raising=False)
+    monkeypatch.setattr(settings, "xkiro_llm_fallback_models", "model-b", raising=False)
+
+    class _BrokenBodyResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return b"event: ping\n\ndata: not-json-at-all"
+
+    calls: list[str] = []
+
+    def fake_urlopen(request: Request, timeout: float):
+        model = json.loads(request.data.decode("utf-8"))["model"]
+        calls.append(model)
+        if model == "model-a":
+            return _BrokenBodyResponse()
+        return _fake_response({"choices": [{"message": {"content": "ok tu model-b"}}]})
+
+    monkeypatch.setattr(xkiro_provider.urllib_request, "urlopen", fake_urlopen)
+
+    result = await XkiroLLMProvider().complete("test")
+
+    assert result == "ok tu model-b"
+    assert calls == ["model-a", "model-b"]
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_xkiro_llm_reports_the_bad_body_when_every_model_returns_invalid_json(monkeypatch):
+    from ytb_pipeline.config.settings import settings
+    from ytb_pipeline.providers.llm import xkiro_provider
+    from ytb_pipeline.providers.llm.xkiro_provider import XkiroLLMProvider
+
+    monkeypatch.setattr(settings, "xkiro_api_key", "test-key", raising=False)
+    monkeypatch.setattr(settings, "xkiro_llm_model", "model-a", raising=False)
+    monkeypatch.setattr(settings, "xkiro_llm_fallback_models", "", raising=False)
+
+    class _BrokenBodyResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return b"not-json-at-all"
+
+    monkeypatch.setattr(
+        xkiro_provider.urllib_request, "urlopen", lambda request, timeout: _BrokenBodyResponse()
+    )
+
+    with pytest.raises(ProviderUnavailableError, match="not-json-at-all"):
+        await XkiroLLMProvider().complete("test")
