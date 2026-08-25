@@ -318,7 +318,9 @@ def test_loader_rejects_explicit_profile_without_version_and_too_many_sections(t
     with pytest.raises(ValueError, match="profile_version"):
         load_script(path)
 
-    payload["profile_version"] = "1.0.0"
+    from ytb_pipeline.content_profiles import load_content_profile
+
+    payload["profile_version"] = load_content_profile("ban-so-6").version
     while len(payload["sections"]) <= 12:
         payload["sections"].append(dict(payload["sections"][2]))
     path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")

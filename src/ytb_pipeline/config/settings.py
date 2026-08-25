@@ -80,6 +80,12 @@ class Settings(BaseSettings):
     broll_allow_downloads: bool = False  # local-first: chỉ tải Pexels khi opt-in rõ ràng
     comfyui_url: str = "http://127.0.0.1:8188"  # ComfyUI local API (Flux)
     flux_checkpoint_name: str = "flux1-dev-fp8.safetensors"
+    # ComfyUI/SDXL + IPAdapter cho content profile character_story — capability
+    # riêng biệt với Flux ở trên (Flux dùng txt2img thuần, không có identity
+    # anchor). Xem providers/image/comfyui_story_provider.py.
+    comfyui_sdxl_checkpoint: str = "sd_xl_base_1.0.safetensors"
+    comfyui_clip_vision_model: str = "CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors"
+    comfyui_ipadapter_model: str = "ip-adapter-plus_sdxl_vit-h.safetensors"
     orientation: str = "portrait"   # portrait (1080x1920 Short) | landscape (1920x1080 clip)
     # Chỉ bắt buộc khi BROLL_ALLOW_DOWNLOADS=true (opt-in tải thêm B-roll mới).
     # Local-only mode (mặc định) không cần key này — key rỗng vẫn render được

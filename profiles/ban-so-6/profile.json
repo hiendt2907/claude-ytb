@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "profile_id": "ban-so-6",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "display_name": "Bàn số 6 — Truyện đời thường",
   "topic": "Những lựa chọn nhỏ của Minh và An tại Bàn số 6",
   "narrative_mode": "character_story",
@@ -45,5 +45,20 @@
       "three-lines.png",
       "reply.png"
     ]
+  },
+  "visual_generation": {
+    "enabled": true,
+    "style_prompt": "2D editorial illustration, soft line art, light paper texture, limited animation still, warm muted palette (cream #E9DFC8, navy #26394A, slate teal #667C7A, burnt orange #B96842, brown #5A4032, ochre #D8B26E), no neon, no 3D shading, no exaggerated expression, youthful mid-20s faces, smooth young skin, no wrinkles, no aged features",
+    "negative_prompt": "3d render, glossy, photo, photorealistic, neon, watermark, text, logo, gibberish text, extra fingers, deformed hands, anime eyes, exaggerated expression, comic panel grid, multiple panels, character turnaround sheet, reference sheet, collage, multiple views of same character, model sheet, old, aged, wrinkles, tired face, middle-aged",
+    "steps": 30,
+    "cfg": 6.5,
+    "solo_weight": 0.45,
+    "duo_weight": 0.3,
+    "duo_denoise": 0.5,
+    "characters": {
+      "minh": "identity/minh.png",
+      "an": "identity/an.png"
+    },
+    "duo_reference_image": "recognition.png"
   }
 }
