@@ -508,6 +508,7 @@ async def validate_or_repair_script(
     expected_video_type: str | None = None,
     requires_financial_evidence: bool = False,
     source_long_context: dict | None = None,
+    exempt_slugs: tuple[str, ...] = (),
 ) -> dict:
     """Write, validate, QA, and make at most one bounded content delta.
 
@@ -663,7 +664,10 @@ async def validate_or_repair_script(
             continue
 
         if script is not None:
-            result = await qa.run({"script": script, "done_topics": done_topics, "strict": strict})
+            result = await qa.run({
+                "script": script, "done_topics": done_topics, "strict": strict,
+                "exempt_slugs": exempt_slugs,
+            })
             if result.status == AgentStatus.SUCCESS:
                 last_qa_output = result.output
                 if log_path:

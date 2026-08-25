@@ -644,6 +644,7 @@ async def _cmd_start_local(args: argparse.Namespace) -> None:
                 args.type_of_rules
             ),
             source_long_context=available_source_long_context,
+            exempt_slugs=tuple(s for s in (replacement_slug,) if s),
         )
         except IdeationQualityFailure as exc:
             rejected_candidates += 1

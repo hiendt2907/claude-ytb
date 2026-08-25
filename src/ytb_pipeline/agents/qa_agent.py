@@ -73,7 +73,9 @@ class QAAgent:
             violations.extend(_check_length(script))
             violations.extend(_check_intro(script))
             violations.extend(_check_self_help(script))
-            violations.extend(_check_dedup(script, context.get("done_topics")))
+            violations.extend(_check_dedup(
+                script, context.get("done_topics"), context.get("exempt_slugs", ()),
+            ))
             violations.extend(_check_absolute_health_finance_claims(script))
             if context.get("strict", False):
                 violations.extend(_check_hook_strength(script))
@@ -586,9 +588,18 @@ def _script_text(script: Any) -> str:
     return " ".join(parts)
 
 
-def _check_dedup(script: Any, done_topics: Any) -> list[dict[str, str]]:
+def _check_dedup(
+    script: Any, done_topics: Any, exempt_slugs: Any = (),
+) -> list[dict[str, str]]:
+    """Chặn chủ đề trùng, trừ những slug đang được thay tại chỗ.
+
+    `--replace-slug` viết lại kịch bản cho một slot ĐÃ tồn tại, nên slug của nó
+    đương nhiên có trong ledger. Không miễn trừ thì mọi lần thay đều bị từ chối:
+    operator xin viết lại một tập, pipeline trả lời rằng tập đó đã có rồi.
+    """
     if not done_topics:
         return []
+    exempt = {series_mod.slugify(str(slug)) for slug in (exempt_slugs or ()) if str(slug).strip()}
     candidates = [
         value
         for value in (
@@ -599,9 +610,11 @@ def _check_dedup(script: Any, done_topics: Any) -> list[dict[str, str]]:
     ]
     if not candidates:
         return []
-    done_slugs = {series_mod.slugify(t) for t in done_topics}
+    done_slugs = {series_mod.slugify(t) for t in done_topics} - exempt
     for candidate in candidates:
         slug = series_mod.slugify(candidate)
+        if slug in exempt:
+            continue
         if slug in done_slugs:
             return [{
                 "rule": "series_dedup",
