@@ -144,8 +144,10 @@ bin/ytb batch run --publish --loop --batch-key <BATCH_KEY> \
   --long-publish-at <YYYY-MM-DD>T06:00:00+0700,...
 ```
 
-`--schedule-slots` là giờ cho Short, `--long-publish-at` là mốc riêng cho Long —
-hai luồng tách biệt, đúng lịch funnel 06:00 / 11:00 / 20:00.
+`--schedule-slots` PHẢI có đúng 3 mốc theo thứ tự **Short 1, Short 2, Long**
+(`scheduler.py:113` từ chối nếu ít hơn). Mốc thứ ba chỉ là fallback cho Long khi
+không truyền `--long-publish-at`; có `--long-publish-at` thì nó thắng. Lịch funnel
+06:00/11:00/20:00 viết thành `--schedule-slots 11:00,20:00,06:00`.
 
 **Ranh giới lên lịch:** `ideation_state.py` CỐ Ý ghi `publish_at: ""` và không bao
 giờ tự cam kết lịch YouTube. `ytb batch run --schedule` là điểm duy nhất gán lịch,
@@ -184,6 +186,8 @@ Lỗi một tập → ghi `status=error` + lý do, bỏ qua sang tập kế, kh�
 | QA từ chối nhiều lần liên tiếp | Bình thường. Đọc `reason=`, thêm ràng buộc vào `--idea`. |
 | CTA comment 403 | Long đích còn private (kể cả đang chờ `publishAt`). Fail-soft, không chặn publish; đăng bù sau giờ công khai nếu cần. |
 | Gate chặn dù đã vá code | Verdict cũ trong checkpoint. `load_or_create_project` tự reset node QA khi `render` chưa done — chạy lại là đủ, KHÔNG cần `ytb batch reset`. |
+| `✗ Daily bundle cần 3 slots` | `--schedule-slots` phải có 3 mốc: Short 1, Short 2, Long. |
+| `✗ Daily bundle yêu cầu Long ... 2 Shorts` | Sinh đủ cụm trước khi `run`. |
 | `load_queue` lấy nhầm batch cũ | Nó chọn `sorted(keys)[-1]`. Đặt tên batch mới sắp xếp sau, archive key cũ. |
 
 ## Checklist mỗi vòng
