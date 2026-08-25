@@ -120,7 +120,14 @@ def load_script(source: str | Path) -> Script:
             raise ValueError(f"Kịch bản {path.name} thiếu field bắt buộc: '{required}'")
 
     compliance = _validate_compliance(data.get("compliance"), path.name)
-    strategy = _strategy_from_raw(data.get("strategy"), path.name)
+    # `strategy` là hợp đồng funnel của kênh giải thích. Với profile không dùng
+    # nó, một `strategy` model lỡ thêm vào KHÔNG được phép đánh hỏng cả tập:
+    # nó không mang nghĩa gì trong hợp đồng của profile đó.
+    strategy = (
+        _strategy_from_raw(data.get("strategy"), path.name)
+        if content_profile.content_rules.require_short_source_trace
+        else None
+    )
     thumbnail_brief = _thumbnail_brief_from_raw(data.get("thumbnail_brief"), path.name)
 
     video_type = _normalize_video_type(data.get("video_type"), data.get("target_minutes"))

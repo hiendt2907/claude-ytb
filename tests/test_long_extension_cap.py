@@ -71,3 +71,28 @@ def test_full_script_at_the_cap_still_receives_the_extension_text():
     assert len(merged["sections"]) == 24
     combined = " ".join(section["voiceover"] for section in merged["sections"])
     assert "Đoạn thêm 0." in combined and "Đoạn thêm 1." in combined
+
+
+def test_story_profile_ignores_a_strategy_it_never_asked_for(tmp_path, monkeypatch):
+    """`strategy` carries no meaning for a character-story profile.
+
+    The prompt tells such a profile to omit it, but a model that adds a partial
+    `strategy` anyway used to fail the loader on `strategy.hook` — rejecting a
+    perfectly valid episode over a field its own contract does not use.
+    """
+    import json
+
+    from ytb_pipeline.ideation.generator import load_script
+
+    payload = json.loads(
+        (
+            __import__("pathlib").Path("profiles/ban-so-6/fixtures/episode-01-short.json")
+        ).read_text(encoding="utf-8")
+    )
+    payload["strategy"] = {"format_id": "core_answer_first_v1"}  # no `hook`
+    path = tmp_path / "story.json"
+    path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+    script = load_script(path)
+
+    assert script.strategy is None
