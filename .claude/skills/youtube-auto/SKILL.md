@@ -120,14 +120,30 @@ bin/ytb batch run --publish --batch-key <BATCH_KEY>
 
 Mặc định upload **private**. Không truyền `--publish` = dry-run, không upload.
 
-### 4d. Chuyển public
+### 4d. Lên lịch tự công khai (KHÔNG chuyển tay)
 
-Video lên private trước, người dùng duyệt, rồi chuyển public qua YouTube API
-(`videos().update`, part="status", giữ nguyên mọi field khác chỉ đổi `privacyStatus`).
+Dùng `--schedule` để `publish_at` được gán trước khi upload; uploader tự đặt
+`privacyStatus=private` + `publishAt`, YouTube tự công khai đúng giờ:
 
-> **BẮT BUỘC: Long phải public TRƯỚC khi sinh Short của nó.** CTA comment dùng
-> `commentThreads.insert`, và YouTube trả 403 khi video đích còn private — đã xác
-> minh thật. Long public rồi thì CTA của Short đăng được ngay.
+```bash
+bin/ytb batch run --publish --loop --batch-key <BATCH_KEY> \
+  --schedule --schedule-start-date <YYYY-MM-DD> \
+  --schedule-slots 11:00,20:00 \
+  --long-publish-at <YYYY-MM-DD>T06:00:00+0700,...
+```
+
+`--schedule-slots` là giờ cho Short, `--long-publish-at` là mốc riêng cho Long —
+hai luồng tách biệt, đúng lịch funnel 06:00 / 11:00 / 20:00.
+
+**Ranh giới lên lịch:** `ideation_state.py` CỐ Ý ghi `publish_at: ""` và không bao
+giờ tự cam kết lịch YouTube. `ytb batch run --schedule` là điểm duy nhất gán lịch,
+sau QA gate. Đừng vá ideation để ghi thẳng `publish_at` — sẽ phá ranh giới đó.
+`--schedule` cũng không ghi đè video đã có lịch, nên chạy lại an toàn.
+
+> **CTA comment và lịch công khai:** `commentThreads.insert` trả 403 khi video đích
+> còn private. Với `publishAt`, Long vẫn private cho tới giờ hẹn — nên CTA của Short
+> đăng lúc upload sẽ trượt. Chấp nhận được: CTA fail-soft, không chặn publish, chỉ
+> ghi cảnh báo. Nếu cần CTA chắc chắn, đăng bù sau khi Long đã tới giờ công khai.
 
 ### 4e. Ghi sổ
 
@@ -154,7 +170,7 @@ Lỗi một tập → ghi `status=error` + lý do, bỏ qua sang tập kế, kh�
 |---|---|
 | Ideation Long timeout, cascade sang Codex | xKiro không đủ sức viết Long. Dùng `--llm-provider codex` thẳng. |
 | QA từ chối nhiều lần liên tiếp | Bình thường. Đọc `reason=`, thêm ràng buộc vào `--idea`. |
-| CTA comment 403 | Long đích còn private. Public Long trước rồi mới sinh Short. |
+| CTA comment 403 | Long đích còn private (kể cả đang chờ `publishAt`). Fail-soft, không chặn publish; đăng bù sau giờ công khai nếu cần. |
 | Gate chặn dù đã vá code | Verdict cũ trong checkpoint. `load_or_create_project` tự reset node QA khi `render` chưa done — chạy lại là đủ, KHÔNG cần `ytb batch reset`. |
 | `load_queue` lấy nhầm batch cũ | Nó chọn `sorted(keys)[-1]`. Đặt tên batch mới sắp xếp sau, archive key cũ. |
 
@@ -167,7 +183,8 @@ Lỗi một tập → ghi `status=error` + lý do, bỏ qua sang tập kế, kh�
 - [ ] `bin/ytb batch preflight <slug>` PASS trước khi chạy
 - [ ] Kiểm ký tự / 5 purpose / situation budget trước khi tốn TTS
 - [ ] `bin/ytb batch run --publish` → private
-- [ ] Long PUBLIC trước khi sinh Short của nó (điều kiện CTA)
+- [ ] Dùng `--schedule` + `--long-publish-at`, KHÔNG chuyển public tay
+- [ ] Biết CTA comment sẽ trượt khi Long chưa tới giờ công khai (fail-soft)
 - [ ] `mark_episode_done` + `write_series` sau mỗi tập
 - [ ] Kiểm `YTB_LISTENER_MANAGED`: MANAGED thì thoát, STANDALONE thì ngủ chờ
 - [ ] Chạm 98% token → ghi sổ + ScheduleWakeup, không thoát
