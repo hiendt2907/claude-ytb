@@ -223,6 +223,22 @@ def chars_per_min_for_provider(provider: str, *, video_type: str | None = None) 
     return F5_CHARS_PER_MIN if normalized == "f5" else EDGE_CHARS_PER_MIN
 
 
+def effective_chars_per_min(
+    provider: str, *, video_type: str | None = None, content_profile: "ContentProfile | None" = None,
+) -> float:
+    """chars_per_min_for_provider, bù thêm hệ số nhịp đọc riêng của profile.
+
+    Hằng số CPM chung đo trên kênh 1-giọng; một profile hội thoại nhiều giọng
+    có overhead chuyển giọng giữa các segment mà hằng số đó không tính tới.
+    Đo được ~7-8% chênh lệch có hệ thống cho ban-so-6 qua hai lần render Long
+    thật (không phải nhiễu một lần). content_profile.providers.tts_pace_factor
+    là hệ số hiệu chỉnh riêng đó; mặc định 1.0 cho profile không khai.
+    """
+    base = chars_per_min_for_provider(provider, video_type=video_type)
+    factor = content_profile.providers.tts_pace_factor if content_profile is not None else 1.0
+    return base * factor
+
+
 def estimate_duration_sec(characters: int, *, chars_per_minute: float) -> float:
     if chars_per_minute <= 0:
         raise ValueError("chars_per_minute phải > 0.")

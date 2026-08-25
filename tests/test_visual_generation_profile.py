@@ -177,3 +177,41 @@ def test_profile_fingerprint_changes_when_an_identity_image_changes(tmp_path):
 
     after = profile_fingerprint(load_content_profile("ban-so-6", profiles_dir=tmp_path))
     assert before != after
+
+
+def test_tts_pace_factor_defaults_to_one_when_absent(tmp_path):
+    from ytb_pipeline.content_profiles import load_content_profile
+
+    _write_profile(tmp_path, "ban-so-6")
+
+    profile = load_content_profile("ban-so-6", profiles_dir=tmp_path)
+
+    assert profile.providers.tts_pace_factor == 1.0
+
+
+def test_tts_pace_factor_reads_from_providers_block(tmp_path):
+    from ytb_pipeline.content_profiles import load_content_profile
+    import json
+
+    folder = _write_profile(tmp_path, "ban-so-6")
+    payload = json.loads((folder / "profile.json").read_text(encoding="utf-8"))
+    payload["providers"]["tts_pace_factor"] = 0.93
+    (folder / "profile.json").write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+    profile = load_content_profile("ban-so-6", profiles_dir=tmp_path)
+
+    assert profile.providers.tts_pace_factor == 0.93
+
+
+@pytest.mark.parametrize("value", [0, -0.1, 2.5])
+def test_tts_pace_factor_out_of_range_is_rejected(tmp_path, value):
+    from ytb_pipeline.content_profiles import ContentProfileError, load_content_profile
+    import json
+
+    folder = _write_profile(tmp_path, "ban-so-6")
+    payload = json.loads((folder / "profile.json").read_text(encoding="utf-8"))
+    payload["providers"]["tts_pace_factor"] = value
+    (folder / "profile.json").write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+    with pytest.raises(ContentProfileError):
+        load_content_profile("ban-so-6", profiles_dir=tmp_path)

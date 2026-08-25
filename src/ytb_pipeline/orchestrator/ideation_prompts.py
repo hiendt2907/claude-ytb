@@ -12,7 +12,12 @@ from typing import TYPE_CHECKING
 
 from ..analytics.quality_report import REQUIRED_PURPOSES_BY_VIDEO_TYPE
 from ..config.settings import settings
-from ..content_contract import CONTRACT_VERSION, chars_per_min_for_provider, contract_for
+from ..content_contract import (
+    CONTRACT_VERSION,
+    chars_per_min_for_provider,
+    contract_for,
+    effective_chars_per_min,
+)
 from ..ideation.generation_schema import SECTION_PURPOSES
 
 if TYPE_CHECKING:
@@ -163,11 +168,11 @@ def script_generation_system_prompt(
     long = content_profile.format_for("long")
     short_contract = contract_for("short", content_profile)
     long_contract = contract_for("long", content_profile)
-    short_rate = chars_per_min_for_provider(
-        content_profile.providers.tts, video_type="short"
+    short_rate = effective_chars_per_min(
+        content_profile.providers.tts, video_type="short", content_profile=content_profile,
     )
-    long_rate = chars_per_min_for_provider(
-        content_profile.providers.tts, video_type="long"
+    long_rate = effective_chars_per_min(
+        content_profile.providers.tts, video_type="long", content_profile=content_profile,
     )
     short_chars = short_contract.safe_character_bounds(
         chars_per_minute=short_rate, segment_count=short.min_sections
@@ -337,8 +342,8 @@ def local_script_prompt(
         long_format.max_sections if long_format else int(LONG_CONTRACT.minimum_sections * 1.5)
     )
     tts_provider = content_profile.providers.tts if content_profile else settings.tts_provider
-    short_rate = chars_per_min_for_provider(tts_provider, video_type="short")
-    long_rate = chars_per_min_for_provider(tts_provider, video_type="long")
+    short_rate = effective_chars_per_min(tts_provider, video_type="short", content_profile=content_profile)
+    long_rate = effective_chars_per_min(tts_provider, video_type="long", content_profile=content_profile)
     short_safe = short_contract.safe_character_bounds(
         chars_per_minute=short_rate, segment_count=short_sections
     )

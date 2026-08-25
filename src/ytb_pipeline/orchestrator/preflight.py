@@ -10,7 +10,7 @@ from typing import Any
 
 from ..analytics.quality_report import missing_required_purposes
 from ..config.settings import settings
-from ..content_contract import chars_per_min_for_provider, contract_for, estimate_duration_sec
+from ..content_contract import contract_for, effective_chars_per_min, estimate_duration_sec
 from ..content_profiles import ContentProfile, ContentProfileError, load_content_profile
 from ..ideation.generator import load_script
 from ..ideation.script_contract import validate_script_payload
@@ -113,23 +113,22 @@ def _load_script(path: Path, failures: list[PreflightFailure]):
 def _validate_runtime(script: Any, failures: list[PreflightFailure]) -> None:
     if script is None:
         return
+    profile = (
+        load_content_profile(script.content_profile_id)
+        if script.content_profile_version else None
+    )
     estimated = estimate_duration_sec(
         sum(len(segment.narration) for segment in script.segments),
-        # Same format-specific rate the prompt planned with, so admission and
-        # generation cannot disagree about how long a script will speak.
-        chars_per_minute=chars_per_min_for_provider(
-            (
-                load_content_profile(script.content_profile_id).providers.tts
-                if script.content_profile_version else settings.tts_provider
-            ),
+        # Same format-specific rate (+ profile pace factor) the prompt
+        # planned with, so admission and generation cannot disagree about
+        # how long a script will speak.
+        chars_per_minute=effective_chars_per_min(
+            profile.providers.tts if profile else settings.tts_provider,
             video_type=script.video_type,
+            content_profile=profile,
         ),
     )
     try:
-        profile = (
-            load_content_profile(script.content_profile_id)
-            if script.content_profile_version else None
-        )
         contract_for(script.video_type, profile).validate_audio_runtime(
             estimated, segment_count=len(script.segments)
         )

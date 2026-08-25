@@ -15,7 +15,7 @@ from urllib.parse import urlparse
 
 from ..agents.base import AgentStatus
 from ..agents.qa_agent import QAAgent
-from ..content_contract import chars_per_min_for_provider, contract_for
+from ..content_contract import contract_for, effective_chars_per_min
 from ..ideation.generator import load_script
 from ..content_profiles import ContentProfile, load_content_profile
 from ..ideation.script_contract import validate_script_payload
@@ -71,7 +71,7 @@ def _repair_character_bounds(
         ) // 2
     format_profile = profile.format_for(video_type)
     contract = contract_for(video_type, profile)
-    rate = chars_per_min_for_provider(profile.providers.tts, video_type=video_type)
+    rate = effective_chars_per_min(profile.providers.tts, video_type=video_type, content_profile=profile)
     lower_sec, upper_sec = contract.audio_runtime_bounds_sec(
         segment_count=format_profile.min_sections
     )

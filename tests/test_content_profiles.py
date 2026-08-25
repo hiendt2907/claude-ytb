@@ -495,3 +495,28 @@ def test_story_script_loads_profile_speaker_and_visual_asset(tmp_path, write_scr
         "narrator", "minh", "an", "narrator"
     ]
     assert script.segments[0].visual_asset == "opening.png"
+
+
+def test_effective_chars_per_min_applies_the_profile_pace_factor(tmp_path):
+    from ytb_pipeline.content_contract import chars_per_min_for_provider, effective_chars_per_min
+    from ytb_pipeline.content_profiles import load_content_profile
+    import json
+
+    folder = _write_profile(tmp_path, "ban-so-6")
+    payload = json.loads((folder / "profile.json").read_text(encoding="utf-8"))
+    payload["providers"]["tts_pace_factor"] = 0.9
+    (folder / "profile.json").write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    profile = load_content_profile("ban-so-6", profiles_dir=tmp_path)
+
+    base = chars_per_min_for_provider("xkiro", video_type="long")
+    adjusted = effective_chars_per_min("xkiro", video_type="long", content_profile=profile)
+
+    assert adjusted == pytest.approx(base * 0.9)
+
+
+def test_effective_chars_per_min_without_profile_is_unchanged():
+    from ytb_pipeline.content_contract import chars_per_min_for_provider, effective_chars_per_min
+
+    assert effective_chars_per_min("xkiro", video_type="long") == chars_per_min_for_provider(
+        "xkiro", video_type="long"
+    )

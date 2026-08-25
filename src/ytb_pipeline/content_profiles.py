@@ -53,6 +53,15 @@ class ProviderProfile:
     render: str
     broll_strategy: str
     broll_allow_downloads: bool
+    # Hệ số bù tốc độ đọc thật của profile so với hằng số CPM chung của
+    # provider. Đo được ~7-8% chênh lệch có hệ thống cho ban-so-6 (hội thoại
+    # nhiều giọng, chuyển giọng giữa các segment có overhead mà hằng số CPM
+    # đo trên kênh 1-giọng không tính tới) qua hai lần render Long thật.
+    tts_pace_factor: float = 1.0
+
+    def __post_init__(self) -> None:
+        if not (0 < self.tts_pace_factor <= 2):
+            raise ContentProfileError("providers.tts_pace_factor phải nằm trong (0, 2].")
 
 
 @dataclass(frozen=True)
@@ -278,6 +287,9 @@ def load_content_profile(
             ),
             broll_allow_downloads=_exact_bool(
                 providers_raw, "broll_allow_downloads", prefix="providers"
+            ),
+            tts_pace_factor=_finite_number(
+                providers_raw, "tts_pace_factor", prefix="providers", default=1.0
             ),
         ),
         voice_cast=voice_cast,

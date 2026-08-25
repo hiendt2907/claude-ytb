@@ -22,7 +22,8 @@
     "tts": "xkiro",
     "render": "story",
     "broll_strategy": "none",
-    "broll_allow_downloads": false
+    "broll_allow_downloads": false,
+    "tts_pace_factor": 0.92
   },
   "voice_cast": {
     "narrator": "standard-female-vietnamese",
