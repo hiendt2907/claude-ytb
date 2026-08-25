@@ -4,10 +4,46 @@ Gom phần build script JSON + khối `compliance` (trước đây lặp ở tes
 test_length_gate, test_intro_gate) về một chỗ để DRY.
 """
 
+import importlib
 import json
+import os
 from pathlib import Path
 
 import pytest
+
+
+# ---------------------------------------------------------------------------
+# Pin the format runtime window BEFORE any pipeline module is imported.
+#
+# The window is operator-configurable by design (`SHORT_VIEWER_MIN_SEC` & co.),
+# so retuning the channel from a 60-90s Short to a 30-45s Short turned two dozen
+# unrelated tests red without a single code change.  Several modules also freeze
+# their character budgets at import time, so patching `settings` inside a fixture
+# would leave the test module and the code under test disagreeing.  Setting the
+# environment here — conftest is imported before the test modules — makes every
+# later import see the same documented defaults.  A test that cares about a
+# specific window sets it explicitly and reloads what it needs.
+# ---------------------------------------------------------------------------
+_WINDOW_ENV = {
+    "SHORT_VIEWER_MIN_SEC": "short_viewer_min_sec",
+    "SHORT_VIEWER_MAX_SEC": "short_viewer_max_sec",
+    "SHORT_MIN_SECTIONS": "short_min_sections",
+    "LONG_VIEWER_MIN_SEC": "long_viewer_min_sec",
+    "LONG_VIEWER_MAX_SEC": "long_viewer_max_sec",
+    "LONG_MIN_SECTIONS": "long_min_sections",
+}
+
+
+def _pin_runtime_window_env() -> None:
+    from ytb_pipeline.config import settings as settings_module
+
+    fields = settings_module.Settings.model_fields
+    for env_name, field in _WINDOW_ENV.items():
+        os.environ[env_name] = str(fields[field].default)
+    importlib.reload(settings_module)
+
+
+_pin_runtime_window_env()
 
 
 @pytest.fixture(autouse=True)

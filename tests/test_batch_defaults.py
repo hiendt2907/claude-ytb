@@ -403,12 +403,22 @@ def test_cmd_start_rejects_a_short_without_a_v1_batch_funnel_before_calling_an_l
 
 
 def test_long_prompt_declares_a_safe_runtime_floor():
-    from ytb_pipeline.orchestrator.ideation_prompts import SCRIPT_GENERATION_SYSTEM_PROMPT, local_script_prompt
+    """The floor must come from the active contract, not a pinned 12-minute literal.
+
+    The runtime window is operator-configurable, so asserting "12" here only
+    tested that nobody had retuned the channel yet.
+    """
+    from ytb_pipeline.orchestrator.ideation_prompts import (
+        LONG_MAX_MINUTES,
+        LONG_MIN_MINUTES,
+        SCRIPT_GENERATION_SYSTEM_PROMPT,
+        local_script_prompt,
+    )
 
     prompt = local_script_prompt(1, 1, "long", "auto", "")
 
-    assert '"target_minutes": 12 (declare EXACTLY 12)' in prompt
-    assert "actual audio stays 12-15 minutes" in SCRIPT_GENERATION_SYSTEM_PROMPT
+    assert f'"target_minutes": {LONG_MIN_MINUTES} (declare EXACTLY {LONG_MIN_MINUTES})' in prompt
+    assert f"actual audio stays {LONG_MIN_MINUTES}-{LONG_MAX_MINUTES} minutes" in SCRIPT_GENERATION_SYSTEM_PROMPT
     assert "first 28 spoken words after the greeting" in SCRIPT_GENERATION_SYSTEM_PROMPT
 
 
