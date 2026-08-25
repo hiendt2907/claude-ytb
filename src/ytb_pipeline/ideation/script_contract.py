@@ -186,6 +186,43 @@ def _validate_thumbnail(raw: object, findings: list[ScriptContractFinding]) -> N
             )
 
 
+# Lặp nguyên văn một câu ngắn có thể là chủ ý ("Minh mở laptop."); lặp nguyên
+# một đoạn dài thì không — đó là dấu hiệu bước vá đã chép lại nội dung cũ.
+_DUPLICATE_SECTION_MIN_CHARS = 60
+
+
+def _normalised_narration(section: Any) -> str:
+    if not isinstance(section, Mapping):
+        return ""
+    text = _text(section.get("voiceover")) or _text(section.get("narration"))
+    return " ".join(text.lower().split())
+
+
+def _check_duplicate_sections(raw: list, findings: list[ScriptContractFinding]) -> None:
+    """Chặn hai section mang cùng một lời đọc.
+
+    Bước vá Long ("extend") từng trả lời bằng cách phát lại nguyên phần mở đầu:
+    section 16-22 trùng từng chữ với 0-6. Mọi cổng khác đều qua — thời lượng,
+    số section, purpose, preflight — vì không cổng nào so các section VỚI NHAU,
+    nên video sẽ đọc lại hai phút đầu.
+    """
+    seen: dict[str, int] = {}
+    for index, section in enumerate(raw):
+        narration = _normalised_narration(section)
+        if len(narration) < _DUPLICATE_SECTION_MIN_CHARS:
+            continue
+        first = seen.get(narration)
+        if first is None:
+            seen[narration] = index
+            continue
+        _add(
+            findings,
+            "sections.duplicate",
+            f"sections[{index}]",
+            f"Lời đọc trùng nguyên văn với section {first + 1}; mỗi section phải mang nội dung mới.",
+        )
+
+
 def _validate_sections(
     raw: object, findings: list[ScriptContractFinding], minimum_sections: int | None,
     content_profile: ContentProfile | None = None,
@@ -208,6 +245,8 @@ def _validate_sections(
             "sections",
             f"Không được vượt quá {maximum_sections} section theo content profile.",
         )
+
+    _check_duplicate_sections(raw, findings)
 
     sections: list[Mapping[str, Any]] = []
     for index, section in enumerate(raw):

@@ -28,7 +28,10 @@ def _payload() -> dict:
             # A "runnable" fixture must satisfy the release gate too, otherwise
             # it proves admission passes a script that publish would reject.
             "purpose": _PURPOSE_BY_INDEX[index],
-            "voiceover": narration,
+            # Mỗi section phải khác nhau: cổng sections.duplicate coi hai lời
+            # đọc giống hệt là lỗi, và một fixture "chạy được" thì không được
+            # vi phạm chính cổng đó.
+            "voiceover": f"Bước {index + 1}. {narration}",
             "visual_intent": "Nhân viên văn phòng nhìn danh sách việc.",
             "pexels_query": "office task list",
             "time_goal": 0.2,
