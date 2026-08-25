@@ -200,9 +200,24 @@ class XkiroVoiceProvider:
             except urllib_error.HTTPError as exc:
                 retryable = exc.code == 429 or 500 <= exc.code < 600
                 if not retryable or attempt == retries - 1:
-                    raise RuntimeError(f"xKiro TTS trả HTTP {exc.code}.") from exc
+                    # Không đọc body khiến một HTTP 400 hoàn toàn không chẩn
+                    # đoán được: nguyên nhân thật (input không có gì để đọc)
+                    # nằm trong phản hồi mà ta đang vứt đi.
+                    raise RuntimeError(
+                        f"xKiro TTS trả HTTP {exc.code}: {_error_detail(exc)} "
+                        f"(input {len(text)} ký tự: {text[:80]!r})"
+                    ) from exc
             except (TimeoutError, urllib_error.URLError) as exc:
                 if attempt == retries - 1:
                     raise RuntimeError("Không kết nối được xKiro TTS.") from exc
             time.sleep(2**attempt)
         raise RuntimeError("xKiro TTS không trả audio sau các lần thử lại.")
+
+
+def _error_detail(exc: urllib_error.HTTPError) -> str:
+    """Nội dung lỗi provider trả về, cắt ngắn; không bao giờ chứa API key."""
+    try:
+        body = exc.read().decode("utf-8", "replace").strip()
+    except (OSError, ValueError):
+        return "<không đọc được body>"
+    return body[:300] or "<body rỗng>"

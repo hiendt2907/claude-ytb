@@ -368,6 +368,10 @@ def _prepare_narration(text: str) -> str:
     return cleaned
 
 
+# "Đọc được" = có ít nhất một chữ cái hoặc chữ số; dấu câu đơn thuần thì không.
+_SPEAKABLE_RE = re.compile(r"[^\W_]", re.UNICODE)
+
+
 def _split_for_pacing(text: str, comma_sec: float,
                       sentence_sec: float) -> list[tuple[str, float]]:
     """Chia narration thành các cụm đọc + khoảng lặng (giây) chèn SAU mỗi cụm.
@@ -395,9 +399,38 @@ def _split_for_pacing(text: str, comma_sec: float,
             pause = 0.0
         out.append((part, pause))
 
+    out = _merge_unspeakable_pieces(out)
     if out:
         out[-1] = (out[-1][0], 0.0)  # cụm cuối: nghỉ ở mức segment, không ở đây
     return out
+
+
+def _merge_unspeakable_pieces(pieces: list[tuple[str, float]]) -> list[tuple[str, float]]:
+    """Gộp cụm không có chữ nào vào cụm liền trước, giữ khoảng nghỉ dài hơn.
+
+    Dấu đóng ngoặc kép không nằm trong bảng dấu ngắt, nên `“...”.` bị tách thành
+    một cụm riêng chỉ gồm `”.` — không có gì để đọc. xKiro trả HTTP 400 cho một
+    input như vậy và cả segment hỏng, dù kịch bản hoàn toàn hợp lệ. Đây là lý do
+    lỗi chỉ xuất hiện ở vài kịch bản có ngoặc kép chứ không phải mọi kịch bản.
+
+    Gộp thay vì bỏ để không mất khoảng nghỉ mà dấu câu đó biểu thị.
+    """
+    merged: list[tuple[str, float]] = []
+    for text, pause in pieces:
+        if _SPEAKABLE_RE.search(text) or not merged:
+            merged.append((text, pause))
+            continue
+        previous_text, previous_pause = merged[-1]
+        merged[-1] = (f"{previous_text}{text}", max(previous_pause, pause))
+    # Cụm đầu tiên cũng có thể không đọc được; khi đó gộp xuôi vào cụm kế.
+    if merged and not _SPEAKABLE_RE.search(merged[0][0]):
+        if len(merged) == 1:
+            return []
+        head_text, head_pause = merged[0]
+        next_text, next_pause = merged[1]
+        merged[1] = (f"{head_text}{next_text}", max(head_pause, next_pause))
+        merged.pop(0)
+    return merged
 
 
 def _coalesce_f5_pieces(
