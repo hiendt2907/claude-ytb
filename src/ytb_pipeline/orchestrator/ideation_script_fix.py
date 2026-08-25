@@ -21,7 +21,7 @@ from ..content_profiles import ContentProfile, load_content_profile
 from ..ideation.script_contract import validate_script_payload
 from .state_io import atomic_write_json
 from .ideation_error_engine import record_ideation_failure
-from .ideation_json_heal import heal_json
+from .ideation_json_heal import heal_json, strip_code_fence
 from .ideation_prompts import (
     LONG_SAFE_MIN_CHARS,
     LONG_SAFE_MAX_CHARS,
@@ -117,14 +117,7 @@ def validate_financial_evidence_register(payload: dict, *, required: bool) -> No
 
 def json_from_llm(text: str) -> dict:
     """Parse structured LLM output, tolerating fenced JSON wrappers."""
-    raw = text.strip()
-    fenced = re.search(r"```(?:json)?\s*(.*?)\s*```", raw, flags=re.IGNORECASE | re.DOTALL)
-    if fenced:
-        raw = fenced.group(1).strip()
-    if raw.startswith("```"):
-        raw = raw.strip("`").strip()
-        if raw.lower().startswith("json"):
-            raw = raw[4:].strip()
+    raw = strip_code_fence(text)
     try:
         return json.loads(raw)
     except json.JSONDecodeError as exc:

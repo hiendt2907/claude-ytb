@@ -68,3 +68,23 @@ def heal_json(raw: str, *, error_pos: int | None = None) -> dict:
     if not isinstance(data, dict):
         raise ValueError("json_repair không trả về object hợp lệ.")
     return data
+
+
+def strip_code_fence(text: str) -> str:
+    """Nội dung bên trong rào markdown ```json, nếu có.
+
+    `json_from_llm` biết bỏ rào từ lâu, nhưng `process_and_sanitize` — chạy
+    TRƯỚC nó trên mọi candidate mới — thì parse thẳng text thô. Model nào chỉ
+    mắc mỗi lỗi bọc rào cũng bị vứt cả phản hồi và trả tiền sinh lại, dù JSON
+    bên trong hoàn toàn hợp lệ. Một hàm dùng chung để hai lớp không lệch nhau
+    lần nữa.
+    """
+    raw = (text or "").strip()
+    fenced = re.search(r"```(?:json)?\s*(.*?)\s*```", raw, flags=re.IGNORECASE | re.DOTALL)
+    if fenced:
+        return fenced.group(1).strip()
+    if raw.startswith("```"):
+        raw = raw.strip("`").strip()
+        if raw.lower().startswith("json"):
+            raw = raw[4:].strip()
+    return raw

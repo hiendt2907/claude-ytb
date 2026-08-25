@@ -15,7 +15,7 @@ import unicodedata
 from typing import Any
 
 from ..content_contract import CONTRACT_VERSION
-from ..orchestrator.ideation_json_heal import heal_json
+from ..orchestrator.ideation_json_heal import heal_json, strip_code_fence
 
 
 _NARRATION_KEYS = {"narration_text", "voiceover", "narration"}
@@ -80,11 +80,12 @@ def process_and_sanitize(raw_llm_output: str) -> dict:
     """Parse and deterministically sanitize one raw Qwen JSON response."""
     if not isinstance(raw_llm_output, str) or not raw_llm_output.strip():
         raise ValueError("raw_llm_output phải là JSON text không rỗng.")
+    unfenced = strip_code_fence(raw_llm_output)
     try:
-        payload = json.loads(raw_llm_output)
+        payload = json.loads(unfenced)
     except json.JSONDecodeError as exc:
         try:
-            payload = heal_json(raw_llm_output, error_pos=exc.pos)
+            payload = heal_json(unfenced, error_pos=exc.pos)
         except ValueError as heal_exc:
             raise ValueError(f"Không thể parse JSON từ LLM: {exc}") from heal_exc
     if not isinstance(payload, dict):
