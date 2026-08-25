@@ -90,6 +90,28 @@ class ContentProfile:
     voice_cast: Mapping[str, str]
     content_rules: ContentRules
     render: RenderProfile
+    visual_generation: "VisualGenerationProfile | None" = None
+
+    def character_reference_path(self, character_id: str) -> Path:
+        vg = self.visual_generation
+        if vg is None or character_id not in vg.characters:
+            raise ContentProfileError(
+                f"Profile '{self.profile_id}' không có ảnh neo cho nhân vật '{character_id}'."
+            )
+        return _safe_child(
+            self.assets_dir, vg.characters[character_id],
+            field=f"visual_generation.characters.{character_id}",
+        )
+
+    def duo_reference_path(self) -> Path:
+        vg = self.visual_generation
+        if vg is None or not vg.duo_reference_image:
+            raise ContentProfileError(
+                f"Profile '{self.profile_id}' không khai duo_reference_image."
+            )
+        return _safe_child(
+            self.assets_dir, vg.duo_reference_image, field="visual_generation.duo_reference_image"
+        )
 
     def format_for(self, video_type: str) -> FormatProfile:
         try:
@@ -147,6 +169,39 @@ class ContentProfile:
         if not relative or not path.is_file():
             raise ContentProfileError(f"Không tìm thấy visual_asset: {path}")
         return path
+
+
+@dataclass(frozen=True)
+class VisualGenerationProfile:
+    """Local ComfyUI/IPAdapter identity-anchored scene generation.
+
+    Only meaningful for narrative_mode == "character_story": a mechanism
+    explainer has no recurring cast, so there is no identity to anchor.
+    `load_content_profile` enforces that gate.
+    """
+
+    enabled: bool
+    style_prompt: str
+    negative_prompt: str
+    steps: int
+    cfg: float
+    solo_weight: float
+    duo_weight: float
+    duo_denoise: float
+    characters: Mapping[str, str]
+    duo_reference_image: str
+
+    def __post_init__(self) -> None:
+        if self.steps < 1:
+            raise ContentProfileError("visual_generation.steps phải >= 1.")
+        if not (0 < self.cfg <= 30):
+            raise ContentProfileError("visual_generation.cfg phải nằm trong (0, 30].")
+        if not (0 <= self.solo_weight <= 2):
+            raise ContentProfileError("visual_generation.solo_weight phải nằm trong [0, 2].")
+        if not (0 <= self.duo_weight <= 2):
+            raise ContentProfileError("visual_generation.duo_weight phải nằm trong [0, 2].")
+        if not (0 < self.duo_denoise <= 1):
+            raise ContentProfileError("visual_generation.duo_denoise phải nằm trong (0, 1].")
 
 
 def profiles_root(profiles_dir: Path | str | None = None) -> Path:
@@ -245,6 +300,7 @@ def load_content_profile(
             ),
             scene_assets=_string_tuple(render_raw.get("scene_assets", ()), "render.scene_assets"),
         ),
+        visual_generation=_visual_generation_profile(raw.get("visual_generation"), profile_id),
     )
     if (
         profile.narrative_mode == "character_story"
@@ -254,6 +310,11 @@ def load_content_profile(
             "Story profile cần inter_segment_gap_sec >= transition_overlap_sec "
             "để lời thoại hai nhân vật không chồng lên nhau."
         )
+    if profile.visual_generation is not None and profile.narrative_mode != "character_story":
+        raise ContentProfileError(
+            f"Profile '{profile_id}' bật visual_generation nhưng narrative_mode không phải "
+            "'character_story'. Tính năng chỉ áp dụng cho profile series kể truyện."
+        )
     for name in prompts:
         profile.prompt_text(name)
     if not profile.assets_dir.is_dir():
@@ -262,7 +323,39 @@ def load_content_profile(
         )
     for asset_name in profile.render.scene_assets:
         profile.visual_asset_path(asset_name)
+    if profile.visual_generation is not None and profile.visual_generation.enabled:
+        for character_id in profile.visual_generation.characters:
+            if character_id == "narrator" or character_id not in profile.voice_cast:
+                raise ContentProfileError(
+                    f"Profile '{profile_id}': visual_generation.characters['{character_id}'] "
+                    "phải là một nhân vật khai trong voice_cast (khác narrator)."
+                )
+            path = profile.character_reference_path(character_id)
+            if not path.is_file():
+                raise ContentProfileError(f"Không tìm thấy ảnh neo nhận dạng: {path}")
+        if profile.visual_generation.duo_reference_image:
+            duo_path = profile.duo_reference_path()
+            if not duo_path.is_file():
+                raise ContentProfileError(f"Không tìm thấy duo_reference_image: {duo_path}")
     return profile
+
+
+def _visual_generation_profile(raw: Any, profile_id: str) -> "VisualGenerationProfile | None":
+    if raw is None:
+        return None
+    mapping = _mapping(raw, "visual_generation")
+    return VisualGenerationProfile(
+        enabled=_exact_bool(mapping, "enabled", prefix="visual_generation"),
+        style_prompt=_required_text(mapping, "style_prompt", prefix="visual_generation"),
+        negative_prompt=_required_text(mapping, "negative_prompt", prefix="visual_generation"),
+        steps=_positive_int(mapping, "steps", path="visual_generation"),
+        cfg=_finite_number(mapping, "cfg", prefix="visual_generation"),
+        solo_weight=_finite_number(mapping, "solo_weight", prefix="visual_generation"),
+        duo_weight=_finite_number(mapping, "duo_weight", prefix="visual_generation"),
+        duo_denoise=_finite_number(mapping, "duo_denoise", prefix="visual_generation"),
+        characters=_string_map(mapping.get("characters"), "visual_generation.characters"),
+        duo_reference_image=str(mapping.get("duo_reference_image") or "").strip(),
+    )
 
 
 def profile_fingerprint(profile: ContentProfile) -> str:
@@ -273,6 +366,13 @@ def profile_fingerprint(profile: ContentProfile) -> str:
         for name, relative in profile.prompts.items()
     )
     paths.extend(profile.visual_asset_path(name) for name in profile.visual_asset_names)
+    if profile.visual_generation is not None:
+        paths.append(profile.root / "profile.json")  # visual_generation block itself
+        paths.extend(
+            profile.character_reference_path(name) for name in profile.visual_generation.characters
+        )
+        if profile.visual_generation.duo_reference_image:
+            paths.append(profile.duo_reference_path())
     digest = hashlib.sha256()
     for path in sorted(paths, key=lambda item: item.relative_to(profile.root).as_posix()):
         relative = path.relative_to(profile.root).as_posix().encode("utf-8")
