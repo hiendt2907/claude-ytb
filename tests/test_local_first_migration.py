@@ -733,6 +733,46 @@ async def test_undersized_short_is_rewritten_by_llm_instead_of_padded(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_undersized_short_retries_invalid_expansion_with_one_allowed_middle_index(tmp_path):
+    """A mixed/CTA delta must be rejected, then corrected without rewriting the CTA."""
+    from ytb_pipeline.orchestrator.ideation_script_fix import validate_or_repair_script
+
+    undersized = _valid_short_script()
+    for section in undersized["sections"]:
+        section["narration"] = "Một nhịp ngắn để kiểm tra lỗi."
+    undersized["sections"][0]["narration"] = "Mở laptop, nhưng tay lại cầm điện thoại."
+    undersized["sections"][1]["narration"] = "Não đang né khoảnh khắc chưa biết bắt đầu từ đâu."
+    original_payoff = undersized["sections"][-1]["narration"]
+    addition = "Một bước nhỏ mỗi ngày giúp giảm sự mơ hồ khi bắt đầu. " * 40
+
+    class RetryingLLM:
+        def __init__(self):
+            self.calls = 0
+
+        async def complete(self, *_args, **_kwargs):
+            self.calls += 1
+            if self.calls == 1:
+                # Index 5 is the payoff/CTA and must never be applied.
+                return json.dumps({"section_updates": [{"index": 5, "append_voiceover": addition}]})
+            return json.dumps({"section_updates": [{"index": 2, "append_voiceover": addition}]})
+
+    provider = RetryingLLM()
+    result = await validate_or_repair_script(
+        provider,
+        undersized,
+        tmp_path / "retry-short.json",
+        ledger_text="",
+        max_attempts=3,
+        strict=False,
+        expected_video_type="short",
+    )
+
+    assert provider.calls == 2
+    assert result["sections"][-1]["narration"] == original_payoff
+    assert result["sections"][2]["narration"].endswith(addition.strip())
+
+
+@pytest.mark.asyncio
 async def test_manual_export_provider_creates_queue_package(tmp_path, monkeypatch):
     from ytb_pipeline.platform.profiles import Platform, get_profile
     from ytb_pipeline.providers.registry import get_publish_provider

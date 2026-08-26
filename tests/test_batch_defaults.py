@@ -569,6 +569,31 @@ def test_short_expansion_prompt_forbids_full_script_regeneration():
     assert "900" in prompt
 
 
+def test_short_expansion_prompt_exposes_only_eligible_zero_based_indexes_and_target_budget():
+    from ytb_pipeline.orchestrator.ideation_prompts import short_expansion_prompt
+
+    prompt = short_expansion_prompt(
+        {
+            "slug": "co-che-test",
+            "sections": [
+                {"purpose": "situation", "voiceover": "Tình huống."},
+                {"purpose": "core_answer", "voiceover": "Đáp án."},
+                {"purpose": "application", "voiceover": "Áp dụng."},
+                {"purpose": "payoff", "voiceover": "Kết."},
+            ],
+        },
+        missing_chars=76,
+        target_chars=185,
+        max_chars=313,
+    )
+
+    assert "zero-based" in prompt
+    assert "ONLY legal index values: [2]" in prompt
+    assert "at least 76" in prompt
+    assert "aim for 185" in prompt
+    assert "at most 313" in prompt
+
+
 def test_script_prompt_uses_canonical_section_fields_without_alias_duplication():
     from ytb_pipeline.orchestrator.ideation_prompts import local_script_prompt
 
