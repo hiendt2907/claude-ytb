@@ -35,3 +35,13 @@
 Nhịp kể là: nhìn thẳng → hiểu nhiều mặt → chọn một bước vừa sức. Không lặp
 triệu chứng, không biến góc nhìn cá nhân thành chân lý, không giấu phần khó để
 đổi lấy một cái kết dễ chịu.
+
+## Kỷ luật điểm nhìn
+
+Giữ một điểm nhìn xưng hô nhất quán trong cả tập. Nếu người kể nói "tôi" để
+chia sẻ một trải nghiệm đã được nêu trong ý tưởng, hãy giữ nó là trải nghiệm
+có giới hạn của người kể; nếu đang đi cùng người nghe bằng "anh" hoặc "bạn",
+đừng đổi sang một quá khứ "tôi từng" không có trong cảnh chỉ để làm lời nói
+có vẻ thật hơn. Mỗi beat evidence phải bắt đầu từ một chi tiết đã có trong
+cảnh, một câu người khác nói, hoặc một lựa chọn/hậu quả vừa xảy ra; sau đó mới
+được mở ra một nhận định. Đừng dùng xã hội học thay cho câu chuyện.
