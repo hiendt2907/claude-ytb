@@ -45,6 +45,21 @@ def test_explainer_prompt_requires_lived_transitions_not_outline_labels():
     assert "chỉ nhắc đến việc nhờ thêm hỗ trợ khi cảnh trước đó đã cho thấy" in prompt
 
 
+def test_explainer_prompt_rejects_disguised_outlines_and_ungrounded_generalizations():
+    """The second live draft evaded the first rule with 'một phía/phía thứ hai'."""
+    from ytb_pipeline.content_profiles import load_content_profile
+    from ytb_pipeline.orchestrator.ideation_prompts import script_generation_system_prompt
+
+    prompt = " ".join(
+        script_generation_system_prompt(
+            load_content_profile("one-cup-cafe-6h"), video_type="long"
+        ).split()
+    ).casefold()
+
+    assert "không thay nhãn số bằng nhãn cấu trúc" in prompt
+    assert "không khái quát hóa thay cho cảnh đời" in prompt
+
+
 def test_story_prompt_keeps_table_six_as_a_real_relationship_not_a_stage_prop():
     from ytb_pipeline.content_profiles import load_content_profile
     from ytb_pipeline.orchestrator.ideation_prompts import script_generation_system_prompt
