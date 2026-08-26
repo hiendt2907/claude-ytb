@@ -235,6 +235,18 @@ def test_direct_pipeline_blocks_a_profile_script_that_fails_editorial_review(mon
         asyncio.run(pipeline.run_project(project, checkpoint, through="input"))
 
 
+def test_publish_manifest_requires_an_editorial_approval_for_enabled_profile(tmp_path):
+    """A project completed before the editorial gate cannot resume to publish."""
+    payload = _raw_script_payload()
+    payload["profile_id"] = "one-cup-cafe-6h"
+    payload["profile_version"] = "1.1.0"
+    path = tmp_path / "profile-script.json"
+    path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Editorial release manifest"):
+        pipeline.validate_editorial_release_approval(path, {"qa_decision": "pass"})
+
+
 def test_render_uses_renderer_declared_by_script_content_profile(monkeypatch, tmp_path):
     """A direct pipeline run must not silently fall back to settings.render_provider.
 

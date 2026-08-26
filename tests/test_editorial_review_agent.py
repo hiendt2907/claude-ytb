@@ -265,6 +265,41 @@ def test_review_is_cached_by_profile_fingerprint_and_script_content(tmp_path):
     assert provider.calls == 1, "unchanged script must not trigger a second LLM call"
 
 
+def test_cached_review_is_rechecked_against_the_current_score_contract(tmp_path):
+    """A cache written before score dimensions existed cannot approve a draft."""
+    from ytb_pipeline.agents import editorial_review_agent as review_agent
+    from ytb_pipeline.agents.editorial_review_agent import run_editorial_review
+    import asyncio
+
+    _write_profile(
+        tmp_path, "stale-cache-review-fixture",
+        editorial_review={
+            "enabled": True,
+            "rubric_prompt_name": "review_rubric",
+            "minimum_score": 9,
+            "max_rewrites": 1,
+        },
+    )
+    profile = load_content_profile("stale-cache-review-fixture", profiles_dir=tmp_path)
+    payload = _script_payload(profile)
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    cache_path = cache_dir / f"{review_agent._cache_key(profile, payload)}.json"
+    cache_path.write_text(json.dumps({
+        "passed": True,
+        "overall_score": 9,
+        "dimension_scores": {},
+        "blocking_findings": [],
+        "section_refs": [],
+        "repair_brief": "",
+    }), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="dimension_scores"):
+        asyncio.run(run_editorial_review(
+            profile, payload, provider=_FakeProvider("should not be called"), cache_dir=cache_dir,
+        ))
+
+
 def test_editorial_review_rejects_a_malformed_llm_response(tmp_path):
     from ytb_pipeline.agents.editorial_review_agent import run_editorial_review
     import asyncio

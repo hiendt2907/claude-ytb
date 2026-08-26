@@ -27,7 +27,7 @@ from typing import Mapping, Protocol
 from ..content_profiles import ContentProfile, profile_fingerprint
 
 
-_REQUIRED_DIMENSIONS = frozenset({
+EDITORIAL_REVIEW_DIMENSIONS = frozenset({
     "human_truth",
     "spoken_naturalness",
     "causal_coherence",
@@ -111,6 +111,55 @@ def _parse_review_response(text: str) -> EditorialReviewResult:
     )
 
 
+def _enforce_profile_score(
+    profile: ContentProfile,
+    result: EditorialReviewResult,
+) -> EditorialReviewResult:
+    """Apply the current profile bar to both fresh and cached verdicts."""
+    review_profile = profile.editorial_review
+    if review_profile is None or not review_profile.minimum_score:
+        return result
+    if result.overall_score is None:
+        raise ValueError(
+            "Editorial review profile có minimum_score nhưng LLM không trả overall_score."
+        )
+    dimensions = dict(result.dimension_scores or {})
+    if set(dimensions) != EDITORIAL_REVIEW_DIMENSIONS:
+        missing = sorted(EDITORIAL_REVIEW_DIMENSIONS - set(dimensions))
+        unexpected = sorted(set(dimensions) - EDITORIAL_REVIEW_DIMENSIONS)
+        detail = []
+        if missing:
+            detail.append(f"thiếu {', '.join(missing)}")
+        if unexpected:
+            detail.append(f"không hợp lệ {', '.join(unexpected)}")
+        raise ValueError(
+            "Editorial review profile có minimum_score nhưng dimension_scores "
+            f"phải có đúng năm tiêu chí ({'; '.join(detail) or 'không hợp lệ'})."
+        )
+    low_dimensions = sorted(
+        name for name, score in dimensions.items() if score < review_profile.minimum_score
+    )
+    if result.overall_score < review_profile.minimum_score or low_dimensions:
+        findings = list(result.blocking_findings)
+        if result.overall_score < review_profile.minimum_score:
+            findings.append(
+                f"Điểm biên tập {result.overall_score}/10 dưới ngưỡng "
+                f"{review_profile.minimum_score}/10 của profile."
+            )
+        if low_dimensions:
+            findings.append(
+                "Các tiêu chí dưới ngưỡng "
+                f"{review_profile.minimum_score}/10: {', '.join(low_dimensions)}."
+            )
+        return replace(
+            result,
+            passed=False,
+            blocking_findings=tuple(findings),
+            repair_brief=result.repair_brief or "Viết lại theo các tiêu chí rubric chưa đạt.",
+        )
+    return result
+
+
 async def run_editorial_review(
     profile: ContentProfile,
     script_payload: dict,
@@ -126,7 +175,9 @@ async def run_editorial_review(
     key = _cache_key(profile, script_payload)
     cache_path = cache_dir / f"{key}.json"
     if cache_path.is_file():
-        return _to_result(json.loads(cache_path.read_text(encoding="utf-8")))
+        return _enforce_profile_score(
+            profile, _to_result(json.loads(cache_path.read_text(encoding="utf-8"))),
+        )
     rubric = profile.editorial_review_rubric_text()
     prompt = (
         "Review this Vietnamese YouTube script JSON against the rubric below. "
@@ -151,46 +202,7 @@ async def run_editorial_review(
         temperature=0.0,
         json_output=True,
     )
-    result = _parse_review_response(text)
-    if review_profile.minimum_score:
-        if result.overall_score is None:
-            raise ValueError(
-                "Editorial review profile có minimum_score nhưng LLM không trả overall_score."
-            )
-        dimensions = dict(result.dimension_scores or {})
-        if set(dimensions) != _REQUIRED_DIMENSIONS:
-            missing = sorted(_REQUIRED_DIMENSIONS - set(dimensions))
-            unexpected = sorted(set(dimensions) - _REQUIRED_DIMENSIONS)
-            detail = []
-            if missing:
-                detail.append(f"thiếu {', '.join(missing)}")
-            if unexpected:
-                detail.append(f"không hợp lệ {', '.join(unexpected)}")
-            raise ValueError(
-                "Editorial review profile có minimum_score nhưng dimension_scores "
-                f"phải có đúng năm tiêu chí ({'; '.join(detail) or 'không hợp lệ'})."
-            )
-        low_dimensions = sorted(
-            name for name, score in dimensions.items() if score < review_profile.minimum_score
-        )
-        if result.overall_score < review_profile.minimum_score or low_dimensions:
-            findings = list(result.blocking_findings)
-            if result.overall_score < review_profile.minimum_score:
-                findings.append(
-                    f"Điểm biên tập {result.overall_score}/10 dưới ngưỡng "
-                    f"{review_profile.minimum_score}/10 của profile."
-                )
-            if low_dimensions:
-                findings.append(
-                    "Các tiêu chí dưới ngưỡng "
-                    f"{review_profile.minimum_score}/10: {', '.join(low_dimensions)}."
-                )
-            result = replace(
-                result,
-                passed=False,
-                blocking_findings=tuple(findings),
-                repair_brief=result.repair_brief or "Viết lại theo các tiêu chí rubric chưa đạt.",
-            )
+    result = _enforce_profile_score(profile, _parse_review_response(text))
     cache_path.write_text(
         json.dumps({
             "passed": result.passed,

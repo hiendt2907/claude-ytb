@@ -30,7 +30,7 @@ from .analytics.quality_report import (
     write_quality_report,
 )
 from .agents.base import AgentStatus
-from .agents.editorial_review_agent import run_editorial_review
+from .agents.editorial_review_agent import EDITORIAL_REVIEW_DIMENSIONS, run_editorial_review
 from .agents.qa_agent import QAAgent
 from .content_contract import CONTRACT_VERSION
 from .content_profiles import load_content_profile, profile_fingerprint
@@ -291,6 +291,47 @@ def _script_profile(path: Path) -> dict[str, str]:
         "content_profile_version": str(raw.get("profile_version") or "").strip(),
         "content_profile_fingerprint": profile_fingerprint(profile),
     }
+
+
+def validate_editorial_release_approval(script_path: Path, input_data: dict[str, Any]) -> None:
+    """Require current-profile editorial evidence before a resumed publish.
+
+    An input checkpoint may predate the editorial gate.  Publish therefore
+    verifies the stored verdict again against the current profile bar and the
+    exact bytes being released instead of trusting a historical DONE node.
+    """
+    try:
+        payload = json.loads(script_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"Editorial release manifest không đọc được script: {exc}") from exc
+    profile_id = str(payload.get("profile_id") or "").strip()
+    if not profile_id:
+        return
+    profile = load_content_profile(
+        profile_id, version=str(payload.get("profile_version") or "").strip() or None,
+    )
+    review_config = profile.editorial_review
+    if review_config is None or not review_config.enabled:
+        return
+    review = input_data.get("editorial_review")
+    if not isinstance(review, dict):
+        raise ValueError("Editorial release manifest thiếu verdict cho profile đang bật review.")
+    if review.get("script_sha256") != _script_sha256(script_path):
+        raise ValueError("Editorial release manifest không khớp script đã được review.")
+    if review.get("passed") is not True:
+        raise ValueError("Editorial release manifest cho thấy transcript chưa đạt review.")
+    if review_config.minimum_score:
+        score = review.get("overall_score")
+        dimensions = review.get("dimension_scores")
+        if isinstance(score, bool) or not isinstance(score, int) or score < review_config.minimum_score:
+            raise ValueError("Editorial release manifest thiếu overall_score đạt ngưỡng profile.")
+        if not isinstance(dimensions, dict) or set(dimensions) != EDITORIAL_REVIEW_DIMENSIONS:
+            raise ValueError("Editorial release manifest thiếu đủ dimension_scores của profile.")
+        if any(
+            isinstance(value, bool) or not isinstance(value, int) or value < review_config.minimum_score
+            for value in dimensions.values()
+        ):
+            raise ValueError("Editorial release manifest có dimension_scores dưới ngưỡng profile.")
 
 
 def _reset_stale_nodes(project: Project) -> Project:
@@ -699,6 +740,7 @@ async def run_project(project: Project, checkpoint: CheckpointManager, through: 
             or input_data.get("qa_decision") != "pass"
         ):
             raise ValueError("Release manifest thiếu Script QA/hashes hợp lệ; chặn publish.")
+        validate_editorial_release_approval(Path(_node_script_path(current)), input_data)
         video = rendered_for(current)
         # Resume có thể rehydrate render cũ mà không chạy lại render_fn; luôn
         # áp dụng final QA tại ranh giới publish để output stale không lọt ra ngoài.
