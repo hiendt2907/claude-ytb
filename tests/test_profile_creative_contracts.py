@@ -23,6 +23,24 @@ def test_explainer_prompt_names_the_midcareer_burdened_man_and_friend_voice():
     assert "không bán công thức đổi đời" in prompt
 
 
+def test_explainer_prompt_requires_lived_transitions_not_outline_labels():
+    """A real failed draft turned distinct angles into a numbered lecture.
+
+    The production prompt must teach the writer how to keep multiple angles
+    without turning a friend-to-friend narration into an outline, and must not
+    manufacture an escalation into generic specialist advice.
+    """
+    from ytb_pipeline.content_profiles import load_content_profile
+    from ytb_pipeline.orchestrator.ideation_prompts import script_generation_system_prompt
+
+    prompt = script_generation_system_prompt(
+        load_content_profile("one-cup-cafe-6h"), video_type="long"
+    ).casefold()
+
+    assert "không dùng nhãn kiểu \"góc nhìn thứ nhất\"" in prompt
+    assert "chỉ nhắc đến việc nhờ thêm hỗ trợ khi cảnh trước đó đã cho thấy" in prompt
+
+
 def test_story_prompt_keeps_table_six_as_a_real_relationship_not_a_stage_prop():
     from ytb_pipeline.content_profiles import load_content_profile
     from ytb_pipeline.orchestrator.ideation_prompts import script_generation_system_prompt
