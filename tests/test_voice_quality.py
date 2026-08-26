@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 import sys
 from types import ModuleType, SimpleNamespace
+from dataclasses import replace
 from ytb_pipeline.pkg.models import Segment, Voiceover
 from ytb_pipeline.voiceover import quality
 
@@ -79,6 +80,38 @@ def test_gate_reports_duration_deviation_and_stt_unavailable(monkeypatch, tmp_pa
     assert [issue.code for issue in result.issues] == ["DURATION_TARGET_DEVIATION", "STT_UNAVAILABLE"]
     assert result.repair_payload["DURATION_TARGET_DEVIATION"]["target"] == "script.target_minutes"
     assert result.repair_payload["STT_UNAVAILABLE"]["action"] == "configure_local_stt"
+
+
+def test_profile_runtime_tolerance_is_shared_by_audio_quality_gate(monkeypatch, tmp_path):
+    """A profile-approved audio boundary must not fail a later audio gate.
+
+    `ban-so-6` calibrates a three-second Long tolerance for its multi-voice
+    xKiro delivery.  The audio contract accepts 297s for its 300s lower bound;
+    audio quality must use that same tolerance rather than reject it against a
+    mathematically exact midpoint/window calculation.
+    """
+    base = _voiceover(tmp_path, target_minutes=5.0)
+    segments = tuple(
+        replace(base.segments[0], duration_sec=13.5)
+        for _ in range(22)
+    )
+    voiceover = replace(
+        base,
+        video_type="long",
+        segments=segments,
+        content_profile_id="ban-so-6",
+        content_profile_version="1.6.0",
+    )
+    monkeypatch.setattr(quality, "probe_audio_duration", lambda _path: 297.1)
+    monkeypatch.setattr(quality, "analyze_local_audio", lambda _path, _duration: {})
+
+    result = quality.run_audio_quality_gate(
+        voiceover,
+        stt_adapter=_UnavailableStt(),
+        duration_tolerance_sec=15.0,
+    )
+
+    assert "DURATION_TARGET_DEVIATION" not in [issue.code for issue in result.issues]
 
 
 def test_gate_requires_local_transcript_when_e2e_requests_it(monkeypatch, tmp_path):

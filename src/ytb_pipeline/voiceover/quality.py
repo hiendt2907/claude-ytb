@@ -30,7 +30,7 @@ from ..pkg.models import Voiceover
 # Bump whenever a detector's verdict logic changes, or cached verdicts from the
 # old logic keep blocking runs the new logic would pass.  v6: an adjacent
 # repeat is only a TTS artifact when the script did not author it.
-_CACHE_VERSION = 7  # bumped: clock-time normalisation changed transcript comparison
+_CACHE_VERSION = 8  # bumped: profile runtime tolerance is part of duration acceptance
 TRANSCRIPT_SIMILARITY_ALGORITHM = "sequence-matcher-no-autojunk-v1"
 _SENTENCE_SPLIT_RE = re.compile(r"[.!?;:\n]+")
 _WORD_RE = re.compile(r"[\wÀ-ỹ]+", re.UNICODE)
@@ -486,10 +486,13 @@ def _target_duration(voiceover: Voiceover) -> float | None:
 
 
 def _duration_tolerance(voiceover: Voiceover, fallback_sec: float) -> float:
-    """Widen a caller's flat tolerance to at least the contract window.
+    """Widen a caller's flat tolerance to the contract's accepted audio range.
 
     A caller may still tighten the gate below the contract, but it must never be
-    narrower than what the voiceover node already accepted.
+    narrower than what the voiceover node already accepted.  In particular, a
+    profile's calibrated runtime tolerance belongs to the same range: otherwise
+    an audio file accepted at the voiceover boundary can fail this later quality
+    gate by a fraction of a second at the lower edge.
     """
     segment_count = len(voiceover.segments)
     if segment_count <= 0:
@@ -500,10 +503,12 @@ def _duration_tolerance(voiceover: Voiceover, fallback_sec: float) -> float:
         load_content_profile(voiceover.content_profile_id)
         if voiceover.content_profile_version else None
     )
-    lower, upper = contract_for(
-        voiceover.video_type, profile
-    ).audio_runtime_bounds_sec(segment_count=segment_count)
-    return max(fallback_sec, (upper - lower) / 2)
+    contract = contract_for(voiceover.video_type, profile)
+    lower, upper = contract.audio_runtime_bounds_sec(segment_count=segment_count)
+    return max(
+        fallback_sec,
+        (upper - lower) / 2 + contract.runtime_tolerance_sec,
+    )
 
 
 def _sha256_file(path: Path | None) -> str:
