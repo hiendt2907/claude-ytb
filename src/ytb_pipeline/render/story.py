@@ -63,10 +63,25 @@ def render_story_video(voiceover: Voiceover, output_dir: Path) -> RenderedVideo:
 
     with tempfile.TemporaryDirectory(prefix=f"{slug}-story-", dir=output_dir) as raw_work:
         work = Path(raw_work)
-        clips: list[Path] = []
-        durations: list[float] = []
+        # Caption cards are a VIDEO-ONLY presentation detail inside a section,
+        # never a scene transition and never a reason to touch the section's
+        # audio. Slicing the original TTS audio into one re-encoded piece per
+        # card (the previous design) let each slice's AAC re-encode round
+        # independently from the (also independently rounding) video track,
+        # so the two streams drifted apart by different amounts — a real
+        # Long ended with a video stream 1.1s shorter than its audio stream.
+        # The fix: build each section's video track from frame-EXACT card
+        # clips (no drift possible, see `_frame_counts`), mux the section's
+        # REAL, UNSLICED audio file onto it exactly once, and let
+        # `_compose_clips` crossfade the video timeline and cross-fade the
+        # audio timeline as two independently measured tracks.
+        section_clips: list[Path] = []
+        video_durations: list[float] = []
+        audio_durations: list[float] = []
         first_frame: Path | None = None
         for index, segment in enumerate(voiceover.segments):
+            if segment.audio_path is None or not Path(segment.audio_path).is_file():
+                raise FileNotFoundError("Story segment thiếu audio_path thật.")
             gap = (
                 profile.render.inter_segment_gap_sec
                 if index < len(voiceover.segments) - 1 else 0.0
@@ -78,27 +93,61 @@ def render_story_video(voiceover: Voiceover, output_dir: Path) -> RenderedVideo:
             # dùng chung một tấm nền, và asset cố định/generate+cache đều đắt
             # hơn việc gọi lại nhiều lần trong vòng lặp thẻ.
             image_path = resolve_scene_image(segment, profile, dims)
-            for card_index, (text, seek, length) in enumerate(cards):
+            frame_counts = _frame_counts([length for (_, _, length) in cards], fps=30)
+            if frame_counts:
+                frame_counts[-1] += round(gap * 30)
+            card_clips: list[Path] = []
+            for card_index, ((text, _seek, _length), frames) in enumerate(zip(cards, frame_counts)):
                 frame = work / f"frame-{index:03d}-{card_index:02d}.jpg"
                 _story_frame(segment, profile, dims, image_path, caption=text).save(frame, quality=92)
                 if first_frame is None:
                     first_frame = frame
                 clip = work / f"clip-{index:03d}-{card_index:02d}.mp4"
-                card_gap = gap if card_index == len(cards) - 1 else 0.0
-                _render_clip(
-                    ffmpeg, frame, segment, clip,
-                    gap=card_gap, seek=seek, length=length,
-                )
-                clips.append(clip)
-                durations.append(length + card_gap)
+                _render_video_card(ffmpeg, frame, clip, frames=frames)
+                card_clips.append(clip)
+            if len(card_clips) == 1:
+                section_video = card_clips[0]
+            else:
+                section_video = work / f"section-{index:03d}-video.mp4"
+                _concat_clips(ffmpeg, card_clips, section_video, work)
+            section_audio = work / f"section-{index:03d}-audio.m4a"
+            _mux_section_audio(ffmpeg, Path(segment.audio_path), section_audio, gap=gap)
+            section_clip = work / f"section-{index:03d}.mp4"
+            _mux_video_audio(ffmpeg, section_video, section_audio, section_clip)
+            # The video track is frame-exact by construction, but the AAC
+            # encode of the section's real audio can still land a fraction of
+            # a codec frame away from that same nominal length. Left alone,
+            # that per-section fraction is consistently signed (AAC frames are
+            # ~21-23ms; padding/encoding tends to round the SAME direction
+            # every time) and compounds across many section joins — a real
+            # 20-section Long drifted 261ms this way even though no single
+            # section was ever more than ~15ms off. Reconciling within each
+            # section keeps the bias from ever accumulating.
+            section_clip = _reconcile_section_streams(ffmpeg, section_clip, work, tag=f"{index:03d}")
+            section_clips.append(section_clip)
+            video_durations.append(_video_duration(section_clip))
+            audio_durations.append(_audio_duration(section_clip))
         _compose_clips(
             ffmpeg,
-            clips,
+            section_clips,
             video_path,
             work,
-            durations=durations,
+            video_durations=video_durations,
+            audio_durations=audio_durations,
             overlap=profile.render.transition_overlap_sec,
         )
+        # Each section's own video/audio streams matched within one frame
+        # (see `_reconcile_section_streams` above), but `xfade`/`acrossfade`
+        # snap their offsets to their own codec's frame grid at EVERY
+        # transition — a real 20-section Long had 19 crossfades and still
+        # drifted 261ms even though no individual section was ever more than
+        # 16ms off, because the video (30fps) and audio (AAC ~21-23ms frames)
+        # grids round independently at every join. Reconciling once more on
+        # the fully composed output closes whatever the transition chain
+        # itself introduced.
+        reconciled = _reconcile_section_streams(ffmpeg, video_path, work, tag="final")
+        if reconciled != video_path:
+            shutil.move(str(reconciled), str(video_path))
         if first_frame is None:
             raise ValueError("Story renderer không sinh được frame đầu.")
         _thumbnail(first_frame, voiceover.title, dims).save(
@@ -189,6 +238,34 @@ def line_durations(lines: list[str], *, total_sec: float) -> list[float]:
     return durations
 
 
+def _merge_short_lines(lines: list[str], *, total_sec: float, min_sec: float) -> list[str]:
+    """Merge a caption line whose proportional slice of `total_sec` would be
+    at/under `min_sec` into a neighbour.
+
+    `textwrap.wrap` inside `caption_lines` can leave a trailing chunk of a
+    long sentence just a few characters long (e.g. "đó?"). `line_durations`
+    weights purely by character count, so that chunk's share of the audio can
+    fall under the profile's own `transition_overlap_sec` — a real Long
+    render crashed in `_compose_clips` ('Story transition_overlap_sec phải
+    ngắn hơn mọi segment clip.') on exactly this. A per-card floor derived
+    from the profile's own overlap, rather than a fixed literal, keeps this
+    correct at any `transition_overlap_sec` a profile declares.
+    """
+    if min_sec <= 0 or len(lines) <= 1:
+        return lines
+    merged = list(lines)
+    while len(merged) > 1:
+        durations = line_durations(merged, total_sec=total_sec)
+        short_index = next((i for i, d in enumerate(durations) if d <= min_sec), None)
+        if short_index is None:
+            break
+        target = short_index - 1 if short_index > 0 else short_index + 1
+        first, second = sorted((short_index, target))
+        merged[first] = f"{merged[first]} {merged[second]}".strip()
+        del merged[second]
+    return merged
+
+
 def _asset_path(profile: ContentProfile, relative: str) -> Path:
     return profile.visual_asset_path(relative)
 
@@ -261,6 +338,7 @@ def resolve_scene_image(
 
 
 _CAPTION_MAX_CHARS = {PORTRAIT: 30, LANDSCAPE: 52}
+_MIN_CARD_SEC = 1 / 30
 
 
 def _segment_cards(
@@ -276,6 +354,14 @@ def _segment_cards(
     lines = caption_lines(segment.narration, max_chars=_CAPTION_MAX_CHARS[dims])
     if not lines:
         return [("", 0.0, segment.duration_sec)]
+    lines = _merge_short_lines(
+        lines,
+        total_sec=segment.duration_sec,
+        # Even hard-cut profiles need enough time to show every card for one
+        # real output frame.  Without this floor, overlap=0 bypassed merging
+        # and could create more cards than the frame timeline can represent.
+        min_sec=max(profile.render.transition_overlap_sec, _MIN_CARD_SEC),
+    )
     lengths = line_durations(lines, total_sec=segment.duration_sec)
     cards: list[tuple[str, float, float]] = []
     seek = 0.0
@@ -344,31 +430,170 @@ def _draw_caption(
     )
 
 
-def _render_clip(
-    ffmpeg: str, frame: Path, segment: Segment, output: Path, *,
-    gap: float, seek: float = 0.0, length: float | None = None,
-) -> None:
-    if segment.audio_path is None or not Path(segment.audio_path).is_file():
-        raise FileNotFoundError("Story segment thiếu audio_path thật.")
-    if segment.duration_sec <= 0:
-        raise ValueError("Story segment cần duration_sec đo từ audio.")
-    span = segment.duration_sec if length is None else length
-    duration = span + gap
-    command = [
+def _frame_counts(lengths: list[float], *, fps: int) -> list[int]:
+    """Per-card frame counts with one frame per card and an exact total.
+
+    Rounding each length to the nearest frame independently lets error
+    accumulate across many cards (a real 12-card section drifted +76ms this
+    way). Cumulative rounding preserves each boundary when every card earns
+    at least one frame. For a sub-frame card, allocate the rounded total with
+    a one-frame floor instead; this retains the exact section total without
+    silently lengthening its visual timeline.
+    """
+    if fps <= 0:
+        raise ValueError("Story renderer cần FPS dương.")
+    if any(length <= 0 for length in lengths):
+        raise ValueError("Mỗi caption card phải có thời lượng dương.")
+
+    counts: list[int] = []
+    cumulative_seconds = 0.0
+    previous_frames = 0
+    for length in lengths:
+        cumulative_seconds += length
+        total_frames = round(cumulative_seconds * fps)
+        counts.append(total_frames - previous_frames)
+        previous_frames = total_frames
+    if all(count >= 1 for count in counts):
+        return counts
+
+    total_frames = round(sum(lengths) * fps)
+    if total_frames < len(lengths):
+        raise ValueError(
+            "Không đủ frame để hiển thị mỗi caption card; hãy gộp caption ngắn."
+        )
+
+    # Start with the indispensable one frame per card, then assign the
+    # remaining frames to the card furthest below its ideal frame budget.
+    # This only handles the sub-frame edge; ordinary sections retain their
+    # cumulative-rounding boundaries above.
+    counts = [1] * len(lengths)
+    ideal_frames = [length * fps for length in lengths]
+    for _ in range(total_frames - len(counts)):
+        chosen = max(
+            range(len(counts)),
+            key=lambda index: (ideal_frames[index] - counts[index], -index),
+        )
+        counts[chosen] += 1
+    return counts
+
+
+def _stream_duration(path: Path, stream: str) -> float:
+    ffprobe = shutil.which("ffprobe")
+    if not ffprobe:
+        raise RuntimeError("Story renderer cần ffprobe trong PATH.")
+    output = subprocess.run([
+        ffprobe, "-v", "error", "-select_streams", stream,
+        "-show_entries", "stream=duration", "-of", "csv=p=0", str(path),
+    ], check=True, capture_output=True, text=True).stdout
+    return float(output.strip())
+
+
+def _video_duration(path: Path) -> float:
+    return _stream_duration(path, "v:0")
+
+
+def _audio_duration(path: Path) -> float:
+    return _stream_duration(path, "a:0")
+
+
+def _probe_duration(path: Path) -> float:
+    """Real container duration — used by callers that don't care which track."""
+    ffprobe = shutil.which("ffprobe")
+    if not ffprobe:
+        raise RuntimeError("Story renderer cần ffprobe trong PATH.")
+    output = subprocess.run([
+        ffprobe, "-v", "error", "-show_entries", "format=duration",
+        "-of", "csv=p=0", str(path),
+    ], check=True, capture_output=True, text=True).stdout
+    return float(output.strip())
+
+
+def _render_video_card(ffmpeg: str, frame: Path, output: Path, *, frames: int) -> None:
+    """Encode exactly `frames` video frames from a static image — no audio.
+
+    Caption-card timing is purely a visual concern. Giving this clip an
+    audio track at all (even a slice of the section's real audio) reintroduces
+    the per-card AAC re-encode rounding that used to desync the video and
+    audio timelines; a video-only clip with an explicit frame count can never
+    drift, because `-frames:v` is exact, not a `-t` cutoff that rounds.
+    """
+    subprocess.run([
         ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
         "-loop", "1", "-framerate", "30", "-i", str(frame),
-    ]
-    if seek > 0:
-        command.extend(("-ss", f"{seek:.3f}"))
-    command.extend(("-i", str(segment.audio_path)))
+        "-frames:v", str(frames), "-r", "30",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+        "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(output),
+    ], check=True)
+
+
+def _mux_section_audio(ffmpeg: str, audio_path: Path, output: Path, *, gap: float) -> None:
+    """Transcode a section's REAL, UNSLICED audio file exactly once.
+
+    Never re-encoded per caption card: one AAC encode per section instead of
+    one per card means at most one small, bounded rounding error per
+    section, not one per card compounding across the whole section.
+    """
+    command = [ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-i", str(audio_path)]
     if gap > 0:
         command.extend(("-af", f"apad=pad_dur={gap:.3f}"))
-    command.extend((
-        "-t", f"{duration:.3f}", "-c:v", "libx264", "-preset", "veryfast",
-        "-crf", "20", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k",
-        "-movflags", "+faststart", str(output),
-    ))
+    command.extend(("-c:a", "aac", "-b:a", "192k", str(output)))
     subprocess.run(command, check=True)
+
+
+def _mux_video_audio(ffmpeg: str, video_path: Path, audio_path: Path, output: Path) -> None:
+    """Combine an already-encoded video-only track and audio-only track.
+
+    Both inputs are already the target codec (h264/aac) — `-c copy` on both
+    is a lossless remux, not a re-encode, so it introduces no new rounding.
+    """
+    subprocess.run([
+        ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+        "-i", str(video_path), "-i", str(audio_path),
+        "-map", "0:v:0", "-map", "1:a:0",
+        "-c:v", "copy", "-c:a", "copy",
+        "-movflags", "+faststart", str(output),
+    ], check=True)
+
+
+_ONE_FRAME_SEC = 1 / 30
+
+
+def _reconcile_section_streams(ffmpeg: str, clip: Path, work: Path, *, tag: str) -> Path:
+    """Align a section's video/audio stream lengths to within one frame.
+
+    The video track is frame-exact; the AAC encode of the section's real
+    audio can still land a fraction of a codec frame away from that same
+    nominal length, and that fraction is consistently signed rather than
+    random — it compounded to 261ms of drift across a real 20-section Long
+    even though no single section was ever more than ~15ms off. Never trims
+    either stream: if audio outlasts video, the video's LAST FRAME is held
+    (not cut) for the difference; if video outlasts audio, audio is padded
+    with silence (never shortened).
+    """
+    video_dur = _video_duration(clip)
+    audio_dur = _audio_duration(clip)
+    residual = audio_dur - video_dur
+    if abs(residual) <= _ONE_FRAME_SEC:
+        return clip
+    fixed = work / f"section-{tag}-reconciled.mp4"
+    if residual > 0:
+        subprocess.run([
+            ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+            "-i", str(clip),
+            "-vf", f"tpad=stop_mode=clone:stop_duration={residual:.3f}",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+            "-pix_fmt", "yuv420p", "-c:a", "copy",
+            "-movflags", "+faststart", str(fixed),
+        ], check=True)
+    else:
+        subprocess.run([
+            ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+            "-i", str(clip),
+            "-af", f"apad=pad_dur={-residual:.3f}",
+            "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
+            "-movflags", "+faststart", str(fixed),
+        ], check=True)
+    return fixed
 
 
 def _compose_clips(
@@ -377,13 +602,23 @@ def _compose_clips(
     output: Path,
     work: Path,
     *,
-    durations: list[float],
+    video_durations: list[float],
+    audio_durations: list[float],
     overlap: float,
 ) -> None:
+    """Crossfade section clips using TWO independent timelines.
+
+    A section clip's video and audio streams are built independently (see
+    `render_story_video`) and can end at very slightly different real
+    lengths. Sharing one `durations` list for both the video `xfade` offset
+    and the audio `acrossfade` offset (the previous design) forced one
+    timeline's rounding onto the other's transitions. Each stream now gets
+    its own measured duration list and its own cumulative offset.
+    """
     if len(clips) == 1 or overlap <= 0:
         _concat_clips(ffmpeg, clips, output, work)
         return
-    if overlap >= min(durations):
+    if overlap >= min(min(video_durations), min(audio_durations)):
         raise ValueError("Story transition_overlap_sec phải ngắn hơn mọi segment clip.")
 
     command = [ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-y"]
@@ -391,24 +626,35 @@ def _compose_clips(
         command.extend(("-i", str(clip)))
     filters: list[str] = []
     for index in range(len(clips)):
-        filters.append(f"[{index}:v]settb=AVTB,setpts=PTS-STARTPTS[v{index}]")
+        # A section clip that is itself a `-c copy` concat of several caption
+        # cards can carry a distorted container-level average frame rate
+        # (e.g. 583680/19471 instead of 30/1) even though every source card
+        # was encoded at a clean 30fps — `xfade` refuses to blend two inputs
+        # whose reported frame rates disagree. `fps=30` normalises the actual
+        # frame timing inside the filter graph regardless of what the
+        # container metadata says, matching the `-framerate 30` every card
+        # was rendered at in `_render_video_card`.
+        filters.append(f"[{index}:v]fps=30,settb=AVTB,setpts=PTS-STARTPTS[v{index}]")
         filters.append(f"[{index}:a]aresample=async=1:first_pts=0[a{index}]")
     video_label = "v0"
     audio_label = "a0"
-    cumulative = durations[0]
+    video_cumulative = video_durations[0]
+    audio_cumulative = audio_durations[0]
     for index in range(1, len(clips)):
         next_video = f"vx{index}"
         next_audio = f"ax{index}"
-        offset = cumulative - overlap
+        video_offset = video_cumulative - overlap
+        audio_offset = audio_cumulative - overlap
         filters.append(
-            f"[{video_label}][v{index}]xfade=transition=fade:duration={overlap:.3f}:offset={offset:.3f}[{next_video}]"
+            f"[{video_label}][v{index}]xfade=transition=fade:duration={overlap:.3f}:offset={video_offset:.3f}[{next_video}]"
         )
         filters.append(
             f"[{audio_label}][a{index}]acrossfade=d={overlap:.3f}:c1=tri:c2=tri[{next_audio}]"
         )
         video_label = next_video
         audio_label = next_audio
-        cumulative += durations[index] - overlap
+        video_cumulative += video_durations[index] - overlap
+        audio_cumulative += audio_durations[index] - overlap
     command.extend((
         "-filter_complex", ";".join(filters),
         "-map", f"[{video_label}]", "-map", f"[{audio_label}]",
