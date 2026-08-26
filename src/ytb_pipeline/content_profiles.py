@@ -351,12 +351,24 @@ class EditorialReviewProfile:
     # Key into `ContentProfile.prompts` — resolved via `profile.prompt_text()`,
     # same lookup every other declared prompt already uses.
     rubric_prompt_name: str
+    # A content profile owns its release bar. Zero retains compatibility for
+    # profiles that only want advisory review results; a production profile can
+    # require a real score such as 9/10 before a script reaches the queue.
+    minimum_score: int = 0
+    # A whole-transcript editorial rewrite is expensive and may regress a
+    # valid schema/detail, so it is bounded by profile data rather than a
+    # global magic number. Zero preserves the historic fail-closed behaviour.
+    max_rewrites: int = 0
 
     def __post_init__(self) -> None:
         if self.enabled and not self.rubric_prompt_name.strip():
             raise ContentProfileError(
                 "editorial_review.rubric_prompt_name không được rỗng khi enabled=true."
             )
+        if not 0 <= self.minimum_score <= 10:
+            raise ContentProfileError("editorial_review.minimum_score phải nằm trong [0, 10].")
+        if self.max_rewrites < 0:
+            raise ContentProfileError("editorial_review.max_rewrites phải >= 0.")
 
 
 @dataclass(frozen=True)
@@ -642,6 +654,12 @@ def _editorial_review_profile(raw: Any) -> "EditorialReviewProfile | None":
     return EditorialReviewProfile(
         enabled=_exact_bool(mapping, "enabled", prefix="editorial_review"),
         rubric_prompt_name=str(mapping.get("rubric_prompt_name") or "").strip(),
+        minimum_score=_bounded_nonnegative_int(
+            mapping, "minimum_score", prefix="editorial_review", maximum=10,
+        ),
+        max_rewrites=_bounded_nonnegative_int(
+            mapping, "max_rewrites", prefix="editorial_review", maximum=10,
+        ),
     )
 
 
@@ -822,6 +840,15 @@ def _positive_int(mapping: Mapping[str, Any], field: str, *, path: str) -> int:
     raw = mapping.get(field)
     if isinstance(raw, bool) or not isinstance(raw, int) or raw < 1:
         raise ContentProfileError(f"{path}.{field} phải là số nguyên dương.")
+    return raw
+
+
+def _bounded_nonnegative_int(
+    mapping: Mapping[str, Any], field: str, *, prefix: str, maximum: int,
+) -> int:
+    raw = mapping.get(field, 0)
+    if isinstance(raw, bool) or not isinstance(raw, int) or not 0 <= raw <= maximum:
+        raise ContentProfileError(f"{prefix}.{field} phải là số nguyên trong [0, {maximum}].")
     return raw
 
 

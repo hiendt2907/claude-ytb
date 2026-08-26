@@ -20,9 +20,9 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Protocol
+from typing import Mapping, Protocol
 
 from ..content_profiles import ContentProfile, profile_fingerprint
 
@@ -33,6 +33,8 @@ class EditorialReviewResult:
     blocking_findings: tuple[str, ...]
     section_refs: tuple[int, ...]
     repair_brief: str
+    overall_score: int | None = None
+    dimension_scores: Mapping[str, int] | None = None
 
 
 class ReviewProvider(Protocol):
@@ -54,6 +56,8 @@ def _to_result(data: dict) -> EditorialReviewResult:
         blocking_findings=tuple(data["blocking_findings"]),
         section_refs=tuple(data["section_refs"]),
         repair_brief=data["repair_brief"],
+        overall_score=data.get("overall_score"),
+        dimension_scores=data.get("dimension_scores"),
     )
 
 
@@ -75,11 +79,26 @@ def _parse_review_response(text: str) -> EditorialReviewResult:
         isinstance(item, int) and not isinstance(item, bool) for item in refs
     ):
         raise ValueError("section_refs phải là mảng số nguyên.")
+    score = data.get("overall_score")
+    if score is not None and (isinstance(score, bool) or not isinstance(score, int) or not 0 <= score <= 10):
+        raise ValueError("overall_score phải là số nguyên trong [0, 10].")
+    dimension_scores = data.get("dimension_scores")
+    if dimension_scores is not None:
+        if not isinstance(dimension_scores, dict) or not all(
+            isinstance(name, str)
+            and isinstance(value, int)
+            and not isinstance(value, bool)
+            and 0 <= value <= 10
+            for name, value in dimension_scores.items()
+        ):
+            raise ValueError("dimension_scores phải là object điểm số nguyên trong [0, 10].")
     return EditorialReviewResult(
         passed=passed,
         blocking_findings=tuple(blocking),
         section_refs=tuple(refs),
         repair_brief=str(data.get("repair_brief") or ""),
+        overall_score=score,
+        dimension_scores=dimension_scores,
     )
 
 
@@ -102,10 +121,14 @@ async def run_editorial_review(
     rubric = profile.editorial_review_rubric_text()
     prompt = (
         "Review this Vietnamese YouTube script JSON against the rubric below. "
-        "Return ONLY one JSON object with keys: passed (boolean), blocking_findings "
+        "Return ONLY one JSON object with keys: passed (boolean), overall_score "
+        "(integer 0-10), dimension_scores (object with integer 0-10 scores for "
+        "human_truth, spoken_naturalness, causal_coherence, role_fidelity, useful_restraint), blocking_findings "
         "(array of short strings), section_refs (array of one-based section indices "
         "the findings refer to), repair_brief (a short instruction for how to fix "
-        "the findings, empty string when passed is true).\n\n"
+        "the findings, empty string when passed is true). A score below the profile "
+        f"bar ({review_profile.minimum_score}/10) MUST set passed=false. Do not award "
+        "a high score merely because the JSON schema or an abstract structure is correct.\n\n"
         f"Rubric:\n{rubric}\n\n"
         f"Script JSON:\n{json.dumps(script_payload, ensure_ascii=False, indent=2)}"
     )
@@ -120,12 +143,30 @@ async def run_editorial_review(
         json_output=True,
     )
     result = _parse_review_response(text)
+    if review_profile.minimum_score:
+        if result.overall_score is None:
+            raise ValueError(
+                "Editorial review profile có minimum_score nhưng LLM không trả overall_score."
+            )
+        if result.overall_score < review_profile.minimum_score:
+            finding = (
+                f"Điểm biên tập {result.overall_score}/10 dưới ngưỡng "
+                f"{review_profile.minimum_score}/10 của profile."
+            )
+            result = replace(
+                result,
+                passed=False,
+                blocking_findings=tuple((*result.blocking_findings, finding)),
+                repair_brief=result.repair_brief or "Viết lại theo các tiêu chí rubric chưa đạt.",
+            )
     cache_path.write_text(
         json.dumps({
             "passed": result.passed,
             "blocking_findings": list(result.blocking_findings),
             "section_refs": list(result.section_refs),
             "repair_brief": result.repair_brief,
+            "overall_score": result.overall_score,
+            "dimension_scores": result.dimension_scores,
         }, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )

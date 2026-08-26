@@ -7,12 +7,19 @@
   "narrative_mode": "mechanism_explainer",
   "prompts": {
     "editorial": "prompts/editorial.md",
+    "editorial_review": "prompts/editorial-review.md",
     "long_transcript_structure": "prompts/long-transcript-structure.md",
     "short_funnel_structure": "prompts/short-funnel-structure.md"
   },
   "format_prompts": {
     "long": "long_transcript_structure",
     "short": "short_funnel_structure"
+  },
+  "editorial_review": {
+    "enabled": true,
+    "rubric_prompt_name": "editorial_review",
+    "minimum_score": 9,
+    "max_rewrites": 2
   },
   "formats": {
     "short": {"viewer_min_sec": 30, "viewer_max_sec": 45, "min_sections": 4, "max_sections": 4},

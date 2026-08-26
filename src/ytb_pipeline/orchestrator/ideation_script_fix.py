@@ -33,6 +33,7 @@ from .ideation_prompts import (
     SHORT_MIN_CHARS,
     SHORT_TARGET_CHARS,
     hook_repair_prompt,
+    editorial_rewrite_prompt,
     ledger_topics,
     long_extension_prompt,
     short_expansion_allowed_indexes,
@@ -602,6 +603,24 @@ def apply_hook_repair(payload: dict, delta: dict) -> dict:
     return enriched
 
 
+def validate_editorial_rewrite_identity(original: dict, rewritten: dict) -> dict:
+    """Reject a full editorial rewrite that changes queue/provenance identity.
+
+    A profile explicitly permits this full rewrite only for human quality. It
+    must not quietly retarget the profile, topic, runtime or Short provenance
+    while doing so. Title/description remain editorial and can improve.
+    """
+    if not isinstance(rewritten, dict):
+        raise ValueError("Editorial rewrite phải trả một JSON object.")
+    immutable = (
+        "slug", "topic", "profile_id", "profile_version", "video_type", "target_minutes", "strategy",
+    )
+    for field in immutable:
+        if field in original and rewritten.get(field) != original[field]:
+            raise ValueError(f"Editorial rewrite không được đổi {field}.")
+    return rewritten
+
+
 async def validate_or_repair_script(
     provider,
     payload: dict,
@@ -617,13 +636,12 @@ async def validate_or_repair_script(
     source_long_context: dict | None = None,
     exempt_slugs: tuple[str, ...] = (),
 ) -> dict:
-    """Write, validate, QA, and make at most two bounded content deltas.
+    """Write, validate, QA, and make profile-authorized content repairs.
 
     Deterministic schema and formatting defects are normalized locally.  The
-    only LLM follow-ups permitted here are a Long section insertion for missing
-    runtime or a Short middle-section expansion for missing runtime.  Any other
-    failure is retained for review rather than asking a model to rewrite a
-    script it did not need to touch.
+    Most LLM follow-ups remain narrow (runtime, hook, identity). A profile may
+    additionally opt into a bounded whole-transcript rewrite after its own
+    editorial reviewer reports an insufficient viewer-quality score.
     """
     qa = QAAgent()
     done_topics = ledger_topics(ledger_text) + list(semantic_history or [])
@@ -634,6 +652,7 @@ async def validate_or_repair_script(
     short_expansion_attempts = 0
     identity_repair_attempted = False
     hook_repair_attempted = False
+    editorial_rewrites = 0
     report_path = script_path.parent.parent / "assets" / "quality_reports" / "ideation_errors.jsonl"
 
     for attempt in range(1, max_attempts + 1):
@@ -859,6 +878,38 @@ async def validate_or_repair_script(
                             f"EDITORIAL_REVIEW_FAILED {attempt}",
                             json.dumps(last_qa_output, ensure_ascii=False, indent=2),
                         )
+                    review_config = review_profile.editorial_review
+                    if (
+                        review_config is not None
+                        and editorial_rewrites < review_config.max_rewrites
+                        and attempt < max_attempts
+                    ):
+                        editorial_rewrites += 1
+                        rewrite_request = editorial_rewrite_prompt(current, review)
+                        if console_prefix:
+                            print(f"{console_prefix} rewrite: editorial score below profile bar", flush=True)
+                        if log_path:
+                            append_local_start_log(log_path, "EDITORIAL_REWRITE_PROMPT", rewrite_request)
+                        rewrite_text = await provider.complete(
+                            rewrite_request,
+                            system=repair_system_prompt(current),
+                            max_tokens=8192,
+                            temperature=0.35,
+                            json_output=True,
+                        )
+                        if log_path:
+                            append_local_start_log(log_path, "EDITORIAL_REWRITE_RESPONSE", rewrite_text)
+                        try:
+                            current = validate_editorial_rewrite_identity(
+                                current, json_from_llm(rewrite_text),
+                            )
+                        except (ValueError, json.JSONDecodeError) as exc:
+                            last_validation_error = f"Editorial rewrite không dùng được: {exc}"
+                            if log_path:
+                                append_local_start_log(
+                                    log_path, "EDITORIAL_REWRITE_FAILED", last_validation_error,
+                                )
+                        continue
                 record_ideation_failure(
                     report_path,
                     script_name=script_path.name,

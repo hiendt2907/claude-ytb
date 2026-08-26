@@ -7,6 +7,7 @@
   "narrative_mode": "character_story",
   "prompts": {
     "editorial": "prompts/editorial.md",
+    "editorial_review": "prompts/editorial-review.md",
     "spoken_language": "prompts/spoken-language.md",
     "conversation_contract": "prompts/conversation-contract.md",
     "long_transcript_structure": "prompts/long-transcript-structure.md",
@@ -17,6 +18,12 @@
   },
   "format_prompts": {
     "long": "long_transcript_structure"
+  },
+  "editorial_review": {
+    "enabled": true,
+    "rubric_prompt_name": "editorial_review",
+    "minimum_score": 9,
+    "max_rewrites": 2
   },
   "formats": {
     "short": {"viewer_min_sec": 30, "viewer_max_sec": 45, "min_sections": 4, "max_sections": 12},

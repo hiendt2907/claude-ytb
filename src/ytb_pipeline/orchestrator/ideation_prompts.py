@@ -501,6 +501,16 @@ def script_generation_system_prompt(
     short_ending_contract = (
         _short_ending_instruction(content_profile) if "short" in active_types else ""
     )
+    review_config = content_profile.editorial_review
+    editorial_acceptance_bar = (
+        "EDITORIAL ACCEPTANCE BAR: this transcript will be reviewed separately "
+        f"against the profile rubric and must earn at least {review_config.minimum_score}/10. "
+        "Before returning, silently score it harshly for human truth, spoken naturalness, "
+        "causal coherence, role fidelity, and useful restraint. Rewrite any line that sounds "
+        "like generic content, an unsupported diagnosis, or an author speaking through a character."
+        if review_config is not None and review_config.enabled and review_config.minimum_score
+        else ""
+    )
     format_contract_lines = "\n".join(format_lines)
     return f"""You are the senior editorial writer for content profile
 `{content_profile.profile_id}` version `{content_profile.version}`.
@@ -524,6 +534,7 @@ Narrative contract:
 {opening_contract}
 {closing_contract}
 {short_ending_contract}
+{editorial_acceptance_bar}
 
 Use original, safe, advertiser-friendly Vietnamese. Verify or omit factual
 claims. Include a complete thumbnail_brief and compliance object. Silently
@@ -1199,5 +1210,41 @@ def repair_prompt(
         "compliance.passed must be true.\n\n"
         f"Recovery directive:\n{recovery_directive or 'Apply the listed validation and QA fixes.'}\n\n"
         f"Issues:\n{json.dumps(issues, ensure_ascii=False, indent=2)}\n\n"
+        f"Current JSON:\n{json.dumps(payload, ensure_ascii=False, indent=2)}"
+    )
+
+
+def editorial_rewrite_prompt(payload: dict, review: object) -> str:
+    """Ask for one bounded full rewrite after a profile editorial rejection.
+
+    Schema/identity repair stays deliberately narrow elsewhere.  This path is
+    different: a bad conversation or a generic peer voice cannot be fixed by
+    swapping one sentence, so an opted-in profile may authorize a complete
+    transcript rewrite.  The profile's system prompt still supplies all
+    format/cast rules; this prompt only carries the concrete reviewer evidence.
+    """
+    findings = list(getattr(review, "blocking_findings", ()) or ())
+    section_refs = list(getattr(review, "section_refs", ()) or ())
+    score = getattr(review, "overall_score", None)
+    repair_brief = str(getattr(review, "repair_brief", "") or "").strip()
+    immutable = {
+        key: payload.get(key)
+        for key in ("slug", "topic", "profile_id", "profile_version", "video_type", "target_minutes", "strategy")
+        if key in payload
+    }
+    return (
+        "Rewrite the entire Vietnamese YouTube script JSON after an editorial review failure. "
+        "Return ONLY one complete corrected JSON object, never markdown or a patch. "
+        "Do not merely polish the cited sentences: rebuild the scene, turns, and payoff where needed "
+        "so the finished transcript sounds like people rather than a content template. "
+        "Keep these immutable production fields exactly unchanged; if a field is absent, do not invent it:\n"
+        f"{json.dumps(immutable, ensure_ascii=False, indent=2)}\n\n"
+        "Editorial review findings:\n"
+        f"- score: {score!r}/10\n"
+        f"- sections: {section_refs}\n"
+        f"- findings: {json.dumps(findings, ensure_ascii=False)}\n"
+        f"- repair brief: {repair_brief}\n\n"
+        "Before returning, silently re-read every spoken line aloud, check that every claimed consequence "
+        "is earned by an earlier action, and apply the full profile system contract.\n\n"
         f"Current JSON:\n{json.dumps(payload, ensure_ascii=False, indent=2)}"
     )
