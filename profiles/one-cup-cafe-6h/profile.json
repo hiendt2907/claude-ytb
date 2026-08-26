@@ -6,7 +6,13 @@
   "topic": "Phát triển bản thân thật, không self-help",
   "narrative_mode": "mechanism_explainer",
   "prompts": {
-    "editorial": "prompts/editorial.md"
+    "editorial": "prompts/editorial.md",
+    "long_transcript_structure": "prompts/long-transcript-structure.md",
+    "short_funnel_structure": "prompts/short-funnel-structure.md"
+  },
+  "format_prompts": {
+    "long": "long_transcript_structure",
+    "short": "short_funnel_structure"
   },
   "formats": {
     "short": {"viewer_min_sec": 30, "viewer_max_sec": 45, "min_sections": 4, "max_sections": 4},
@@ -24,7 +30,9 @@
   },
   "content_rules": {
     "require_pexels_query": true,
-    "require_short_source_trace": true
+    "require_short_source_trace": true,
+    "long_opening_mode": "pain_first",
+    "short_ending_mode": "funnel_bridge"
   },
   "render": {
     "assets_dir": "assets",

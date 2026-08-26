@@ -5,10 +5,12 @@ tự sinh đa dạng. Short vào hook thẳng, cấm mở bằng lời chào.
 """
 
 import pytest
+from types import SimpleNamespace
 
 from ytb_pipeline.ideation.generator import (
     CHARS_PER_MIN,
     GREETING_PREFIX,
+    _validate_intro,
     chars_per_min_for_provider,
     load_script,
 )
@@ -83,3 +85,50 @@ def test_short_khong_loi_chao_thi_qua(write_script):
     body = _short_body("Dừng ngay việc này lại.")
     path = write_script(_short(body))
     assert load_script(path).segments
+
+
+def test_profile_pain_first_long_is_not_forced_through_legacy_greeting():
+    """A profile chooses its opening contract; narrative_mode must not decide it."""
+    profile = SimpleNamespace(
+        narrative_mode="mechanism_explainer",
+        content_rules=SimpleNamespace(long_opening_mode="pain_first"),
+    )
+    segments = (SimpleNamespace(
+        narration="Bạn đã mở slide ba lần mà vẫn chưa viết nổi dòng đầu tiên.",
+    ),)
+
+    _validate_intro(
+        segments,
+        target_minutes=5,
+        name="pain-first-long.json",
+        content_profile=profile,
+    )
+
+
+def test_qa_uses_the_same_pain_first_opening_contract(monkeypatch):
+    from ytb_pipeline.agents import qa_agent
+
+    profile = SimpleNamespace(
+        narrative_mode="mechanism_explainer",
+        content_rules=SimpleNamespace(long_opening_mode="pain_first"),
+    )
+    script = SimpleNamespace(
+        target_minutes=5,
+        segments=(SimpleNamespace(
+            narration="Bạn đã mở slide ba lần mà vẫn chưa viết nổi dòng đầu tiên.",
+        ),),
+    )
+    monkeypatch.setattr(qa_agent, "_content_profile", lambda _script: profile)
+
+    assert qa_agent._check_intro(script) == []
+
+
+def test_profile_channel_greeting_keeps_the_legacy_long_contract():
+    profile = SimpleNamespace(
+        narrative_mode="mechanism_explainer",
+        content_rules=SimpleNamespace(long_opening_mode="channel_greeting"),
+    )
+    segments = (SimpleNamespace(narration="Bạn đang kẹt trước slide đầu tiên."),)
+
+    with pytest.raises(ValueError, match="Mến chào các bạn"):
+        _validate_intro(segments, target_minutes=5, name="legacy-long.json", content_profile=profile)

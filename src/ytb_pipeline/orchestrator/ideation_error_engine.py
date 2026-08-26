@@ -23,8 +23,8 @@ _RECOVERY = {
         "Do not ask for an in-place repair or reuse partial narration."
     ),
     "QA_HOOK_WEAK": (
-        "Rewrite only the opening: preserve the topic and, for a Long, the greeting; "
-        "put a concrete question or tension marker in the next 28 spoken words."
+        "Rewrite only the opening: preserve the topic and its profile-declared opening contract; "
+        "put a concrete question, stake, or tension in the first 28 spoken words as that contract requires."
     ),
     "QA_CENTRAL_MECHANISM": (
         "Keep one named mechanism only. Rewrite generic CTA phrases such as 'các cơ chế khiến…' "

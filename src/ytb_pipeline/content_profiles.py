@@ -32,6 +32,9 @@ class FormatProfile:
     viewer_max_sec: float
     min_sections: int
     max_sections: int
+    # Profile-declared allowance for measured timing variance at the floor.
+    # Zero preserves the exact historical contract.
+    runtime_tolerance_sec: float = 0.0
 
     def __post_init__(self) -> None:
         if self.viewer_min_sec <= 0 or self.viewer_max_sec <= self.viewer_min_sec:
@@ -40,6 +43,8 @@ class FormatProfile:
             raise ContentProfileError("Format cần ít nhất một section.")
         if self.max_sections < self.min_sections:
             raise ContentProfileError("Format cần max_sections >= min_sections.")
+        if self.runtime_tolerance_sec < 0:
+            raise ContentProfileError("Format runtime_tolerance_sec phải >= 0.")
 
     @property
     def viewer_runtime_bounds_sec(self) -> tuple[float, float]:
@@ -69,6 +74,41 @@ class ContentRules:
     require_pexels_query: bool
     require_short_source_trace: bool
     require_conversation_turns: bool = False
+    # A profile may retain its historical Short format for reading/validation
+    # old scripts while refusing to generate any NEW Shorts. This lets a story
+    # series become Long-only without destroying its existing artifacts.
+    allow_short_generation: bool = True
+    # Optional role contract for a three-voice story Long. Empty values keep
+    # a character_story profile on the older, more permissive cast contract.
+    story_primary_speaker_id: str = ""
+    story_supporting_speaker_id: str = ""
+    require_next_episode_bridge: bool = False
+    # Opt-in variant of the character_story ending contract: when True, the
+    # final beat is judged as the NARRATOR generalising the story into a
+    # lesson spoken directly to the viewer (`qa_agent._check_immediate_action`)
+    # instead of the legacy contract, which requires a concrete bounded
+    # action shown through what a character does. Defaults to False so every
+    # existing character_story profile keeps its current ending contract
+    # unchanged unless it explicitly opts in.
+    narrator_lesson_closing: bool = False
+    # A Long opening is a profile/editorial decision, not a global channel
+    # invariant.  `channel_greeting` keeps the historical explainer contract;
+    # `pain_first` starts straight in the audience's observable problem; and
+    # `story_context` leaves the story hook to the narrator/cast contract.
+    long_opening_mode: str = "channel_greeting"
+    # A Short either completes with an immediate action (legacy/default), or
+    # deliberately preserves an open loop and names its declared Long source.
+    short_ending_mode: str = "final_action"
+
+    def __post_init__(self) -> None:
+        if self.long_opening_mode not in {"channel_greeting", "pain_first", "story_context"}:
+            raise ContentProfileError(
+                "content_rules.long_opening_mode phải là channel_greeting, pain_first, hoặc story_context."
+            )
+        if self.short_ending_mode not in {"final_action", "funnel_bridge"}:
+            raise ContentProfileError(
+                "content_rules.short_ending_mode phải là final_action hoặc funnel_bridge."
+            )
 
 
 # The explainer taxonomy every schema-version-1 profile relied on before
@@ -186,6 +226,10 @@ class ContentProfile:
     visual_generation: "VisualGenerationProfile | None" = None
     editorial_contract: EditorialContractProfile = field(default=_LEGACY_EDITORIAL_CONTRACT)
     editorial_review: "EditorialReviewProfile | None" = None
+    # Selectable format-specific prompt artifacts. They are kept out of the
+    # general editorial bundle and injected only for the requested video type,
+    # so a Short writer never sees a Long's structure (and vice versa).
+    format_prompts: Mapping[str, str] = field(default_factory=dict)
 
     def editorial_review_rubric_text(self) -> str:
         if self.editorial_review is None:
@@ -220,6 +264,22 @@ class ContentProfile:
             raise ContentProfileError(
                 f"Profile '{self.profile_id}' không hỗ trợ format {video_type!r}."
             ) from exc
+
+    def supports_generation(self, video_type: str) -> bool:
+        """Whether this profile may create a *new* script of ``video_type``.
+
+        Formats can outlive production support so archived scripts remain
+        inspectable. Generation is therefore a separate capability check.
+        """
+        normalized = (video_type or "").strip().lower()
+        if normalized not in self.formats:
+            return False
+        return normalized != "short" or self.content_rules.allow_short_generation
+
+    def format_prompt_text(self, video_type: str) -> str:
+        normalized = (video_type or "").strip().lower()
+        name = self.format_prompts.get(normalized)
+        return self.prompt_text(name) if name else ""
 
     def prompt_text(self, name: str) -> str:
         try:
@@ -369,6 +429,7 @@ def load_content_profile(
         raise ContentProfileError(f"Profile '{profile_id}' cần schema_version=1.")
 
     prompts = _string_map(raw.get("prompts"), "prompts")
+    format_prompts = _string_map(raw["format_prompts"], "format_prompts") if "format_prompts" in raw else {}
     formats_raw = _mapping(raw.get("formats"), "formats")
     formats = {
         name: _format_profile(value, f"formats.{name}")
@@ -377,6 +438,16 @@ def load_content_profile(
     }
     if set(formats) != {"short", "long"}:
         raise ContentProfileError(f"Profile '{profile_id}' phải khai báo short và long.")
+    unknown_format_prompts = set(format_prompts) - {"short", "long"}
+    if unknown_format_prompts:
+        raise ContentProfileError(
+            f"Profile '{profile_id}' có format_prompts không hợp lệ: {sorted(unknown_format_prompts)}."
+        )
+    missing_prompt_names = sorted(set(format_prompts.values()) - set(prompts))
+    if missing_prompt_names:
+        raise ContentProfileError(
+            f"Profile '{profile_id}' format_prompts tham chiếu prompt không tồn tại: {missing_prompt_names}."
+        )
     providers_raw = _mapping(raw.get("providers"), "providers")
     rules_raw = _mapping(raw.get("content_rules"), "content_rules")
     render_raw = _mapping(raw.get("render"), "render")
@@ -421,6 +492,32 @@ def load_content_profile(
             require_conversation_turns=_exact_bool(
                 rules_raw, "require_conversation_turns", prefix="content_rules"
             ),
+            allow_short_generation=_exact_bool(
+                rules_raw, "allow_short_generation", prefix="content_rules", default=True
+            ),
+            story_primary_speaker_id=str(
+                rules_raw.get("story_primary_speaker_id") or ""
+            ).strip().lower(),
+            story_supporting_speaker_id=str(
+                rules_raw.get("story_supporting_speaker_id") or ""
+            ).strip().lower(),
+            require_next_episode_bridge=_exact_bool(
+                rules_raw, "require_next_episode_bridge", prefix="content_rules", default=False
+            ),
+            narrator_lesson_closing=_exact_bool(
+                rules_raw, "narrator_lesson_closing", prefix="content_rules", default=False
+            ),
+            long_opening_mode=str(
+                rules_raw.get("long_opening_mode")
+                or (
+                    "story_context"
+                    if str(raw.get("narrative_mode") or "").strip() == "character_story"
+                    else "channel_greeting"
+                )
+            ).strip().lower(),
+            short_ending_mode=str(
+                rules_raw.get("short_ending_mode") or "final_action"
+            ).strip().lower(),
         ),
         render=RenderProfile(
             assets_dir_name=_required_text(render_raw, "assets_dir", prefix="render"),
@@ -436,7 +533,27 @@ def load_content_profile(
         visual_generation=_visual_generation_profile(raw.get("visual_generation"), profile_id),
         editorial_contract=editorial_contract,
         editorial_review=_editorial_review_profile(raw.get("editorial_review")),
+        format_prompts=format_prompts,
     )
+    primary = profile.content_rules.story_primary_speaker_id
+    supporting = profile.content_rules.story_supporting_speaker_id
+    if bool(primary) != bool(supporting):
+        raise ContentProfileError(
+            "content_rules.story_primary_speaker_id và story_supporting_speaker_id phải cùng khai báo."
+        )
+    if primary:
+        narrator_id = profile.editorial_contract.narration_speaker_id
+        if primary == supporting or primary == narrator_id or supporting == narrator_id:
+            raise ContentProfileError("Hai vai story phải khác nhau và đều khác narrator.")
+        unknown_roles = {primary, supporting} - set(profile.voice_cast)
+        if unknown_roles:
+            raise ContentProfileError(
+                f"Vai story chưa có voice_cast: {sorted(unknown_roles)}."
+            )
+    elif profile.content_rules.require_next_episode_bridge:
+        raise ContentProfileError(
+            "require_next_episode_bridge chỉ hợp lệ khi profile khai báo hai vai story."
+        )
     if (
         profile.narrative_mode == "character_story"
         and profile.render.inter_segment_gap_sec < profile.render.transition_overlap_sec
@@ -686,6 +803,9 @@ def _format_profile(value: Any, field: str) -> FormatProfile:
                 _positive_int(mapping, "max_sections", path=field)
                 if "max_sections" in mapping
                 else _positive_int(mapping, "min_sections", path=field)
+            ),
+            runtime_tolerance_sec=_finite_number(
+                mapping, "runtime_tolerance_sec", prefix=field, default=0.0
             ),
         )
     except (KeyError, TypeError, ValueError) as exc:

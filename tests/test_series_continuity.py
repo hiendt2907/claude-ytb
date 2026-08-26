@@ -135,7 +135,7 @@ def test_story_generation_schema_requires_a_continuity_declaration():
     from ytb_pipeline.ideation.generation_schema import script_generation_schema
 
     schema = script_generation_schema(
-        "short", content_profile=load_content_profile("ban-so-6")
+        "long", content_profile=load_content_profile("ban-so-6")
     )
 
     assert "continuity" in schema["required"]

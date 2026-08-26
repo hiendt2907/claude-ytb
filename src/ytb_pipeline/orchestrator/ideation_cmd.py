@@ -343,6 +343,10 @@ async def _cmd_start_local(args: argparse.Namespace) -> None:
     content_profile = getattr(args, "_content_profile", None) or load_content_profile(
         getattr(args, "profile_id", None)
     )
+    if not content_profile.supports_generation(args.type_of_vid):
+        raise SystemExit(
+            f"✗ Profile '{content_profile.profile_id}' không cho sinh {args.type_of_vid} mới."
+        )
     generation_profile = (
         content_profile if getattr(args, "_profile_scoped", False) else None
     )
@@ -449,7 +453,9 @@ async def _cmd_start_local(args: argparse.Namespace) -> None:
         print(f"{prefix} LLM: generating script JSON...", flush=True)
         text = await provider.complete(
             prompt,
-            system=script_generation_system_prompt(generation_profile),
+            system=script_generation_system_prompt(
+                generation_profile, video_type=args.type_of_vid
+            ),
             max_tokens=SCRIPT_LLM_MAX_TOKENS,
             temperature=0.2,
             json_output=True,

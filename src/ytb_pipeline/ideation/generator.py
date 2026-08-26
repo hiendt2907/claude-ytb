@@ -126,6 +126,7 @@ def load_script(source: str | Path) -> Script:
             f"Kịch bản {path.name}: profile_version={declared_profile_version!r} "
             f"không khớp profile '{profile_id}' version={content_profile.version!r}."
         )
+    video_type = _normalize_video_type(data.get("video_type"), data.get("target_minutes"))
 
     for required in ("title", "sections"):
         if not data.get(required):
@@ -142,7 +143,6 @@ def load_script(source: str | Path) -> Script:
     )
     thumbnail_brief = _thumbnail_brief_from_raw(data.get("thumbnail_brief"), path.name)
 
-    video_type = _normalize_video_type(data.get("video_type"), data.get("target_minutes"))
     target_minutes = data.get("target_minutes")
     segments = tuple(_segment_from_raw(s, path.name) for s in data["sections"]
                      if _section_voiceover(s).strip())
@@ -439,7 +439,7 @@ def _validate_length(
     required_target_sec = float(target_minutes) * 60 + (
         contract.transition_loss_sec(len(segments)) if renderer_aware else 0.0
     )
-    if est_sec < required_target_sec:
+    if est_sec + contract.runtime_tolerance_sec < required_target_sec:
         chars_can = int(
             required_target_sec / 60
             * chars_per_min_for_provider(tts_provider, video_type=video_type)
@@ -507,28 +507,26 @@ def _validate_intro(
     segments, target_minutes, name: str,
     *, content_profile: ContentProfile | None = None,
 ) -> None:
-    """Cổng mở đầu (mục 1b): video DÀI phải mở bằng lời chào; SHORT thì KHÔNG.
-
-    Video dài (có `target_minutes`): segment đầu PHẢI bắt đầu bằng cụm cố định
-    "Mến chào các bạn," (phần sau tự sinh: đọc tiêu đề + câu móc). Thiếu -> fail-fast.
-
-    Short (không khai báo `target_minutes`): segment đầu KHÔNG được mở bằng lời chào
-    — feed Shorts cần hook 2s thẳng, lời chào làm rớt Stayed-to-watch.
-    """
+    """Validate the profile-declared Long opening; Shorts never greet."""
     first = segments[0].narration.lstrip()
     is_long = target_minutes is not None
     starts_with_greeting = first.startswith(GREETING_PREFIX)
 
-    # E2E profile prioritizes a natural retention hook; production keeps the
-    # established long-form greeting contract unchanged.
-    needs_channel_greeting = (
-        content_profile is None or content_profile.narrative_mode == "mechanism_explainer"
+    opening_mode = (
+        content_profile.content_rules.long_opening_mode
+        if content_profile is not None
+        else "channel_greeting"
     )
-    if is_long and needs_channel_greeting and not starts_with_greeting and not settings.e2e_test:
+    if is_long and opening_mode == "channel_greeting" and not starts_with_greeting and not settings.e2e_test:
         raise ValueError(
             f"Kịch bản {name}: video dài phải mở đầu bằng cụm cố định "
             f"\"{GREETING_PREFIX}\" rồi đọc tiêu đề + câu móc (xem mục 1b). "
             "Phần sau cụm chào tự sinh đa dạng theo chủ đề."
+        )
+    if is_long and opening_mode == "pain_first" and starts_with_greeting:
+        raise ValueError(
+            f"Kịch bản {name}: profile pain_first phải mở thẳng bằng tình huống đau, "
+            f"không dùng lời chào \"{GREETING_PREFIX}\"."
         )
     if not is_long and starts_with_greeting:
         raise ValueError(

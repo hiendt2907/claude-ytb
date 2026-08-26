@@ -65,6 +65,7 @@ class ContentContract:
     answer_start_deadline_sec: float | None = None
     transition_overlap_sec: float = TRANSITION_OVERLAP_SEC
     inter_segment_gap_sec: float = 0.0
+    runtime_tolerance_sec: float = 0.0
 
     def situation_char_budget(self, *, chars_per_minute: float) -> int:
         """Longest opening hook that still starts the answer by the target.
@@ -125,8 +126,12 @@ class ContentContract:
         lower, upper = bounds
         label = "Short" if self.video_type == "short" else "Long"
         qualifier = "audio " if stage == "audio" else ""
-        if duration_sec < lower:
-            raise ValueError(f"{label} quá ngắn: {qualifier}{duration_sec:.1f}s; ít nhất {lower:.1f}s.")
+        accepted_lower = lower - self.runtime_tolerance_sec
+        if duration_sec < accepted_lower:
+            raise ValueError(
+                f"{label} quá ngắn: {qualifier}{duration_sec:.1f}s; "
+                f"ít nhất {accepted_lower:.1f}s."
+            )
         if duration_sec > upper:
             raise ValueError(f"{label} quá dài {upper:.0f}s: {qualifier}{duration_sec:.1f}s.")
 
@@ -169,6 +174,9 @@ def _build_contract(
             inter_segment_gap_sec=(
                 content_profile.render.inter_segment_gap_sec if content_profile else 0.0
             ),
+            runtime_tolerance_sec=(
+                profile_format.runtime_tolerance_sec if profile_format else 0.0
+            ),
         )
     profile_format = content_profile.format_for("long") if content_profile else None
     return ContentContract(
@@ -192,6 +200,9 @@ def _build_contract(
         ),
         inter_segment_gap_sec=(
             content_profile.render.inter_segment_gap_sec if content_profile else 0.0
+        ),
+        runtime_tolerance_sec=(
+            profile_format.runtime_tolerance_sec if profile_format else 0.0
         ),
     )
 

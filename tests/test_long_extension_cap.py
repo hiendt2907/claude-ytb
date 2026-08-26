@@ -100,13 +100,8 @@ def test_full_script_at_the_cap_still_receives_the_extension_text():
     assert "Đoạn thêm 0." in combined and "Đoạn thêm 1." in combined
 
 
-def test_story_profile_ignores_a_strategy_it_never_asked_for(tmp_path, monkeypatch):
-    """`strategy` carries no meaning for a character-story profile.
-
-    The prompt tells such a profile to omit it, but a model that adds a partial
-    `strategy` anyway used to fail the loader on `strategy.hook` — rejecting a
-    perfectly valid episode over a field its own contract does not use.
-    """
+def test_long_only_story_profile_rejects_new_short_generation_but_reads_archives(tmp_path):
+    """Long-only restricts ideation, never an archived artifact reader."""
     import json
 
     from ytb_pipeline.ideation.generator import load_script
@@ -116,10 +111,16 @@ def test_story_profile_ignores_a_strategy_it_never_asked_for(tmp_path, monkeypat
             __import__("pathlib").Path("profiles/ban-so-6/fixtures/episode-01-short.json")
         ).read_text(encoding="utf-8")
     )
+    from ytb_pipeline.content_profiles import load_content_profile
+    payload["profile_version"] = load_content_profile("ban-so-6").version
     payload["strategy"] = {"format_id": "core_answer_first_v1"}  # no `hook`
     path = tmp_path / "story.json"
     path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
 
-    script = load_script(path)
+    import pytest
+    from ytb_pipeline.content_profiles import ContentProfileError
+    from ytb_pipeline.orchestrator.ideation_prompts import local_script_prompt
 
-    assert script.strategy is None
+    assert load_script(path).video_type == "short"
+    with pytest.raises(ContentProfileError, match="không cho sinh short"):
+        local_script_prompt(1, 1, "short", "auto", "", content_profile=load_content_profile("ban-so-6"))

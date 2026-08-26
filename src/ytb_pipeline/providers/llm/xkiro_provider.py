@@ -32,6 +32,10 @@ class _ResponseFormatUnsupportedError(RuntimeError):
     """The gateway rejected `response_format`, not the selected model."""
 
 
+class _ResponseFormatGatewayError(RuntimeError):
+    """The gateway crashes only when an OpenAI response format is supplied."""
+
+
 class XkiroLLMProvider:
     """LLM cloud qua xKiro, gọi đúng một model đã được cấu hình."""
 
@@ -64,6 +68,16 @@ class XkiroLLMProvider:
             try:
                 return await asyncio.to_thread(
                     self._request, model, prompt, system, max_tokens, temperature, response_format
+                )
+            except _ResponseFormatGatewayError:
+                # Some xKiro gateways acknowledge OpenAI-compatible structured
+                # output yet return HTTP 500 for both json_schema and
+                # json_object. The ideation pipeline still validates/parses
+                # JSON deterministically after this call, so retry plain text
+                # on the SAME pinned model/provider rather than failing every
+                # generation or swapping models.
+                return await asyncio.to_thread(
+                    self._request, model, prompt, system, max_tokens, temperature, None
                 )
             except _ResponseFormatUnsupportedError:
                 if response_format is None or response_format["type"] != "json_schema":
@@ -140,6 +154,11 @@ class XkiroLLMProvider:
             if exc.code == 400 and response_format is not None:
                 raise _ResponseFormatUnsupportedError(
                     f"xKiro LLM ({model}) từ chối response_format={response_format['type']}."
+                ) from exc
+            if exc.code >= 500 and response_format is not None:
+                raise _ResponseFormatGatewayError(
+                    f"xKiro LLM ({model}) lỗi gateway khi gửi response_format="
+                    f"{response_format['type']}."
                 ) from exc
             raise RuntimeError(f"xKiro LLM ({model}) trả HTTP {exc.code}.") from exc
         try:

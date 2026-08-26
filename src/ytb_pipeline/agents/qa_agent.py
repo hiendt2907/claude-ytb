@@ -18,9 +18,9 @@ from collections import Counter
 from typing import Any
 
 from ..ideation import series as series_mod
-from ..content_contract import contract_for, estimate_duration_sec
+from ..content_contract import contract_for, effective_chars_per_min, estimate_duration_sec
 from ..content_profiles import load_content_profile
-from ..ideation.generator import GREETING_PREFIX, chars_per_min_for_provider
+from ..ideation.generator import GREETING_PREFIX
 from ..config.settings import settings
 from .base import AgentResult, AgentStatus
 
@@ -86,6 +86,7 @@ class QAAgent:
                 violations.extend(_check_speaker_prefix_leak(script))
                 violations.extend(_check_story_speaker_ownership(script))
                 violations.extend(_check_character_voiceover_is_direct(script))
+                violations.extend(_check_story_series_arc(script))
                 violations.extend(_check_knowledge_examples(script))
                 violations.extend(_check_immediate_action(script))
                 violations.extend(_check_final_payoff(script))
@@ -159,9 +160,10 @@ def _check_length(script: Any) -> list[dict[str, str]]:
     contract = contract_for(video_type, profile)
     est_sec = estimate_duration_sec(
         sum(len(_narration_of(segment)) for segment in segments),
-        chars_per_minute=chars_per_min_for_provider(
+        chars_per_minute=effective_chars_per_min(
             profile.providers.tts if profile else settings.tts_provider,
             video_type=video_type,
+            content_profile=profile,
         ),
     )
 
@@ -176,7 +178,8 @@ def _check_length(script: Any) -> list[dict[str, str]]:
                     f"[{min_minutes:.0f}, {max_minutes:.0f}]."
                 ),
             }]
-        if est_sec < float(target_minutes) * 60 + contract.transition_loss_sec(len(segments)):
+        required_target_sec = float(target_minutes) * 60 + contract.transition_loss_sec(len(segments))
+        if est_sec + contract.runtime_tolerance_sec < required_target_sec:
             return [{
                 "rule": "length",
                 "detail": f"Nội dung quá mỏng: audio ước lượng {est_sec / 60:.1f}p < target {target_minutes}p.",
@@ -199,11 +202,18 @@ def _check_intro(script: Any) -> list[dict[str, str]]:
     starts_with_greeting = first.startswith(GREETING_PREFIX)
 
     profile = _content_profile(script)
-    needs_channel_greeting = profile is None or profile.narrative_mode == "mechanism_explainer"
-    if is_long and needs_channel_greeting and not starts_with_greeting and not settings.e2e_test:
+    opening_mode = (
+        profile.content_rules.long_opening_mode if profile is not None else "channel_greeting"
+    )
+    if is_long and opening_mode == "channel_greeting" and not starts_with_greeting and not settings.e2e_test:
         return [{
             "rule": "intro",
             "detail": f"Video dài phải mở đầu bằng \"{GREETING_PREFIX}\".",
+        }]
+    if is_long and opening_mode == "pain_first" and starts_with_greeting:
+        return [{
+            "rule": "intro",
+            "detail": "Profile pain_first phải mở thẳng bằng tình huống đau, không dùng lời chào.",
         }]
     if not is_long and starts_with_greeting:
         return [{
@@ -248,11 +258,26 @@ _STORY_NUMBER_WORDS = frozenset({
     "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín", "mười",
     "mươi", "rưỡi", "kém",
 })
-# Dấu hiệu có thứ để mất: nghĩa vụ chưa xong, thời hạn, hoặc một sự dở dang.
-_STORY_STAKE_MARKERS = (
+# Dấu hiệu có thứ để mất — hai lớp NGỮ NGHĨA khác nhau, cả hai đều là "stake"
+# hợp lệ theo STORY_HOOK_CONTRACT (ideation_prompts.py): (1) nghĩa vụ/thời hạn
+# chưa xong; (2) hậu quả/rủi ro. Một câu mở thật của Qwen ("sợ hỏi An thì bị
+# chê là thiếu chủ động") có anchor rõ nhưng vẫn bị QA từ chối vì lớp (2)
+# trước đây chưa có marker nào — không phải vì thiếu marker "sợ hỏi ... bị
+# chê" cụ thể, mà vì thiếu CẢ LỚP hậu quả/rủi ro trong danh sách.
+_STORY_STAKE_OBLIGATION_MARKERS = (
     "phải", "chưa", "vẫn", "còn", "sắp", "kịp", "hạn", "trễ", "muộn",
     "trước khi", "nhưng", "quên", "lỡ",
 )
+# "bị" là trợ từ bị động-nghịch (adversative passive) của tiếng Việt: gần như
+# luôn đứng trước một hậu quả xấu xảy đến cho chủ thể ("bị chê", "bị la", "bị
+# phạt", "bị đuổi", "bị trừ điểm"...), khác với "được" (trung tính/tích cực).
+# Vì vậy một từ "bị" khái quát được cả lớp hậu quả mà không cần liệt kê từng
+# động từ theo sau. "sợ"/"lo"/"nếu"/"nhỡ"/"kẻo" đánh dấu một rủi ro nhân vật
+# đang lường trước, dù hậu quả có thể chưa xảy ra.
+_STORY_STAKE_RISK_MARKERS = (
+    "bị", "sợ", "lo", "nếu", "nhỡ", "kẻo",
+)
+_STORY_STAKE_MARKERS = _STORY_STAKE_OBLIGATION_MARKERS + _STORY_STAKE_RISK_MARKERS
 
 
 def _story_words(text: str) -> list[str]:
@@ -514,10 +539,81 @@ def _check_character_voiceover_is_direct(script: Any) -> list[dict[str, str]]:
         narration = _narration_of(segment).strip()
         colon = narration.find(":")
         if 0 < colon < len(narration) - 8:
+            prelude = narration[:colon].casefold()
+            # A character may naturally quote the exact words they are about
+            # to say ("Tôi sẽ nói một câu: ...").  That is direct speech,
+            # not narrator staging.  The unsafe shape remains third-person
+            # action before the quote ("An đặt cốc xuống: ...").
+            if re.search(r"\b(?:tôi|mình|em|tớ|ta|chúng tôi)\b", prelude):
+                continue
             violations.append(_repair(
                 "character_voiceover_direct",
                 f"Section {index} có phần dẫn/hành động trước dấu ':' trong voiceover của {speaker}.",
                 "Chuyển hành động sang narrator hoặc visual_intent; voiceover nhân vật chỉ giữ câu họ nói trực tiếp.",
+            ))
+    return violations
+
+
+_NEXT_EPISODE_MARKERS = (
+    "tập sau", "hẹn gặp lại", "lần tới", "phần sau",
+)
+
+
+def _check_story_series_arc(script: Any) -> list[dict[str, str]]:
+    """Enforce an opt-in three-voice Long-series ending at the release gate.
+
+    The profile declares roles, so this contains no knowledge of a particular
+    cast or series. It proves the generated transcript kept the storyteller as
+    the frame, let both characters actually participate, and left a truthful
+    invitation into the following episode.
+    """
+    profile = _content_profile(script)
+    if (
+        profile is None
+        or profile.narrative_mode != "character_story"
+        or _script_video_type(script) != "long"
+        or not profile.content_rules.story_primary_speaker_id
+    ):
+        return []
+    segments = _segments_of(script)
+    if not segments:
+        return []
+    rules = profile.content_rules
+    narrator_id = profile.editorial_contract.narration_speaker_id
+    primary = rules.story_primary_speaker_id
+    supporting = rules.story_supporting_speaker_id
+    speakers = [
+        str(_get(segment, "speaker_id", narrator_id) or narrator_id).strip().lower()
+        for segment in segments
+    ]
+    violations: list[dict[str, str]] = []
+    unexpected = sorted(set(speakers) - {narrator_id, primary, supporting})
+    if unexpected:
+        violations.append(_repair(
+            "story_series_cast",
+            f"Story Long có speaker ngoài cast ba vai đã khai báo: {', '.join(unexpected)}.",
+            "Chỉ dùng narrator, nhân vật chính và nhân vật phụ của profile; không thêm speaker mới.",
+        ))
+    missing = [speaker for speaker in (primary, supporting) if speaker not in speakers]
+    if missing:
+        violations.append(_repair(
+            "story_series_roles",
+            f"Story Long thiếu lượt thoại của vai: {', '.join(missing)}.",
+            "Cho cả nhân vật chính lẫn nhân vật phụ một lượt thoại trực tiếp, có phản hồi nhân quả.",
+        ))
+    if speakers[0] != narrator_id or speakers[-1] != narrator_id:
+        violations.append(_repair(
+            "story_series_narrator_frame",
+            "Story Long phải để narrator mở bối cảnh và khép ý nghĩa ở section cuối.",
+            "Mở bằng narrator neo cảnh/cái giá; kết bằng narrator đúc kết cho người xem.",
+        ))
+    if rules.require_next_episode_bridge:
+        final_text = _narration_of(segments[-1]).casefold()
+        if not any(marker in final_text for marker in _NEXT_EPISODE_MARKERS):
+            violations.append(_repair(
+                "story_series_next_episode",
+                "Phần chốt Story Long chưa hẹn một câu hỏi/lựa chọn cho tập tiếp theo.",
+                "Giữ phần đúc kết của narrator và thêm một bridge tự nhiên như 'Tập sau...' hoặc 'Hẹn gặp lại...'.",
             ))
     return violations
 
@@ -542,11 +638,91 @@ def _has_bounded_action(text: str) -> bool:
     return bool(_STORY_NUMBER_WORDS & set(words)) or any(c.isdigit() for c in text)
 
 
+# A generalised lesson needs enough substance to actually say something to
+# the viewer, not just a one-line tag stapled onto the scene.
+_NARRATOR_LESSON_MIN_WORDS = 12
+# A lesson generalises to the VIEWER, not to the character it just watched —
+# it needs a marker of direct address or of a repeatable/general situation
+# ("next time", "you", "every time"), the same way a real advice-giving
+# sentence would open in Vietnamese.
+_NARRATOR_LESSON_ADDRESS_MARKERS = (
+    "bạn", "chúng ta", "lần tới", "lần sau", "mỗi khi", "mỗi lần", "đừng",
+)
+
+
+def _is_narrator_lesson_closing(profile: Any, final_segment: Any, final_text: str) -> bool:
+    """Opt-in ending contract: the NARRATOR generalises the story into a
+    lesson spoken directly to the viewer (`content_rules.narrator_lesson_closing`),
+    instead of the legacy contract requiring a bounded action a character does.
+
+    A plain narrator sentence that just resolves the scene ("Buổi sáng trôi
+    qua và Minh cảm thấy nhẹ nhõm hơn") is NOT a lesson — it still talks
+    about a character in third person. This is rejected two ways: it must
+    not name any cast member, and it must carry a direct-address/generalising
+    marker, not just be a long narrator line.
+    """
+    if (
+        profile is None
+        or profile.narrative_mode != "character_story"
+        or not profile.content_rules.narrator_lesson_closing
+    ):
+        return False
+    narrator_id = profile.editorial_contract.narration_speaker_id
+    speaker = str(_get(final_segment, "speaker_id", narrator_id) or narrator_id).strip().lower()
+    if speaker != narrator_id:
+        return False
+    # The lesson is addressed to the viewer. A separate, explicitly marked
+    # next-episode bridge may naturally refer back to a character, so only
+    # evaluate the lesson portion for a cast-name leak.
+    normalized_final = final_text.casefold()
+    bridge_positions = [
+        normalized_final.find(marker)
+        for marker in _NEXT_EPISODE_MARKERS
+        if normalized_final.find(marker) >= 0
+    ]
+    lesson_text = final_text[:min(bridge_positions)] if bridge_positions else final_text
+    words = _story_words(lesson_text)
+    if len(words) < _NARRATOR_LESSON_MIN_WORDS:
+        return False
+    cast = {name for name in profile.voice_cast if name != narrator_id}
+    if cast & set(words):
+        return False
+    word_set = set(words)
+    has_address = any(
+        marker in word_set for marker in _NARRATOR_LESSON_ADDRESS_MARKERS if " " not in marker
+    ) or any(
+        marker in lesson_text for marker in _NARRATOR_LESSON_ADDRESS_MARKERS if " " in marker
+    )
+    return has_address
+
+
 def _check_immediate_action(script: Any) -> list[dict[str, str]]:
-    final_text = _narration_of(_segments_of(script)[-1]).lower() if _segments_of(script) else ""
+    segments = _segments_of(script)
+    final_text = _narration_of(segments[-1]).lower() if segments else ""
+    profile = _content_profile(script)
+    if (
+        profile is not None
+        and _script_video_type(script) == "short"
+        and profile.content_rules.short_ending_mode == "funnel_bridge"
+    ):
+        strategy = _get(script, "strategy", None)
+        long_slug = str(_get(strategy, "long_form_slug", "") or "").strip()
+        cta_target = str(_get(strategy, "cta_target", "") or "").strip()
+        source_long_slug = str(_get(strategy, "source_long_slug", "") or "").strip()
+        bridge_markers = ("video dài", "xem tiếp", "xem video", "long")
+        if (
+            long_slug
+            and long_slug == cta_target == source_long_slug
+            and any(marker in final_text for marker in bridge_markers)
+        ):
+            return []
+        return [_repair(
+            "funnel_bridge",
+            "Short phễu phải kết bằng cầu nối tự nhiên tới đúng video Long đã khai báo.",
+            "Nêu phần Long sẽ giải thích tiếp và giữ long_form_slug, cta_target, source_long_slug trùng nhau.",
+        )]
     if any(hint in final_text for hint in _IMMEDIATE_ACTION_HINTS):
         return []
-    profile = _content_profile(script)
     if (
         profile is not None
         and profile.narrative_mode == "character_story"
@@ -554,6 +730,8 @@ def _check_immediate_action(script: Any) -> list[dict[str, str]]:
     ):
         # Truyện kiếm được phần chốt bằng cách CHO THẤY hành động, không bằng
         # cách ra lệnh. Bắt buộc chữ "Hãy" là quy ước của kênh giải thích.
+        return []
+    if segments and _is_narrator_lesson_closing(profile, segments[-1], final_text):
         return []
     return [_repair(
         "immediate_action",

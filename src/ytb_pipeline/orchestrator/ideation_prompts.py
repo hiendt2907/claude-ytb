@@ -18,7 +18,11 @@ from ..content_contract import (
     contract_for,
     effective_chars_per_min,
 )
-from ..content_profiles import LEGACY_SHORT_EXPANSION_PURPOSES, load_content_profile
+from ..content_profiles import (
+    ContentProfileError,
+    LEGACY_SHORT_EXPANSION_PURPOSES,
+    load_content_profile,
+)
 from ..ideation.generation_schema import SECTION_PURPOSES
 
 if TYPE_CHECKING:
@@ -91,6 +95,210 @@ CHANNEL_EDITORIAL_BRIEF = """Kênh là "1 Cốc Café 6h", theo ngách "phát tr
 
 SECTION_PURPOSES_LIST = ", ".join(SECTION_PURPOSES)
 
+# Sourced from `agents/qa_agent.py::_check_story_hook` — that gate requires an
+# ANCHOR (a concrete moment: a clock time, a place, a named cast member, an
+# event already in progress) plus a STAKE (an unfinished obligation, deadline,
+# consequence, or risk) in the opening narration, for every profile whose
+# narrative_mode is "character_story". Before this constant existed, no
+# generation or repair prompt stated that contract, so a model could pass
+# every other gate and still fail QA's hook rule with no instruction telling
+# it why. Never mention a specific series, cast name, or fixed example scene
+# here — a new character_story profile must satisfy this from the rule alone.
+STORY_HOOK_CONTRACT = (
+    "The opening narration must pass a hook gate: it needs BOTH an anchor and "
+    "a stake, or it is rejected. Anchor: name a concrete moment already in "
+    "progress — a clock time, a specific place, or a named cast member — never "
+    "a vague general time like \"mornings\" or \"lately\". Stake: state an "
+    "unfinished obligation, a deadline, a consequence, or something the "
+    "character could still lose, in that same opening — an anchor with no "
+    "stake (a character just sitting somewhere) still fails this gate. Close "
+    "the opening with an action or question that follows directly from that "
+    "situation, not a separate topic."
+)
+
+
+# Sourced from `agents/qa_agent.py::_check_immediate_action` /
+# `_is_narrator_lesson_closing` — the profile-declared
+# `content_rules.narrator_lesson_closing` switches which ending contract that
+# gate enforces. Never mention a specific series, cast name, or fixed episode
+# here — this must hold for any character_story profile from the rule alone.
+_BOUNDED_ACTION_CLOSING = (
+    "End the final section on a concrete bounded action a viewer could "
+    "copy — name a real quantity such as twenty minutes, three lines, "
+    "one page — shown through what a character actually does."
+)
+
+
+def _character_story_closing_instruction(content_profile: "ContentProfile | None") -> str:
+    if content_profile is not None and content_profile.content_rules.narrator_lesson_closing:
+        narrator_id = content_profile.editorial_contract.narration_speaker_id
+        instruction = (
+            f"End on a section whose speaker_id is \"{narrator_id}\": the narrator "
+            "generalises what just happened into a lesson spoken directly to the "
+            "viewer (2-3 sentences, addressed to \"you\"/\"bạn\", not to a character) "
+            "— state the principle the story demonstrated, not a command to act "
+            "right now and not another character's dialogue."
+        )
+        if content_profile.content_rules.require_next_episode_bridge:
+            instruction += (
+                " In that same closing, naturally name the unresolved question or "
+                "choice the next episode will examine; use a clear next-episode bridge "
+                "such as 'Tập sau…', 'Lần tới…', or 'Hẹn gặp lại ở tập sau…'."
+            )
+        return instruction
+    instruction = _BOUNDED_ACTION_CLOSING
+    if content_profile is not None and content_profile.content_rules.require_next_episode_bridge:
+        instruction += (
+            " In the same natural closing, name the unresolved question or choice the next "
+            "episode will examine; use a clear next-episode bridge such as 'Tập sau…', "
+            "'Lần tới…', or 'Hẹn gặp lại ở tập sau…'."
+        )
+    return instruction
+
+
+def _story_series_role_instruction(content_profile: "ContentProfile") -> str:
+    """Return the profile-declared three-role story contract, if enabled."""
+    rules = content_profile.content_rules
+    if not rules.story_primary_speaker_id:
+        return ""
+    narrator_id = content_profile.editorial_contract.narration_speaker_id
+    return (
+        "This Long has exactly three speaking roles: narrator speaker_id is "
+        f"\"{narrator_id}\"; primary speaker_id is \"{rules.story_primary_speaker_id}\"; "
+        f"supporting speaker_id is \"{rules.story_supporting_speaker_id}\". "
+        "The narrator owns the opening context/stakes and the final meaning; the primary "
+        "character carries the choice under pressure; the supporting character listens, "
+        "questions, or offers a specific counterpoint. Both characters must speak in the "
+        "episode. Do not add a fourth speaker or turn the narrator into a second main character."
+    )
+
+
+def _hook_repair_directive(content_profile: "ContentProfile | None") -> str:
+    """The contract text used to fix a QA `rule=hook` violation.
+
+    Routed identically everywhere a hook repair can happen (the free-standing
+    `repair_prompt` and the bounded `hook_repair_prompt` below): a
+    character_story profile gets the same anchor+stake contract
+    `qa_agent.py::_check_story_hook` enforces. Explainers then follow their
+    declared Long opening mode, so a pain-first profile is never repaired into
+    a legacy channel greeting.
+    """
+    if content_profile is not None and content_profile.narrative_mode == "character_story":
+        return STORY_HOOK_CONTRACT
+    if (
+        content_profile is not None
+        and content_profile.content_rules.long_opening_mode == "pain_first"
+    ):
+        return (
+            "for a pain-first Long, keep the opening as a concrete observable pain scene "
+            "and do not add a greeting or title read. In its first 28 spoken words, make "
+            "the cost, contradiction, or question explicit with a concrete question or one "
+            "tension marker (nhưng, thật ra, đừng, không phải, vì sao, sai lầm)."
+        )
+    return (
+        "for a Long, keep the required greeting but make the first 28 spoken words "
+        "after it contain a concrete question or one explicit tension marker "
+        "(nhưng, thật ra, đừng, không phải, vì sao, sai lầm). Do not merely add a "
+        "marker later in the section."
+    )
+
+
+def _long_opening_instruction(content_profile: "ContentProfile") -> str:
+    """Return the one Long opening contract shared by generation and repair.
+
+    The profile data, not `narrative_mode` nor profile id, decides whether an
+    episode retains the historical greeting. This keeps new editorial formats
+    compatible with the same workflow engine.
+    """
+    mode = content_profile.content_rules.long_opening_mode
+    if mode == "pain_first":
+        return (
+            "OPENING MODE: PAIN_FIRST. For a Long, open immediately with one concrete, "
+            "observable audience pain and the cost or pressure around it. Do not greet, "
+            "read the title, or define the topic before that scene."
+        )
+    if mode == "story_context":
+        return (
+            "OPENING MODE: STORY_CONTEXT. For a Long, let the narrator open with a concrete "
+            "scene, anchor, and stake required by the story contract. Do not force a channel greeting."
+        )
+    return (
+        "OPENING MODE: CHANNEL_GREETING. For a Long, begin exactly with \"Mến chào các bạn,\" "
+        "then the title and a topic-specific hook. In the first 28 spoken words after the "
+        "greeting, include a concrete question or one explicit tension marker."
+    )
+
+
+def _long_closing_instruction(content_profile: "ContentProfile") -> str:
+    """State the final beat expected by the profile's narrative form.
+
+    This is deliberately a prompt contract, paired with the existing QA gates:
+    explainers end on the viewer's immediate action; a story ends through its
+    narrator's lesson and bridge. Neither format gets a detached promotional
+    epilogue after its real ending.
+    """
+    if content_profile.narrative_mode == "character_story":
+        return _character_story_closing_instruction(content_profile)
+    if content_profile.narrative_mode == "mechanism_explainer":
+        return (
+            "CLOSING MODE: FINAL_ACTION. The final spoken section must contain one direct, "
+            "specific action the viewer can do today, beginning with exactly \"Hãy \". Do not "
+            "append a separate trailer, next-video promotion, or generic CTA after that action."
+        )
+    return ""
+
+
+def _short_ending_instruction(content_profile: "ContentProfile") -> str:
+    """Describe the Short's ending without coupling the engine to a channel.
+
+    A funnel Short intentionally leaves the substantive answer for its declared
+    Long.  A standalone explainer Short instead closes on an immediate action.
+    The profile decides which outcome is editorially honest; QA verifies the
+    corresponding observable contract.
+    """
+    if content_profile.content_rules.short_ending_mode == "funnel_bridge":
+        return (
+            "SHORT ENDING MODE: FUNNEL_BRIDGE. The final spoken section must naturally name "
+            "what the declared Long will explain next and invite the viewer to continue there. "
+            "Keep long_form_slug, cta_target, and source_long_slug identical. Do not replace "
+            "that bridge with a generic imperative or pretend this Short has resolved the topic."
+        )
+    if content_profile.narrative_mode == "mechanism_explainer":
+        return (
+            "SHORT ENDING MODE: FINAL_ACTION. The final spoken section must contain one direct, "
+            "specific action the viewer can do immediately."
+        )
+    return ""
+
+
+def hook_repair_prompt(
+    payload: dict, detail: str, *, content_profile: "ContentProfile | None" = None,
+) -> str:
+    """Ask for a bounded rewrite of ONLY the opening section's spoken text.
+
+    Mirrors the shape of `short_expansion_prompt`/`long_extension_prompt`: one
+    small JSON delta, every other field (title, section count, purposes,
+    strategy, continuity, payoff/CTA) explicitly untouched, so a hook fix can
+    never become an uncontrolled full-script rewrite.
+    """
+    context = {key: payload.get(key) for key in ("slug", "topic", "title", "video_type")}
+    sections = payload.get("sections") or []
+    context["first_section"] = sections[0] if sections else None
+    directive = _hook_repair_directive(content_profile)
+    return (
+        "Rewrite ONLY the opening narration of this Vietnamese YouTube script to fix "
+        "a QA hook rejection.\n"
+        f"QA detail: {detail}\n"
+        f"{directive}\n"
+        'Return ONLY one JSON object shaped {"voiceover": <new Vietnamese opening '
+        "text>}. Do not return the full script, markdown, or any other field. Keep "
+        "the same speaker, purpose, and scene as the existing opening; do not "
+        "introduce a new character, mechanism, event, or topic. Keep it natural to "
+        "speak aloud — no stage directions, no camera language.\n\n"
+        f"Script context:\n{json.dumps(context, ensure_ascii=False, indent=2)}"
+    )
+
+
 STRATEGY_V1_CONTRACT = f"""Every newly generated Short MUST include a strategy object. strategy contains format_id, core_mechanism, audience_problem, angle, long_form_slug, playlist, cta_target, and hook. hook contains situation, core_answer, open_loop, answer_by_sec. Use format_id="core_answer_first_v1" unless explicit analytics feedback says another tested format won. The Short must show the situation in the first segment, put the exact core_answer in a section whose purpose is "core_answer", and set answer_by_sec to 5 or less. Every section must include purpose, one of exactly: {SECTION_PURPOSES_LIST}. Do not delay the core answer with a greeting, a generic question, or an abstract definition. The core_answer should be a careful explanation, not an absolute diagnosis or a dopamine cliché."""
 
 PERSONAL_FINANCE_PSYCHOLOGY_PROFILE = "personal_finance_psychology"
@@ -157,6 +365,8 @@ Before responding, silently audit title/topic-to-narration coherence sentence by
 
 def script_generation_system_prompt(
     content_profile: "ContentProfile | None" = None,
+    *,
+    video_type: str | None = None,
 ) -> str:
     """Build a profile-scoped system contract without changing pipeline code.
 
@@ -165,44 +375,88 @@ def script_generation_system_prompt(
     """
     if content_profile is None:
         return SCRIPT_GENERATION_SYSTEM_PROMPT
-    short = content_profile.format_for("short")
-    long = content_profile.format_for("long")
-    short_contract = contract_for("short", content_profile)
-    long_contract = contract_for("long", content_profile)
-    short_rate = effective_chars_per_min(
-        content_profile.providers.tts, video_type="short", content_profile=content_profile,
+    requested_type = (video_type or "").strip().lower()
+    if requested_type and requested_type not in {"short", "long"}:
+        raise ContentProfileError(f"video_type không hợp lệ: {video_type!r}.")
+    if requested_type and not content_profile.supports_generation(requested_type):
+        raise ContentProfileError(
+            f"Profile '{content_profile.profile_id}' không cho sinh {requested_type} mới."
+        )
+    active_types = (
+        (requested_type,)
+        if requested_type
+        else tuple(kind for kind in ("short", "long") if content_profile.supports_generation(kind))
     )
-    long_rate = effective_chars_per_min(
-        content_profile.providers.tts, video_type="long", content_profile=content_profile,
-    )
-    short_chars = short_contract.safe_character_bounds(
-        chars_per_minute=short_rate, segment_count=short.min_sections
-    )
-    long_chars = long_contract.safe_character_bounds(
-        chars_per_minute=long_rate, segment_count=long.min_sections
-    )
+    if not active_types:
+        raise ContentProfileError(f"Profile '{content_profile.profile_id}' không có format nào được phép sinh.")
+    format_prompt_names = set(content_profile.format_prompts.values())
     prompt_rules = "\n\n".join(
-        content_profile.prompt_text(name) for name in content_profile.prompts
+        content_profile.prompt_text(name)
+        for name in content_profile.prompts
+        if name not in format_prompt_names
     )
+    format_structure = "\n\n".join(
+        f"{kind.upper()} transcript structure:\n{content_profile.format_prompt_text(kind)}"
+        for kind in active_types
+        if content_profile.format_prompt_text(kind)
+    )
+    format_lines: list[str] = []
+    purpose_rules: list[str] = []
     purpose_policy = content_profile.editorial_contract.purpose_policy
-    long_required = ", ".join(purpose_policy.required_for("long")) or "(none declared)"
-    short_required = ", ".join(purpose_policy.required_for("short")) or "(none declared)"
     purpose_vocabulary = ", ".join(purpose_policy.vocabulary)
+    for kind in active_types:
+        profile_format = content_profile.format_for(kind)
+        format_contract = contract_for(kind, content_profile)
+        rate = effective_chars_per_min(
+            content_profile.providers.tts, video_type=kind, content_profile=content_profile,
+        )
+        chars = format_contract.safe_character_bounds(
+            chars_per_minute=rate, segment_count=profile_format.min_sections
+        )
+        label = "Short" if kind == "short" else "Long"
+        runtime = (
+            f"{profile_format.viewer_min_sec:g}-{profile_format.viewer_max_sec:g}s"
+            if kind == "short"
+            else f"{profile_format.viewer_min_sec / 60:g}-{profile_format.viewer_max_sec / 60:g} minutes"
+        )
+        format_lines.append(
+            f"- {label}: {runtime}, {profile_format.min_sections}-{profile_format.max_sections} "
+            f"sections, aim for {chars[0]}-{chars[1]} Vietnamese narration characters."
+        )
+        required = ", ".join(purpose_policy.required_for(kind)) or "(none declared)"
+        purpose_rules.append(f"- Required purposes for this {label}: {required}.")
     required_purposes_rule = (
-        f"- Required purposes across every Long: {long_required}. Shorts require {short_required}. "
-        f"Use only purposes from this profile's vocabulary: {purpose_vocabulary}."
+        "\n".join(purpose_rules)
+        + f"\n- Use only purposes from this profile's vocabulary: {purpose_vocabulary}."
     )
-    if content_profile.narrative_mode == "character_story" and "evidence" in purpose_policy.required_for("long"):
+    if (
+        content_profile.narrative_mode == "character_story"
+        and "long" in active_types
+        and "evidence" in purpose_policy.required_for("long")
+    ):
         required_purposes_rule += (
             " In a character story, evidence may be a concrete observed consequence, response, "
             "or detail that tests the character's belief; do not invent a research claim just to "
             "fill this beat."
         )
     vg = content_profile.visual_generation
+    story_long_contract = ""
+    if (
+        content_profile.narrative_mode == "character_story"
+        and (
+            requested_type == "long"
+            or (not requested_type and active_types == ("long",))
+        )
+    ):
+        story_long_contract = (
+            f" {_story_series_role_instruction(content_profile)}"
+            f" {_character_story_closing_instruction(content_profile)}"
+        )
     if content_profile.narrative_mode == "character_story":
+        narrator_id = content_profile.editorial_contract.narration_speaker_id
         visual_field_rule = (
             "Every section must include speaker_id and scene_characters (array of "
-            f"cast ids visible in frame, from {sorted(n for n in content_profile.voice_cast if n != 'narrator')}, "
+            f"cast ids visible in frame, from {sorted(n for n in content_profile.voice_cast if n != narrator_id)}, "
             "at most 2, [] for an establishing/prop shot with nobody visible — never "
             "invent visual_asset)."
             if vg is not None and vg.enabled
@@ -223,6 +477,8 @@ def script_generation_system_prompt(
                 "turn is planning metadata only and must never appear in voiceover."
                 if content_profile.content_rules.require_conversation_turns else ""
             )
+            + story_long_contract
+            + f" {STORY_HOOK_CONTRACT}"
         )
     else:
         strategy_rule = (
@@ -236,6 +492,16 @@ def script_generation_system_prompt(
             else "Do not require pexels_query unless the profile editorial contract above asks for it."
         )
         narrative_contract = f"{strategy_rule} {pexels_rule}"
+    opening_contract = (
+        _long_opening_instruction(content_profile) if "long" in active_types else ""
+    )
+    closing_contract = (
+        _long_closing_instruction(content_profile) if "long" in active_types else ""
+    )
+    short_ending_contract = (
+        _short_ending_instruction(content_profile) if "short" in active_types else ""
+    )
+    format_contract_lines = "\n".join(format_lines)
     return f"""You are the senior editorial writer for content profile
 `{content_profile.profile_id}` version `{content_profile.version}`.
 Return exactly one valid JSON object and no markdown. Set ruleset_id to
@@ -246,13 +512,18 @@ Profile editorial contract:
 {prompt_rules}
 
 Format contract:
-- Short: {short.viewer_min_sec:g}-{short.viewer_max_sec:g}s, {short.min_sections}-{short.max_sections} sections, aim for {short_chars[0]}-{short_chars[1]} Vietnamese narration characters.
-- Long: {long.viewer_min_sec / 60:g}-{long.viewer_max_sec / 60:g} minutes, {long.min_sections}-{long.max_sections} sections, aim for {long_chars[0]}-{long_chars[1]} Vietnamese narration characters.
+{format_contract_lines}
 - Every section needs a positive numeric time_goal, purpose, voiceover, and visual_intent.
 {required_purposes_rule}
 
+Format-specific transcript structure:
+{format_structure or '(No extra structure file declared; follow the profile editorial contract.)'}
+
 Narrative contract:
 {narrative_contract}
+{opening_contract}
+{closing_contract}
+{short_ending_contract}
 
 Use original, safe, advertiser-friendly Vietnamese. Verify or omit factual
 claims. Include a complete thumbnail_brief and compliance object. Silently
@@ -369,32 +640,63 @@ def local_script_prompt(
     content_profile: "ContentProfile | None" = None,
 ) -> str:
     """Prompt sinh 1 script JSON qua local/structured LLM (khác luồng Claude skill)."""
-    short_contract = contract_for("short", content_profile)
-    long_contract = contract_for("long", content_profile)
-    short_format = content_profile.format_for("short") if content_profile else None
-    long_format = content_profile.format_for("long") if content_profile else None
+    normalized_type = (type_of_vid or "").strip().lower()
+    if normalized_type not in {"short", "long"}:
+        raise ContentProfileError(f"video_type không hợp lệ: {type_of_vid!r}.")
+    if content_profile is not None and not content_profile.supports_generation(normalized_type):
+        raise ContentProfileError(
+            f"Profile '{content_profile.profile_id}' không cho sinh {normalized_type} mới."
+        )
+    short_contract = contract_for("short", content_profile) if normalized_type == "short" else None
+    long_contract = contract_for("long", content_profile) if normalized_type == "long" else None
+    short_format = (
+        content_profile.format_for("short")
+        if content_profile is not None and normalized_type == "short"
+        else None
+    )
+    long_format = (
+        content_profile.format_for("long")
+        if content_profile is not None and normalized_type == "long"
+        else None
+    )
     short_sections = short_format.min_sections if short_format else SHORT_PROMPT_SECTIONS
     short_max_sections = short_format.max_sections if short_format else short_sections
     long_max_sections = (
         long_format.max_sections if long_format else int(LONG_CONTRACT.minimum_sections * 1.5)
     )
     tts_provider = content_profile.providers.tts if content_profile else settings.tts_provider
-    short_rate = effective_chars_per_min(tts_provider, video_type="short", content_profile=content_profile)
-    long_rate = effective_chars_per_min(tts_provider, video_type="long", content_profile=content_profile)
-    short_safe = short_contract.safe_character_bounds(
-        chars_per_minute=short_rate, segment_count=short_sections
+    short_rate = (
+        effective_chars_per_min(tts_provider, video_type="short", content_profile=content_profile)
+        if normalized_type == "short" else 0.0
     )
-    short_absolute_seconds = short_contract.audio_runtime_bounds_sec(
-        segment_count=short_sections
+    long_rate = (
+        effective_chars_per_min(tts_provider, video_type="long", content_profile=content_profile)
+        if normalized_type == "long" else 0.0
+    )
+    short_safe = (
+        short_contract.safe_character_bounds(chars_per_minute=short_rate, segment_count=short_sections)
+        if short_contract is not None else (0, 0)
+    )
+    short_absolute_seconds = (
+        short_contract.audio_runtime_bounds_sec(segment_count=short_sections)
+        if short_contract is not None else (0.0, 0.0)
     )
     short_absolute = tuple(int(short_rate * seconds / 60) for seconds in short_absolute_seconds)
     long_sections = long_format.min_sections if long_format else LONG_CONTRACT.minimum_sections
-    long_safe = long_contract.safe_character_bounds(
-        chars_per_minute=long_rate, segment_count=long_sections
+    long_safe = (
+        long_contract.safe_character_bounds(chars_per_minute=long_rate, segment_count=long_sections)
+        if long_contract is not None else (0, 0)
     )
-    long_minutes = tuple(value / 60 for value in long_contract.viewer_runtime_bounds_sec)
+    long_minutes = (
+        tuple(value / 60 for value in long_contract.viewer_runtime_bounds_sec)
+        if long_contract is not None else (0.0, 0.0)
+    )
     editorial_brief = (
-        content_profile.prompt_text("editorial") if content_profile else CHANNEL_EDITORIAL_BRIEF
+        "\n\n".join(filter(None, (
+            content_profile.prompt_text("editorial"),
+            content_profile.format_prompt_text(normalized_type),
+        )))
+        if content_profile else CHANNEL_EDITORIAL_BRIEF
     )
     # Ngân sách MỖI SECTION, suy ra từ tổng và số section cho phép.  Short đã có
     # bảng này; Long thì không, nên model chọn đúng số section rồi viết mỗi
@@ -613,14 +915,36 @@ def local_script_prompt(
             "Never prefix a line with the speaker name (write \"Cậu mở hộp thư "
             "lần thứ mấy rồi?\", not \"An: Cậu mở hộp thư...\") — speaker_id "
             "already routes the voice and the prefix gets read aloud. "
-            "End the final section on a concrete bounded action a viewer could "
-            "copy — name a real quantity such as twenty minutes, three lines, "
-            "one page — shown through what a character actually does.\n"
+            + (
+                f"{_story_series_role_instruction(content_profile)} "
+                f"{_character_story_closing_instruction(content_profile)}\n"
+                if normalized_type == "long"
+                else ""
+            )
+            + f"{STORY_HOOK_CONTRACT}\n"
         )
+    opening_instruction = (
+        _long_opening_instruction(content_profile) + "\n"
+        if content_profile is not None and normalized_type == "long"
+        else ""
+    )
+    closing_instruction = (
+        _long_closing_instruction(content_profile) + "\n"
+        if content_profile is not None and normalized_type == "long"
+        else ""
+    )
+    short_ending_instruction = (
+        _short_ending_instruction(content_profile) + "\n"
+        if content_profile is not None and normalized_type == "short"
+        else ""
+    )
     return (
         "You are writing a Vietnamese YouTube script JSON for a local-first pipeline.\n"
         f"Video {index}/{total}. Type: {type_of_vid}. Requirement: {topic}\n"
         f"Content profile editorial compass:\n{editorial_brief}\n"
+        f"{opening_instruction}"
+        f"{closing_instruction}"
+        f"{short_ending_instruction}"
         f"{strategy_instruction}"
         f"Length contract: {target}.\n"
         f"{funnel_instruction}"
@@ -832,6 +1156,12 @@ def repair_prompt(
         else ""
     )
     financial_schema = "editorial_profile, evidence_register, " if is_financial_psychology else ""
+    repair_profile_id = str(payload.get("profile_id") or "").strip()
+    repair_profile = load_content_profile(repair_profile_id) if repair_profile_id else None
+    hook_repair_rule = (
+        "Rewrite the first narration section whenever the QA issues include rule "
+        f"'hook': {_hook_repair_directive(repair_profile)}\n"
+    )
     return (
         "Repair this Vietnamese YouTube script JSON for the local-first pipeline.\n"
         "Return ONLY the full corrected JSON object. Do not add markdown.\n"
@@ -856,7 +1186,7 @@ def repair_prompt(
         "everyday example, mechanism, application step, and real-stock-footage Pexels queries.\n"
         "If review reports a missing example, repair the narration with a specific everyday context, observable action, consequence, and practical application in natural Vietnamese. Do not add fixed labels merely to satisfy a parser.\n"
         "For both Shorts and Longs, retain or add at most one value-first retention beat only where it follows a concrete insight: acknowledge the topic-specific value just delivered, then make a brief natural invitation to like or follow/subscribe. Do not use a fixed sentence, repeat it across sections, or place it before the hook.\n"
-        "Rewrite the first narration section whenever the QA issues include rule 'hook': for a Long, keep the required greeting but make the first 28 spoken words after it contain a concrete question or one explicit tension marker (nhưng, thật ra, đừng, không phải, vì sao, sai lầm). Do not merely add a marker later in the section.\n"
+        f"{hook_repair_rule}"
         "Required schema: slug, topic, title, description, tags, video_type, target_minutes, voice_profile, "
         f"{financial_schema}strategy, sections, compliance. video_type is only short or long. \"target_minutes\" is required for a Long "
         f"and must be the JSON number {LONG_MIN_MINUTES}; omit it for a Short. voice_profile is knowledge "

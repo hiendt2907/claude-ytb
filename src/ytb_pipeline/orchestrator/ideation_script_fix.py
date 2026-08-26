@@ -32,6 +32,7 @@ from .ideation_prompts import (
     SHORT_MAX_CHARS,
     SHORT_MIN_CHARS,
     SHORT_TARGET_CHARS,
+    hook_repair_prompt,
     ledger_topics,
     long_extension_prompt,
     short_expansion_allowed_indexes,
@@ -60,7 +61,9 @@ def _explicit_profile(payload: dict) -> ContentProfile | None:
 
 def repair_system_prompt(payload: dict) -> str:
     """Follow-up LLM calls inherit the same editorial profile as generation."""
-    return script_generation_system_prompt(_explicit_profile(payload))
+    return script_generation_system_prompt(
+        _explicit_profile(payload), video_type=str(payload.get("video_type") or "") or None
+    )
 
 
 def _repair_character_bounds(
@@ -569,6 +572,34 @@ def apply_short_expansion(payload: dict, delta: dict) -> dict:
     return enriched
 
 
+def apply_hook_repair(payload: dict, delta: dict) -> dict:
+    """Replace ONLY the opening section's spoken text — nothing else.
+
+    Bounded the same way as `apply_short_expansion`: the delta may name
+    exactly one field (`voiceover`), and every other field of the payload —
+    title, section count, purposes, strategy, continuity, payoff/CTA, other
+    sections' content — is copied through untouched. `narration` is kept in
+    sync only because `ideation.generator._section_voiceover` reads
+    `voiceover` first; nothing downstream should ever branch on which of the
+    two is present.
+    """
+    new_voiceover = str(delta.get("voiceover") or "").strip()
+    if not new_voiceover:
+        raise ValueError("Hook repair phải trả về voiceover không rỗng.")
+    sections = payload.get("sections")
+    if not isinstance(sections, list) or not sections:
+        raise ValueError("Script không có sections để sửa hook.")
+    first = sections[0]
+    if not isinstance(first, dict):
+        raise ValueError("Section đầu phải là object.")
+    enriched = deepcopy(payload)
+    section0 = enriched["sections"][0]
+    section0["voiceover"] = new_voiceover
+    if "narration" in section0:
+        section0["narration"] = new_voiceover
+    return enriched
+
+
 async def validate_or_repair_script(
     provider,
     payload: dict,
@@ -600,6 +631,7 @@ async def validate_or_repair_script(
     long_extension_attempts = 0
     short_expansion_attempts = 0
     identity_repair_attempted = False
+    hook_repair_attempted = False
     report_path = script_path.parent.parent / "assets" / "quality_reports" / "ideation_errors.jsonl"
 
     for attempt in range(1, max_attempts + 1):
@@ -831,18 +863,29 @@ async def validate_or_repair_script(
                     validation_error=None,
                     qa=last_qa_output,
                 )
+                # Multiple repairable violations can arrive in the SAME
+                # QA_RESULT (a real Qwen candidate failed both series_dedup
+                # and hook at once). Applying only one and re-validating used
+                # to "swallow" the other: identity repair changed title/topic,
+                # never touched narration, and the next QA round saw the
+                # still-broken hook with no attempts left to fix it. Every
+                # repairable rule found here is applied — in this fixed
+                # order, each strictly single-shot via its own `*_attempted`
+                # flag — inside the SAME attempt slot, so one extra
+                # validate/QA round (not one per violation) is enough to
+                # verify all of them.
+                violation_rules = {
+                    str(v.get("rule")) for v in (last_qa_output or {}).get("violations", [])
+                }
+                repaired_anything = False
+
                 # A duplicate identity is a bounded repair: preserve every
-                # section and ask Qwen only for a new title/topic pair. This
-                # avoids paying for a full script regeneration while keeping
-                # the semantic-dedup gate authoritative.
-                if (
-                    not identity_repair_attempted
-                    and any(
-                        str(v.get("rule")) == "series_dedup"
-                        for v in (last_qa_output or {}).get("violations", [])
-                    )
-                ):
+                # section and ask the model only for a new title/topic pair.
+                # This avoids paying for a full script regeneration while
+                # keeping the semantic-dedup gate authoritative.
+                if not identity_repair_attempted and "series_dedup" in violation_rules:
                     identity_repair_attempted = True
+                    repaired_anything = True
                     repair_prompt = (
                         "Return ONLY JSON with keys title and topic.\n"
                         "Change only the title and topic of this video so neither is"
@@ -878,6 +921,54 @@ async def validate_or_repair_script(
                         value = identity.get(key)
                         if isinstance(value, str) and value.strip():
                             current[key] = value.strip()
+
+                # A weak opening is a bounded repair too: rewrite ONLY the
+                # first section's spoken text against the same anchor+stake
+                # (or legacy Long greeting/tension-marker) contract the
+                # generation and free-standing repair prompts already state,
+                # never the whole script.
+                if not hook_repair_attempted and "hook" in violation_rules:
+                    hook_repair_attempted = True
+                    repaired_anything = True
+                    hook_violation = next(
+                        (
+                            v for v in (last_qa_output or {}).get("violations", [])
+                            if str(v.get("rule")) == "hook"
+                        ),
+                        {},
+                    )
+                    hook_request = hook_repair_prompt(
+                        current,
+                        str(hook_violation.get("detail") or ""),
+                        content_profile=_explicit_profile(current),
+                    )
+                    if console_prefix:
+                        print(f"{console_prefix} repair: opening only for hook gate", flush=True)
+                    if log_path:
+                        append_local_start_log(log_path, "HOOK_REPAIR_PROMPT", hook_request)
+                    hook_text = await provider.complete(
+                        hook_request,
+                        system=repair_system_prompt(current),
+                        max_tokens=1024,
+                        temperature=0.4,
+                        json_output=True,
+                        response_schema={
+                            "type": "object",
+                            "properties": {"voiceover": {"type": "string"}},
+                            "required": ["voiceover"],
+                            "additionalProperties": False,
+                        },
+                    )
+                    if log_path:
+                        append_local_start_log(log_path, "HOOK_REPAIR_RESPONSE", hook_text)
+                    try:
+                        current = apply_hook_repair(current, json_from_llm(hook_text))
+                    except (ValueError, json.JSONDecodeError) as exc:
+                        last_validation_error = f"Hook repair không dùng được: {exc}"
+                        if log_path:
+                            append_local_start_log(log_path, "HOOK_REPAIR_FAILED", last_validation_error)
+
+                if repaired_anything:
                     continue
             else:
                 last_qa_output = {"passed": False, "violations": [{"rule": "qa_agent", "detail": result.error}]}

@@ -23,6 +23,14 @@ def script_generation_schema(
     prevent a model from emitting strings or loose field names inside
     ``sections`` where the pipeline requires objects.
     """
+    if (
+        content_profile is not None
+        and video_type in {"short", "long"}
+        and not content_profile.supports_generation(video_type)
+    ):
+        raise ValueError(
+            f"Profile '{content_profile.profile_id}' không cho sinh {video_type} mới."
+        )
     nullable_string = {"type": ["string", "null"]}
     section_contract = (
         contract_for(video_type, content_profile)

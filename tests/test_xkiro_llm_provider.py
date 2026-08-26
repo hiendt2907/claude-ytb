@@ -187,25 +187,33 @@ async def test_xkiro_llm_does_not_hide_an_unsupported_response_format_by_changin
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_xkiro_llm_surfaces_server_error_without_changing_model(monkeypatch):
+async def test_xkiro_llm_retries_same_model_without_response_format_when_gateway_500s(monkeypatch):
     from ytb_pipeline.config.settings import settings
     from ytb_pipeline.providers.llm import xkiro_provider
     from ytb_pipeline.providers.llm.xkiro_provider import XkiroLLMProvider
 
     monkeypatch.setattr(settings, "xkiro_api_key", "test-key", raising=False)
     monkeypatch.setattr(settings, "xkiro_llm_model", "model-a", raising=False)
-    calls: list[str] = []
+    calls: list[tuple[str, object]] = []
 
     def fake_urlopen(request: Request, timeout: float):
-        model = json.loads(request.data.decode("utf-8"))["model"]
-        calls.append(model)
-        raise urllib_error.HTTPError(request.full_url, 500, "Server Error", None, None)
+        payload = json.loads(request.data.decode("utf-8"))
+        calls.append((payload["model"], payload.get("response_format")))
+        if "response_format" in payload:
+            raise urllib_error.HTTPError(request.full_url, 500, "Server Error", None, None)
+        return _fake_response({"choices": [{"message": {"content": "{}"}}]})
 
     monkeypatch.setattr(xkiro_provider.urllib_request, "urlopen", fake_urlopen)
 
-    with pytest.raises(ProviderUnavailableError, match="HTTP 500"):
-        await XkiroLLMProvider().complete("script", json_output=True, response_schema={"type": "object"})
-    assert calls == ["model-a"]
+    assert await XkiroLLMProvider().complete(
+        "script", json_output=True, response_schema={"type": "object"}
+    ) == "{}"
+    assert calls == [
+        ("model-a", {"type": "json_schema", "json_schema": {
+            "name": "youtube_script", "strict": True, "schema": {"type": "object"},
+        }}),
+        ("model-a", None),
+    ]
 
 
 @pytest.mark.unit

@@ -262,12 +262,12 @@ def test_profile_prompt_replaces_channel_hardcode_and_static_six_section_budget(
     assert "grounded Pexels queries" not in prompt
 
 
-def test_custom_story_idea_keeps_profile_voice_instead_of_old_knowledge_channel_rules():
+def test_custom_story_long_idea_keeps_profile_voice_instead_of_old_knowledge_channel_rules():
     from ytb_pipeline.content_profiles import load_content_profile
     from ytb_pipeline.orchestrator.ideation_prompts import local_script_prompt
 
     prompt = local_script_prompt(
-        1, 1, "short", "Minh ngại gửi bản nháp", "",
+        1, 1, "long", "Minh ngại gửi bản nháp", "",
         content_profile=load_content_profile("ban-so-6"),
     )
 
@@ -276,7 +276,7 @@ def test_custom_story_idea_keeps_profile_voice_instead_of_old_knowledge_channel_
     assert "Minh ngại gửi bản nháp" in prompt
 
 
-def test_story_prompt_names_the_cast_for_scene_characters_when_auto_generating():
+def test_story_long_prompt_names_the_cast_for_scene_characters_when_auto_generating():
     """ban-so-6 has visual_generation enabled: the model names WHO is on
     screen (scene_characters), not a fixed filename."""
     from ytb_pipeline.content_profiles import load_content_profile
@@ -284,7 +284,7 @@ def test_story_prompt_names_the_cast_for_scene_characters_when_auto_generating()
 
     profile = load_content_profile("ban-so-6")
     prompt = local_script_prompt(
-        1, 1, "short", "auto", "", content_profile=profile
+        1, 1, "long", "auto", "", content_profile=profile
     )
 
     assert "scene_characters" in prompt
@@ -373,7 +373,7 @@ def test_release_contract_fails_closed_on_profile_version_cast_and_section_cap()
     }
 
 
-def test_loader_rejects_explicit_profile_without_version_and_too_many_sections(tmp_path):
+def test_loader_rejects_explicit_profile_without_version_but_reads_disabled_story_short(tmp_path):
     from ytb_pipeline.ideation.generator import load_script
 
     fixture = Path("profiles/ban-so-6/fixtures/episode-01-short.json")
@@ -387,11 +387,10 @@ def test_loader_rejects_explicit_profile_without_version_and_too_many_sections(t
     from ytb_pipeline.content_profiles import load_content_profile
 
     payload["profile_version"] = load_content_profile("ban-so-6").version
-    while len(payload["sections"]) <= 12:
-        payload["sections"].append(dict(payload["sections"][2]))
     path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
-    with pytest.raises(ValueError, match="tối đa 12"):
-        load_script(path)
+    # `allow_short_generation` protects ideation only. Existing series
+    # artifacts remain readable/renderable after a profile goes Long-only.
+    assert load_script(path).video_type == "short"
 
 
 def test_profile_loader_rejects_string_booleans_nonfinite_numbers_and_dialogue_overlap(

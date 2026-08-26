@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "profile_id": "ban-so-6",
-  "version": "1.4.0",
+  "version": "1.6.0",
   "display_name": "Bàn số 6 — Truyện đời thường",
   "topic": "Những lựa chọn nhỏ của Minh và An tại Bàn số 6",
   "narrative_mode": "character_story",
@@ -9,14 +9,18 @@
     "editorial": "prompts/editorial.md",
     "spoken_language": "prompts/spoken-language.md",
     "conversation_contract": "prompts/conversation-contract.md",
+    "long_transcript_structure": "prompts/long-transcript-structure.md",
     "series_bible": "series-bible.md",
     "visual_bible": "visual-bible.md",
     "season_plan": "season-01.md",
     "continuity": "continuity-ledger.json"
   },
+  "format_prompts": {
+    "long": "long_transcript_structure"
+  },
   "formats": {
     "short": {"viewer_min_sec": 30, "viewer_max_sec": 45, "min_sections": 4, "max_sections": 12},
-    "long": {"viewer_min_sec": 300, "viewer_max_sec": 420, "min_sections": 10, "max_sections": 24}
+    "long": {"viewer_min_sec": 300, "viewer_max_sec": 420, "runtime_tolerance_sec": 3, "min_sections": 10, "max_sections": 24}
   },
   "providers": {
     "llm": "xkiro",
@@ -34,7 +38,12 @@
   "content_rules": {
     "require_pexels_query": false,
     "require_short_source_trace": false,
-    "require_conversation_turns": true
+    "require_conversation_turns": true,
+    "narrator_lesson_closing": true,
+    "allow_short_generation": false,
+    "story_primary_speaker_id": "minh",
+    "story_supporting_speaker_id": "an",
+    "require_next_episode_bridge": true
   },
   "render": {
     "assets_dir": "assets",

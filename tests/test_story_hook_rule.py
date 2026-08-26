@@ -124,7 +124,7 @@ def test_story_ending_without_any_concrete_action_is_still_rejected():
     assert [v["rule"] for v in qa_agent._check_immediate_action(script)] == ["immediate_action"]
 
 
-def test_explainer_still_requires_an_imperative():
+def test_unconfigured_explainer_still_requires_an_imperative(monkeypatch):
     script = SimpleNamespace(
         video_type="short", target_minutes=None,
         content_profile_id="one-cup-cafe-6h", content_profile_version="1.0.0",
@@ -133,6 +133,8 @@ def test_explainer_still_requires_an_imperative():
             purpose="payoff",
         ),),
     )
+
+    monkeypatch.setattr(qa_agent, "_content_profile", lambda _script: None)
 
     assert [v["rule"] for v in qa_agent._check_immediate_action(script)] == ["immediate_action"]
 
@@ -172,6 +174,19 @@ def test_story_rejects_staging_prefix_in_character_voiceover():
     violations = qa_agent._check_character_voiceover_is_direct(script)
 
     assert [v["rule"] for v in violations] == ["character_voiceover_direct"]
+
+
+def test_story_allows_a_character_to_quote_the_exact_words_they_will_say():
+    """A colon can introduce a character's own quote, not just staging."""
+    script = _story_script([
+        (
+            "application",
+            "an",
+            "Tôi sẽ nói đúng một câu: 'Chỗ dột sau kệ nước, nhờ anh xem giúp.'",
+        ),
+    ])
+
+    assert qa_agent._check_character_voiceover_is_direct(script) == []
 
 
 def test_narration_naming_a_character_normally_is_not_a_prefix_leak():
