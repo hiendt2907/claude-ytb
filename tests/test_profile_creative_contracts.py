@@ -60,6 +60,21 @@ def test_explainer_prompt_rejects_disguised_outlines_and_ungrounded_generalizati
     assert "không khái quát hóa thay cho cảnh đời" in prompt
 
 
+def test_explainer_prompt_keeps_one_listener_viewpoint_and_scene_bound_evidence():
+    """The next live draft should not drift among tôi/mình/anh or lecture from sociology."""
+    from ytb_pipeline.content_profiles import load_content_profile
+    from ytb_pipeline.orchestrator.ideation_prompts import script_generation_system_prompt
+
+    prompt = " ".join(
+        script_generation_system_prompt(
+            load_content_profile("one-cup-cafe-6h"), video_type="long"
+        ).split()
+    ).casefold()
+
+    assert "giữ một điểm nhìn xưng hô nhất quán" in prompt
+    assert "mỗi beat evidence phải bắt đầu từ một chi tiết đã có trong cảnh" in prompt
+
+
 def test_story_prompt_keeps_table_six_as_a_real_relationship_not_a_stage_prop():
     from ytb_pipeline.content_profiles import load_content_profile
     from ytb_pipeline.orchestrator.ideation_prompts import script_generation_system_prompt
