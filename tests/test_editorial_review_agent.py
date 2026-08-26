@@ -552,3 +552,63 @@ def test_editorial_rejection_rewrites_then_re_reviews_until_the_profile_bar(tmp_
     assert result["title"] == "Bản đã viết lại"
     assert provider.rewrite_calls == 1
     assert provider.review_calls == 2
+
+
+def test_editorial_only_retry_never_spends_a_contract_repair_call(tmp_path, monkeypatch):
+    """A bad editorial rewrite fails closed instead of borrowing a hook retry."""
+    import asyncio
+    from ytb_pipeline.agents.base import AgentResult, AgentStatus
+    from ytb_pipeline.orchestrator.ideation_script_fix import IdeationQualityFailure, validate_or_repair_script
+    from ytb_pipeline.config.settings import settings
+    import ytb_pipeline.orchestrator.ideation_script_fix as fix_module
+
+    _write_profile(
+        tmp_path, "editorial-budget-fixture",
+        editorial_review={
+            "enabled": True, "rubric_prompt_name": "review_rubric",
+            "minimum_score": 9, "max_rewrites": 1,
+        },
+    )
+    monkeypatch.setattr(settings, "content_profiles_dir", tmp_path, raising=False)
+    monkeypatch.setattr(settings, "assets_dir", tmp_path / "assets_root", raising=False)
+    profile = load_content_profile("editorial-budget-fixture", profiles_dir=tmp_path)
+    calls = 0
+
+    async def _qa_pass_then_hook(self, _context):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return AgentResult(agent_name="qa", status=AgentStatus.SUCCESS, output={"passed": True})
+        return AgentResult(
+            agent_name="qa", status=AgentStatus.SUCCESS,
+            output={"passed": False, "violations": [{"rule": "hook", "detail": "opening weak"}]},
+        )
+
+    monkeypatch.setattr(fix_module.QAAgent, "run", _qa_pass_then_hook)
+    original = _valid_review_gate_payload(profile)
+
+    class Provider:
+        def __init__(self):
+            self.prompts: list[str] = []
+
+        async def complete(self, prompt, **_kwargs):
+            self.prompts.append(prompt)
+            if prompt.startswith("Review this Vietnamese YouTube script JSON"):
+                return json.dumps({
+                    "passed": False, "overall_score": 8,
+                    "dimension_scores": {
+                        "human_truth": 9, "spoken_naturalness": 8,
+                        "causal_coherence": 9, "role_fidelity": 9, "useful_restraint": 9,
+                    },
+                    "blocking_findings": ["Văn nói còn gượng."], "section_refs": [1],
+                    "repair_brief": "Viết lại tự nhiên hơn.",
+                })
+            assert "Editorial review findings" in prompt
+            return json.dumps(original)
+
+    provider = Provider()
+    with pytest.raises(IdeationQualityFailure):
+        asyncio.run(validate_or_repair_script(
+            provider, original, tmp_path / "s.json", "", max_attempts=1,
+        ))
+    assert not any(prompt.startswith("Rewrite ONLY the opening narration") for prompt in provider.prompts)

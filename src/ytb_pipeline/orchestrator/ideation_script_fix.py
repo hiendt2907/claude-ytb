@@ -688,6 +688,9 @@ async def validate_or_repair_script(
     total_attempts = max_attempts + editorial_retry_budget
 
     for attempt in range(1, total_attempts + 1):
+        # Editorial-reserved retries may validate and re-review the rewritten
+        # transcript, but never borrow more contract-repair LLM calls.
+        is_deterministic_attempt = attempt <= max_attempts
         current, long_note = normalize_long_overflow(current, expected_video_type)
         current, normalized_note = normalize_short_narration(
             current, expected_video_type=expected_video_type
@@ -757,6 +760,8 @@ async def validate_or_repair_script(
                 append_local_start_log(log_path, f"VALIDATION_ERROR {attempt}", last_validation_error)
 
         if (
+            is_deterministic_attempt
+            and
             script is None
             and expected_video_type == "long"
             and max_attempts > 1
@@ -826,6 +831,8 @@ async def validate_or_repair_script(
             continue
 
         if (
+            is_deterministic_attempt
+            and
             script is None
             and expected_video_type == "short"
             and max_attempts > 1
@@ -978,7 +985,11 @@ async def validate_or_repair_script(
                 # section and ask the model only for a new title/topic pair.
                 # This avoids paying for a full script regeneration while
                 # keeping the semantic-dedup gate authoritative.
-                if not identity_repair_attempted and "series_dedup" in violation_rules:
+                if (
+                    is_deterministic_attempt
+                    and not identity_repair_attempted
+                    and "series_dedup" in violation_rules
+                ):
                     identity_repair_attempted = True
                     repaired_anything = True
                     repair_prompt = (
@@ -1022,7 +1033,11 @@ async def validate_or_repair_script(
                 # (or legacy Long greeting/tension-marker) contract the
                 # generation and free-standing repair prompts already state,
                 # never the whole script.
-                if not hook_repair_attempted and "hook" in violation_rules:
+                if (
+                    is_deterministic_attempt
+                    and not hook_repair_attempted
+                    and "hook" in violation_rules
+                ):
                     hook_repair_attempted = True
                     repaired_anything = True
                     hook_violation = next(
