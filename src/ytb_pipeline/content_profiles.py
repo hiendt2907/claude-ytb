@@ -83,6 +83,7 @@ _LEGACY_REQUIRED_PURPOSES: Mapping[str, tuple[str, ...]] = {
     "short": ("situation", "core_answer", "application", "payoff"),
     "long": ("situation", "core_answer", "evidence", "application", "payoff"),
 }
+LEGACY_SHORT_EXPANSION_PURPOSES: tuple[str, ...] = ("evidence", "application")
 
 
 @dataclass(frozen=True)
@@ -127,16 +128,29 @@ class EditorialContractProfile:
     # not change behaviour; it lets a future profile declare a different
     # narration speaker id without a core code change.
     narration_speaker_id: str = "narrator"
+    # Each profile owns the Short beats that can receive bounded duration
+    # repair. A newly declared contract that omits this stays fail-closed.
+    short_expansion_purposes: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.narration_speaker_id.strip():
             raise ContentProfileError("editorial_contract.narration_speaker_id không được rỗng.")
+        unknown = [
+            purpose for purpose in self.short_expansion_purposes
+            if purpose not in self.purpose_policy.vocabulary
+        ]
+        if unknown:
+            raise ContentProfileError(
+                "editorial_contract.short_expansion_purposes chứa purpose ngoài vocabulary: "
+                f"{unknown}."
+            )
 
 
 _LEGACY_EDITORIAL_CONTRACT = EditorialContractProfile(
     purpose_policy=PurposePolicy(
         vocabulary=_LEGACY_PURPOSE_VOCABULARY, required=_LEGACY_REQUIRED_PURPOSES,
     ),
+    short_expansion_purposes=LEGACY_SHORT_EXPANSION_PURPOSES,
 )
 
 
@@ -523,9 +537,18 @@ def _editorial_contract_profile(raw: Any) -> EditorialContractProfile:
         if "narration_speaker_id" in mapping
         else "narrator"
     )
+    short_expansion_purposes = (
+        _string_tuple(
+            mapping["short_expansion_purposes"],
+            "editorial_contract.short_expansion_purposes",
+        )
+        if "short_expansion_purposes" in mapping
+        else ()
+    )
     return EditorialContractProfile(
         purpose_policy=PurposePolicy(vocabulary=vocabulary, required=required),
         narration_speaker_id=narration_speaker_id,
+        short_expansion_purposes=short_expansion_purposes,
     )
 
 

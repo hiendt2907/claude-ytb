@@ -113,6 +113,53 @@ def test_second_profile_declares_its_own_purpose_vocabulary_with_no_pipeline_cha
     )
 
 
+def test_profile_declares_its_own_short_expansion_beats_without_legacy_taxonomy(tmp_path):
+    from ytb_pipeline.orchestrator.ideation_prompts import short_expansion_allowed_indexes
+
+    payload = _panel_payload()
+    payload["editorial_contract"]["short_expansion_purposes"] = ["rebuttal"]
+    _write_profile(tmp_path, "panel-debate-fixture", payload)
+    profile = load_content_profile("panel-debate-fixture", profiles_dir=tmp_path)
+
+    assert profile.editorial_contract.short_expansion_purposes == ("rebuttal",)
+    script = {
+        "sections": [
+            {"purpose": "cold_open", "hook": True, "voiceover": "Mở."},
+            {"purpose": "claim", "voiceover": "Luận điểm."},
+            {"purpose": "rebuttal", "voiceover": "Phản biện."},
+            {"purpose": "synthesis", "voiceover": "Kết luận."},
+        ]
+    }
+    assert short_expansion_allowed_indexes(script, content_profile=profile) == (2,)
+
+
+def test_short_expansion_purpose_matching_is_case_insensitive_for_profile_metadata(tmp_path):
+    """Profile labels may be title-cased; repair matching must use the same normalization."""
+    from ytb_pipeline.orchestrator.ideation_prompts import short_expansion_allowed_indexes
+
+    payload = _panel_payload()
+    payload["editorial_contract"] = {
+        "purpose_vocabulary": ["Cold_Open", "Claim", "Rebuttal", "Synthesis"],
+        "required_purposes": {
+            "short": ["Cold_Open", "Claim"],
+            "long": ["Cold_Open", "Claim", "Rebuttal", "Synthesis"],
+        },
+        "short_expansion_purposes": ["Rebuttal"],
+    }
+    _write_profile(tmp_path, "panel-debate-fixture", payload)
+    profile = load_content_profile("panel-debate-fixture", profiles_dir=tmp_path)
+
+    script = {
+        "sections": [
+            {"purpose": "Cold_Open", "hook": True, "voiceover": "Mở."},
+            {"purpose": "Claim", "voiceover": "Luận điểm."},
+            {"purpose": "Rebuttal", "voiceover": "Phản biện."},
+            {"purpose": "Synthesis", "voiceover": "Kết luận."},
+        ]
+    }
+    assert short_expansion_allowed_indexes(script, content_profile=profile) == (2,)
+
+
 def test_required_purpose_outside_vocabulary_fails_closed(tmp_path):
     payload = _panel_payload("bad-panel-fixture")
     payload["editorial_contract"]["required_purposes"]["short"] = ["cold_open", "not_in_vocab"]

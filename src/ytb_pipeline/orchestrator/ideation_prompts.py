@@ -18,6 +18,7 @@ from ..content_contract import (
     contract_for,
     effective_chars_per_min,
 )
+from ..content_profiles import LEGACY_SHORT_EXPANSION_PURPOSES, load_content_profile
 from ..ideation.generation_schema import SECTION_PURPOSES
 
 if TYPE_CHECKING:
@@ -727,22 +728,79 @@ def long_extension_prompt(
     )
 
 
-def short_expansion_prompt(payload: dict, missing_chars: int) -> str:
-    """Ask for bounded additions to existing Short sections, never a rewrite."""
+def short_expansion_allowed_indexes(
+    payload: dict,
+    *,
+    content_profile: "ContentProfile | None" = None,
+) -> tuple[int, ...]:
+    """Return mutable Short beat indexes using the engine's zero-based contract.
+
+    Array position cannot determine what is safe to edit. Each profile declares
+    repairable purposes; the hook and final CTA always remain immutable. Scripts
+    without a profile preserve the documented legacy policy.
+    """
+    sections = payload.get("sections")
+    if not isinstance(sections, list):
+        return ()
+    if content_profile is None:
+        profile_id = str(payload.get("profile_id") or "").strip()
+        content_profile = load_content_profile(profile_id) if profile_id else None
+    repairable_purposes = {
+        purpose.strip().casefold()
+        for purpose in (
+            content_profile.editorial_contract.short_expansion_purposes
+            if content_profile is not None
+            else LEGACY_SHORT_EXPANSION_PURPOSES
+        )
+    }
+    last_index = len(sections) - 1
+    return tuple(
+        index
+        for index, section in enumerate(sections)
+        if isinstance(section, dict)
+        and index != last_index
+        and not bool(section.get("hook"))
+        and str(section.get("purpose") or "").strip().casefold() in repairable_purposes
+    )
+
+
+def short_expansion_prompt(
+    payload: dict,
+    missing_chars: int,
+    *,
+    target_chars: int | None = None,
+    max_chars: int | None = None,
+    content_profile: "ContentProfile | None" = None,
+) -> str:
+    """Ask for one bounded Short addition, never a rewrite or CTA edit."""
     context = {
         key: payload.get(key)
         for key in ("slug", "topic", "title", "strategy", "compliance")
     }
     context["sections"] = payload.get("sections", [])
+    allowed_indexes = short_expansion_allowed_indexes(
+        payload, content_profile=content_profile,
+    )
+    target_clause = (
+        f" aim for {target_chars:,} characters."
+        if target_chars is not None else ""
+    )
+    maximum_clause = (
+        f" use at most {max_chars:,} characters."
+        if max_chars is not None else ""
+    )
     return (
         "Expand only the underdeveloped middle narration of this Vietnamese Short.\n"
         "Return ONLY one JSON object with a `section_updates` array. Do not return the full script "
-        "or markdown. Every item is exactly `{\"index\": <existing section index>, "
-        "\"append_voiceover\": <new Vietnamese text>}`. Do not change title, metadata, hook, "
-        "source trace, section order, or the first situation/core_answer sections. Select only evidence "
-        "or application sections that already exist, and add specific topic-relevant explanation, example, "
-        "or action. The combined appended text must be at least "
-        f"{missing_chars:,} characters. Do not add greetings, duplicated CTA, generic self-help, or unsupported claims.\n\n"
+        "or markdown. `index` is a ZERO-BASED JSON array index, not a human section number. "
+        "Return exactly ONE item shaped `{\"index\": <allowed zero-based index>, "
+        "\"append_voiceover\": <new Vietnamese text>}`. "
+        f"ONLY legal index values: {list(allowed_indexes)}. Do not change title, metadata, hook, "
+        "source trace, section order, the first situation/core_answer sections, or the final payoff/CTA. "
+        "Add a specific topic-relevant explanation, example, or action that follows the chosen existing "
+        "section. Do not introduce a new person, place, event, or outcome outside that section's context. "
+        f"The appended text must be at least {missing_chars:,} characters.{target_clause}{maximum_clause} "
+        "Do not add greetings, duplicated CTA, generic self-help, or unsupported claims.\n\n"
         f"Script context:\n{json.dumps(context, ensure_ascii=False, indent=2)}"
     )
 

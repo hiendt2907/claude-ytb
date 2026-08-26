@@ -661,7 +661,11 @@ def test_local_short_normalizer_never_pads_too_short_script_with_template_text()
 
 @pytest.mark.asyncio
 async def test_undersized_short_is_rewritten_by_llm_instead_of_padded(tmp_path):
-    from ytb_pipeline.orchestrator.ideation_script_fix import validate_or_repair_script
+    from ytb_pipeline.orchestrator.ideation_script_fix import (
+        _repair_character_bounds,
+        short_narration_chars,
+        validate_or_repair_script,
+    )
     from ytb_pipeline.orchestrator.ideation_prompts import SCRIPT_GENERATION_SYSTEM_PROMPT, SHORT_MIN_CHARS
 
     undersized = _valid_short_script()
@@ -699,7 +703,9 @@ async def test_undersized_short_is_rewritten_by_llm_instead_of_padded(tmp_path):
     # section — a full script rewrite is explicitly rejected ("without
     # allowing a full script rewrite"). Push section index 2 well past
     # SHORT_MIN_CHARS on its own so the merged total clears the gate.
-    addition = "Một bước nhỏ mỗi ngày giúp giảm sự mơ hồ khi bắt đầu. " * 40
+    unit = "Một bước nhỏ mỗi ngày giúp giảm sự mơ hồ khi bắt đầu. "
+    _minimum, _maximum, target = _repair_character_bounds(undersized, "short")
+    addition = unit * (-(-(target - short_narration_chars(undersized)) // len(unit)))
     expansion = {"section_updates": [{"index": 2, "append_voiceover": addition}]}
 
     class RepairingLLM:
@@ -735,7 +741,11 @@ async def test_undersized_short_is_rewritten_by_llm_instead_of_padded(tmp_path):
 @pytest.mark.asyncio
 async def test_undersized_short_retries_invalid_expansion_with_one_allowed_middle_index(tmp_path):
     """A mixed/CTA delta must be rejected, then corrected without rewriting the CTA."""
-    from ytb_pipeline.orchestrator.ideation_script_fix import validate_or_repair_script
+    from ytb_pipeline.orchestrator.ideation_script_fix import (
+        _repair_character_bounds,
+        short_narration_chars,
+        validate_or_repair_script,
+    )
 
     undersized = _valid_short_script()
     for section in undersized["sections"]:
@@ -743,7 +753,9 @@ async def test_undersized_short_retries_invalid_expansion_with_one_allowed_middl
     undersized["sections"][0]["narration"] = "Mở laptop, nhưng tay lại cầm điện thoại."
     undersized["sections"][1]["narration"] = "Não đang né khoảnh khắc chưa biết bắt đầu từ đâu."
     original_payoff = undersized["sections"][-1]["narration"]
-    addition = "Một bước nhỏ mỗi ngày giúp giảm sự mơ hồ khi bắt đầu. " * 40
+    unit = "Một bước nhỏ mỗi ngày giúp giảm sự mơ hồ khi bắt đầu. "
+    _minimum, _maximum, target = _repair_character_bounds(undersized, "short")
+    addition = unit * (-(-(target - short_narration_chars(undersized)) // len(unit)))
 
     class RetryingLLM:
         def __init__(self):

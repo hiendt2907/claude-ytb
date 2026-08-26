@@ -594,6 +594,68 @@ def test_short_expansion_prompt_exposes_only_eligible_zero_based_indexes_and_tar
     assert "at most 313" in prompt
 
 
+def test_short_expansion_uses_section_semantics_to_protect_late_core_answer_and_payoff():
+    from ytb_pipeline.orchestrator.ideation_prompts import short_expansion_allowed_indexes
+    from ytb_pipeline.orchestrator.ideation_script_fix import apply_short_expansion
+
+    source = {
+        "sections": [
+            {"purpose": "situation", "hook": True, "voiceover": "Mở."},
+            {"purpose": "evidence", "voiceover": "Bằng chứng."},
+            {"purpose": "application", "voiceover": "Áp dụng."},
+            {"purpose": "core_answer", "voiceover": "Đáp án đến muộn."},
+            {"purpose": "evidence", "voiceover": "Bằng chứng sau."},
+            {"purpose": "payoff", "payoff": "CTA", "voiceover": "Kết."},
+        ]
+    }
+
+    assert short_expansion_allowed_indexes(source) == (1, 2, 4)
+    with pytest.raises(ValueError, match=r"an toàn \[1, 2, 4\]"):
+        apply_short_expansion(
+            source,
+            {"section_updates": [{"index": 3, "append_voiceover": " Không được sửa."}]},
+        )
+
+
+def test_story_profile_fixture_never_exposes_late_core_answer_or_final_payoff_to_expansion():
+    from ytb_pipeline.orchestrator.ideation_prompts import short_expansion_allowed_indexes
+
+    fixture = Path("profiles/ban-so-6/fixtures/episode-01-short.json")
+    payload = json.loads(fixture.read_text(encoding="utf-8"))
+    allowed = short_expansion_allowed_indexes(payload)
+
+    assert 5 not in allowed  # core_answer is intentionally late in this story beat.
+    assert 8 not in allowed  # final payoff/CTA.
+    assert {2, 3, 4, 6, 7}.issubset(allowed)
+
+
+def test_short_expansion_rejects_delta_that_exceeds_remaining_duration_budget():
+    from ytb_pipeline.orchestrator.ideation_script_fix import (
+        _repair_character_bounds,
+        apply_short_expansion,
+        short_narration_chars,
+    )
+
+    source = {
+        "sections": [
+            {"purpose": "situation", "voiceover": "a" * 100},
+            {"purpose": "core_answer", "voiceover": "b" * 100},
+            {"purpose": "evidence", "voiceover": "c" * 100},
+            {"purpose": "application", "voiceover": "d" * 100},
+            {"purpose": "evidence", "voiceover": "e" * 100},
+            {"purpose": "payoff", "voiceover": "f" * 100},
+        ]
+    }
+
+    _minimum, maximum, _target = _repair_character_bounds(source, "short")
+    overflow = "x" * (maximum - short_narration_chars(source) + 1)
+    with pytest.raises(ValueError, match="runtime budget"):
+        apply_short_expansion(
+            source,
+            {"section_updates": [{"index": 2, "append_voiceover": overflow}]},
+        )
+
+
 def test_script_prompt_uses_canonical_section_fields_without_alias_duplication():
     from ytb_pipeline.orchestrator.ideation_prompts import local_script_prompt
 

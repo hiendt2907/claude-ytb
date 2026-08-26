@@ -34,6 +34,7 @@ from .ideation_prompts import (
     SHORT_TARGET_CHARS,
     ledger_topics,
     long_extension_prompt,
+    short_expansion_allowed_indexes,
     short_expansion_prompt,
     script_generation_system_prompt,
     PERSONAL_FINANCE_PSYCHOLOGY_PROFILE,
@@ -516,23 +517,32 @@ def _extension_insertion_index(extension: dict, section_count: int) -> int:
 def apply_short_expansion(payload: dict, delta: dict) -> dict:
     """Apply an LLM's bounded additions without allowing a full script rewrite."""
     updates = delta.get("section_updates")
-    if not isinstance(updates, list) or not updates:
-        raise ValueError("Short expansion phải trả về section_updates không rỗng.")
+    if not isinstance(updates, list) or len(updates) != 1:
+        raise ValueError("Short expansion phải trả về đúng một section_update.")
     current_sections = payload.get("sections")
     if not isinstance(current_sections, list):
         raise ValueError("Short hiện tại phải có mảng sections trước khi bổ sung.")
+    allowed_indexes = set(
+        short_expansion_allowed_indexes(
+            payload, content_profile=_explicit_profile(payload),
+        )
+    )
+    if not allowed_indexes:
+        raise ValueError("Short không có section giữa an toàn để bổ sung.")
 
     enriched = deepcopy(payload)
-    seen: set[int] = set()
     for update in updates:
         if not isinstance(update, dict):
             raise ValueError("Mỗi short section_update phải là object.")
         index = update.get("index")
         addition = str(update.get("append_voiceover", "")).strip()
-        if not isinstance(index, int) or isinstance(index, bool) or index in seen:
-            raise ValueError("short section_update.index phải là số nguyên không trùng.")
-        if index < 2 or index >= len(current_sections) - 1:
-            raise ValueError("Short chỉ được bổ sung section giữa, không sửa hook/CTA.")
+        if not isinstance(index, int) or isinstance(index, bool):
+            raise ValueError("short section_update.index phải là số nguyên.")
+        if index not in allowed_indexes:
+            raise ValueError(
+                "Short chỉ được bổ sung section giữa an toàn "
+                f"{sorted(allowed_indexes)}, không sửa hook/CTA."
+            )
         if not addition:
             raise ValueError("short section_update.append_voiceover không được rỗng.")
         section = enriched["sections"][index]
@@ -542,13 +552,20 @@ def apply_short_expansion(payload: dict, delta: dict) -> dict:
         if not existing:
             raise ValueError("Short section cần bổ sung phải có narration gốc.")
         combined = f"{existing} {addition}".strip()
+        _short_min_chars, short_max_chars, _short_target_chars = _repair_character_bounds(
+            payload, "short"
+        )
+        projected_total = short_narration_chars(payload) + len(combined) - len(existing)
+        if projected_total > short_max_chars:
+            raise ValueError(
+                "Short expansion vượt runtime budget; không cắt hook/core/payoff/CTA để cứu delta."
+            )
         if "voiceover" in section:
             section["voiceover"] = combined
         if "narration" in section:
             section["narration"] = combined
         if "voiceover" not in section and "narration" not in section:
             section["voiceover"] = combined
-        seen.add(index)
     return enriched
 
 
@@ -581,7 +598,7 @@ async def validate_or_repair_script(
     last_validation_error: str | None = None
     last_qa_output: dict | None = None
     long_extension_attempts = 0
-    short_expansion_attempted = False
+    short_expansion_attempts = 0
     identity_repair_attempted = False
     report_path = script_path.parent.parent / "assets" / "quality_reports" / "ideation_errors.jsonl"
 
@@ -726,15 +743,25 @@ async def validate_or_repair_script(
             script is None
             and expected_video_type == "short"
             and max_attempts > 1
-            and not short_expansion_attempted
+            and short_expansion_attempts < max_attempts - 1
             and last_validation_error
             and "quá ngắn" in last_validation_error
         ):
-            short_min_chars, _short_max_chars, _short_target_chars = _repair_character_bounds(
+            short_min_chars, short_max_chars, short_target_chars = _repair_character_bounds(
                 current, "short"
             )
-            missing_chars = max(1, short_min_chars - short_narration_chars(current))
-            expansion_request = short_expansion_prompt(current, missing_chars)
+            current_chars = short_narration_chars(current)
+            missing_chars = max(1, short_min_chars - current_chars)
+            target_chars = max(missing_chars, short_target_chars - current_chars)
+            max_chars = max(missing_chars, short_max_chars - current_chars)
+            short_profile = _explicit_profile(current)
+            expansion_request = short_expansion_prompt(
+                current,
+                missing_chars,
+                target_chars=target_chars,
+                max_chars=max_chars,
+                content_profile=short_profile,
+            )
             if console_prefix:
                 print(f"{console_prefix} extend: asking LLM for bounded Short additions", flush=True)
             if log_path:
@@ -754,7 +781,7 @@ async def validate_or_repair_script(
                 last_validation_error = f"Short expansion không dùng được: {exc}"
                 if log_path:
                     append_local_start_log(log_path, "SHORT_EXPANSION_FAILED", last_validation_error)
-            short_expansion_attempted = True
+            short_expansion_attempts += 1
             continue
 
         if script is not None:
@@ -861,8 +888,6 @@ async def validate_or_repair_script(
                         json.dumps(last_qa_output, ensure_ascii=False, indent=2),
                     )
 
-        if attempt == max_attempts or (short_expansion_attempted and script is None):
-            break
         # Fail closed.  A broad "repair the full JSON" prompt is deliberately
         # forbidden: it spends cloud tokens and can regress already-approved
         # narrative, source trace, or funnel metadata.
