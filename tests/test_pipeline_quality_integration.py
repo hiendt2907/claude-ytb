@@ -192,6 +192,49 @@ def test_voice_provider_receives_project_id_as_artifact_slug(monkeypatch, tmp_pa
     assert received_scripts[0].project_id == "nao-ne-viec-kho"
 
 
+def test_direct_pipeline_blocks_a_profile_script_that_fails_editorial_review(monkeypatch, tmp_path):
+    """`python -m ytb_pipeline` cannot bypass batch-start's content gate."""
+    audio_result = SimpleNamespace(
+        passed=True, issues=(), cache_key="audio-key", cached=False, metrics={}, repair_payload={},
+    )
+    project, checkpoint, _ = _prepare_run(monkeypatch, tmp_path, audio_result)
+    monkeypatch.setattr(pipeline.settings, "assets_dir", tmp_path / "assets", raising=False)
+    payload = _raw_script_payload()
+    payload["profile_id"] = "one-cup-cafe-6h"
+    payload["profile_version"] = "1.1.0"
+    payload["sections"] = payload["sections"][:4]
+    for section, purpose in zip(payload["sections"], ("situation", "core_answer", "application", "payoff")):
+        section["purpose"] = purpose
+    Path(project.script_path).write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+    class PassingQa:
+        async def run(self, _context):
+            return SimpleNamespace(status=pipeline.AgentStatus.SUCCESS, output={"passed": True})
+
+    class RejectingReviewerProvider:
+        async def complete(self, _prompt, **_kwargs):
+            return json.dumps({
+                "passed": False,
+                "overall_score": 6,
+                "dimension_scores": {
+                    "human_truth": 6, "spoken_naturalness": 6,
+                    "causal_coherence": 7, "role_fidelity": 9,
+                    "useful_restraint": 8,
+                },
+                "blocking_findings": ["Nội dung nghe như một bài thuyết minh."],
+                "section_refs": [1],
+                "repair_brief": "Viết lại bằng một cảnh thật.",
+            })
+
+    monkeypatch.setattr(pipeline, "QAAgent", PassingQa)
+    monkeypatch.setattr(pipeline, "get_llm_provider", lambda _name=None: RejectingReviewerProvider())
+
+    from ytb_pipeline.project.workflow import WorkflowError
+
+    with pytest.raises(WorkflowError, match="Editorial review chặn TTS"):
+        asyncio.run(pipeline.run_project(project, checkpoint, through="input"))
+
+
 def test_render_uses_renderer_declared_by_script_content_profile(monkeypatch, tmp_path):
     """A direct pipeline run must not silently fall back to settings.render_provider.
 

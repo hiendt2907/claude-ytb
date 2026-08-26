@@ -194,6 +194,54 @@ def test_review_rejects_a_self_approved_score_below_the_profile_bar(tmp_path):
     assert any("8/10" in finding for finding in result.blocking_findings)
 
 
+@pytest.mark.parametrize("dimension_scores", [
+    {},
+    {
+        "human_truth": 9,
+        "spoken_naturalness": 9,
+        "causal_coherence": 9,
+        "role_fidelity": 8,
+        "useful_restraint": 9,
+    },
+])
+def test_review_requires_every_declared_dimension_to_clear_the_profile_bar(tmp_path, dimension_scores):
+    """An overall 9 cannot hide a missing or weak essential dimension."""
+    from ytb_pipeline.agents.editorial_review_agent import run_editorial_review
+    import asyncio
+
+    _write_profile(
+        tmp_path, "dimension-review-fixture",
+        editorial_review={
+            "enabled": True,
+            "rubric_prompt_name": "review_rubric",
+            "minimum_score": 9,
+            "max_rewrites": 1,
+        },
+    )
+    profile = load_content_profile("dimension-review-fixture", profiles_dir=tmp_path)
+    provider = _FakeProvider(json.dumps({
+        "passed": True,
+        "overall_score": 9,
+        "dimension_scores": dimension_scores,
+        "blocking_findings": [],
+        "section_refs": [],
+        "repair_brief": "",
+    }))
+
+    if not dimension_scores:
+        with pytest.raises(ValueError, match="dimension_scores"):
+            asyncio.run(run_editorial_review(
+                profile, _script_payload(profile), provider=provider, cache_dir=tmp_path / "cache",
+            ))
+    else:
+        result = asyncio.run(run_editorial_review(
+            profile, _script_payload(profile), provider=provider, cache_dir=tmp_path / "cache",
+        ))
+        assert result is not None
+        assert result.passed is False
+        assert any("role_fidelity" in finding for finding in result.blocking_findings)
+
+
 def test_review_is_cached_by_profile_fingerprint_and_script_content(tmp_path):
     from ytb_pipeline.agents.editorial_review_agent import run_editorial_review
     import asyncio

@@ -30,6 +30,7 @@ from .analytics.quality_report import (
     write_quality_report,
 )
 from .agents.base import AgentStatus
+from .agents.editorial_review_agent import run_editorial_review
 from .agents.qa_agent import QAAgent
 from .content_contract import CONTRACT_VERSION
 from .content_profiles import load_content_profile, profile_fingerprint
@@ -38,7 +39,7 @@ from .ideation.script_contract import validate_script_payload
 from .project.checkpoint import CheckpointManager
 from .project.models import NodeStatus, Project
 from .project.workflow import NodeDef, WorkflowGraph
-from .providers.registry import get_render_provider, get_voice_provider
+from .providers.registry import get_llm_provider, get_render_provider, get_voice_provider
 from .config.settings import settings
 from .pkg.models import PublishResult, RenderedVideo, Voiceover
 from .publish.multiplatform import publish_to_platforms
@@ -567,6 +568,32 @@ async def run_project(project: Project, checkpoint: CheckpointManager, through: 
                 for item in decision.get("violations", [])
             )
             raise ValueError(f"Script QA chặn TTS: {details or 'unknown violation'}")
+        editorial_output: dict[str, Any] | None = None
+        profile_id = str(raw_payload.get("profile_id") or "").strip()
+        if profile_id:
+            profile = load_content_profile(
+                profile_id,
+                version=str(raw_payload.get("profile_version") or "").strip() or None,
+            )
+            review = await run_editorial_review(
+                profile,
+                raw_payload,
+                provider=get_llm_provider(profile.providers.llm),
+                cache_dir=settings.assets_dir / "editorial_review_cache" / profile.profile_id,
+            )
+            if review is not None:
+                editorial_output = {
+                    "passed": review.passed,
+                    "overall_score": review.overall_score,
+                    "dimension_scores": dict(review.dimension_scores or {}),
+                    "blocking_findings": list(review.blocking_findings),
+                    "section_refs": list(review.section_refs),
+                    "repair_brief": review.repair_brief,
+                    "script_sha256": _script_sha256(Path(script_path)),
+                }
+                if not review.passed:
+                    details = "; ".join(review.blocking_findings)
+                    raise ValueError(f"Editorial review chặn TTS: {details or 'không đạt rubric profile'}")
         print(f"[0/3] Input     ✓  {script.title} ({len(script.segments)} đoạn; approved by batch start)")
         state["script"] = script
         return _node_script_path(current), {
@@ -575,6 +602,7 @@ async def run_project(project: Project, checkpoint: CheckpointManager, through: 
             "ruleset_id": script.ruleset_id,
             "script_sha256": current.metadata.get("script_sha256"),
             "qa_decision": "pass",
+            "editorial_review": editorial_output,
         }
 
     async def voiceover_fn(current: Project):

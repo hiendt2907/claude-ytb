@@ -27,6 +27,15 @@ from typing import Mapping, Protocol
 from ..content_profiles import ContentProfile, profile_fingerprint
 
 
+_REQUIRED_DIMENSIONS = frozenset({
+    "human_truth",
+    "spoken_naturalness",
+    "causal_coherence",
+    "role_fidelity",
+    "useful_restraint",
+})
+
+
 @dataclass(frozen=True)
 class EditorialReviewResult:
     passed: bool
@@ -148,15 +157,38 @@ async def run_editorial_review(
             raise ValueError(
                 "Editorial review profile có minimum_score nhưng LLM không trả overall_score."
             )
-        if result.overall_score < review_profile.minimum_score:
-            finding = (
-                f"Điểm biên tập {result.overall_score}/10 dưới ngưỡng "
-                f"{review_profile.minimum_score}/10 của profile."
+        dimensions = dict(result.dimension_scores or {})
+        if set(dimensions) != _REQUIRED_DIMENSIONS:
+            missing = sorted(_REQUIRED_DIMENSIONS - set(dimensions))
+            unexpected = sorted(set(dimensions) - _REQUIRED_DIMENSIONS)
+            detail = []
+            if missing:
+                detail.append(f"thiếu {', '.join(missing)}")
+            if unexpected:
+                detail.append(f"không hợp lệ {', '.join(unexpected)}")
+            raise ValueError(
+                "Editorial review profile có minimum_score nhưng dimension_scores "
+                f"phải có đúng năm tiêu chí ({'; '.join(detail) or 'không hợp lệ'})."
             )
+        low_dimensions = sorted(
+            name for name, score in dimensions.items() if score < review_profile.minimum_score
+        )
+        if result.overall_score < review_profile.minimum_score or low_dimensions:
+            findings = list(result.blocking_findings)
+            if result.overall_score < review_profile.minimum_score:
+                findings.append(
+                    f"Điểm biên tập {result.overall_score}/10 dưới ngưỡng "
+                    f"{review_profile.minimum_score}/10 của profile."
+                )
+            if low_dimensions:
+                findings.append(
+                    "Các tiêu chí dưới ngưỡng "
+                    f"{review_profile.minimum_score}/10: {', '.join(low_dimensions)}."
+                )
             result = replace(
                 result,
                 passed=False,
-                blocking_findings=tuple((*result.blocking_findings, finding)),
+                blocking_findings=tuple(findings),
                 repair_brief=result.repair_brief or "Viết lại theo các tiêu chí rubric chưa đạt.",
             )
     cache_path.write_text(
