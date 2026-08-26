@@ -139,13 +139,11 @@ def test_model_name_raises_when_none_available(monkeypatch):
         provider.model_name()
 
 
-def test_configured_script_provider_wires_xkiro_cascade():
+def test_configured_script_provider_wires_only_xkiro():
     from ytb_pipeline.orchestrator import ideation_cmd
+    from ytb_pipeline.providers.llm.xkiro_provider import XkiroLLMProvider
 
     provider = ideation_cmd._configured_script_provider("xkiro")
 
-    assert isinstance(provider, CascadeScriptProvider)
+    assert isinstance(provider, XkiroLLMProvider)
     assert provider.name == "xkiro"
-    assert [p.name for p in provider._providers] == ["xkiro", "codex", "claude"]
-    assert isinstance(provider._providers[1], ideation_cmd._CodexStartProvider)
-    assert isinstance(provider._providers[2], ideation_cmd._ClaudeStartProvider)

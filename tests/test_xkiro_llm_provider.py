@@ -39,6 +39,16 @@ def test_xkiro_llm_provider_registers_and_satisfies_protocol():
 
 
 @pytest.mark.unit
+def test_xkiro_script_defaults_pin_gemini_flash_without_model_fallbacks():
+    from ytb_pipeline.config.settings import Settings
+
+    defaults = Settings(_env_file=None)
+
+    assert defaults.xkiro_llm_model == "gemini-3.7-flash"
+    assert defaults.xkiro_llm_fallback_models == ""
+
+
+@pytest.mark.unit
 def test_xkiro_llm_unavailable_without_api_key(monkeypatch):
     from ytb_pipeline.config.settings import settings
     from ytb_pipeline.providers.llm.xkiro_provider import XkiroLLMProvider
