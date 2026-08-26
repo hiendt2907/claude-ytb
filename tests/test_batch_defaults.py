@@ -169,7 +169,7 @@ def test_batch_start_rejects_non_xkiro_profile_provider(monkeypatch):
         "settings": type("Settings", (), {"llm_provider": "codex"})(),
     })())
 
-    with pytest.raises(SystemExit, match="chỉ dùng xkiro/Gemini 3.7 Flash"):
+    with pytest.raises(SystemExit, match="chỉ dùng xkiro/DeepSeek V4 Pro"):
         ideation_cmd.cmd_start(type("Args", (), {
             "num_of_vid": 1,
             "type_of_vid": "long",

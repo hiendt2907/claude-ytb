@@ -1,8 +1,8 @@
 """XkiroLLMProvider — bọc endpoint OpenAI-compatible `/v1/chat/completions`
 của xKiro. Tách hẳn khỏi `XkiroVoiceProvider` (TTS) dù dùng chung API key.
 
-Ideation cố ý chỉ gọi model được cấu hình (`google/gemini-3.7-flash` trên
-xKiro, tức Gemini 3.7 Flash).
+Ideation cố ý chỉ gọi model được cấu hình (`deepseek/deepseek-v4-pro` trên
+xKiro, tức DeepSeek V4 Pro).
 Một lỗi phải được trả thẳng về operator: không thử model khác và không che
 nguồn gốc/năng lực thực tế của kịch bản.
 """

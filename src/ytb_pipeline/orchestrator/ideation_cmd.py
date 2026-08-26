@@ -330,7 +330,7 @@ def _validate_short_generation_request(args: argparse.Namespace) -> None:
 def _configured_script_provider(name: str):
     if name != "xkiro":
         raise ValueError(
-            "Ideation chỉ hỗ trợ xkiro/Gemini 3.7 Flash; "
+            "Ideation chỉ hỗ trợ xkiro/DeepSeek V4 Pro; "
             "không có fallback sang Codex hoặc Claude."
         )
     return get_llm_provider("xkiro")
@@ -574,7 +574,7 @@ def cmd_start(args: argparse.Namespace) -> None:
     if getattr(args, "local", False):
         raise SystemExit(
             "✗ --local đã bị gỡ cùng Ollama/MLX-LM (amendment 2026-08-24, "
-            "PROJECT_VISION.md Amendment Log). Ideation chỉ dùng xKiro/Gemini 3.7 Flash."
+            "PROJECT_VISION.md Amendment Log). Ideation chỉ dùng xKiro/DeepSeek V4 Pro."
         )
     if getattr(args, "clear_ledger", False):
         if getattr(args, "resume", False):
@@ -583,7 +583,7 @@ def cmd_start(args: argparse.Namespace) -> None:
     if getattr(args, "cloud", False):
         raise SystemExit(
             "✗ --cloud đã bị gỡ vì bỏ qua system prompt và strategy-v1. "
-            "Ideation chỉ dùng xKiro/Gemini 3.7 Flash."
+            "Ideation chỉ dùng xKiro/DeepSeek V4 Pro."
         )
 
     profile_scoped = hasattr(args, "profile_id")
@@ -601,7 +601,7 @@ def cmd_start(args: argparse.Namespace) -> None:
     )
     if requested_provider != "xkiro":
         raise SystemExit(
-            "✗ Ideation chỉ dùng xkiro/Gemini 3.7 Flash. "
+            "✗ Ideation chỉ dùng xkiro/DeepSeek V4 Pro. "
             "Cập nhật providers.llm của content profile thành `xkiro`."
         )
     setattr(args, "_provider", _configured_script_provider("xkiro"))

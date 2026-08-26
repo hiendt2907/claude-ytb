@@ -79,6 +79,12 @@ Không sửa tool chỉ để tăng số lượng video. Mỗi thay đổi phả
   fallback và CLI cascade
   Codex → Claude cho bước sinh kịch bản: lỗi xKiro phải dừng minh bạch, không
   âm thầm đổi provider/model. TTS xKiro và visual/render không đổi.
+- **Amendment 2026-08-26 (thay thế model cùng ngày):** model Gemini bị key
+  hiện tại trả 403 nên không dùng được. Ideation chuyển sang xKiro
+  `deepseek/deepseek-v4-pro` (DeepSeek V4 Pro, 65k output-token capacity),
+  đã smoke-test completion thật thành công trong 3.23 giây. Trần 14k token
+  cho một script vẫn giữ nguyên để giới hạn đúng output video, không phải
+  giới hạn năng lực của model.
 - Không đưa người que hoặc legacy `image_motion` vào production.
 - Publish phải tôn trọng `DRY_RUN`, privacy và publish schedule.
 - Mọi trạng thái phải resume được sau lỗi hoặc dừng graceful.

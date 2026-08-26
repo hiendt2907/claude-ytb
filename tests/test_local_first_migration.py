@@ -161,7 +161,7 @@ def _valid_short_script() -> dict:
 
 def test_settings_default_to_local_first_stack():
     # llm_provider mặc định "xkiro". Amendment 2026-08-26 pin ideation vào
-    # Gemini 3.7 Flash qua xKiro, không fallback provider. Image/video vẫn
+    # DeepSeek V4 Pro qua xKiro, không fallback provider. Image/video vẫn
     # cố định local-first.
     assert settings.image_provider == "pillow"
     assert settings.video_provider == "pexels"

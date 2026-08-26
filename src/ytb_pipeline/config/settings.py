@@ -30,8 +30,8 @@ class Settings(BaseSettings):
     # riêng với TTS dù chung API key. Ideation chỉ dùng một model đã chọn rõ;
     # lỗi phải dừng để operator biết, không âm thầm đổi chất lượng/nội dung.
     xkiro_llm_url: str = "https://api.xkiro.com/v1/chat/completions"
-    # xKiro gateway namespace; the upstream Google model is Gemini 3.7 Flash.
-    xkiro_llm_model: str = "google/gemini-3.7-flash"
+    # xKiro gateway namespace; DeepSeek V4 Pro supports up to 65k output tokens.
+    xkiro_llm_model: str = "deepseek/deepseek-v4-pro"
     # Optional operator override for Edge remote speech rate. Empty keeps the profile rate.
     edge_tts_rate_override: str = ""
     # Explicit local F5 backend. Production keeps Apple Silicon MPS; CPU is a
@@ -191,7 +191,7 @@ class Settings(BaseSettings):
     # Cho phép lệnh /sh chạy shell tùy ý trên máy (mạnh + nguy hiểm). Bật có chủ đích.
     listener_allow_shell: bool = True
 
-    # LLM — ideation chỉ dùng xKiro/Gemini 3.7 Flash (amendment 2026-08-26).
+    # LLM — ideation chỉ dùng xKiro/DeepSeek V4 Pro (amendment 2026-08-26).
     # MacBook chỉ chạy workflow/pipeline, không còn chạy local LLM inference.
     llm_provider: str = "xkiro"
     # Explicit opt-in only: shortens the Long contract for local E2E tests.

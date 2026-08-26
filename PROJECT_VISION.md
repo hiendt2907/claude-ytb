@@ -40,7 +40,7 @@ to honor them — never the reverse.
 
 2. **Cloud-primary inference for LLM + voice; local-first elsewhere (amended
    2026-08-26 — see Amendment Log).** Ideation uses only xKiro with
-   Gemini 3.7 Flash; an xKiro failure stops generation and is never silently
+   DeepSeek V4 Pro; an xKiro failure stops generation and is never silently
    substituted with Codex or Claude. Text-to-speech defaults to xKiro. Image
    generation and video generation are unaffected by this amendment and keep
    local inference as the default (Flux/local diffusion).
@@ -104,14 +104,14 @@ Priority order when choosing or evaluating a dependency, highest first:
    vendor lock and licensing risk for image/video/render paths.
 3. **Swappable behind a `Provider` port** — no direct coupling in domain code.
 4. **Has an explicit failure policy** appropriate to the capability;
-   ideation is intentionally pinned to xKiro/Gemini 3.7 Flash and stops on
+   ideation is intentionally pinned to xKiro/DeepSeek V4 Pro and stops on
    failure rather than changing model/provider.
 
 Current/target stack by capability:
 
 | Capability | Local option | Cloud option |
 |---|---|---|
-| LLM reasoning (ideation, outline, research synthesis) | — (see Amendment 2026-08-26) | **xKiro / Gemini 3.7 Flash only** |
+| LLM reasoning (ideation, outline, research synthesis) | — (see Amendment 2026-08-26) | **xKiro / DeepSeek V4 Pro only** |
 | Voice synthesis | F5-TTS (still available, opt-in) | **xKiro (default)**, Edge-TTS, ElevenLabs |
 | Image generation | Flux (local diffusion) | — |
 | Video generation | Local image-to-video / animation pipeline | — |
@@ -221,3 +221,11 @@ section overrides Section 2.*
   model (and HTTP 403 for `GET /v1/models`), so ideation cannot run until the
   xKiro account grants access; this is an account entitlement, not a fallback
   condition.
+- 2026-08-26 — Replaces the earlier same-day Gemini model selection for
+  ideation only. **Rationale:** the operator selected an xKiro model with a
+  65k-token output capacity while preserving one-model provenance. **Change:**
+  the sole ideation model is now `deepseek/deepseek-v4-pro` (DeepSeek V4 Pro).
+  The no-model-fallback and no-Codex/Claude-fallback policy is unchanged.
+  A live minimal completion completed successfully in 3.23 seconds with the
+  configured xKiro key. The production script cap remains 14k tokens because
+  it is a per-video output budget, not the model's maximum capability.

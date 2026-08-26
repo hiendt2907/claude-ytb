@@ -6,7 +6,7 @@
 > hiện tại đơn giản hơn nhiều: `providers/registry.py::get_llm_provider()`
 > trực tiếp cho ideation. **Ollama và MLX-LM đã bị GỠ KHỎI CODEBASE** — mọi mô
 > tả "Ollama local là default" bên dưới đã lỗi thời. Default thực tế:
-> **xKiro / Gemini 3.7 Flash** duy nhất; lỗi dừng, không cascade sang Codex
+> **xKiro / DeepSeek V4 Pro** duy nhất; lỗi dừng, không cascade sang Codex
 > hoặc Claude. Không đọc phần "Supported Providers"/"Provider Selection
 > Strategy" bên dưới như thực trạng — chỉ là roadmap tương lai.
 
@@ -67,7 +67,7 @@ class LLMProvider(Protocol):
 
 | Provider | Type | Notes |
 |---|---|---|
-| **xKiro / Gemini 3.7 Flash** | cloud | The sole ideation adapter and pinned model. A failure is surfaced to the operator. |
+| **xKiro / DeepSeek V4 Pro** | cloud | The sole ideation adapter and pinned model. A failure is surfaced to the operator. |
 
 Each provider is a thin adapter implementing `LLMProvider` — no agent or
 engine code branches on provider name; all branching happens inside the
@@ -90,7 +90,7 @@ class LLMProviderRegistry:
         raise NoProviderAvailable(capability)
 ```
 
-The implemented ideation provider is `[xkiro / google/gemini-3.7-flash]`.
+The implemented ideation provider is `[xkiro / deepseek/deepseek-v4-pro]`.
 There is no model or cross-provider fallback: an unavailable or failed request
 is surfaced directly. There is no offline LLM mode because local LLM providers
 were deliberately removed in the 2026-08-24 amendment.

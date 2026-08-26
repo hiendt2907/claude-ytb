@@ -33,7 +33,7 @@ amendment ghi rõ ngày + lý do trong chính file đó):
    cả hai đã là cloud-primary (xKiro) theo chủ đích, MacBook chỉ chạy
    workflow/pipeline orchestration + render.
 2. **Cloud-primary LLM+TTS, local-first phần còn lại (amended 2026-08-26).**
-   Ideation chỉ dùng **xKiro / Gemini 3.7 Flash**. Khi xKiro lỗi, lệnh dừng
+   Ideation chỉ dùng **xKiro / DeepSeek V4 Pro**. Khi xKiro lỗi, lệnh dừng
    minh bạch; không được thay thế bằng Codex hoặc Claude. TTS vẫn dùng xKiro.
    Ollama và MLX-LM đã bị GỠ KHỎI CODEBASE — không còn local LLM provider
    nào. Ảnh (Flux), video (Wan2.2) KHÔNG đổi, vẫn **default local**. Mọi
@@ -161,7 +161,7 @@ buộc:
 
 ## AI Rules
 
-- **xKiro/Gemini 3.7 Flash là LLM duy nhất cho ideation; xKiro là TTS mặc
+- **xKiro/DeepSeek V4 Pro là LLM duy nhất cho ideation; xKiro là TTS mặc
   định.** `llm_provider` và `tts_provider` đều mặc định là `"xkiro"`;
   `allow_cloud_providers=true` mặc định. Ideation lỗi phải báo lỗi, không
   fallback sang Codex/Claude. Không thêm lại Ollama, MLX-LM, `local_stack`,

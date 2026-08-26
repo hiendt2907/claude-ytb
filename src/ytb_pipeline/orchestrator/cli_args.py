@@ -25,7 +25,7 @@ Các lệnh:
   benchmark-local  Benchmark local AI stack và ghi JSON report
 
 Quy trình thường dùng:
-  ytb batch start -n 5 --type-of-vid long   # xKiro/Gemini 3.7 Flash viết kịch bản
+  ytb batch start -n 5 --type-of-vid long   # xKiro/DeepSeek V4 Pro viết kịch bản
   ytb doctor                # kiểm tra môi trường trước (shortcut top-level)
   ytb batch status          # xem còn video nào pending
   ytb batch run             # chạy 1 video, lặp lại lệnh này cho video kế
@@ -70,7 +70,7 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
     p_start = _sub(
         sub, "start",
         help="Sinh phần SÁNG TẠO (ideation + viết N kịch bản)",
-        description="Chỉ dùng xKiro/Gemini 3.7 Flash để sinh kịch bản; khi lỗi lệnh dừng "
+        description="Chỉ dùng xKiro/DeepSeek V4 Pro để sinh kịch bản; khi lỗi lệnh dừng "
         "minh bạch, không fallback sang Claude hoặc Codex. "
         "để chọn chủ đề "
         "(chống trùng data/ledger.md), viết kịch bản đầy đủ cho N video vào "
@@ -108,7 +108,7 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
     p_start.add_argument(
         "--llm-provider", "--llm", dest="llm_provider",
         choices=["xkiro"], default=None,
-        help="LLM viết kịch bản duy nhất: xkiro/Gemini 3.7 Flash.",
+        help="LLM viết kịch bản duy nhất: xkiro/DeepSeek V4 Pro.",
     )
     p_start.add_argument(
         "--idea",
