@@ -544,7 +544,9 @@ def test_editorial_rejection_rewrites_then_re_reviews_until_the_profile_bar(tmp_
 
     provider = _ReviewThenRewriteProvider()
     result = asyncio.run(validate_or_repair_script(
-        provider, original, tmp_path / "s.json", "", max_attempts=2,
+        # A profile-authorized editorial rewrite must remain available even
+        # when the deterministic attempt budget has just been exhausted.
+        provider, original, tmp_path / "s.json", "", max_attempts=1,
     ))
 
     assert result["title"] == "Bản đã viết lại"

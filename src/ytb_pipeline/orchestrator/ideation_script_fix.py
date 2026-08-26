@@ -676,8 +676,18 @@ async def validate_or_repair_script(
     hook_repair_attempted = False
     editorial_rewrites = 0
     report_path = script_path.parent.parent / "assets" / "quality_reports" / "ideation_errors.jsonl"
+    initial_review_profile = _explicit_profile(current)
+    editorial_retry_budget = (
+        initial_review_profile.editorial_review.max_rewrites
+        if initial_review_profile is not None and initial_review_profile.editorial_review is not None
+        else 0
+    )
+    # Formatting/QA repairs and whole-transcript editorial rewrites solve
+    # different failures.  A Long that first needs a length or hook repair
+    # must not consume the profile's explicitly approved editorial budget.
+    total_attempts = max_attempts + editorial_retry_budget
 
-    for attempt in range(1, max_attempts + 1):
+    for attempt in range(1, total_attempts + 1):
         current, long_note = normalize_long_overflow(current, expected_video_type)
         current, normalized_note = normalize_short_narration(
             current, expected_video_type=expected_video_type
@@ -689,7 +699,7 @@ async def validate_or_repair_script(
             if log_path:
                 append_local_start_log(log_path, f"NORMALIZE {attempt}", note)
         if console_prefix:
-            print(f"{console_prefix} validate: attempt {attempt}/{max_attempts}", flush=True)
+            print(f"{console_prefix} validate: attempt {attempt}/{total_attempts}", flush=True)
         if log_path:
             append_local_start_log(
                 log_path,
@@ -914,7 +924,6 @@ async def validate_or_repair_script(
                     if (
                         review_config is not None
                         and editorial_rewrites < review_config.max_rewrites
-                        and attempt < max_attempts
                     ):
                         editorial_rewrites += 1
                         rewrite_request = editorial_rewrite_prompt(current, review)
@@ -1086,6 +1095,8 @@ async def validate_or_repair_script(
     atomic_write_json(script_path, current)
     raise IdeationQualityFailure(
         "✗ LLM tạo script không qua QA sau "
-        f"{max_attempts} lần. validation={last_validation_error!r} qa={last_qa_output!r}",
+        f"{total_attempts} lượt (gồm {max_attempts} lượt contract và "
+        f"{editorial_retry_budget} lượt editorial). validation={last_validation_error!r} "
+        f"qa={last_qa_output!r}",
         current,
     )
