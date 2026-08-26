@@ -1223,6 +1223,12 @@ def editorial_rewrite_prompt(payload: dict, review: object) -> str:
     transcript rewrite.  The profile's system prompt still supplies all
     format/cast rules; this prompt only carries the concrete reviewer evidence.
     """
+    # `_editorial_review` is a receipt produced *after* a previous editorial
+    # verdict.  It is not story material.  Passing it back to the writer can
+    # anchor a retry on stale self-approval rather than the current diagnosis.
+    rewrite_context = {
+        key: value for key, value in payload.items() if key != "_editorial_review"
+    }
     findings = list(getattr(review, "blocking_findings", ()) or ())
     section_refs = list(getattr(review, "section_refs", ()) or ())
     score = getattr(review, "overall_score", None)
@@ -1267,5 +1273,5 @@ def editorial_rewrite_prompt(payload: dict, review: object) -> str:
         "dimension already at the target bar unless changing it is necessary to fix a cited dependency.\n\n"
         "Before returning, silently re-read every spoken line aloud, check that every claimed consequence "
         "is earned by an earlier action, and apply the full profile system contract.\n\n"
-        f"Current JSON:\n{json.dumps(payload, ensure_ascii=False, indent=2)}"
+        f"Current JSON:\n{json.dumps(rewrite_context, ensure_ascii=False, indent=2)}"
     )

@@ -622,6 +622,7 @@ def test_editorial_rewrite_prompt_gives_xkiro_dimension_level_feedback():
     payload = {
         "slug": "fixture", "topic": "Một tình huống công việc", "profile_id": "one-cup-cafe-6h",
         "profile_version": "1.1.0", "video_type": "long", "target_minutes": 5,
+        "_editorial_review": {"passed": True, "overall_score": 10},
     }
     review = SimpleNamespace(
         overall_score=8,
@@ -640,3 +641,4 @@ def test_editorial_rewrite_prompt_gives_xkiro_dimension_level_feedback():
     assert '"spoken_naturalness": 7' in prompt
     assert "sections: [3, 4]" in prompt
     assert "Bỏ đánh số góc nhìn" in prompt
+    assert "_editorial_review" not in prompt
