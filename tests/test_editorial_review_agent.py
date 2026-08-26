@@ -612,3 +612,31 @@ def test_editorial_only_retry_never_spends_a_contract_repair_call(tmp_path, monk
             provider, original, tmp_path / "s.json", "", max_attempts=1,
         ))
     assert not any(prompt.startswith("Rewrite ONLY the opening narration") for prompt in provider.prompts)
+
+
+def test_editorial_rewrite_prompt_gives_xkiro_dimension_level_feedback():
+    """A rejected writer gets actionable evidence, not a vague retry order."""
+    from types import SimpleNamespace
+    from ytb_pipeline.orchestrator.ideation_prompts import editorial_rewrite_prompt
+
+    payload = {
+        "slug": "fixture", "topic": "Một tình huống công việc", "profile_id": "one-cup-cafe-6h",
+        "profile_version": "1.1.0", "video_type": "long", "target_minutes": 5,
+    }
+    review = SimpleNamespace(
+        overall_score=8,
+        dimension_scores={
+            "human_truth": 9, "spoken_naturalness": 7,
+            "causal_coherence": 9, "role_fidelity": 9, "useful_restraint": 9,
+        },
+        section_refs=(3, 4),
+        blocking_findings=("Phần 3-4 liệt kê như dàn bài.",),
+        repair_brief="Bỏ đánh số góc nhìn, chuyển thành lời kể liền mạch.",
+    )
+
+    prompt = editorial_rewrite_prompt(payload, review)
+
+    assert "target bar: every dimension and overall score must reach 9/10" in prompt
+    assert '"spoken_naturalness": 7' in prompt
+    assert "sections: [3, 4]" in prompt
+    assert "Bỏ đánh số góc nhìn" in prompt

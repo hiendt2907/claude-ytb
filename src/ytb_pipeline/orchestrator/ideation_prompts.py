@@ -1226,7 +1226,23 @@ def editorial_rewrite_prompt(payload: dict, review: object) -> str:
     findings = list(getattr(review, "blocking_findings", ()) or ())
     section_refs = list(getattr(review, "section_refs", ()) or ())
     score = getattr(review, "overall_score", None)
+    dimension_scores = dict(getattr(review, "dimension_scores", None) or {})
     repair_brief = str(getattr(review, "repair_brief", "") or "").strip()
+    profile_id = str(payload.get("profile_id") or "").strip()
+    profile_version = str(payload.get("profile_version") or "").strip() or None
+    try:
+        review_profile = load_content_profile(profile_id, version=profile_version) if profile_id else None
+    except ContentProfileError:
+        review_profile = None
+    minimum_score = (
+        review_profile.editorial_review.minimum_score
+        if review_profile is not None and review_profile.editorial_review is not None
+        else None
+    )
+    target_bar = (
+        f"target bar: every dimension and overall score must reach {minimum_score}/10"
+        if minimum_score else "target bar: satisfy the active profile editorial contract"
+    )
     immutable = {
         key: payload.get(key)
         for key in ("slug", "topic", "profile_id", "profile_version", "video_type", "target_minutes", "strategy")
@@ -1241,9 +1257,14 @@ def editorial_rewrite_prompt(payload: dict, review: object) -> str:
         f"{json.dumps(immutable, ensure_ascii=False, indent=2)}\n\n"
         "Editorial review findings:\n"
         f"- score: {score!r}/10\n"
+        f"- {target_bar}\n"
+        f"- dimension scores: {json.dumps(dimension_scores, ensure_ascii=False, sort_keys=True)}\n"
         f"- sections: {section_refs}\n"
         f"- findings: {json.dumps(findings, ensure_ascii=False)}\n"
         f"- repair brief: {repair_brief}\n\n"
+        "Treat the review packet as the diagnosis: repair the cited weak dimensions and cited sections, "
+        "do not invent a different problem or answer with generic motivational language. Preserve any "
+        "dimension already at the target bar unless changing it is necessary to fix a cited dependency.\n\n"
         "Before returning, silently re-read every spoken line aloud, check that every claimed consequence "
         "is earned by an earlier action, and apply the full profile system contract.\n\n"
         f"Current JSON:\n{json.dumps(payload, ensure_ascii=False, indent=2)}"
