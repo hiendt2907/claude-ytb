@@ -16,6 +16,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import unicodedata
 from typing import Any, Callable, Mapping, Protocol
 
 from ..config.settings import settings
@@ -29,15 +30,30 @@ from ..pkg.models import Voiceover
 # Bump whenever a detector's verdict logic changes, or cached verdicts from the
 # old logic keep blocking runs the new logic would pass.  v6: an adjacent
 # repeat is only a TTS artifact when the script did not author it.
-_CACHE_VERSION = 6
+_CACHE_VERSION = 7  # bumped: clock-time normalisation changed transcript comparison
 TRANSCRIPT_SIMILARITY_ALGORITHM = "sequence-matcher-no-autojunk-v1"
 _SENTENCE_SPLIT_RE = re.compile(r"[.!?;:\n]+")
 _WORD_RE = re.compile(r"[\wÀ-ỹ]+", re.UNICODE)
+_TIME_SHORTHAND_RE = re.compile(r"\b(\d{1,2})h(\d{1,2})\b")
 # Measured with the local Faster-Whisper small model against natural-tempo F5
 # Vietnamese speech.  0.82 tolerates predictable ASR spelling substitutions;
 # an omitted/mismatched narration remains far below it (the 2x-tempo failure
 # was 0.98%).
 LOCAL_TTS_TRANSCRIPT_SIMILARITY_THRESHOLD = 0.82
+_VIETNAMESE_NUMBERS = {
+    "khong": 0,
+    "mot": 1,
+    "hai": 2,
+    "ba": 3,
+    "bon": 4,
+    "tu": 4,
+    "nam": 5,
+    "lam": 5,
+    "sau": 6,
+    "bay": 7,
+    "tam": 8,
+    "chin": 9,
+}
 
 
 @dataclass(frozen=True)
@@ -588,12 +604,102 @@ def _transcript_similarity(expected: str, actual: str) -> float:
 
 
 def _normalise_words(text: str) -> str:
-    return " ".join(_WORD_RE.findall(text.casefold()))
+    return " ".join(_canonical_word_tokens(text))
 
 
 def _normalised_words(text: str) -> str:
     """Punctuation-free word stream, so a script phrase matches a transcript one."""
-    return " ".join(_WORD_RE.findall(text.casefold()))
+    return " ".join(_canonical_word_tokens(text))
+
+
+def _canonical_word_tokens(text: str) -> list[str]:
+    words = _WORD_RE.findall(_TIME_SHORTHAND_RE.sub(r" \1 giờ \2 phút ", text.casefold()))
+    canonical: list[str] = []
+    index = 0
+    while index < len(words):
+        matched = _match_clock_time(words, index)
+        if matched is not None:
+            token, index = matched
+            canonical.append(token)
+            continue
+        canonical.append(words[index])
+        index += 1
+    return canonical
+
+
+def _match_clock_time(words: list[str], index: int) -> tuple[str, int] | None:
+    if words[index].isdigit() and index + 1 < len(words) and words[index + 1] == "giờ":
+        hour = int(words[index])
+        next_index = index + 2
+        minute = 0
+        if next_index < len(words) and words[next_index].isdigit():
+            minute = int(words[next_index])
+            next_index += 1
+            if next_index < len(words) and words[next_index] == "phút":
+                next_index += 1
+        return _clock_token(hour, minute), next_index
+
+    for hour_span in range(4, 0, -1):
+        hour_end = index + hour_span
+        if hour_end >= len(words) or words[hour_end] != "giờ":
+            continue
+        hour = _parse_vietnamese_number(words[index:hour_end])
+        if hour is None or not 0 <= hour <= 23:
+            continue
+        next_index = hour_end + 1
+        minute = 0
+        minute_end = next_index
+        for minute_span in range(4, 0, -1):
+            candidate_end = next_index + minute_span
+            if candidate_end > len(words):
+                continue
+            parsed = _parse_vietnamese_number(words[next_index:candidate_end])
+            if parsed is None or not 0 <= parsed <= 59:
+                continue
+            minute = parsed
+            minute_end = candidate_end
+            if minute_end < len(words) and words[minute_end] == "phút":
+                minute_end += 1
+            break
+        return _clock_token(hour, minute), minute_end
+    return None
+
+
+def _clock_token(hour: int, minute: int) -> str:
+    return f"time_{hour:02d}_{minute:02d}"
+
+
+def _parse_vietnamese_number(words: list[str]) -> int | None:
+    tokens = [_strip_accents(word) for word in words if word]
+    if not tokens:
+        return None
+    if len(tokens) == 1:
+        if tokens[0].isdigit():
+            return int(tokens[0])
+        return _VIETNAMESE_NUMBERS.get(tokens[0])
+    if tokens[0] == "muoi":
+        if len(tokens) == 1:
+            return 10
+        unit = _VIETNAMESE_NUMBERS.get(tokens[1])
+        return 10 + unit if unit is not None else None
+    tens = _VIETNAMESE_NUMBERS.get(tokens[0])
+    if tens is None:
+        return None
+    if len(tokens) >= 2 and tokens[1] == "muoi":
+        if len(tokens) == 2:
+            return tens * 10
+        unit = _VIETNAMESE_NUMBERS.get(tokens[2])
+        return (tens * 10) + unit if unit is not None else None
+    if len(tokens) >= 3 and tokens[1] in {"linh", "le"}:
+        unit = _VIETNAMESE_NUMBERS.get(tokens[2])
+        return (tens * 10) + unit if unit is not None else None
+    return None
+
+
+def _strip_accents(value: str) -> str:
+    return "".join(
+        char for char in unicodedata.normalize("NFD", value) if unicodedata.category(char) != "Mn"
+    )
 
 
 def _adjacent_repeated_phrase(transcript: str) -> str | None:

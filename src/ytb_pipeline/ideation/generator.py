@@ -18,6 +18,7 @@ from ..content_contract import (
     F5_CHARS_PER_MIN,
     contract_for,
     chars_per_min_for_provider as _contract_chars_per_min,
+    effective_chars_per_min,
     estimate_duration_sec,
 )
 from ..pkg.models import (
@@ -69,7 +70,8 @@ _WEAK_PEXELS_QUERIES = {"", "video", "stock footage", "broll", "background", "ab
 
 
 def estimate_minutes(
-    segments, *, tts_provider: str | None = None, video_type: str | None = None
+    segments, *, tts_provider: str | None = None, video_type: str | None = None,
+    content_profile: ContentProfile | None = None,
 ) -> float:
     """Ước lượng planning theo provider; không thay thế duration audio thực.
 
@@ -77,10 +79,20 @@ def estimate_minutes(
     nhanh hơn Short cùng số ký tự.
     """
     chars = sum(len(seg.narration) for seg in segments)
-    return estimate_duration_sec(
-        chars,
-        chars_per_minute=chars_per_min_for_provider(tts_provider, video_type=video_type),
-    ) / 60
+    # The per-profile pace correction has been calibrated for Longs, where
+    # multi-voice segment handoffs materially affect the admission floor. Keep
+    # legacy/Short estimates on the public compatibility helper; their
+    # fixtures and their separately calibrated Short contract use that rate.
+    rate = (
+        effective_chars_per_min(
+            tts_provider or settings.tts_provider,
+            video_type=video_type,
+            content_profile=content_profile,
+        )
+        if video_type == "long" and content_profile is not None
+        else chars_per_min_for_provider(tts_provider, video_type=video_type)
+    )
+    return estimate_duration_sec(chars, chars_per_minute=rate) / 60
 
 
 def validate_runtime_duration(
@@ -408,7 +420,10 @@ def _validate_length(
         )
     tts_provider = content_profile.providers.tts if content_profile is not None else None
     est_sec = estimate_minutes(
-        segments, tts_provider=tts_provider, video_type=video_type
+        segments,
+        tts_provider=tts_provider,
+        video_type=video_type,
+        content_profile=content_profile,
     ) * 60
     try:
         contract.validate_audio_runtime(

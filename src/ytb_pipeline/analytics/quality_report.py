@@ -49,14 +49,25 @@ def normalise_purpose(purpose: str) -> str:
     return _PURPOSE_ALIASES.get(normalised, normalised)
 
 
-def missing_required_purposes(video_type: str, purposes: Iterable[str]) -> tuple[str, ...]:
+def missing_required_purposes(
+    video_type: str,
+    purposes: Iterable[str],
+    *,
+    required_purposes: Mapping[str, Sequence[str]] | None = None,
+) -> tuple[str, ...]:
     """Required purposes absent from `purposes`; empty when the script is complete.
 
     Exposed so admission (`preflight`) can reject offline exactly what the
     release gate rejects after render.  Discovering a missing `payoff` only at
     the pre-publish gate means the TTS and render bill has already been paid.
+
+    `required_purposes` lets a caller pass a content profile's own declared
+    policy (`profile.editorial_contract.purpose_policy.required`) instead of
+    the legacy explainer vocabulary below.  Omitted, this falls back to that
+    legacy vocabulary so a profile predating `editorial_contract` is unaffected.
     """
-    required = _REQUIRED_PURPOSES.get((video_type or "").strip().lower())
+    lookup = required_purposes if required_purposes is not None else _REQUIRED_PURPOSES
+    required = lookup.get((video_type or "").strip().lower())
     if required is None:
         return ()
     present = {normalise_purpose(item) for item in purposes}

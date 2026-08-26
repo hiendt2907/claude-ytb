@@ -82,3 +82,41 @@ def test_unknown_speaker_falls_back_to_the_narrator_colour():
     profile = load_content_profile("ban-so-6")
 
     assert speaker_colour(profile, "khach-la") == speaker_colour(profile, "narrator")
+
+
+def test_segment_cards_never_yields_a_clip_shorter_than_the_profile_transition_overlap(tmp_path):
+    """A real Long render crashed in `_compose_clips` ('Story transition_overlap_sec
+    phải ngắn hơn mọi segment clip.') because a short trailing sentence
+    ('Cậu thấy sao?') got its own proportional caption card, and that
+    card's duration fell at/under `profile.render.transition_overlap_sec`.
+    `_segment_cards` must merge such a card into a neighbour instead of ever
+    handing the renderer a clip length the compose step cannot use."""
+    from ytb_pipeline.render.story import _segment_cards, LANDSCAPE
+    from ytb_pipeline.pkg.models import Segment
+    from tests.test_visual_generation_profile import _write_profile
+
+    folder = _write_profile(tmp_path, "ban-so-6")
+    profile = load_content_profile("ban-so-6", profiles_dir=tmp_path)
+    # Verbatim narration from a real Long render that crashed here: a long
+    # sentence wraps to a tiny trailing chunk ("đó?"), whose proportional
+    # share of the section's real measured duration (16.43s) came out at
+    # 0.176s — under the profile's 0.4s transition_overlap_sec.
+    narration = (
+        "Vậy cậu thấy câu hỏi nào làm cậu khó chịu nhất? Là phần số liệu, "
+        "phương pháp, hay câu hỏi mục tiêu đó? An hỏi, tay cầm cốc cà phê của "
+        "mình, không uống mà chỉ xoay nhẹ. 'Tớ không phải chuyên gia, nhưng "
+        "tớ có thể nghe cậu nói xem cậu đang bí ở đâu. Đôi khi chỉ cần nói ra "
+        "là thấy nhẹ hơn.'"
+    )
+    segment = Segment(
+        caption="", narration=narration, voiceover=narration,
+        time_goal=0.3, visual_intent="An hoi Minh.", speaker_id="an",
+        scene_characters=("minh", "an"), duration_sec=16.426485,
+        audio_path=str(tmp_path / "fake.mp3"),
+    )
+
+    cards = _segment_cards(segment, profile, LANDSCAPE)
+
+    assert all(
+        length > profile.render.transition_overlap_sec for _text, _seek, length in cards
+    ), [length for _t, _s, length in cards]

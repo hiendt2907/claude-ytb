@@ -84,6 +84,8 @@ class QAAgent:
                     violations.extend(_check_release_schema(script))
                 violations.extend(_check_stage_direction_leak(script))
                 violations.extend(_check_speaker_prefix_leak(script))
+                violations.extend(_check_story_speaker_ownership(script))
+                violations.extend(_check_character_voiceover_is_direct(script))
                 violations.extend(_check_knowledge_examples(script))
                 violations.extend(_check_immediate_action(script))
                 violations.extend(_check_final_payoff(script))
@@ -270,7 +272,8 @@ def _check_story_hook(script: Any, profile: Any) -> list[dict[str, str]]:
         return []
     first = _narration_of(segments[0]).strip()
     words = _story_words(first)
-    cast = {name for name in profile.voice_cast if name != "narrator"}
+    narrator_id = profile.editorial_contract.narration_speaker_id
+    cast = {name for name in profile.voice_cast if name != narrator_id}
     word_set = set(words)
     has_clock = any(marker in word_set for marker in _STORY_MOMENT_MARKERS) and (
         bool(_STORY_NUMBER_WORDS & word_set) or any(character.isdigit() for character in first)
@@ -444,7 +447,8 @@ def _check_speaker_prefix_leak(script: Any) -> list[dict[str, str]]:
     profile = _content_profile(script)
     if profile is None or profile.narrative_mode != "character_story":
         return []
-    cast = {name for name in profile.voice_cast if name != "narrator"}
+    narrator_id = profile.editorial_contract.narration_speaker_id
+    cast = {name for name in profile.voice_cast if name != narrator_id}
     violations: list[dict[str, str]] = []
     for index, segment in enumerate(_segments_of(script), start=1):
         head = _narration_of(segment).strip().split(":", 1)[0].strip().lower()
@@ -453,6 +457,67 @@ def _check_speaker_prefix_leak(script: Any) -> list[dict[str, str]]:
                 "speaker_prefix",
                 f"Section {index} mở đầu bằng tên người nói ('{head}:'); TTS sẽ đọc cả tên.",
                 "Bỏ tiền tố tên khỏi voiceover; giọng đã được chọn qua speaker_id.",
+            ))
+    return violations
+
+
+def _check_story_speaker_ownership(script: Any) -> list[dict[str, str]]:
+    """Reject a character's direct speech hidden inside a narrator segment.
+
+    The schema-level ``turn`` card handles ownership before TTS. This second
+    guard catches the most damaging escaped form: a long first-person address
+    after narrative staging, which causes the narrator voice to read a whole
+    character monologue. It is profile-configured and Vietnamese-generic; it
+    does not know Minh, An, or any series-specific wording.
+    """
+    profile = _content_profile(script)
+    if (
+        profile is None
+        or profile.narrative_mode != "character_story"
+        or not profile.content_rules.require_conversation_turns
+    ):
+        return []
+    direct_address = re.compile(
+        r"(?:anh|chị|em|cậu|bạn)\s+ơi\s*,\s*(?:em|tôi|mình)\b",
+        flags=re.IGNORECASE,
+    )
+    narrator_id = profile.editorial_contract.narration_speaker_id
+    violations: list[dict[str, str]] = []
+    for index, segment in enumerate(_segments_of(script), start=1):
+        if str(_get(segment, "speaker_id", narrator_id) or narrator_id).strip().lower() != narrator_id:
+            continue
+        narration = _narration_of(segment).strip()
+        if len(narration) >= 220 and direct_address.search(narration):
+            violations.append(_repair(
+                "speaker_ownership",
+                f"Section {index} gán một lời xưng hô trực tiếp dài cho narrator.",
+                "Tách lời đó thành section riêng với speaker_id của nhân vật; narrator chỉ neo cảnh và hành động.",
+            ))
+    return violations
+
+
+def _check_character_voiceover_is_direct(script: Any) -> list[dict[str, str]]:
+    """A routed character voice may not narrate its own staging before speech."""
+    profile = _content_profile(script)
+    if (
+        profile is None
+        or profile.narrative_mode != "character_story"
+        or not profile.content_rules.require_conversation_turns
+    ):
+        return []
+    narrator_id = profile.editorial_contract.narration_speaker_id
+    violations: list[dict[str, str]] = []
+    for index, segment in enumerate(_segments_of(script), start=1):
+        speaker = str(_get(segment, "speaker_id", narrator_id) or narrator_id).strip().lower()
+        if speaker == narrator_id:
+            continue
+        narration = _narration_of(segment).strip()
+        colon = narration.find(":")
+        if 0 < colon < len(narration) - 8:
+            violations.append(_repair(
+                "character_voiceover_direct",
+                f"Section {index} có phần dẫn/hành động trước dấu ':' trong voiceover của {speaker}.",
+                "Chuyển hành động sang narrator hoặc visual_intent; voiceover nhân vật chỉ giữ câu họ nói trực tiếp.",
             ))
     return violations
 

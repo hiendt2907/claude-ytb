@@ -40,6 +40,33 @@ def test_extension_below_the_cap_is_inserted_before_the_conclusion():
     assert voiceovers[3:5] == ["Đoạn thêm 0.", "Đoạn thêm 1."]
 
 
+def test_extension_can_choose_a_timeline_safe_insertion_boundary():
+    """An extension may belong before an existing time jump, not the ending."""
+    source = {
+        "sections": [
+            {"purpose": "situation", "voiceover": "Sáu giờ sáng."},
+            {"purpose": "payoff", "voiceover": "Cuộc họp kết thúc."},
+            {"purpose": "payoff", "voiceover": "Sáng hôm sau."},
+            {"purpose": "payoff", "voiceover": "Bàn trống."},
+        ]
+    }
+    result = append_long_extension(
+        source,
+        {
+            "insert_before_section_index": 2,
+            "sections": [{"purpose": "evidence", "voiceover": "Một việc xảy ra sau cuộc họp."}],
+        },
+    )
+
+    assert [section["voiceover"] for section in result["sections"]] == [
+        "Sáu giờ sáng.",
+        "Một việc xảy ra sau cuộc họp.",
+        "Cuộc họp kết thúc.",
+        "Sáng hôm sau.",
+        "Bàn trống.",
+    ]
+
+
 def test_overflow_is_folded_into_text_instead_of_new_sections():
     """The extension exists to add characters; the cap must not discard them."""
     merged = append_long_extension(_payload(23), _extension(4), max_sections=24)

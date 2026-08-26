@@ -42,14 +42,23 @@ def script_generation_schema(
             if video_type == "short"
             else int(section_contract.minimum_sections * 1.5)
         )
+    purpose_vocabulary = (
+        content_profile.editorial_contract.purpose_policy.vocabulary
+        if content_profile is not None
+        else SECTION_PURPOSES
+    )
     section = {
         "type": "object",
         "properties": {
             # Closed vocabulary so structured output enforces what the prompt
             # only stated in prose.  A 36-section Long invented 15 free-form
             # purposes, and the pre-publish gate — which demands the canonical
-            # five — blocked it after render for a missing "core_answer".
-            "purpose": {"type": "string", "enum": list(SECTION_PURPOSES)},
+            # five — blocked it after render for a missing "core_answer".  The
+            # vocabulary itself is profile-declared: a non-explainer profile
+            # (interview, panel, diary...) must not be forced through the
+            # explainer's situation/core_answer/evidence/application/payoff
+            # taxonomy just because this enum used to be a fixed constant.
+            "purpose": {"type": "string", "enum": list(purpose_vocabulary)},
             "time_goal": {"type": "number"},
             "voiceover": {"type": "string"},
             "narration": {"type": "string"},
@@ -77,7 +86,10 @@ def script_generation_schema(
             "type": "string",
             "enum": sorted(content_profile.voice_cast),
         }
-        cast_ids = sorted(name for name in content_profile.voice_cast if name != "narrator")
+        cast_ids = sorted(
+            name for name in content_profile.voice_cast
+            if name != content_profile.editorial_contract.narration_speaker_id
+        )
         vg = content_profile.visual_generation
         if vg is not None and vg.enabled:
             # Auto-generate mode: the model names who is ON SCREEN, not a

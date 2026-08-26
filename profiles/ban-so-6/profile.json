@@ -1,13 +1,14 @@
 {
   "schema_version": 1,
   "profile_id": "ban-so-6",
-  "version": "1.1.0",
+  "version": "1.4.0",
   "display_name": "Bàn số 6 — Truyện đời thường",
   "topic": "Những lựa chọn nhỏ của Minh và An tại Bàn số 6",
   "narrative_mode": "character_story",
   "prompts": {
     "editorial": "prompts/editorial.md",
     "spoken_language": "prompts/spoken-language.md",
+    "conversation_contract": "prompts/conversation-contract.md",
     "series_bible": "series-bible.md",
     "visual_bible": "visual-bible.md",
     "season_plan": "season-01.md",
@@ -32,7 +33,8 @@
   },
   "content_rules": {
     "require_pexels_query": false,
-    "require_short_source_trace": false
+    "require_short_source_trace": false,
+    "require_conversation_turns": true
   },
   "render": {
     "assets_dir": "assets",

@@ -238,13 +238,59 @@ def _validate_scene_characters(
         _add(findings, f"{path}.scene_characters.max", f"{path}.scene_characters", "scene_characters tối đa 2 nhân vật trong một khung hình.")
     if len(set(raw)) != len(raw):
         _add(findings, f"{path}.scene_characters.duplicate", f"{path}.scene_characters", "scene_characters không được lặp tên.")
-    cast = {name for name in content_profile.voice_cast if name != "narrator"}
+    cast = {
+        name for name in content_profile.voice_cast
+        if name != content_profile.editorial_contract.narration_speaker_id
+    }
     for name in raw:
         if name not in cast:
             _add(
                 findings, f"{path}.scene_characters.unknown", f"{path}.scene_characters",
                 f"'{name}' không nằm trong voice_cast của profile '{content_profile.profile_id}'.",
             )
+
+
+def _validate_conversation_turn(
+    section: Mapping[str, Any],
+    content_profile: ContentProfile,
+    *,
+    section_index: int,
+    path: str,
+    findings: list[ScriptContractFinding],
+) -> None:
+    """Enforce profile-owned conversation planning metadata.
+
+    This is deliberately profile-configured, not keyed to a cast name or a
+    series. The shared workflow only knows that a story profile opted into
+    explicit speaker-turn ownership before TTS.
+    """
+    if not content_profile.content_rules.require_conversation_turns:
+        return
+    if "turn" not in section:
+        _add(findings, f"{path}.turn.required", f"{path}.turn", "Story profile yêu cầu field turn cho mọi section.")
+        return
+    speaker = _text(section.get("speaker_id")).lower()
+    turn = section.get("turn")
+    if speaker == content_profile.editorial_contract.narration_speaker_id:
+        if turn is not None:
+            _add(findings, f"{path}.turn.narrator_null", f"{path}.turn", "Narrator phải có turn=null; lời trực tiếp thuộc section nhân vật.")
+        return
+    if not isinstance(turn, Mapping):
+        _add(findings, f"{path}.turn.object", f"{path}.turn", "Section nhân vật cần turn object gồm scene, intent, responds_to.")
+        return
+    for field in ("scene", "intent"):
+        if not _text(turn.get(field)):
+            _add(findings, f"{path}.turn.{field}.required", f"{path}.turn.{field}", f"turn.{field} không được để trống.")
+    responds_to = turn.get("responds_to")
+    if responds_to is None:
+        return
+    if isinstance(responds_to, bool) or not isinstance(responds_to, int) or not 1 <= responds_to < section_index:
+        _add(
+            findings,
+            f"{path}.turn.responds_to.previous_section",
+            f"{path}.turn.responds_to",
+            "turn.responds_to phải là null hoặc số section 1-based đứng trước lượt hiện tại.",
+        )
 
 
 def _validate_sections(
@@ -323,6 +369,14 @@ def _validate_sections(
                 f"{path}.speaker_id.in_voice_cast",
                 f"{path}.speaker_id",
                 f"speaker_id phải thuộc voice_cast: {sorted(content_profile.voice_cast)}.",
+            )
+        if content_profile is not None and content_profile.narrative_mode == "character_story":
+            _validate_conversation_turn(
+                section,
+                content_profile,
+                section_index=index + 1,
+                path=path,
+                findings=findings,
             )
         if not _positive_number(section.get("time_goal")):
             _add(

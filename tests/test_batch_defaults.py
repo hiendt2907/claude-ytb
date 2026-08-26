@@ -550,6 +550,31 @@ def test_long_extension_prompt_requests_only_new_sections_for_the_missing_runtim
     assert "Do not rewrite, repeat, or summarize the existing sections" in prompt
     assert "10,000" in prompt
     assert "voiceover" in prompt
+    assert "insert_before_section_index" in prompt
+
+
+def test_long_extension_prompt_scales_section_count_to_the_missing_runtime():
+    from ytb_pipeline.orchestrator.ideation_prompts import long_extension_prompt
+
+    prompt = long_extension_prompt(
+        {"slug": "ngan", "title": "Ngắn", "sections": [{"voiceover": "x"}]},
+        missing_chars=119,
+        max_new_sections=1,
+    )
+
+    assert "Add 1 new" in prompt
+
+
+def test_long_extension_prompt_labels_existing_sections_for_placement():
+    from ytb_pipeline.orchestrator.ideation_prompts import long_extension_prompt
+
+    prompt = long_extension_prompt(
+        {"slug": "moc", "sections": [{"voiceover": "Buổi duyệt 8:30."}]},
+        missing_chars=300,
+    )
+
+    assert '"section_index": 1' in prompt
+    assert "immediately before" in prompt
 
 
 def test_append_long_extension_inserts_before_conclusion_without_mutating_source():

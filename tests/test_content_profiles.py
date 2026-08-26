@@ -115,11 +115,29 @@ def test_builtin_topic_profiles_are_self_contained():
     assert explainer.content_rules.require_pexels_query is True
     assert story.providers.render == "story"
     assert story.content_rules.require_pexels_query is False
+    assert story.content_rules.require_conversation_turns is True
     assert story.voice_for("minh") != story.voice_for("an")
     assert "văn nói" in story.prompt_text("spoken_language").casefold()
+    assert "conversation contract" in story.prompt_text("conversation_contract").casefold()
+    assert "forbidden in character voiceover" in story.prompt_text("conversation_contract").casefold()
+    assert "người dẫn chuyện bắt buộc" in story.prompt_text("conversation_contract").casefold()
     assert story.render.transition_overlap_sec == pytest.approx(0.4)
     assert contract_for("short", story).transition_loss_sec(9) == pytest.approx(0.0)
     assert expected_story_duration_sec(story, [5.0] * 9) == pytest.approx(45.0)
+
+
+def test_story_profile_requires_turn_cards_for_character_conversation():
+    from ytb_pipeline.ideation.script_contract import validate_script_payload
+
+    payload = json.loads(
+        (Path("profiles/ban-so-6/fixtures/episode-01-short.json")).read_text(encoding="utf-8")
+    )
+    payload["sections"][1].pop("turn")
+
+    result = validate_script_payload(payload)
+
+    assert not result.publishable
+    assert any(finding.rule.endswith("turn.required") for finding in result.findings)
 
 
 def test_story_system_prompt_includes_declared_series_memory():
@@ -131,6 +149,19 @@ def test_story_system_prompt_includes_declared_series_memory():
     assert "29 tuổi" in system
     assert "chỗ dột" in system
     assert "Bảy lần mở laptop" in system
+
+
+def test_story_system_prompt_requires_story_pacing_and_real_dialogue():
+    """Profile prompts, not global code, own editorial quality requirements."""
+    from ytb_pipeline.content_profiles import load_content_profile
+    from ytb_pipeline.orchestrator.ideation_prompts import script_generation_system_prompt
+
+    system = script_generation_system_prompt(load_content_profile("ban-so-6"))
+    normalized = " ".join(system.split()).casefold()
+
+    assert "không được kết thúc cao trào rồi nối thêm một bài luận" in normalized
+    assert "thoại trực tiếp" in normalized
+    assert "người có thể phản hồi" in normalized
 
 
 def test_queue_loads_profile_and_legacy_item_uses_configured_default(tmp_path, monkeypatch):
@@ -259,6 +290,23 @@ def test_story_prompt_names_the_cast_for_scene_characters_when_auto_generating()
     assert "scene_characters" in prompt
     assert "'minh'" in prompt or "minh" in prompt
     assert "Use only these visual_asset filenames" not in prompt
+
+
+def test_story_prompt_requires_complete_long_arc_and_single_speaker_turns():
+    """Profile generation cannot contradict the shared release contract.
+
+    A story Long still needs an evidence beat; its evidence may be an observed
+    consequence in the scene rather than a forced research claim.  And because
+    speaker_id selects one TTS voice, one character section cannot also narrate
+    action or another character's reply.
+    """
+    from ytb_pipeline.content_profiles import load_content_profile
+    from ytb_pipeline.orchestrator.ideation_prompts import script_generation_system_prompt
+
+    prompt = script_generation_system_prompt(load_content_profile("ban-so-6"))
+
+    assert "situation, core_answer, evidence, application, payoff" in prompt
+    assert "exactly that character's spoken utterance" in prompt
 
 
 def test_story_prompt_lists_only_assets_available_in_the_profile(tmp_path):
@@ -520,3 +568,21 @@ def test_effective_chars_per_min_without_profile_is_unchanged():
     assert effective_chars_per_min("xkiro", video_type="long") == chars_per_min_for_provider(
         "xkiro", video_type="long"
     )
+
+
+def test_loader_duration_estimate_honors_the_content_profile_tts_pace():
+    """Ideation admission and preflight must estimate story audio identically."""
+    from types import SimpleNamespace
+
+    from ytb_pipeline.content_profiles import load_content_profile
+    from ytb_pipeline.ideation.generator import estimate_minutes
+
+    segments = [SimpleNamespace(narration="x" * 5_100)]
+    profile = load_content_profile("ban-so-6")
+
+    profile_minutes = estimate_minutes(
+        segments, tts_provider="xkiro", video_type="long", content_profile=profile
+    )
+    generic_minutes = estimate_minutes(segments, tts_provider="xkiro", video_type="long")
+
+    assert profile_minutes > generic_minutes

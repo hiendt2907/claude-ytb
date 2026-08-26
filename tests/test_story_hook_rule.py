@@ -149,6 +149,31 @@ def test_speaker_name_prefix_in_narration_is_rejected():
     assert [v["rule"] for v in violations] == ["speaker_prefix"]
 
 
+def test_story_rejects_direct_character_monologue_hidden_in_narrator_voice():
+    script = _story_script([
+        (
+            "situation", "narrator",
+            "An đặt tách cà phê xuống. Chị ơi, em không biết phải bắt đầu từ đâu nữa, "
+            "em đã mở máy rất nhiều lần rồi mà vẫn không dám gửi bản nháp này cho ai cả. "
+            "Cứ nghĩ đến phản hồi là em lại muốn đóng máy và làm việc khác để khỏi phải nhìn vào nó.",
+        ),
+    ])
+
+    violations = qa_agent._check_story_speaker_ownership(script)
+
+    assert [v["rule"] for v in violations] == ["speaker_ownership"]
+
+
+def test_story_rejects_staging_prefix_in_character_voiceover():
+    script = _story_script([
+        ("core_answer", "an", "An đặt tách cà phê xuống: 'Cậu mở hộp thư lần thứ mấy rồi?'"),
+    ])
+
+    violations = qa_agent._check_character_voiceover_is_direct(script)
+
+    assert [v["rule"] for v in violations] == ["character_voiceover_direct"]
+
+
 def test_narration_naming_a_character_normally_is_not_a_prefix_leak():
     script = _story_script([
         ("situation", "narrator", "Bảy giờ, Minh mở hộp thư lần thứ tư. Vẫn phải chờ."),

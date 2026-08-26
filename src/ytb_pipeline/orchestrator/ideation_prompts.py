@@ -183,6 +183,20 @@ def script_generation_system_prompt(
     prompt_rules = "\n\n".join(
         content_profile.prompt_text(name) for name in content_profile.prompts
     )
+    purpose_policy = content_profile.editorial_contract.purpose_policy
+    long_required = ", ".join(purpose_policy.required_for("long")) or "(none declared)"
+    short_required = ", ".join(purpose_policy.required_for("short")) or "(none declared)"
+    purpose_vocabulary = ", ".join(purpose_policy.vocabulary)
+    required_purposes_rule = (
+        f"- Required purposes across every Long: {long_required}. Shorts require {short_required}. "
+        f"Use only purposes from this profile's vocabulary: {purpose_vocabulary}."
+    )
+    if content_profile.narrative_mode == "character_story" and "evidence" in purpose_policy.required_for("long"):
+        required_purposes_rule += (
+            " In a character story, evidence may be a concrete observed consequence, response, "
+            "or detail that tests the character's belief; do not invent a research claim just to "
+            "fill this beat."
+        )
     vg = content_profile.visual_generation
     if content_profile.narrative_mode == "character_story":
         visual_field_rule = (
@@ -195,10 +209,32 @@ def script_generation_system_prompt(
         )
         narrative_contract = (
             f"{visual_field_rule} Dialogue must react to the previous line and sound "
-            "natural when spoken. Do not require strategy or Pexels fields."
+            "natural when spoken. For a section whose speaker_id is a character, "
+            "voiceover is exactly that character's spoken utterance: never narrate "
+            "their action in third person and never put another character's reply "
+            "inside it. Put action in a narrator section or visual_intent, and split "
+            "a back-and-forth into separate speaker turns. Do not require strategy "
+            "or Pexels fields. "
+            + (
+                "Every section must include turn. Narrator sections set turn=null. "
+                "A character section sets turn to an object with non-empty scene and intent, "
+                "and responds_to as null or a previous one-based section number it answers. "
+                "turn is planning metadata only and must never appear in voiceover."
+                if content_profile.content_rules.require_conversation_turns else ""
+            )
         )
     else:
-        narrative_contract = f"For Shorts, strategy-v1 is mandatory: {STRATEGY_V1_CONTRACT}"
+        strategy_rule = (
+            f"For Shorts, strategy-v1 is mandatory: {STRATEGY_V1_CONTRACT}"
+            if content_profile.content_rules.require_short_source_trace
+            else "Do not require a strategy object unless the profile editorial contract above asks for one."
+        )
+        pexels_rule = (
+            "Every section must include a grounded pexels_query for real stock footage."
+            if content_profile.content_rules.require_pexels_query
+            else "Do not require pexels_query unless the profile editorial contract above asks for it."
+        )
+        narrative_contract = f"{strategy_rule} {pexels_rule}"
     return f"""You are the senior editorial writer for content profile
 `{content_profile.profile_id}` version `{content_profile.version}`.
 Return exactly one valid JSON object and no markdown. Set ruleset_id to
@@ -212,7 +248,7 @@ Format contract:
 - Short: {short.viewer_min_sec:g}-{short.viewer_max_sec:g}s, {short.min_sections}-{short.max_sections} sections, aim for {short_chars[0]}-{short_chars[1]} Vietnamese narration characters.
 - Long: {long.viewer_min_sec / 60:g}-{long.viewer_max_sec / 60:g} minutes, {long.min_sections}-{long.max_sections} sections, aim for {long_chars[0]}-{long_chars[1]} Vietnamese narration characters.
 - Every section needs a positive numeric time_goal, purpose, voiceover, and visual_intent.
-- Required purposes across the script: situation, core_answer, application, payoff; use evidence when a factual claim needs support.
+{required_purposes_rule}
 
 Narrative contract:
 {narrative_contract}
@@ -518,10 +554,18 @@ def local_script_prompt(
         content_profile and content_profile.visual_generation and content_profile.visual_generation.enabled
     )
     if content_profile and content_profile.narrative_mode == "character_story":
-        cast_ids = sorted(name for name in content_profile.voice_cast if name != "narrator")
+        cast_ids = sorted(
+            name for name in content_profile.voice_cast
+            if name != content_profile.editorial_contract.narration_speaker_id
+        )
         section_fields = (
             f"Each section also needs speaker_id and scene_characters (array subset of {cast_ids}, "
             "at most 2, listing who is VISIBLE in this frame; use [] for an establishing/prop shot). "
+            + (
+                "Each section also needs turn: narrator uses null; a character uses an object with "
+                "scene, intent, and responds_to (null or a previous one-based section number). "
+                if content_profile.content_rules.require_conversation_turns else ""
+            )
             if auto_visuals
             else "Each section also needs speaker_id and visual_asset; visual_asset is a filename under the profile assets directory. "
         )
@@ -538,7 +582,10 @@ def local_script_prompt(
     visual_asset_instruction = ""
     if content_profile and content_profile.narrative_mode == "character_story":
         if auto_visuals:
-            cast_ids = sorted(name for name in content_profile.voice_cast if name != "narrator")
+            cast_ids = sorted(
+                name for name in content_profile.voice_cast
+                if name != content_profile.editorial_contract.narration_speaker_id
+            )
             visual_asset_instruction = (
                 f"scene_characters lists who is on screen, from {cast_ids}, max 2 — "
                 "never a filename, never more than the two the profile can render together.\n"
@@ -604,21 +651,77 @@ def local_script_prompt(
     )
 
 
-def long_extension_prompt(payload: dict, missing_chars: int) -> str:
+def _long_extension_field_rule(content_profile: "ContentProfile | None") -> str:
+    """Field guidance a new Long section must follow, sourced from the profile.
+
+    This used to hardcode `pexels_query` as required on every added section —
+    correct for the explainer channel, but a story profile with auto-generated
+    scenes has no Pexels field at all, and Long extension paid for an LLM call
+    whose sections were then rejected by script_contract for having the wrong
+    shape. Every field this text asks for must be exactly what the profile's
+    own required-field policy (mirrored in generation_schema/script_contract)
+    will accept.
+    """
+    base = "purpose, time_goal (a positive number), voiceover, visual_intent"
+    if content_profile is None:
+        return f"Each new section must have {base}, pexels_query, caption, hook, transition, payoff, and emphasis."
+    if content_profile.narrative_mode == "character_story":
+        vg = content_profile.visual_generation
+        narrator_id = content_profile.editorial_contract.narration_speaker_id
+        auto_visuals = vg is not None and vg.enabled
+        if auto_visuals:
+            cast_ids = sorted(name for name in content_profile.voice_cast if name != narrator_id)
+            visual_field = (
+                f"scene_characters (array subset of {cast_ids}, at most 2, [] for no one "
+                "visible — never invent visual_asset)"
+            )
+        else:
+            visual_field = "visual_asset (a filename under the profile assets directory)"
+        rule = f"Each new section must have {base}, speaker_id, {visual_field}, caption, hook, transition, payoff, and emphasis."
+        if content_profile.content_rules.require_conversation_turns:
+            rule += (
+                " Each new section also needs turn: narrator sections set turn=null; a character "
+                "section sets turn to an object with non-empty scene and intent, and responds_to as "
+                "null or a previous one-based section number it answers."
+            )
+        return rule
+    pexels_clause = ", pexels_query" if content_profile.content_rules.require_pexels_query else ""
+    return f"Each new section must have {base}{pexels_clause}, caption, hook, transition, payoff, and emphasis."
+
+
+def long_extension_prompt(
+    payload: dict,
+    missing_chars: int,
+    *,
+    max_new_sections: int | None = None,
+    content_profile: "ContentProfile | None" = None,
+) -> str:
     """Ask for only the missing Long sections, keeping one Codex response bounded."""
     context = {
         key: payload.get(key)
         for key in ("slug", "topic", "title", "description", "tags", "voice_profile", "compliance")
     }
-    context["existing_sections"] = payload.get("sections", [])
+    context["existing_sections"] = [
+        {**section, "section_index": index}
+        for index, section in enumerate(payload.get("sections", []) or (), start=1)
+        if isinstance(section, dict)
+    ]
+    if max_new_sections == 1:
+        section_count_instruction = "Add 1 new, topic-specific section "
+    elif max_new_sections is not None:
+        section_count_instruction = f"Add 1-{max_new_sections} new, topic-specific sections "
+    else:
+        section_count_instruction = "Add only as many new, topic-specific sections as are needed "
+    field_rule = _long_extension_field_rule(content_profile)
     return (
         "Extend a Vietnamese long-form YouTube script without rewriting its existing narration.\n"
-        "Return ONLY one JSON object with a `sections` array; do not return the full script or markdown.\n"
-        "Do not rewrite, repeat, or summarize the existing sections. Add 10-12 new, topic-specific sections "
-        f"whose combined `voiceover` is at least {missing_chars:,} Vietnamese characters. Each section must "
-        "have purpose, time_goal (a positive number), voiceover, visual_intent, pexels_query, caption, hook, "
-        "transition, payoff, and emphasis. Place the new material before the final conclusion; develop only the "
-        "same named mechanism through fresh evidence, concrete examples, limits, or applications. Do not add a "
+        "Return ONLY one JSON object with a `sections` array and `insert_before_section_index`; do not return the full script or markdown. "
+        "insert_before_section_index is the one-based section_index of an EXISTING section that the new material must come immediately before. "
+        "Choose the chronological boundary from the supplied story: the first event in your additions must happen before that target section, never after a later time jump, flash-forward, meeting, or conclusion.\n"
+        f"Do not rewrite, repeat, or summarize the existing sections. {section_count_instruction}"
+        f"whose combined `voiceover` is at least {missing_chars:,} Vietnamese characters. {field_rule} Develop only the "
+        "same named mechanism through fresh evidence, concrete examples, limits, or applications. Prefer the fewest "
+        "complete beats that satisfy the missing runtime. Do not add a "
         "second greeting, a duplicate CTA, a generic self-help list, or unsupported factual claims.\n\n"
         f"Script context:\n{json.dumps(context, ensure_ascii=False, indent=2)}"
     )

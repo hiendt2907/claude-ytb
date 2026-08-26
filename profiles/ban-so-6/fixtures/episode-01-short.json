@@ -1,7 +1,7 @@
 {
  "ruleset_id": "2026-07-28.1",
  "profile_id": "ban-so-6",
- "profile_version": "1.1.0",
+  "profile_version": "1.4.0",
  "slug": "ban-so-6-bay-lan-mo-laptop",
  "topic": "Vì sao càng chuẩn bị càng khó bắt đầu",
  "title": "Bảy Lần Mở Laptop",
@@ -24,7 +24,8 @@
   {
    "purpose": "situation",
    "time_goal": 0.08,
-   "speaker_id": "narrator",
+      "speaker_id": "narrator",
+      "turn": null,
    "voiceover": "Sáu giờ bảy, Minh mở laptop. Tám rưỡi, cậu phải gửi bản đề xuất cho chị Hương.",
    "visual_intent": "Minh mở laptop tại bàn số 6",
    "caption": "6:07 — Minh mở laptop",
@@ -41,7 +42,8 @@
   {
    "purpose": "situation",
    "time_goal": 0.06,
-   "speaker_id": "minh",
+      "speaker_id": "minh",
+      "turn": {"scene": "ban_06_0607", "intent": "avoid_starting", "responds_to": null},
    "voiceover": "Sắp lại mấy đầu mục này đã. Lát viết một mạch cho nhanh.",
    "visual_intent": "Minh xếp lại giấy",
    "caption": "Sắp lại đã...",
@@ -56,7 +58,8 @@
   {
    "purpose": "evidence",
    "time_goal": 0.07,
-   "speaker_id": "narrator",
+      "speaker_id": "narrator",
+      "turn": null,
    "voiceover": "Bảy giờ mười tám. File vẫn trống. Còn sáu tờ giấy trên bàn thì đã kín chữ.",
    "visual_intent": "Màn hình trống cạnh giấy kín chữ",
    "caption": "7:18 — File vẫn trống",
@@ -73,7 +76,8 @@
   {
    "purpose": "application",
    "time_goal": 0.09,
-   "speaker_id": "an",
+      "speaker_id": "an",
+      "turn": {"scene": "ban_06_0718", "intent": "ask_for_clarity", "responds_to": 2},
    "voiceover": "Chị hỏi thật nhé... em đang làm đề xuất, hay đang bày mọi thứ cho đẹp để chưa phải bắt đầu?",
    "visual_intent": "An đứng cạnh bàn và hỏi Minh",
    "caption": "Em đang làm, hay đang né?",
@@ -89,7 +93,8 @@
   {
    "purpose": "evidence",
    "time_goal": 0.05,
-   "speaker_id": "minh",
+      "speaker_id": "minh",
+      "turn": {"scene": "ban_06_0718", "intent": "admit_fear", "responds_to": 4},
    "voiceover": "Em chỉ sợ gửi đi rồi người ta thấy nó sơ sài quá.",
    "visual_intent": "Minh nhìn màn hình và thú nhận",
    "caption": "Em sợ nó sơ sài",
@@ -105,7 +110,8 @@
   {
    "purpose": "core_answer",
    "time_goal": 0.09,
-   "speaker_id": "an",
+      "speaker_id": "an",
+      "turn": {"scene": "ban_06_0718", "intent": "make_small_offer", "responds_to": 5},
    "voiceover": "Vậy thì em gửi một bản ngắn trước đi. Chỗ nào chưa đúng, người ta góp ý rồi mình sửa tiếp.",
    "visual_intent": "An đề nghị một bước nhỏ, cụ thể",
    "caption": "Gửi bản ngắn trước đi",
@@ -123,7 +129,8 @@
   {
    "purpose": "application",
    "time_goal": 0.07,
-   "speaker_id": "narrator",
+      "speaker_id": "narrator",
+      "turn": null,
    "voiceover": "Minh im lặng một lúc. Rồi cậu xóa năm đầu mục, gõ ba dòng và gửi cho Tuấn.",
    "visual_intent": "Minh gõ ba dòng và bấm gửi",
    "caption": "Ba dòng. Gửi.",
@@ -140,7 +147,8 @@
   {
    "purpose": "evidence",
    "time_goal": 0.08,
-   "speaker_id": "narrator",
+      "speaker_id": "narrator",
+      "turn": null,
    "voiceover": "Bảy phút sau, Tuấn nhắn lại. Hướng này ổn đấy. Sửa mốc năm giờ thành sáu giờ là được.",
    "visual_intent": "Tin nhắn góp ý hiện cạnh bản nháp",
    "caption": "Hướng này ổn đấy",
@@ -155,7 +163,8 @@
   {
    "purpose": "payoff",
    "time_goal": 0.12,
-   "speaker_id": "narrator",
+      "speaker_id": "narrator",
+      "turn": null,
    "voiceover": "Minh mất hơn một tiếng để tránh một lỗi mà cậu sửa chưa đến một phút. Nếu bạn cũng mắc ở bản đầu tiên, hãy gửi một phần đủ nhỏ để người khác góp ý.",
    "visual_intent": "Minh nhìn bản sửa nhỏ trên màn hình",
    "caption": "Phản hồi thật tốt hơn chuẩn bị mãi",

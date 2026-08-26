@@ -62,7 +62,8 @@ def cmd_verify(args: argparse.Namespace) -> None:
 
 def cmd_retry(args: argparse.Namespace) -> None:
     cli = _cli()
-    queue = cli.load_queue()
+    batch_key = str(getattr(args, "batch_key", "") or "").strip() or None
+    queue = cli.load_queue(batch_key=batch_key) if batch_key is not None else cli.load_queue()
     item = next((i for i in queue if i.slug == args.slug), None)
     if item is None:
         print(f"Không tìm thấy slug '{args.slug}' trong queue.")
@@ -91,6 +92,7 @@ def cmd_retry(args: argparse.Namespace) -> None:
             item,
             _output,
             ledger_path=cli.LEDGER_PATH,
+            batch_key=batch_key,
             auto_state_path=cli.AUTO_STATE_PATH,
         )
     print("✓ Thành công" if ok else "✗ Thất bại — xem assets/batch_cli_warnings.log")

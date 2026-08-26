@@ -1,0 +1,14 @@
+[3/4] Render    ▶  đang dựng video (ai/landscape)...
+[3/4] Render    ✓  (ai/landscape) assets/output/ban-nhap-xau-dau-tien_xkiro.mp4
+[4/4] Publish   ▶  đang upload...
+── DRY RUN — không upload thật ──
+  Loại  : Clip thường
+  Title : Gửi Bản Nháp Xấu Đầu Tiên
+  Tags  : trì hoãn, bắt đầu, hoàn thiện chủ nghĩa, làm việc hiệu quả, tâm lý hành vi
+  Hashtag: #trìhoãn #bắtđầu #hoànthiệnchủnghĩa #làmviệchiệuquả #tâmlýhànhvi
+  Made with AI (containsSyntheticMedia): True
+  Video : assets/output/ban-nhap-xau-dau-tien_xkiro.mp4
+  Thumb : assets/output/ban-nhap-xau-dau-tien_xkiro_thumb.jpg
+  Privacy: private  |  Thời lượng: 400.2s
+[4/4] Publish   ✓  uploaded=False
+Xong stage=publish: uploaded=False url=None

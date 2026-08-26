@@ -2467,7 +2467,8 @@
       "local_path": "assets/broll/bfe7bd84ce2aca63.mp4",
       "topics": [
         "crowd walking city one person standing opposite direction",
-        "person walking past cafe commute city evening crossroads"
+        "person walking past cafe commute city evening crossroads",
+        "person walking to bus stop morning crowd"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -2481,6 +2482,11 @@
           "video_slug": "khi-ly-do-bao-ve-hinh-anh-ban-than-bat-hoa-nhan-thuc_knowledge",
           "role": "payoff",
           "used_at": "2026-07-22T04:21:46.430718+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:40:44.789578+00:00"
         }
       ]
     },
@@ -2493,10 +2499,11 @@
       "topics": [
         "crowd walking city one person standing opposite direction",
         "preparing water bottle commute walking city evening phone app settings",
-        "young adult declining invitation phone alone apartment evening"
+        "young adult declining invitation phone alone apartment evening",
+        "leaking ceiling bucket water"
       ],
       "orientation": "landscape",
-      "duration_sec": 2.5,
+      "duration_sec": 6.0,
       "uses": [
         {
           "video_slug": "vi-sao-ban-nghi-ai-cung-ong-y-voi-minh_knowledge",
@@ -2512,6 +2519,11 @@
           "video_slug": "chi-phi-co-hoi-cai-gia-khong-tren-hoa-don_xkiro",
           "role": "hook",
           "used_at": "2026-08-25T03:23:20.631023+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:39:33.731310+00:00"
         }
       ]
     },
@@ -2524,7 +2536,8 @@
       "topics": [
         "crowd walking city one person standing opposite direction",
         "preparing water bottle commute walking city evening phone app settings",
-        "thoughtful person walking evening journaling window"
+        "thoughtful person walking evening journaling window",
+        "person walking to bus stop morning crowd"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -2543,6 +2556,11 @@
           "video_slug": "chi-phi-chim-khi-nao-nen-dung-lai_xkiro",
           "role": "payoff",
           "used_at": "2026-08-24T14:56:08.342773+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:40:44.798766+00:00"
         }
       ]
     },
@@ -2555,10 +2573,11 @@
       "topics": [
         "crowd walking city one person standing opposite direction",
         "preparing water bottle commute walking city evening phone app settings",
-        "young adult declining invitation phone alone apartment evening"
+        "young adult declining invitation phone alone apartment evening",
+        "leaking ceiling bucket water"
       ],
       "orientation": "landscape",
-      "duration_sec": 2.5,
+      "duration_sec": 6.0,
       "uses": [
         {
           "video_slug": "vi-sao-ban-nghi-ai-cung-ong-y-voi-minh_knowledge",
@@ -2574,6 +2593,11 @@
           "video_slug": "chi-phi-co-hoi-cai-gia-khong-tren-hoa-don_xkiro",
           "role": "hook",
           "used_at": "2026-08-25T03:23:20.659071+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:39:33.748417+00:00"
         }
       ]
     },
@@ -2641,7 +2665,8 @@
       "source_url": "https://videos.pexels.com/video-files/5965077/5965077-hd_1920_1080_24fps.mp4",
       "local_path": "assets/broll/847708e766162676.mp4",
       "topics": [
-        "university campus students walking outdoors sunny"
+        "university campus students walking outdoors sunny",
+        "person walking to bus stop morning crowd"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -2650,6 +2675,11 @@
           "video_slug": "vi-sao-ban-nghi-ai-cung-ong-y-voi-minh_knowledge",
           "role": "payoff",
           "used_at": "2026-07-16T05:38:47.412344+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:40:44.807832+00:00"
         }
       ]
     },
@@ -3045,7 +3075,8 @@
       "source_url": "https://videos.pexels.com/video-files/15872811/15872811-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/a199bf892ed12d58.mp4",
       "topics": [
-        "person typing angry comment laptop night screen glow"
+        "person typing angry comment laptop night screen glow",
+        "blank laptop screen cursor blinking"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -3054,6 +3085,11 @@
           "video_slug": "vi-sao-ban-nghi-ai-cung-ong-y-voi-minh_knowledge",
           "role": "payoff",
           "used_at": "2026-07-16T05:40:23.585733+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:39:03.592772+00:00"
         }
       ]
     },
@@ -3064,7 +3100,8 @@
       "source_url": "https://videos.pexels.com/video-files/34771069/14741596_1920_1080_25fps.mp4",
       "local_path": "assets/broll/a5bc165bda86edb5.mp4",
       "topics": [
-        "person typing angry comment laptop night screen glow"
+        "person typing angry comment laptop night screen glow",
+        "blank laptop screen cursor blinking"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -3073,6 +3110,11 @@
           "video_slug": "vi-sao-ban-nghi-ai-cung-ong-y-voi-minh_knowledge",
           "role": "payoff",
           "used_at": "2026-07-16T05:40:23.586758+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:39:03.601552+00:00"
         }
       ]
     },
@@ -3103,7 +3145,8 @@
       "local_path": "assets/broll/b63aafa09f894a92.mp4",
       "topics": [
         "two colleagues disagreement tense office conversation",
-        "two friends calm conversation cafe listening"
+        "two friends calm conversation cafe listening",
+        "calm morning routine focus lifestyle"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -3117,6 +3160,11 @@
           "video_slug": "khi-ly-do-bao-ve-hinh-anh-ban-than-bat-hoa-nhan-thuc_knowledge",
           "role": "payoff",
           "used_at": "2026-07-22T04:20:55.952857+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:40:30.161476+00:00"
         }
       ]
     },
@@ -3128,7 +3176,8 @@
       "local_path": "assets/broll/b6030820416b7df0.mp4",
       "topics": [
         "two colleagues disagreement tense office conversation",
-        "two friends calm conversation cafe listening"
+        "two friends calm conversation cafe listening",
+        "calm morning routine focus lifestyle"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -3142,6 +3191,11 @@
           "video_slug": "khi-ly-do-bao-ve-hinh-anh-ban-than-bat-hoa-nhan-thuc_knowledge",
           "role": "payoff",
           "used_at": "2026-07-22T04:20:55.946418+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:40:30.152759+00:00"
         }
       ]
     },
@@ -3172,7 +3226,8 @@
       "local_path": "assets/broll/91962072b4adf0b5.mp4",
       "topics": [
         "two colleagues disagreement tense office conversation",
-        "two friends calm conversation cafe listening"
+        "two friends calm conversation cafe listening",
+        "calm morning routine focus lifestyle"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -3186,6 +3241,11 @@
           "video_slug": "khi-ly-do-bao-ve-hinh-anh-ban-than-bat-hoa-nhan-thuc_knowledge",
           "role": "payoff",
           "used_at": "2026-07-22T04:20:55.940375+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:40:27.253179+00:00"
         }
       ]
     },
@@ -3267,10 +3327,11 @@
       "topics": [
         "couple planning vacation laptop living room evening",
         "working parent commuting evening tired realistic lifestyle",
-        "person working laptop planner clock office daylight evening"
+        "person working laptop planner clock office daylight evening",
+        "calm morning routine focus lifestyle"
       ],
       "orientation": "landscape",
-      "duration_sec": 2.5,
+      "duration_sec": 6.0,
       "uses": [
         {
           "video_slug": "vi-sao-ban-nghi-ai-cung-ong-y-voi-minh_knowledge",
@@ -3286,6 +3347,11 @@
           "video_slug": "planning-fallacy-du-lieu-qua-khu_xkiro",
           "role": "hook",
           "used_at": "2026-08-25T01:56:14.835775+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:40:38.976126+00:00"
         }
       ]
     },
@@ -4150,10 +4216,11 @@
         "person writing three steps journal asking question phone",
         "morning reflection journal window natural light",
         "five minute journal three questions decision reflection",
-        "writing journal question pen desk morning light"
+        "writing journal question pen desk morning light",
+        "morning coffee shop window condensation"
       ],
       "orientation": "landscape",
-      "duration_sec": 6.0,
+      "duration_sec": 2.5,
       "uses": [
         {
           "video_slug": "vi-sao-ban-nghi-ai-cung-ong-y-voi-minh_knowledge",
@@ -4169,6 +4236,11 @@
           "video_slug": "chi-phi-chim-khi-nao-nen-dung-lai_xkiro",
           "role": "payoff",
           "used_at": "2026-08-24T13:57:33.179220+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "hook",
+          "used_at": "2026-08-25T10:38:58.531857+00:00"
         }
       ]
     },
@@ -4230,7 +4302,8 @@
       "topics": [
         "open notebook sending message phone desk warm light",
         "person typing honest text message phone evening home",
-        "person composing difficult message phone home"
+        "person composing difficult message phone home",
+        "typing deleting text computer"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -4249,6 +4322,11 @@
           "video_slug": "chi-phi-chim-khi-nao-nen-dung-lai_xkiro",
           "role": "payoff",
           "used_at": "2026-08-24T14:55:57.239785+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:39:24.154802+00:00"
         }
       ]
     },
@@ -4264,7 +4342,8 @@
         "woman online course laptop notebook evening home",
         "person laptop online course payment receipt evening desk",
         "typing professional deadline update message laptop",
-        "receipt payment phone calendar empty schedule close up"
+        "receipt payment phone calendar empty schedule close up",
+        "typing deleting text computer"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -4298,6 +4377,11 @@
           "video_slug": "chi-phi-co-hoi-cai-gia-khong-tren-hoa-don_xkiro",
           "role": "payoff",
           "used_at": "2026-08-25T03:23:33.181975+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:39:24.171898+00:00"
         }
       ]
     },
@@ -4313,7 +4397,8 @@
         "woman online course laptop notebook evening home",
         "person laptop online course payment receipt evening desk",
         "typing professional deadline update message laptop",
-        "receipt payment phone calendar empty schedule close up"
+        "receipt payment phone calendar empty schedule close up",
+        "typing deleting text computer"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -4347,6 +4432,11 @@
           "video_slug": "chi-phi-co-hoi-cai-gia-khong-tren-hoa-don_xkiro",
           "role": "payoff",
           "used_at": "2026-08-25T03:23:33.172587+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:39:24.163437+00:00"
         }
       ]
     },
@@ -4409,7 +4499,8 @@
       "topics": [
         "crowd walking city one person standing opposite direction",
         "preparing water bottle commute walking city evening phone app settings",
-        "glass overflowing water"
+        "glass overflowing water",
+        "leaking ceiling bucket water"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -4428,6 +4519,11 @@
           "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
           "role": "payoff",
           "used_at": "2026-07-27T13:58:53.697591+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:39:33.739898+00:00"
         }
       ]
     },
@@ -7627,7 +7723,8 @@
       "source_url": "https://videos.pexels.com/video-files/3126361/3126361-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/44831ee0a80b4906.mp4",
       "topics": [
-        "stressed employee reading email late deadline office"
+        "stressed employee reading email late deadline office",
+        "stressed employee meeting boss"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -7636,6 +7733,11 @@
           "video_slug": "ban-a-oi-viec-nhung-mot-phan-tam-tri-van-o-lai_knowledge",
           "role": "payoff",
           "used_at": "2026-07-16T10:00:40.976999+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:39:45.396481+00:00"
         }
       ]
     },
@@ -7646,7 +7748,8 @@
       "source_url": "https://videos.pexels.com/video-files/8135866/8135866-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/73257e30b33f7274.mp4",
       "topics": [
-        "stressed employee reading email late deadline office"
+        "stressed employee reading email late deadline office",
+        "stressed employee meeting boss"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -7655,6 +7758,11 @@
           "video_slug": "ban-a-oi-viec-nhung-mot-phan-tam-tri-van-o-lai_knowledge",
           "role": "payoff",
           "used_at": "2026-07-16T10:00:40.979544+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:39:45.405816+00:00"
         }
       ]
     },
@@ -8248,7 +8356,8 @@
       "local_path": "assets/broll/904bfd61830287ad.mp4",
       "topics": [
         "student studying textbook phone distraction desk night",
-        "healthy snack desk phone message reply routine"
+        "healthy snack desk phone message reply routine",
+        "calm morning routine focus lifestyle"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -8262,6 +8371,11 @@
           "video_slug": "khi-ly-do-bao-ve-hinh-anh-ban-than-bat-hoa-nhan-thuc_knowledge",
           "role": "payoff",
           "used_at": "2026-07-22T04:20:27.744274+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:40:22.403623+00:00"
         }
       ]
     },
@@ -8335,7 +8449,8 @@
       "local_path": "assets/broll/7e40d4adc8deb415.mp4",
       "topics": [
         "person putting phone down study timer focus",
-        "snowball rolling down hill gaining size"
+        "snowball rolling down hill gaining size",
+        "calm morning routine focus lifestyle"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -8349,6 +8464,11 @@
           "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
           "role": "payoff",
           "used_at": "2026-07-27T13:59:10.189607+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:40:22.386151+00:00"
         }
       ]
     },
@@ -8397,7 +8517,8 @@
       "local_path": "assets/broll/b7141aa50f6cd438.mp4",
       "topics": [
         "person putting phone down study timer focus",
-        "person placing book on pillow hiding phone"
+        "person placing book on pillow hiding phone",
+        "calm morning routine focus lifestyle"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -8411,6 +8532,11 @@
           "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
           "role": "payoff",
           "used_at": "2026-07-27T13:59:13.521818+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:40:30.170051+00:00"
         }
       ]
     },
@@ -8422,7 +8548,8 @@
       "local_path": "assets/broll/9591fac6a962708d.mp4",
       "topics": [
         "person putting phone down study timer focus",
-        "snowball rolling down hill gaining size"
+        "snowball rolling down hill gaining size",
+        "calm morning routine focus lifestyle"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -8436,6 +8563,11 @@
           "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
           "role": "payoff",
           "used_at": "2026-07-27T13:59:10.196138+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:40:27.262383+00:00"
         }
       ]
     },
@@ -8719,7 +8851,8 @@
       "source_url": "https://videos.pexels.com/video-files/7792451/7792451-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/aa240b48c617cc90.mp4",
       "topics": [
-        "person writing four step framework whiteboard notes"
+        "person writing four step framework whiteboard notes",
+        "messy notes vs blank screen"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -8728,6 +8861,11 @@
           "video_slug": "ban-a-oi-viec-nhung-mot-phan-tam-tri-van-o-lai_knowledge",
           "role": "payoff",
           "used_at": "2026-07-16T10:04:36.569310+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:39:39.675628+00:00"
         }
       ]
     },
@@ -8740,7 +8878,8 @@
       "topics": [
         "person writing four step framework whiteboard notes",
         "simple phone notes cafe reflection friends evening",
-        "task list planning kitchen groceries work phone notes"
+        "task list planning kitchen groceries work phone notes",
+        "colorful notes planning strategy"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -8759,6 +8898,11 @@
           "video_slug": "planning-fallacy-du-lieu-qua-khu_xkiro",
           "role": "payoff",
           "used_at": "2026-08-25T01:57:14.325246+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:39:13.889601+00:00"
         }
       ]
     },
@@ -8801,7 +8945,8 @@
       "local_path": "assets/broll/8d79d80ab5e81067.mp4",
       "topics": [
         "hand writing action item notebook then typing laptop",
-        "two column notebook decision analysis hand writing"
+        "two column notebook decision analysis hand writing",
+        "hand writing bullet points notebook"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -8815,6 +8960,11 @@
           "video_slug": "chi-phi-chim-khi-nao-nen-dung-lai_xkiro",
           "role": "payoff",
           "used_at": "2026-08-24T14:54:51.148946+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:39:08.757284+00:00"
         }
       ]
     },
@@ -8863,7 +9013,8 @@
       "local_path": "assets/broll/db3fcfede0f342c5.mp4",
       "topics": [
         "hand writing action item notebook then typing laptop",
-        "two column notebook decision analysis hand writing"
+        "two column notebook decision analysis hand writing",
+        "hand writing bullet points notebook"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -8877,6 +9028,11 @@
           "video_slug": "chi-phi-chim-khi-nao-nen-dung-lai_xkiro",
           "role": "payoff",
           "used_at": "2026-08-24T14:54:51.155779+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:39:08.766478+00:00"
         }
       ]
     },
@@ -8925,7 +9081,8 @@
       "local_path": "assets/broll/5ea996366f6c37fa.mp4",
       "topics": [
         "sorting sticky notes categories calm workspace",
-        "small decisions escalating commitment sticky notes timeline"
+        "small decisions escalating commitment sticky notes timeline",
+        "calm morning routine focus lifestyle"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -8939,6 +9096,11 @@
           "video_slug": "chi-phi-chim-khi-nao-nen-dung-lai_xkiro",
           "role": "payoff",
           "used_at": "2026-08-24T13:58:51.135698+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:40:19.548904+00:00"
         }
       ]
     },
@@ -8949,7 +9111,8 @@
       "source_url": "https://videos.pexels.com/video-files/9057504/9057504-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/aad2f39fdbf35400.mp4",
       "topics": [
-        "sorting sticky notes categories calm workspace"
+        "sorting sticky notes categories calm workspace",
+        "messy notes vs blank screen"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -8958,6 +9121,11 @@
           "video_slug": "ban-a-oi-viec-nhung-mot-phan-tam-tri-van-o-lai_knowledge",
           "role": "payoff",
           "used_at": "2026-07-16T10:05:16.533687+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:39:39.684546+00:00"
         }
       ]
     },
@@ -8969,7 +9137,8 @@
       "local_path": "assets/broll/3fa08e6a20c8d30a.mp4",
       "topics": [
         "sorting sticky notes categories calm workspace",
-        "calm person leaving cafe evening reflective walk home"
+        "calm person leaving cafe evening reflective walk home",
+        "calm morning routine focus lifestyle"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -8983,6 +9152,11 @@
           "video_slug": "khi-ly-do-bao-ve-hinh-anh-ban-than-bat-hoa-nhan-thuc_knowledge",
           "role": "payoff",
           "used_at": "2026-07-22T04:23:02.532011+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:40:13.902455+00:00"
         }
       ]
     },
@@ -8993,7 +9167,8 @@
       "source_url": "https://videos.pexels.com/video-files/7252988/7252988-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/c4fb78f5864a88fa.mp4",
       "topics": [
-        "sorting sticky notes categories calm workspace"
+        "sorting sticky notes categories calm workspace",
+        "calm morning routine focus lifestyle"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -9002,6 +9177,11 @@
           "video_slug": "ban-a-oi-viec-nhung-mot-phan-tam-tri-van-o-lai_knowledge",
           "role": "payoff",
           "used_at": "2026-07-16T10:05:16.540644+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:40:05.343157+00:00"
         }
       ]
     },
@@ -9052,7 +9232,8 @@
         "person tracking habits weekly journal pen desk",
         "habit tracking journal coffee shop lifestyle notebook",
         "calm professional conversation coffee shop notebook",
-        "seven day habit tracker notebook pen coffee"
+        "seven day habit tracker notebook pen coffee",
+        "calm morning routine focus lifestyle"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -9076,6 +9257,11 @@
           "video_slug": "chi-phi-co-hoi-cai-gia-khong-tren-hoa-don_xkiro",
           "role": "payoff",
           "used_at": "2026-08-25T03:24:58.553352+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:40:00.183021+00:00"
         }
       ]
     },
@@ -9384,10 +9570,11 @@
       "topics": [
         "person resting looking out window calm office",
         "morning reflection journal window natural light",
-        "person looking in mirror frustrated reflection"
+        "person looking in mirror frustrated reflection",
+        "morning coffee shop window condensation"
       ],
       "orientation": "landscape",
-      "duration_sec": 6.0,
+      "duration_sec": 2.5,
       "uses": [
         {
           "video_slug": "ban-a-oi-viec-nhung-mot-phan-tam-tri-van-o-lai_knowledge",
@@ -9403,6 +9590,11 @@
           "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
           "role": "payoff",
           "used_at": "2026-07-27T13:58:51.324001+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "hook",
+          "used_at": "2026-08-25T10:38:58.541192+00:00"
         }
       ]
     },
@@ -9446,7 +9638,8 @@
       "topics": [
         "person resting looking out window calm office",
         "person looking at clock tired office",
-        "family watching movie home relaxed resting by window"
+        "family watching movie home relaxed resting by window",
+        "calm morning routine focus lifestyle"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -9465,6 +9658,11 @@
           "video_slug": "chi-phi-co-hoi-cai-gia-khong-tren-hoa-don_xkiro",
           "role": "payoff",
           "used_at": "2026-08-25T03:23:59.968298+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:40:41.917633+00:00"
         }
       ]
     },
@@ -9807,10 +10005,11 @@
       "topics": [
         "smartphone notification screen desk evening light",
         "morning reflection journal window natural light",
-        "writing journal question pen desk morning light"
+        "writing journal question pen desk morning light",
+        "morning coffee shop window condensation"
       ],
       "orientation": "landscape",
-      "duration_sec": 6.0,
+      "duration_sec": 2.5,
       "uses": [
         {
           "video_slug": "ban-a-oi-viec-nhung-mot-phan-tam-tri-van-o-lai_knowledge",
@@ -9826,6 +10025,11 @@
           "video_slug": "chi-phi-chim-khi-nao-nen-dung-lai_xkiro",
           "role": "payoff",
           "used_at": "2026-08-24T14:57:11.653642+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "hook",
+          "used_at": "2026-08-25T10:38:58.549218+00:00"
         }
       ]
     },
@@ -17642,7 +17846,8 @@
         "new employee confused searching spreadsheet files office",
         "person journaling food habit reflection at cafe",
         "person closing old planner opening new plan calm reflection",
-        "closing old project opening new plan notebook"
+        "closing old project opening new plan notebook",
+        "calm morning routine focus lifestyle"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -17661,6 +17866,11 @@
           "video_slug": "chi-phi-chim-khi-nao-nen-dung-lai_xkiro",
           "role": "payoff",
           "used_at": "2026-08-24T13:58:08.663658+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:40:37.300194+00:00"
         }
       ]
     },
@@ -17798,7 +18008,8 @@
       "local_path": "assets/broll/408394bcba3f8c07.mp4",
       "topics": [
         "clear work brief checklist spreadsheet laptop",
-        "packing suitcase travel documents charger bedroom checklist"
+        "packing suitcase travel documents charger bedroom checklist",
+        "relieved person packing bag sunlight"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -17812,6 +18023,11 @@
           "video_slug": "planning-fallacy-du-lieu-qua-khu_xkiro",
           "role": "payoff",
           "used_at": "2026-08-25T01:57:05.676062+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:39:55.394220+00:00"
         }
       ]
     },
@@ -19952,7 +20168,8 @@
       "local_path": "assets/broll/3e2ff975b0d0bca0.mp4",
       "topics": [
         "quality checklist content production desk",
-        "packing suitcase travel documents charger bedroom checklist"
+        "packing suitcase travel documents charger bedroom checklist",
+        "relieved person packing bag sunlight"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -19966,6 +20183,11 @@
           "video_slug": "planning-fallacy-du-lieu-qua-khu_xkiro",
           "role": "payoff",
           "used_at": "2026-08-25T01:57:05.668889+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:39:55.385694+00:00"
         }
       ]
     },
@@ -20235,7 +20457,8 @@
       "local_path": "assets/broll/110e9510b8dae68c.mp4",
       "topics": [
         "writer proofreading social media article laptop",
-        "fragmented calendar focus time laptop multitasking"
+        "fragmented calendar focus time laptop multitasking",
+        "calm morning routine focus lifestyle"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -20249,6 +20472,11 @@
           "video_slug": "planning-fallacy-du-lieu-qua-khu_xkiro",
           "role": "payoff",
           "used_at": "2026-08-25T01:59:08.779119+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:40:05.370885+00:00"
         }
       ]
     },
@@ -20317,7 +20545,8 @@
       "local_path": "assets/broll/bf0e003428051a85.mp4",
       "topics": [
         "person putting phone face down desk",
-        "healthy snack desk phone message reply routine"
+        "healthy snack desk phone message reply routine",
+        "calm morning routine focus lifestyle"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -20331,6 +20560,11 @@
           "video_slug": "khi-ly-do-bao-ve-hinh-anh-ban-than-bat-hoa-nhan-thuc_knowledge",
           "role": "payoff",
           "used_at": "2026-07-22T04:20:27.750463+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:40:30.178650+00:00"
         }
       ]
     },
@@ -21238,7 +21472,8 @@
       "source_url": "https://videos.pexels.com/video-files/7647791/7647791-hd_1920_1080_30fps.mp4",
       "local_path": "assets/broll/933babb4fe2e8fce.mp4",
       "topics": [
-        "employee asking question in team meeting"
+        "employee asking question in team meeting",
+        "stressed employee meeting boss"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -21247,6 +21482,11 @@
           "video_slug": "hieu-ung-en-san-khau-vi-sao-mot-loi-nho-khien-ban-tuong-ai-cung-ang-chu-y_knowledge",
           "role": "payoff",
           "used_at": "2026-07-17T14:08:29.368940+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:39:45.414467+00:00"
         }
       ]
     },
@@ -21289,7 +21529,8 @@
       "local_path": "assets/broll/4348f8479f16408c.mp4",
       "topics": [
         "moderating online comments laptop calm workspace",
-        "online shopping sale countdown thoughtful person laptop"
+        "online shopping sale countdown thoughtful person laptop",
+        "calm morning routine focus lifestyle"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -21303,6 +21544,11 @@
           "video_slug": "khi-ly-do-bao-ve-hinh-anh-ban-than-bat-hoa-nhan-thuc_knowledge",
           "role": "payoff",
           "used_at": "2026-07-22T04:21:19.356414+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:40:13.910945+00:00"
         }
       ]
     },
@@ -21611,7 +21857,8 @@
       "source_url": "https://videos.pexels.com/video-files/7550639/7550639-hd_1920_1080_30fps.mp4",
       "local_path": "assets/broll/e290f469a2b6d786.mp4",
       "topics": [
-        "calm person reviewing work priorities"
+        "calm person reviewing work priorities",
+        "calm morning routine focus lifestyle"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -21620,6 +21867,11 @@
           "video_slug": "hieu-ung-en-san-khau-vi-sao-mot-loi-nho-khien-ban-tuong-ai-cung-ang-chu-y_knowledge",
           "role": "payoff",
           "used_at": "2026-07-17T14:10:04.098968+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:40:05.361598+00:00"
         }
       ]
     },
@@ -21631,7 +21883,8 @@
       "local_path": "assets/broll/83ca4c8c40c067bd.mp4",
       "topics": [
         "calm person reviewing work priorities",
-        "work shoes budget emergency expense comparison"
+        "work shoes budget emergency expense comparison",
+        "calm morning routine focus lifestyle"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -21645,6 +21898,11 @@
           "video_slug": "chi-phi-co-hoi-cai-gia-khong-tren-hoa-don_xkiro",
           "role": "payoff",
           "used_at": "2026-08-25T03:24:24.035408+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:40:22.395109+00:00"
         }
       ]
     },
@@ -21655,7 +21913,8 @@
       "source_url": "https://videos.pexels.com/video-files/7550641/7550641-hd_1920_1080_30fps.mp4",
       "local_path": "assets/broll/d68430b8948b2496.mp4",
       "topics": [
-        "calm person reviewing work priorities"
+        "calm person reviewing work priorities",
+        "calm morning routine focus lifestyle"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -21664,6 +21923,11 @@
           "video_slug": "hieu-ung-en-san-khau-vi-sao-mot-loi-nho-khien-ban-tuong-ai-cung-ang-chu-y_knowledge",
           "role": "payoff",
           "used_at": "2026-07-17T14:10:04.148554+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:40:05.352737+00:00"
         }
       ]
     },
@@ -22258,7 +22522,8 @@
       "source_url": "https://videos.pexels.com/video-files/7647809/7647809-hd_1920_1080_30fps.mp4",
       "local_path": "assets/broll/abe351ea413ab9c7.mp4",
       "topics": [
-        "educational presenter speaking to camera calm light"
+        "educational presenter speaking to camera calm light",
+        "calm morning routine focus lifestyle"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -22267,6 +22532,11 @@
           "video_slug": "hieu-ung-en-san-khau-vi-sao-mot-loi-nho-khien-ban-tuong-ai-cung-ang-chu-y_knowledge",
           "role": "payoff",
           "used_at": "2026-07-17T14:12:59.352657+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:40:00.192485+00:00"
         }
       ]
     },
@@ -22278,7 +22548,8 @@
       "local_path": "assets/broll/4b186b1339215b23.mp4",
       "topics": [
         "educational presenter speaking to camera calm light",
-        "calm person leaving cafe evening reflective walk home"
+        "calm person leaving cafe evening reflective walk home",
+        "calm morning routine focus lifestyle"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -22292,6 +22563,11 @@
           "video_slug": "khi-ly-do-bao-ve-hinh-anh-ban-than-bat-hoa-nhan-thuc_knowledge",
           "role": "payoff",
           "used_at": "2026-07-22T04:23:02.538114+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:40:19.539462+00:00"
         }
       ]
     },
@@ -22302,7 +22578,8 @@
       "source_url": "https://videos.pexels.com/video-files/8716788/8716788-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/c432ebfa8956bd55.mp4",
       "topics": [
-        "educational presenter speaking to camera calm light"
+        "educational presenter speaking to camera calm light",
+        "calm morning routine focus lifestyle"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -22311,6 +22588,11 @@
           "video_slug": "hieu-ung-en-san-khau-vi-sao-mot-loi-nho-khien-ban-tuong-ai-cung-ang-chu-y_knowledge",
           "role": "payoff",
           "used_at": "2026-07-17T14:12:59.360884+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:40:00.201599+00:00"
         }
       ]
     },
@@ -22321,7 +22603,8 @@
       "source_url": "https://videos.pexels.com/video-files/32075797/13672868_1920_1080_25fps.mp4",
       "local_path": "assets/broll/a5b7fefac03821eb.mp4",
       "topics": [
-        "workflow steps sticky notes computer office"
+        "workflow steps sticky notes computer office",
+        "browsing computer files folders"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -22330,6 +22613,11 @@
           "video_slug": "loi-nguyen-tri-thuc-vi-sao-biet-roi-lai-kho-giai-thich-cho-nguoi-khac_knowledge",
           "role": "payoff",
           "used_at": "2026-07-17T14:13:01.121248+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:39:19.021641+00:00"
         }
       ]
     },
@@ -22365,7 +22653,8 @@
       "source_url": "https://videos.pexels.com/video-files/5583011/5583011-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/5edcadd324d76a3d.mp4",
       "topics": [
-        "workflow steps sticky notes computer office"
+        "workflow steps sticky notes computer office",
+        "browsing computer files folders"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -22374,6 +22663,11 @@
           "video_slug": "loi-nguyen-tri-thuc-vi-sao-biet-roi-lai-kho-giai-thich-cho-nguoi-khac_knowledge",
           "role": "payoff",
           "used_at": "2026-07-17T14:13:01.179462+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:39:19.012857+00:00"
         }
       ]
     },
@@ -22434,7 +22728,8 @@
       "source_url": "https://videos.pexels.com/video-files/7147921/7147921-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/18c383e2f9ea3a0d.mp4",
       "topics": [
-        "data analyst categorizing customer feedback computer"
+        "data analyst categorizing customer feedback computer",
+        "browsing computer files folders"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -22443,6 +22738,11 @@
           "video_slug": "loi-nguyen-tri-thuc-vi-sao-biet-roi-lai-kho-giai-thich-cho-nguoi-khac_knowledge",
           "role": "payoff",
           "used_at": "2026-07-17T14:13:43.205843+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:39:19.003744+00:00"
         }
       ]
     },
@@ -22472,7 +22772,8 @@
       "source_url": "https://videos.pexels.com/video-files/36418660/15442087_1920_1080_25fps.mp4",
       "local_path": "assets/broll/b1cbb5e3e600ff4b.mp4",
       "topics": [
-        "data analyst categorizing customer feedback computer"
+        "data analyst categorizing customer feedback computer",
+        "waitress serving coffee customer"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -22481,6 +22782,11 @@
           "video_slug": "loi-nguyen-tri-thuc-vi-sao-biet-roi-lai-kho-giai-thich-cho-nguoi-khac_knowledge",
           "role": "payoff",
           "used_at": "2026-07-17T14:13:43.216413+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:39:28.818348+00:00"
         }
       ]
     },
@@ -22567,7 +22873,8 @@
       "local_path": "assets/broll/26ca09fa1ddd7637.mp4",
       "topics": [
         "checking checklist laptop office close up",
-        "packing suitcase travel documents charger bedroom checklist"
+        "packing suitcase travel documents charger bedroom checklist",
+        "relieved person packing bag sunlight"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -22581,6 +22888,11 @@
           "video_slug": "planning-fallacy-du-lieu-qua-khu_xkiro",
           "role": "payoff",
           "used_at": "2026-08-25T01:57:05.662144+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:39:55.376539+00:00"
         }
       ]
     },
@@ -22717,7 +23029,8 @@
       "source_url": "https://videos.pexels.com/video-files/7448473/7448473-hd_2048_1080_25fps.mp4",
       "local_path": "assets/broll/d16dd5206b11a58e.mp4",
       "topics": [
-        "manager sending clear task instructions laptop"
+        "manager sending clear task instructions laptop",
+        "sending email clicking mouse"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -22726,6 +23039,11 @@
           "video_slug": "loi-nguyen-tri-thuc-vi-sao-biet-roi-lai-kho-giai-thich-cho-nguoi-khac_knowledge",
           "role": "payoff",
           "used_at": "2026-07-17T14:16:42.269882+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:39:49.904388+00:00"
         }
       ]
     },
@@ -22736,7 +23054,8 @@
       "source_url": "https://videos.pexels.com/video-files/7100893/7100893-hd_1920_1080_30fps.mp4",
       "local_path": "assets/broll/863be1ffb91110b6.mp4",
       "topics": [
-        "manager sending clear task instructions laptop"
+        "manager sending clear task instructions laptop",
+        "sending email clicking mouse"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -22745,6 +23064,11 @@
           "video_slug": "loi-nguyen-tri-thuc-vi-sao-biet-roi-lai-kho-giai-thich-cho-nguoi-khac_knowledge",
           "role": "payoff",
           "used_at": "2026-07-17T14:16:42.279853+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:39:49.895050+00:00"
         }
       ]
     },
@@ -22755,7 +23079,8 @@
       "source_url": "https://videos.pexels.com/video-files/8135920/8135920-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/d55b45b7323247cb.mp4",
       "topics": [
-        "manager sending clear task instructions laptop"
+        "manager sending clear task instructions laptop",
+        "sending email clicking mouse"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -22764,6 +23089,11 @@
           "video_slug": "loi-nguyen-tri-thuc-vi-sao-biet-roi-lai-kho-giai-thich-cho-nguoi-khac_knowledge",
           "role": "payoff",
           "used_at": "2026-07-17T14:16:42.291053+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:39:49.912985+00:00"
         }
       ]
     },
@@ -24134,7 +24464,8 @@
       "source_url": "https://videos.pexels.com/video-files/7692852/7692852-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/9b8a1dbad97fda06.mp4",
       "topics": [
-        "focused office workflow customer feedback analysis"
+        "focused office workflow customer feedback analysis",
+        "waitress serving coffee customer"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -24143,6 +24474,11 @@
           "video_slug": "loi-nguyen-tri-thuc-vi-sao-biet-roi-lai-kho-giai-thich-cho-nguoi-khac_knowledge",
           "role": "payoff",
           "used_at": "2026-07-17T14:28:36.422637+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:39:28.809783+00:00"
         }
       ]
     },
@@ -24172,7 +24508,8 @@
       "source_url": "https://videos.pexels.com/video-files/7682732/7682732-hd_1920_1080_24fps.mp4",
       "local_path": "assets/broll/9895a8ed7d9ca163.mp4",
       "topics": [
-        "focused office workflow customer feedback analysis"
+        "focused office workflow customer feedback analysis",
+        "waitress serving coffee customer"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -24181,6 +24518,11 @@
           "video_slug": "loi-nguyen-tri-thuc-vi-sao-biet-roi-lai-kho-giai-thich-cho-nguoi-khac_knowledge",
           "role": "payoff",
           "used_at": "2026-07-17T14:28:36.451773+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:39:28.800680+00:00"
         }
       ]
     },
@@ -24413,7 +24755,8 @@
         "person writing clear task instructions notebook office",
         "person writing time tradeoff decision notebook evening",
         "hands writing notes calendar time tracking notebook",
-        "budget calendar decision notebook split screen"
+        "budget calendar decision notebook split screen",
+        "messy notes vs blank screen"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -24437,6 +24780,11 @@
           "video_slug": "chi-phi-co-hoi-cai-gia-khong-tren-hoa-don_xkiro",
           "role": "payoff",
           "used_at": "2026-08-25T03:24:36.209604+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:39:39.666500+00:00"
         }
       ]
     },
@@ -28377,7 +28725,8 @@
         "overwhelmed person looking at laptop task list",
         "online shopping sale countdown thoughtful person laptop",
         "task list planning kitchen groceries work phone notes",
-        "shopping shoes sale price budget notebook travel planning"
+        "shopping shoes sale price budget notebook travel planning",
+        "colorful notes planning strategy"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -28401,6 +28750,11 @@
           "video_slug": "chi-phi-co-hoi-cai-gia-khong-tren-hoa-don_xkiro",
           "role": "payoff",
           "used_at": "2026-08-25T03:23:40.246660+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:39:13.898398+00:00"
         }
       ]
     },
@@ -28475,7 +28829,8 @@
       "topics": [
         "overwhelmed person looking at laptop task list",
         "brain animation prefrontal cortex glowing",
-        "task list planning kitchen groceries work phone notes"
+        "task list planning kitchen groceries work phone notes",
+        "colorful notes planning strategy"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -28494,6 +28849,11 @@
           "video_slug": "planning-fallacy-du-lieu-qua-khu_xkiro",
           "role": "payoff",
           "used_at": "2026-08-25T01:57:14.311305+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:39:13.880773+00:00"
         }
       ]
     },
@@ -28869,7 +29229,8 @@
       "local_path": "assets/broll/3661085cc073551f.mp4",
       "topics": [
         "writer staring at blank document laptop",
-        "fragmented calendar focus time laptop multitasking"
+        "fragmented calendar focus time laptop multitasking",
+        "calm morning routine focus lifestyle"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -28883,6 +29244,11 @@
           "video_slug": "planning-fallacy-du-lieu-qua-khu_xkiro",
           "role": "payoff",
           "used_at": "2026-08-25T01:59:08.794112+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:40:13.893493+00:00"
         }
       ]
     },
@@ -28894,7 +29260,8 @@
       "local_path": "assets/broll/15e5c55ec6beff55.mp4",
       "topics": [
         "writer staring at blank document laptop",
-        "fragmented calendar focus time laptop multitasking"
+        "fragmented calendar focus time laptop multitasking",
+        "calm morning routine focus lifestyle"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -28908,6 +29275,11 @@
           "video_slug": "planning-fallacy-du-lieu-qua-khu_xkiro",
           "role": "payoff",
           "used_at": "2026-08-25T01:59:08.787109+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:40:11.582452+00:00"
         }
       ]
     },
@@ -28918,7 +29290,8 @@
       "source_url": "https://videos.pexels.com/video-files/4705782/4705782-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/3e3e4dd6968d81a6.mp4",
       "topics": [
-        "writer staring at blank document laptop"
+        "writer staring at blank document laptop",
+        "blank laptop screen cursor blinking"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -28927,6 +29300,11 @@
           "video_slug": "danh-sach-cang-dai-ban-cang-kho-bat-au-vi-mot-co-che-trong-nao_knowledge",
           "role": "payoff",
           "used_at": "2026-07-20T12:28:46.330041+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:39:03.583791+00:00"
         }
       ]
     },
@@ -28998,7 +29376,8 @@
         "cafe menu decision smartphone note reflective",
         "hand writing decision question sticky note before payment laptop",
         "person writing reflective question notebook quiet room",
-        "writing reflective question notebook coffee evening"
+        "writing reflective question notebook coffee evening",
+        "hand writing bullet points notebook"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -29022,6 +29401,11 @@
           "video_slug": "chi-phi-co-hoi-cai-gia-khong-tren-hoa-don_xkiro",
           "role": "payoff",
           "used_at": "2026-08-25T03:24:48.999588+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:39:08.775252+00:00"
         }
       ]
     },
@@ -29166,10 +29550,11 @@
       "topics": [
         "weekly productivity tracking notebook",
         "habit tracking journal coffee shop lifestyle notebook",
-        "seven day habit tracker notebook pen coffee"
+        "seven day habit tracker notebook pen coffee",
+        "morning coffee shop window condensation"
       ],
       "orientation": "landscape",
-      "duration_sec": 6.0,
+      "duration_sec": 2.5,
       "uses": [
         {
           "video_slug": "danh-sach-cang-dai-ban-cang-kho-bat-au-vi-mot-co-che-trong-nao_knowledge",
@@ -29185,6 +29570,11 @@
           "video_slug": "chi-phi-co-hoi-cai-gia-khong-tren-hoa-don_xkiro",
           "role": "payoff",
           "used_at": "2026-08-25T03:24:58.575556+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "hook",
+          "used_at": "2026-08-25T10:38:58.523522+00:00"
         }
       ]
     },
@@ -29697,7 +30087,8 @@
       "topics": [
         "person sitting at desk looking at blank notebook",
         "person looking at receipt coffee shop thoughtful close up",
-        "calm professional conversation coffee shop notebook"
+        "calm professional conversation coffee shop notebook",
+        "calm morning routine focus lifestyle"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -29716,6 +30107,11 @@
           "video_slug": "chi-phi-chim-khi-nao-nen-dung-lai_xkiro",
           "role": "payoff",
           "used_at": "2026-08-24T14:56:00.877657+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:40:38.985287+00:00"
         }
       ]
     },
@@ -29728,7 +30124,8 @@
       "topics": [
         "person sitting at desk looking at blank notebook",
         "person revising personal goals notebook morning coffee",
-        "personal goals notebook old new comparison"
+        "personal goals notebook old new comparison",
+        "calm morning routine focus lifestyle"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -29747,6 +30144,11 @@
           "video_slug": "chi-phi-chim-khi-nao-nen-dung-lai_xkiro",
           "role": "payoff",
           "used_at": "2026-08-24T14:55:31.164004+00:00"
+        },
+        {
+          "video_slug": "ban-nhap-xau-dau-tien_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-25T10:40:41.908617+00:00"
         }
       ]
     },

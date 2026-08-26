@@ -281,6 +281,11 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
         "  ytb batch retry thien-kien-xac-nhan-vi-sao-nao-chi-thay-dieu-ban-muon-thay\n",
     )
     p_retry.add_argument("slug", help="Slug video (khớp với auto_state.json)")
+    p_retry.add_argument(
+        "--batch-key",
+        default="",
+        help="Chỉ tìm slug trong batch chỉ định; cần khi nhiều profile/batch cùng tồn tại.",
+    )
     p_retry.add_argument("--publish", action="store_true", help="Cho phép upload YouTube; mặc định dry-run.")
     p_retry.set_defaults(func=cmd_funcs["retry"])
 

@@ -670,7 +670,7 @@ async def test_undersized_short_is_rewritten_by_llm_instead_of_padded(tmp_path):
     # far under SHORT_MIN_CHARS in total narration, so `validate_or_repair_script`
     # reaches load_script's audio-runtime "quá ngắn" gate instead of failing
     # earlier on script_contract's structural checks.
-    undersized_purposes = ["situation", "core_answer", "evidence", "evidence", "evidence", "application"]
+    undersized_purposes = ["situation", "core_answer", "evidence", "evidence", "application", "payoff"]
     undersized["sections"] = [
         {
             "caption": f"Beat {i}",

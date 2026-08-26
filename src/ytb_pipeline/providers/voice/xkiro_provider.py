@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import re
 import subprocess
 import time
 from contextvars import ContextVar
@@ -122,6 +123,7 @@ class XkiroVoiceProvider:
                 "model": settings.xkiro_model,
                 "voice": voice_id,
                 "text": prepared,
+                "max_chars_per_piece": settings.xkiro_max_chars_per_piece,
                 "profile": vars(profile),
             },
             ensure_ascii=False,
@@ -161,7 +163,10 @@ class XkiroVoiceProvider:
         self, narration: str, profile, output: Path, index: int, *, voice_id: str
     ) -> None:
         prepared = _prepare_narration(narration)
-        pieces = _split_for_pacing(prepared, profile.comma_sec, profile.sentence_sec)
+        pieces = _chunk_xkiro_pieces(
+            _split_for_pacing(prepared, profile.comma_sec, profile.sentence_sec),
+            max_chars=settings.xkiro_max_chars_per_piece,
+        )
         if not pieces:
             raise ValueError(f"Segment {index + 1} không có narration để xKiro đọc.")
 
@@ -257,3 +262,42 @@ def _error_detail(exc: urllib_error.HTTPError) -> str:
     except (OSError, ValueError):
         return "<không đọc được body>"
     return body[:300] or "<body rỗng>"
+
+
+def _chunk_xkiro_pieces(
+    pieces: list[tuple[str, float]],
+    *,
+    max_chars: int,
+) -> list[tuple[str, float]]:
+    """Break long clauses into shorter requests so xKiro keeps full articulation."""
+    chunked: list[tuple[str, float]] = []
+    for text, pause in pieces:
+        fragments = _split_long_clause(text, max_chars=max_chars)
+        if not fragments:
+            continue
+        for fragment in fragments[:-1]:
+            chunked.append((fragment, 0.0))
+        chunked.append((fragments[-1], pause))
+    return chunked
+
+
+def _split_long_clause(text: str, *, max_chars: int) -> list[str]:
+    if len(text) <= max_chars:
+        return [text]
+    words = re.findall(r"\S+\s*", text.strip())
+    if not words:
+        return []
+    chunks: list[str] = []
+    current: list[str] = []
+    current_len = 0
+    for word in words:
+        if current and current_len + len(word) > max_chars:
+            chunks.append("".join(current).strip())
+            current = [word]
+            current_len = len(word)
+            continue
+        current.append(word)
+        current_len += len(word)
+    if current:
+        chunks.append("".join(current).strip())
+    return chunks

@@ -146,8 +146,16 @@ def _validate_required_purposes(script: Any, failures: list[PreflightFailure]) -
     """
     if script is None:
         return
+    profile = (
+        load_content_profile(script.content_profile_id)
+        if script.content_profile_version else None
+    )
+    required_purposes = (
+        profile.editorial_contract.purpose_policy.required if profile is not None else None
+    )
     missing = missing_required_purposes(
         script.video_type, (segment.purpose for segment in script.segments),
+        required_purposes=required_purposes,
     )
     for purpose in missing:
         failures.append(PreflightFailure(

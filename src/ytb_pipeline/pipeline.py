@@ -624,11 +624,17 @@ async def run_project(project: Project, checkpoint: CheckpointManager, through: 
         voiceover = voiceover_for(current)
         enforce_checkpointed_audio_quality(current)
         validate_render_orientation(voiceover.video_type)
-        renderer = get_render_provider()
-        print(f"[3/4] Render    ▶  đang dựng video ({settings.render_provider}/{settings.orientation})...")
+        # Queue/batch runners export the profile renderer into the environment,
+        # but a direct or resumed DAG run must honour the script contract on its
+        # own.  Otherwise a character story can pass preflight for `story` and
+        # still render stock B-roll through the global `ai` default.
+        profile = load_content_profile(voiceover.content_profile_id)
+        renderer_name = profile.providers.render
+        renderer = get_render_provider(renderer_name)
+        print(f"[3/4] Render    ▶  đang dựng video ({renderer_name}/{settings.orientation})...")
         video = await renderer.render(voiceover, Path("assets/output"))
         validate_final_video(video)
-        print(f"[3/4] Render    ✓  ({settings.render_provider}/{settings.orientation}) {video.video_path}")
+        print(f"[3/4] Render    ✓  ({renderer_name}/{settings.orientation}) {video.video_path}")
         state["video"] = video
         return str(video.video_path), _rendered_output_data(video)
 

@@ -1,0 +1,42 @@
+[2026-08-25 17:35:53.283] [ctranslate2] [thread 9242027] [warning] The compute type inferred from the saved model is float16, but the target device or backend do not support efficient float16 computation. The model weights have been automatically converted to use the float32 compute type instead.
+Traceback (most recent call last):
+  File "/Users/hiendang/claude-ytb/src/ytb_pipeline/project/workflow.py", line 99, in execute
+    output = await node.fn(current)
+             ^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/hiendang/claude-ytb/src/ytb_pipeline/pipeline.py", line 626, in render_fn
+    validate_render_orientation(voiceover.video_type)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/hiendang/claude-ytb/src/ytb_pipeline/pipeline.py", line 198, in validate_render_orientation
+    raise ValueError(
+        f"{label} phải render {expected}; cấu hình hiện tại là {settings.orientation}."
+    )
+ValueError: Long phải render landscape; cấu hình hiện tại là portrait.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/Users/hiendang/claude-ytb/src/ytb_pipeline/__main__.py", line 39, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "/Users/hiendang/claude-ytb/src/ytb_pipeline/__main__.py", line 27, in main
+    final = asyncio.run(run_project(project, checkpoint, through=args.through))
+  File "/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py", line 195, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/base_events.py", line 725, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "/Users/hiendang/claude-ytb/src/ytb_pipeline/pipeline.py", line 706, in run_project
+    return await graph.execute(project)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/hiendang/claude-ytb/src/ytb_pipeline/project/workflow.py", line 103, in execute
+    raise WorkflowError(node_id, str(exc)) from exc
+ytb_pipeline.project.workflow.WorkflowError: Node 'render' failed: Long phải render landscape; cấu hình hiện tại là portrait.
+[0/3] Input     ✓  Gửi Bản Nháp Xấu Đầu Tiên (24 đoạn; approved by batch start)
+[2/4] Voiceover ▶  đang tạo audio...
+[2/4] Voiceover ✓  assets/audio/ban-nhap-xau-dau-tien_xkiro.mp3  (400.2s)

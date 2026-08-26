@@ -192,8 +192,9 @@ _SENTENCE_END = re.compile(r"(?<=[.!?…])\s+")
 
 def speaker_colour(profile: ContentProfile, speaker_id: str) -> tuple[int, int, int]:
     """Màu chữ của một người nói; người lạ dùng màu narrator."""
-    normalised = (speaker_id or "narrator").strip().lower()
-    cast = [name for name in profile.voice_cast if name != "narrator"]
+    narrator_id = profile.editorial_contract.narration_speaker_id
+    normalised = (speaker_id or narrator_id).strip().lower()
+    cast = [name for name in profile.voice_cast if name != narrator_id]
     if normalised in cast:
         return _CAST_COLOURS[cast.index(normalised) % len(_CAST_COLOURS)]
     return _NARRATOR_COLOUR
@@ -322,8 +323,8 @@ def resolve_scene_image(
         return cached
 
     if provider is None:
-        from ..providers.image.comfyui_story_provider import ComfyUIStoryProvider
-        provider = ComfyUIStoryProvider()
+        from ..providers.registry import get_story_image_provider
+        provider = get_story_image_provider()
 
     gen_width, gen_height = _SDXL_GENERATION_DIMS[dims]
     seed = int(key[:16], 16) % (2**32)

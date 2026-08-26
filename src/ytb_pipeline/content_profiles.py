@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import hashlib
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from math import isfinite
 from pathlib import Path
 from typing import Any, Mapping
@@ -68,6 +68,76 @@ class ProviderProfile:
 class ContentRules:
     require_pexels_query: bool
     require_short_source_trace: bool
+    require_conversation_turns: bool = False
+
+
+# The explainer taxonomy every schema-version-1 profile relied on before
+# `editorial_contract` existed. Kept ONLY as the compatibility default for a
+# profile.json that does not declare its own purpose_vocabulary/required_purposes
+# — a new narrative form (interview, panel, diary...) must never be forced
+# through this vocabulary just because the field is absent.
+_LEGACY_PURPOSE_VOCABULARY: tuple[str, ...] = (
+    "situation", "core_answer", "evidence", "application", "payoff",
+)
+_LEGACY_REQUIRED_PURPOSES: Mapping[str, tuple[str, ...]] = {
+    "short": ("situation", "core_answer", "application", "payoff"),
+    "long": ("situation", "core_answer", "evidence", "application", "payoff"),
+}
+
+
+@dataclass(frozen=True)
+class PurposePolicy:
+    """Closed section-purpose vocabulary + which purposes each format requires.
+
+    Declared by the profile so the generation schema, the offline preflight
+    gate, and the pre-publish release gate can agree on one vocabulary without
+    core code branching on narrative_mode or profile_id.
+    """
+
+    vocabulary: tuple[str, ...]
+    required: Mapping[str, tuple[str, ...]]
+
+    def __post_init__(self) -> None:
+        if not self.vocabulary:
+            raise ContentProfileError("editorial_contract.purpose_vocabulary không được rỗng.")
+        for video_type, required in self.required.items():
+            if video_type not in ("short", "long"):
+                raise ContentProfileError(
+                    f"editorial_contract.required_purposes có video_type không hợp lệ: {video_type!r}."
+                )
+            unknown = [purpose for purpose in required if purpose not in self.vocabulary]
+            if unknown:
+                raise ContentProfileError(
+                    "editorial_contract.required_purposes."
+                    f"{video_type} chứa purpose ngoài vocabulary: {unknown}."
+                )
+
+    def required_for(self, video_type: str) -> tuple[str, ...]:
+        return self.required.get((video_type or "").strip().lower(), ())
+
+
+@dataclass(frozen=True)
+class EditorialContractProfile:
+    """The profile-declared editorial policy shared by every LLM entry path:
+    initial generation, repair, Long extension, and Short expansion."""
+
+    purpose_policy: PurposePolicy
+    # Seam for migrating off the "narrator" sentinel identity. Every existing
+    # v1 profile still uses the literal "narrator" default, so this alone does
+    # not change behaviour; it lets a future profile declare a different
+    # narration speaker id without a core code change.
+    narration_speaker_id: str = "narrator"
+
+    def __post_init__(self) -> None:
+        if not self.narration_speaker_id.strip():
+            raise ContentProfileError("editorial_contract.narration_speaker_id không được rỗng.")
+
+
+_LEGACY_EDITORIAL_CONTRACT = EditorialContractProfile(
+    purpose_policy=PurposePolicy(
+        vocabulary=_LEGACY_PURPOSE_VOCABULARY, required=_LEGACY_REQUIRED_PURPOSES,
+    ),
+)
 
 
 @dataclass(frozen=True)
@@ -100,6 +170,13 @@ class ContentProfile:
     content_rules: ContentRules
     render: RenderProfile
     visual_generation: "VisualGenerationProfile | None" = None
+    editorial_contract: EditorialContractProfile = field(default=_LEGACY_EDITORIAL_CONTRACT)
+    editorial_review: "EditorialReviewProfile | None" = None
+
+    def editorial_review_rubric_text(self) -> str:
+        if self.editorial_review is None:
+            raise ContentProfileError(f"Profile '{self.profile_id}' không bật editorial_review.")
+        return self.prompt_text(self.editorial_review.rubric_prompt_name)
 
     def character_reference_path(self, character_id: str) -> Path:
         vg = self.visual_generation
@@ -144,7 +221,7 @@ class ContentProfile:
             raise ContentProfileError(f"Không đọc được prompt profile: {path}") from exc
 
     def voice_for(self, speaker_id: str) -> str:
-        normalized = (speaker_id or "narrator").strip().lower()
+        normalized = (speaker_id or self.editorial_contract.narration_speaker_id).strip().lower()
         try:
             return self.voice_cast[normalized]
         except KeyError as exc:
@@ -178,6 +255,30 @@ class ContentProfile:
         if not relative or not path.is_file():
             raise ContentProfileError(f"Không tìm thấy visual_asset: {path}")
         return path
+
+
+@dataclass(frozen=True)
+class EditorialReviewProfile:
+    """Opt-in LLM narrative-quality gate, scoped to this profile's own rubric.
+
+    Deterministic `script_contract` validation only checks schema/cast/turn
+    shape — it cannot judge dialogue quality, narrator discipline, or
+    timeline sense. This is a SEPARATE, optional LLM review a profile can
+    turn on; absent (`enabled=False` or the block missing entirely), zero
+    extra LLM calls are made and behaviour is unchanged from before this
+    field existed.
+    """
+
+    enabled: bool
+    # Key into `ContentProfile.prompts` — resolved via `profile.prompt_text()`,
+    # same lookup every other declared prompt already uses.
+    rubric_prompt_name: str
+
+    def __post_init__(self) -> None:
+        if self.enabled and not self.rubric_prompt_name.strip():
+            raise ContentProfileError(
+                "editorial_review.rubric_prompt_name không được rỗng khi enabled=true."
+            )
 
 
 @dataclass(frozen=True)
@@ -266,8 +367,11 @@ def load_content_profile(
     rules_raw = _mapping(raw.get("content_rules"), "content_rules")
     render_raw = _mapping(raw.get("render"), "render")
     voice_cast = _string_map(raw.get("voice_cast"), "voice_cast")
-    if "narrator" not in voice_cast:
-        raise ContentProfileError(f"Profile '{profile_id}' phải có voice_cast.narrator.")
+    editorial_contract = _editorial_contract_profile(raw.get("editorial_contract"))
+    if editorial_contract.narration_speaker_id not in voice_cast:
+        raise ContentProfileError(
+            f"Profile '{profile_id}' phải có voice_cast.{editorial_contract.narration_speaker_id}."
+        )
 
     profile = ContentProfile(
         profile_id=profile_id,
@@ -300,6 +404,9 @@ def load_content_profile(
             require_short_source_trace=_exact_bool(
                 rules_raw, "require_short_source_trace", prefix="content_rules"
             ),
+            require_conversation_turns=_exact_bool(
+                rules_raw, "require_conversation_turns", prefix="content_rules"
+            ),
         ),
         render=RenderProfile(
             assets_dir_name=_required_text(render_raw, "assets_dir", prefix="render"),
@@ -313,6 +420,8 @@ def load_content_profile(
             scene_assets=_string_tuple(render_raw.get("scene_assets", ()), "render.scene_assets"),
         ),
         visual_generation=_visual_generation_profile(raw.get("visual_generation"), profile_id),
+        editorial_contract=editorial_contract,
+        editorial_review=_editorial_review_profile(raw.get("editorial_review")),
     )
     if (
         profile.narrative_mode == "character_story"
@@ -329,6 +438,15 @@ def load_content_profile(
         )
     for name in prompts:
         profile.prompt_text(name)
+    if (
+        profile.editorial_review is not None
+        and profile.editorial_review.enabled
+        and profile.editorial_review.rubric_prompt_name not in profile.prompts
+    ):
+        raise ContentProfileError(
+            f"Profile '{profile_id}': editorial_review.rubric_prompt_name "
+            f"'{profile.editorial_review.rubric_prompt_name}' phải là một key trong prompts."
+        )
     if not profile.assets_dir.is_dir():
         raise ContentProfileError(
             f"Profile '{profile_id}' thiếu thư mục asset: {profile.assets_dir}"
@@ -337,7 +455,10 @@ def load_content_profile(
         profile.visual_asset_path(asset_name)
     if profile.visual_generation is not None and profile.visual_generation.enabled:
         for character_id in profile.visual_generation.characters:
-            if character_id == "narrator" or character_id not in profile.voice_cast:
+            if (
+                character_id == profile.editorial_contract.narration_speaker_id
+                or character_id not in profile.voice_cast
+            ):
                 raise ContentProfileError(
                     f"Profile '{profile_id}': visual_generation.characters['{character_id}'] "
                     "phải là một nhân vật khai trong voice_cast (khác narrator)."
@@ -350,6 +471,16 @@ def load_content_profile(
             if not duo_path.is_file():
                 raise ContentProfileError(f"Không tìm thấy duo_reference_image: {duo_path}")
     return profile
+
+
+def _editorial_review_profile(raw: Any) -> "EditorialReviewProfile | None":
+    if raw is None:
+        return None
+    mapping = _mapping(raw, "editorial_review")
+    return EditorialReviewProfile(
+        enabled=_exact_bool(mapping, "enabled", prefix="editorial_review"),
+        rubric_prompt_name=str(mapping.get("rubric_prompt_name") or "").strip(),
+    )
 
 
 def _visual_generation_profile(raw: Any, profile_id: str) -> "VisualGenerationProfile | None":
@@ -367,6 +498,34 @@ def _visual_generation_profile(raw: Any, profile_id: str) -> "VisualGenerationPr
         duo_denoise=_finite_number(mapping, "duo_denoise", prefix="visual_generation"),
         characters=_string_map(mapping.get("characters"), "visual_generation.characters"),
         duo_reference_image=str(mapping.get("duo_reference_image") or "").strip(),
+    )
+
+
+def _editorial_contract_profile(raw: Any) -> EditorialContractProfile:
+    if raw is None:
+        return _LEGACY_EDITORIAL_CONTRACT
+    mapping = _mapping(raw, "editorial_contract")
+    vocabulary = (
+        _string_tuple(mapping["purpose_vocabulary"], "editorial_contract.purpose_vocabulary")
+        if "purpose_vocabulary" in mapping
+        else _LEGACY_PURPOSE_VOCABULARY
+    )
+    if "required_purposes" in mapping:
+        required_raw = _mapping(mapping["required_purposes"], "editorial_contract.required_purposes")
+        required = {
+            key: _string_tuple(value, f"editorial_contract.required_purposes.{key}")
+            for key, value in required_raw.items()
+        }
+    else:
+        required = dict(_LEGACY_REQUIRED_PURPOSES)
+    narration_speaker_id = (
+        _required_text(mapping, "narration_speaker_id", prefix="editorial_contract")
+        if "narration_speaker_id" in mapping
+        else "narrator"
+    )
+    return EditorialContractProfile(
+        purpose_policy=PurposePolicy(vocabulary=vocabulary, required=required),
+        narration_speaker_id=narration_speaker_id,
     )
 
 
@@ -412,7 +571,7 @@ def profile_environment(profile: ContentProfile) -> dict[str, str]:
         "SHOW_CAPTIONS": str(profile.render.show_captions).lower(),
         "PROFILE_INTER_SEGMENT_GAP_SEC": str(profile.render.inter_segment_gap_sec),
         "PROFILE_TRANSITION_OVERLAP_SEC": str(profile.render.transition_overlap_sec),
-        "XKIRO_VOICE": profile.voice_for("narrator"),
+        "XKIRO_VOICE": profile.voice_for(profile.editorial_contract.narration_speaker_id),
         "SHORT_VIEWER_MIN_SEC": str(short.viewer_min_sec),
         "SHORT_VIEWER_MAX_SEC": str(short.viewer_max_sec),
         "SHORT_MIN_SECTIONS": str(short.min_sections),

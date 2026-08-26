@@ -1,0 +1,37 @@
+Traceback (most recent call last):
+  File "/Users/hiendang/claude-ytb/src/ytb_pipeline/project/workflow.py", line 99, in execute
+    output = await node.fn(current)
+             ^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/hiendang/claude-ytb/src/ytb_pipeline/pipeline.py", line 625, in render_fn
+    enforce_checkpointed_audio_quality(current)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Users/hiendang/claude-ytb/src/ytb_pipeline/pipeline.py", line 474, in enforce_checkpointed_audio_quality
+    raise ValueError(f"Audio quality gate chặn render: {details or 'audio không đạt QA.'}")
+ValueError: Audio quality gate chặn render: TRANSCRIPT_MISMATCH: Transcript local khớp script 81%, dưới ngưỡng 82%.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/Users/hiendang/claude-ytb/src/ytb_pipeline/__main__.py", line 39, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "/Users/hiendang/claude-ytb/src/ytb_pipeline/__main__.py", line 27, in main
+    final = asyncio.run(run_project(project, checkpoint, through=args.through))
+  File "/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py", line 195, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/base_events.py", line 725, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "/Users/hiendang/claude-ytb/src/ytb_pipeline/pipeline.py", line 706, in run_project
+    return await graph.execute(project)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/hiendang/claude-ytb/src/ytb_pipeline/project/workflow.py", line 103, in execute
+    raise WorkflowError(node_id, str(exc)) from exc
+ytb_pipeline.project.workflow.WorkflowError: Node 'render' failed: Audio quality gate chặn render: TRANSCRIPT_MISMATCH: Transcript local khớp script 81%, dưới ngưỡng 82%.
+  ⚠ Audio quality gate phát hiện lỗi; đã lưu report cục bộ.

@@ -8,6 +8,7 @@ có giới hạn số lần.
 from __future__ import annotations
 
 import json
+import math
 import re
 from copy import deepcopy
 from pathlib import Path
@@ -15,6 +16,9 @@ from urllib.parse import urlparse
 
 from ..agents.base import AgentStatus
 from ..agents.qa_agent import QAAgent
+from ..agents.editorial_review_agent import run_editorial_review
+from ..analytics.quality_report import missing_required_purposes
+from ..config.settings import settings
 from ..content_contract import contract_for, effective_chars_per_min
 from ..ideation.generator import load_script
 from ..content_profiles import ContentProfile, load_content_profile
@@ -113,6 +117,36 @@ def validate_financial_evidence_register(payload: dict, *, required: bool) -> No
             raise ValueError(f"evidence_register[{index}].published_year phải là năm.") from exc
         if not 1900 <= published_year <= 2100:
             raise ValueError(f"evidence_register[{index}].published_year ngoài khoảng hợp lệ.")
+
+
+def validate_release_purposes(payload: dict) -> None:
+    """Apply the same purpose-completeness rule as preflight and release.
+
+    ``validate_script_payload`` intentionally focuses on JSON shape while the
+    release report owns semantic completeness.  Ideation sits before both TTS
+    and queueing, therefore it must not accept a candidate that those later
+    gates will certainly reject.
+    """
+    sections = payload.get("sections") or ()
+    purposes = (
+        str(section.get("purpose") or "")
+        for section in sections
+        if isinstance(section, dict)
+    )
+    profile = _explicit_profile(payload)
+    required_purposes = (
+        profile.editorial_contract.purpose_policy.required if profile is not None else None
+    )
+    missing = missing_required_purposes(
+        str(payload.get("video_type") or ""), purposes, required_purposes=required_purposes,
+    )
+    if missing:
+        messages = "; ".join(
+            "Kịch bản thiếu section purpose="
+            f"'{purpose}'; cổng trước publish sẽ chặn."
+            for purpose in missing
+        )
+        raise ValueError(messages)
 
 
 def json_from_llm(text: str) -> dict:
@@ -407,7 +441,7 @@ def normalize_long_overflow(payload: dict, expected_video_type: str | None = Non
 def append_long_extension(
     payload: dict, extension: dict, *, max_sections: int | None = None
 ) -> dict:
-    """Insert new long-form sections before the existing conclusion without mutation.
+    """Insert new long-form sections at a declared narrative boundary.
 
     `max_sections` là trần section của content profile. Bản cũ nối thẳng mọi
     section mới, nên một Long quá mỏng được vá xong lại vượt trần và bị chính
@@ -423,18 +457,27 @@ def append_long_extension(
     if not isinstance(current_sections, list) or len(current_sections) < 2:
         raise ValueError("Long cần ít nhất phần mở đầu và phần kết trước khi bổ sung.")
 
+    insertion_index = _extension_insertion_index(extension, len(current_sections))
     enriched = deepcopy(payload)
-    body = list(deepcopy(current_sections[:-1]))
-    conclusion = deepcopy(current_sections[-1])
+    before = list(deepcopy(current_sections[:insertion_index]))
+    after = list(deepcopy(current_sections[insertion_index:]))
     additions = deepcopy(sections)
 
-    room = None if max_sections is None else max(0, max_sections - len(body) - 1)
+    room = None if max_sections is None else max(0, max_sections - len(current_sections))
     kept = additions if room is None else additions[:room]
     overflow = [] if room is None else additions[room:]
 
-    merged = [*body, *kept, conclusion]
+    merged = [*before, *kept, *after]
     if overflow:
-        target = merged[len(body) + len(kept) - 1] if kept else merged[len(body) - 1]
+        # Prefer the last accepted addition, then the preceding existing beat.
+        # If insertion is at the start of a full script, prepend to the next
+        # beat rather than silently dropping the added narration.
+        if kept:
+            target = merged[len(before) + len(kept) - 1]
+        elif before:
+            target = before[-1]
+        else:
+            target = after[0]
         spilled = " ".join(
             str(section.get("voiceover") or section.get("narration") or "").strip()
             for section in overflow
@@ -447,6 +490,27 @@ def append_long_extension(
 
     enriched["sections"] = merged
     return enriched
+
+
+def _extension_insertion_index(extension: dict, section_count: int) -> int:
+    """Resolve a one-based LLM boundary, preserving old conclusion placement."""
+    raw_index = extension.get("insert_before_section_index")
+    if raw_index is None:
+        return section_count - 1
+    if isinstance(raw_index, bool):
+        raise ValueError("insert_before_section_index phải là số nguyên 1-based.")
+    try:
+        index = int(raw_index)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("insert_before_section_index phải là số nguyên 1-based.") from exc
+    if isinstance(raw_index, str) and raw_index.strip() != str(index):
+        raise ValueError("insert_before_section_index phải là số nguyên 1-based.")
+    if not 1 <= index <= section_count:
+        raise ValueError(
+            "insert_before_section_index phải trỏ tới một section hiện có "
+            f"trong khoảng 1-{section_count}."
+        )
+    return index - 1
 
 
 def apply_short_expansion(payload: dict, delta: dict) -> dict:
@@ -493,7 +557,7 @@ async def validate_or_repair_script(
     payload: dict,
     script_path: Path,
     ledger_text: str,
-    max_attempts: int = 2,
+    max_attempts: int = 3,
     log_path: Path | None = None,
     console_prefix: str = "",
     strict: bool = True,
@@ -503,7 +567,7 @@ async def validate_or_repair_script(
     source_long_context: dict | None = None,
     exempt_slugs: tuple[str, ...] = (),
 ) -> dict:
-    """Write, validate, QA, and make at most one bounded content delta.
+    """Write, validate, QA, and make at most two bounded content deltas.
 
     Deterministic schema and formatting defects are normalized locally.  The
     only LLM follow-ups permitted here are a Long section insertion for missing
@@ -516,7 +580,7 @@ async def validate_or_repair_script(
     current = dict(payload)
     last_validation_error: str | None = None
     last_qa_output: dict | None = None
-    long_extension_attempted = False
+    long_extension_attempts = 0
     short_expansion_attempted = False
     identity_repair_attempted = False
     report_path = script_path.parent.parent / "assets" / "quality_reports" / "ideation_errors.jsonl"
@@ -561,6 +625,7 @@ async def validate_or_repair_script(
                     expected_video_type=expected_video_type,
                     script_name=script_path.name,
                 )
+            validate_release_purposes(current)
             content_profile = load_content_profile(
                 str(current.get("profile_id") or "") or None
             )
@@ -592,7 +657,7 @@ async def validate_or_repair_script(
             script is None
             and expected_video_type == "long"
             and max_attempts > 1
-            and not long_extension_attempted
+            and long_extension_attempts < max_attempts - 1
             and last_validation_error
             and "nội dung quá mỏng" in last_validation_error
         ):
@@ -600,7 +665,27 @@ async def validate_or_repair_script(
                 current, "long"
             )
             missing_chars = max(1, long_min_chars - short_narration_chars(current))
-            extension_request = long_extension_prompt(current, missing_chars)
+            extension_profile = _explicit_profile(current)
+            extension_max_sections = (
+                extension_profile.format_for("long").max_sections
+                if extension_profile is not None else None
+            )
+            available_slots = (
+                max(1, extension_max_sections - len(current.get("sections") or ()))
+                if extension_max_sections is not None else None
+            )
+            # A thin script often lacks only one normal story beat. Asking for
+            # 10-12 sections guaranteed a cap overflow and a dense, unnatural
+            # merged paragraph. Use the smallest bounded count that can carry
+            # the missing runtime, while leaving room for a complete beat.
+            max_new_sections = (
+                min(available_slots, max(1, math.ceil(missing_chars / 350)))
+                if available_slots is not None else None
+            )
+            extension_request = long_extension_prompt(
+                current, missing_chars, max_new_sections=max_new_sections,
+                content_profile=extension_profile,
+            )
             if console_prefix:
                 print(f"{console_prefix} extend: asking LLM for missing long-form sections", flush=True)
             if log_path:
@@ -608,13 +693,16 @@ async def validate_or_repair_script(
             extension_text = await provider.complete(
                 extension_request,
                 system=repair_system_prompt(current),
-                max_tokens=8192,
+                # A bounded delta needs a few thousand tokens, not a whole
+                # script budget. Keeping this at 4k caps xKiro's dynamic
+                # timeout near 102s and lets the provider cascade recover
+                # promptly instead of idling for several minutes per model.
+                max_tokens=4096,
                 temperature=0.2,
                 json_output=True,
             )
             if log_path:
                 append_local_start_log(log_path, "LONG_EXTENSION_RESPONSE", extension_text)
-            extension_profile = _explicit_profile(current)
             # Một lần vá hỏng là một lần vá THẤT BẠI, không phải lý do làm sập
             # cả lệnh batch: JSON lỗi từ bước extend từng thoát ra ngoài dưới
             # dạng traceback và giết luôn tiến trình, mất cả candidate đang có.
@@ -631,7 +719,7 @@ async def validate_or_repair_script(
                 last_validation_error = f"Long extension không dùng được: {exc}"
                 if log_path:
                     append_local_start_log(log_path, "LONG_EXTENSION_FAILED", last_validation_error)
-            long_extension_attempted = True
+            long_extension_attempts += 1
             continue
 
         if (
@@ -683,7 +771,32 @@ async def validate_or_repair_script(
                         json.dumps(result.output, ensure_ascii=False, indent=2),
                     )
                 if result.output and result.output.get("passed"):
-                    return current
+                    review_profile = _explicit_profile(current)
+                    review = (
+                        await run_editorial_review(
+                            review_profile, current, provider=provider,
+                            cache_dir=settings.assets_dir / "editorial_review_cache" / review_profile.profile_id,
+                        )
+                        if review_profile is not None
+                        else None
+                    )
+                    if review is None or review.passed:
+                        return current
+                    last_qa_output = {
+                        "passed": False,
+                        "violations": [
+                            {"rule": "editorial_review", "detail": finding}
+                            for finding in review.blocking_findings
+                        ],
+                        "repair_brief": review.repair_brief,
+                        "section_refs": list(review.section_refs),
+                    }
+                    if log_path:
+                        append_local_start_log(
+                            log_path,
+                            f"EDITORIAL_REVIEW_FAILED {attempt}",
+                            json.dumps(last_qa_output, ensure_ascii=False, indent=2),
+                        )
                 record_ideation_failure(
                     report_path,
                     script_name=script_path.name,
@@ -748,9 +861,7 @@ async def validate_or_repair_script(
                         json.dumps(last_qa_output, ensure_ascii=False, indent=2),
                     )
 
-        if attempt == max_attempts or (
-            (long_extension_attempted or short_expansion_attempted) and script is None
-        ):
+        if attempt == max_attempts or (short_expansion_attempted and script is None):
             break
         # Fail closed.  A broad "repair the full JSON" prompt is deliberately
         # forbidden: it spends cloud tokens and can regress already-approved

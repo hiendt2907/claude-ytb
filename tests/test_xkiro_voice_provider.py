@@ -46,6 +46,26 @@ def test_xkiro_cache_key_changes_when_endpoint_changes(monkeypatch, tmp_path):
 
 
 @pytest.mark.unit
+def test_xkiro_cache_key_changes_when_chunking_strategy_changes(monkeypatch, tmp_path):
+    from ytb_pipeline.config.settings import settings
+    from ytb_pipeline.providers.voice.xkiro_provider import XkiroVoiceProvider
+
+    provider = XkiroVoiceProvider()
+    script = Script(
+        topic="t",
+        title="xKiro demo",
+        description="d",
+        segments=(Segment(caption="c", narration="Một câu rất dài cần được chia nhỏ để đọc rõ hơn."),),
+    )
+    monkeypatch.setattr(settings, "xkiro_max_chars_per_piece", 48, raising=False)
+    first = provider._segment_path(script, script.segments[0], 0, tmp_path)
+    monkeypatch.setattr(settings, "xkiro_max_chars_per_piece", 32, raising=False)
+    second = provider._segment_path(script, script.segments[0], 0, tmp_path)
+
+    assert first != second
+
+
+@pytest.mark.unit
 def test_xkiro_provider_registers_and_satisfies_voice_protocol():
     from ytb_pipeline.providers.base import VoiceProvider
     from ytb_pipeline.providers.registry import get_voice_provider
@@ -210,6 +230,43 @@ async def test_xkiro_provider_reuses_only_matching_cache(monkeypatch, tmp_path):
 
     assert requests == ["Đây là câu thứ hai."]
     assert voiceover.segments[0].audio_path == cached
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_xkiro_provider_splits_long_clause_before_request(monkeypatch, tmp_path):
+    from ytb_pipeline.config.settings import settings
+    from ytb_pipeline.providers.voice.xkiro_provider import XkiroVoiceProvider
+    from ytb_pipeline.providers.voice import xkiro_provider
+
+    monkeypatch.setattr(settings, "xkiro_api_key", "test-key", raising=False)
+    monkeypatch.setattr(settings, "xkiro_max_chars_per_piece", 32, raising=False)
+    requests: list[str] = []
+    monkeypatch.setattr(XkiroVoiceProvider, "_request_audio", lambda _self, text: requests.append(text) or b"new")
+    monkeypatch.setattr(xkiro_provider, "_probe_duration", lambda _path: 2.0)
+    monkeypatch.setattr(xkiro_provider, "_to_mp3", lambda src, dst: dst.write_bytes(src.read_bytes()))
+    monkeypatch.setattr(xkiro_provider, "_concat_audio", lambda _parts, output: output.write_bytes(b"combined"))
+    monkeypatch.setattr(xkiro_provider, "_silence_mp3", lambda _seconds, output: output.write_bytes(b"silence"))
+    script = Script(
+        topic="t",
+        title="xKiro demo",
+        description="d",
+        segments=(
+            Segment(
+                caption="c",
+                narration="Đây là một câu rất dài không có dấu phẩy nhưng cần được chia nhỏ để xKiro đọc rõ ràng hơn và không nuốt mất phần cuối",
+            ),
+        ),
+    )
+
+    await XkiroVoiceProvider().synthesise(script, tmp_path)
+
+    assert len(requests) > 1
+    assert all(len(part) <= 32 for part in requests)
+    assert " ".join(requests).replace("  ", " ") == (
+        "Đây là một câu rất dài không có dấu phẩy nhưng cần được chia nhỏ để "
+        "xKiro đọc rõ ràng hơn và không nuốt mất phần cuối"
+    )
 
 
 @pytest.mark.unit

@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     xkiro_tts_url: str = "https://api.xkiro.com/v1/audio/speech"
     xkiro_model: str = "xkiro-voice"
     xkiro_voice: str = "confident-male-vietnamese"
+    xkiro_max_chars_per_piece: int = Field(default=48, ge=24, le=160)
     xkiro_timeout_sec: float = Field(default=120.0, gt=0)
     xkiro_max_retries: int = Field(default=3, ge=1, le=5)
     # xKiro cũng lộ /v1/chat/completions OpenAI-compatible (LLM), tách endpoint
@@ -86,6 +87,12 @@ class Settings(BaseSettings):
     comfyui_sdxl_checkpoint: str = "sd_xl_base_1.0.safetensors"
     comfyui_clip_vision_model: str = "CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors"
     comfyui_ipadapter_model: str = "ip-adapter-plus_sdxl_vit-h.safetensors"
+    # Which story-scene image provider `render/story.py::resolve_scene_image`
+    # uses for character_story profiles. Config-selectable ALTERNATIVE, not a
+    # fallback and not a new default: CLAUDE.md's local-first visual/render
+    # policy is unchanged — "comfyui" (local) stays the default. "codex" shells
+    # out to the Codex CLI's built-in cloud image_gen tool (opt-in, cloud).
+    story_image_provider: str = "comfyui"  # comfyui | codex
     orientation: str = "portrait"   # portrait (1080x1920 Short) | landscape (1920x1080 clip)
     # Chỉ bắt buộc khi BROLL_ALLOW_DOWNLOADS=true (opt-in tải thêm B-roll mới).
     # Local-only mode (mặc định) không cần key này — key rỗng vẫn render được

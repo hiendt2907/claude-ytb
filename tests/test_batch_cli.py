@@ -1702,6 +1702,25 @@ def test_cmd_retry_finds_short_video(tmp_path, monkeypatch, capsys):
     assert "Thành công" in capsys.readouterr().out
 
 
+def test_cmd_retry_scopes_lookup_to_explicit_batch(monkeypatch, capsys):
+    batch_key = "shorts_funnel_batch_story_episode"
+    captured = {}
+    item = cli.QueueItem(day=1, slug="story-episode", publish_at="", shorts_status="queued")
+
+    def fake_load_queue(*, batch_key=None):
+        captured["batch_key"] = batch_key
+        return [item]
+
+    monkeypatch.setattr(cli, "load_queue", fake_load_queue)
+    monkeypatch.setattr(cli, "preflight_script", lambda _path: type("Result", (), {"passed": True})())
+    monkeypatch.setattr(cli, "run_with_retry", lambda *_args, **_kwargs: (True, "ok"))
+
+    cli.cmd_retry(argparse.Namespace(slug="story-episode", publish=False, batch_key=batch_key))
+
+    assert captured["batch_key"] == batch_key
+    assert "Thành công" in capsys.readouterr().out
+
+
 def test_cmd_retry_publish_finalizes_verified_upload(auto_state_file, ledger_file, monkeypatch):
     monkeypatch.setattr(cli, "AUTO_STATE_PATH", auto_state_file)
     monkeypatch.setattr(cli, "LEDGER_PATH", ledger_file)

@@ -126,7 +126,14 @@ def _prepare_run(monkeypatch, tmp_path, audio_result, voice_scripts=None):
         async def synthesise(self, _script, _output_dir):
             if voice_scripts is not None:
                 voice_scripts.append(_script)
-            return voiceover
+            # Production providers preserve the Script identity in Voiceover;
+            # keep this fake honest so renderer selection tests exercise the
+            # same profile contract.
+            return replace(
+                voiceover,
+                content_profile_id=_script.content_profile_id,
+                content_profile_version=_script.content_profile_version,
+            )
 
     class RenderProvider:
         async def render(self, voiced, _output_dir):
@@ -135,7 +142,7 @@ def _prepare_run(monkeypatch, tmp_path, audio_result, voice_scripts=None):
 
     monkeypatch.setattr(pipeline, "load_script", lambda _path: script)
     monkeypatch.setattr(pipeline, "get_voice_provider", lambda: VoiceProvider())
-    monkeypatch.setattr(pipeline, "get_render_provider", lambda: RenderProvider())
+    monkeypatch.setattr(pipeline, "get_render_provider", lambda _name=None: RenderProvider())
     monkeypatch.setattr(pipeline, "validate_audio", lambda _voice: None)
     monkeypatch.setattr(pipeline, "validate_final_video", lambda _video: None)
     monkeypatch.setattr(
@@ -183,6 +190,50 @@ def test_voice_provider_receives_project_id_as_artifact_slug(monkeypatch, tmp_pa
     asyncio.run(pipeline.run_project(project, checkpoint, through="voiceover"))
 
     assert received_scripts[0].project_id == "nao-ne-viec-kho"
+
+
+def test_render_uses_renderer_declared_by_script_content_profile(monkeypatch, tmp_path):
+    """A direct pipeline run must not silently fall back to settings.render_provider.
+
+    The batch runner exports RENDER_PROVIDER from the queue profile, but direct
+    or resumed pipeline runs have to honour the same script contract themselves.
+    Otherwise a character-story script can pass preflight for ``story`` and then
+    render a stock-B-roll video through global ``ai`` settings.
+    """
+    audio_result = SimpleNamespace(
+        passed=True, issues=(), cache_key="audio-key", cached=False, metrics={}, repair_payload={},
+    )
+    project, checkpoint, _ = _prepare_run(monkeypatch, tmp_path, audio_result)
+    from ytb_pipeline.content_profiles import load_content_profile
+
+    script = replace(
+        _script(),
+        content_profile_id="ban-so-6",
+        content_profile_version=load_content_profile("ban-so-6").version,
+    )
+    requested_renderers: list[str | None] = []
+
+    class StoryRenderProvider:
+        async def render(self, voiceover, _output_dir):
+            video_path = tmp_path / "story.mp4"
+            video_path.write_bytes(b"story")
+            return replace(RenderedVideo(**vars(voiceover)), video_path=video_path)
+
+    class PassingQAAgent:
+        async def run(self, _context):
+            return SimpleNamespace(status=pipeline.AgentStatus.SUCCESS, output={"passed": True})
+
+    monkeypatch.setattr(pipeline, "load_script", lambda _path: script)
+    monkeypatch.setattr(pipeline, "QAAgent", PassingQAAgent)
+    monkeypatch.setattr(
+        pipeline,
+        "get_render_provider",
+        lambda name=None: (requested_renderers.append(name), StoryRenderProvider())[1],
+    )
+
+    asyncio.run(pipeline.run_project(project, checkpoint, through="render"))
+
+    assert requested_renderers == ["story"]
 
 
 def test_resumed_voiceover_keeps_project_id_for_renderer(monkeypatch, tmp_path):
