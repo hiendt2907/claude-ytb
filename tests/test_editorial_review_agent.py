@@ -265,6 +265,46 @@ def test_review_is_cached_by_profile_fingerprint_and_script_content(tmp_path):
     assert provider.calls == 1, "unchanged script must not trigger a second LLM call"
 
 
+def test_persisted_editorial_evidence_is_excluded_from_review_prompt_and_cache(tmp_path):
+    """An audit receipt must never become self-referential reviewer input."""
+    from ytb_pipeline.agents.editorial_review_agent import run_editorial_review
+    import asyncio
+
+    _write_profile(
+        tmp_path, "evidence-isolation-fixture",
+        editorial_review={"enabled": True, "rubric_prompt_name": "review_rubric"},
+    )
+    profile = load_content_profile("evidence-isolation-fixture", profiles_dir=tmp_path)
+    payload = _script_payload(profile)
+
+    class CapturingProvider:
+        def __init__(self):
+            self.calls = 0
+            self.prompts: list[str] = []
+
+        async def complete(self, prompt, **_kwargs):
+            self.calls += 1
+            self.prompts.append(prompt)
+            return json.dumps({
+                "passed": True, "blocking_findings": [], "section_refs": [], "repair_brief": "",
+            })
+
+    provider = CapturingProvider()
+    cache_dir = tmp_path / "cache"
+    first = asyncio.run(run_editorial_review(profile, payload, provider=provider, cache_dir=cache_dir))
+    with_evidence = {
+        **payload,
+        "_editorial_review": {"passed": True, "overall_score": 10, "dimension_scores": {}},
+    }
+    second = asyncio.run(run_editorial_review(
+        profile, with_evidence, provider=provider, cache_dir=cache_dir,
+    ))
+
+    assert first is not None and second is not None
+    assert provider.calls == 1
+    assert "_editorial_review" not in provider.prompts[0]
+
+
 def test_cached_review_is_rechecked_against_the_current_score_contract(tmp_path):
     """A cache written before score dimensions existed cannot approve a draft."""
     from ytb_pipeline.agents import editorial_review_agent as review_agent

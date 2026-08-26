@@ -34,6 +34,7 @@ EDITORIAL_REVIEW_DIMENSIONS = frozenset({
     "role_fidelity",
     "useful_restraint",
 })
+_AUDIT_ONLY_FIELDS = frozenset({"_editorial_review"})
 
 
 @dataclass(frozen=True)
@@ -57,6 +58,19 @@ def _cache_key(profile: ContentProfile, script_payload: dict) -> str:
     digest.update(profile_fingerprint(profile).encode("utf-8"))
     digest.update(json.dumps(script_payload, sort_keys=True, ensure_ascii=False).encode("utf-8"))
     return digest.hexdigest()
+
+
+def _reviewable_payload(script_payload: dict) -> dict:
+    """Remove pipeline audit receipts before asking an independent reviewer.
+
+    A saved approval is evidence for a human, not evidence for the next LLM.
+    Keeping it out of this canonical payload also preserves the cache key when
+    the transcript itself is unchanged.
+    """
+    return {
+        key: value for key, value in script_payload.items()
+        if key not in _AUDIT_ONLY_FIELDS
+    }
 
 
 def _to_result(data: dict) -> EditorialReviewResult:
@@ -171,8 +185,9 @@ async def run_editorial_review(
     review_profile = profile.editorial_review
     if review_profile is None or not review_profile.enabled:
         return None
+    review_payload = _reviewable_payload(script_payload)
     cache_dir.mkdir(parents=True, exist_ok=True)
-    key = _cache_key(profile, script_payload)
+    key = _cache_key(profile, review_payload)
     cache_path = cache_dir / f"{key}.json"
     if cache_path.is_file():
         return _enforce_profile_score(
@@ -190,7 +205,7 @@ async def run_editorial_review(
         f"bar ({review_profile.minimum_score}/10) MUST set passed=false. Do not award "
         "a high score merely because the JSON schema or an abstract structure is correct.\n\n"
         f"Rubric:\n{rubric}\n\n"
-        f"Script JSON:\n{json.dumps(script_payload, ensure_ascii=False, indent=2)}"
+        f"Script JSON:\n{json.dumps(review_payload, ensure_ascii=False, indent=2)}"
     )
     text = await provider.complete(
         prompt,
