@@ -150,6 +150,50 @@ def test_profile_with_review_enabled_calls_the_llm_and_parses_the_verdict(tmp_pa
     assert "Narrator must narrate" in provider.last_prompt
 
 
+def test_review_rejects_a_self_approved_score_below_the_profile_bar(tmp_path):
+    """A model cannot approve its own weak draft by setting passed=true.
+
+    The product bar is profile-owned: a script only clears editorial review
+    when the independent score reaches that profile's declared threshold.
+    """
+    from ytb_pipeline.agents.editorial_review_agent import run_editorial_review
+    import asyncio
+
+    _write_profile(
+        tmp_path, "scored-review-fixture",
+        editorial_review={
+            "enabled": True,
+            "rubric_prompt_name": "review_rubric",
+            "minimum_score": 9,
+            "max_rewrites": 1,
+        },
+    )
+    profile = load_content_profile("scored-review-fixture", profiles_dir=tmp_path)
+    provider = _FakeProvider(json.dumps({
+        "passed": True,
+        "overall_score": 8,
+        "dimension_scores": {
+            "human_truth": 9,
+            "spoken_naturalness": 8,
+            "causal_coherence": 9,
+            "role_fidelity": 9,
+            "useful_restraint": 9,
+        },
+        "blocking_findings": [],
+        "section_refs": [],
+        "repair_brief": "",
+    }))
+
+    result = asyncio.run(run_editorial_review(
+        profile, _script_payload(profile), provider=provider, cache_dir=tmp_path / "cache",
+    ))
+
+    assert result is not None
+    assert result.overall_score == 8
+    assert result.passed is False
+    assert any("8/10" in finding for finding in result.blocking_findings)
+
+
 def test_review_is_cached_by_profile_fingerprint_and_script_content(tmp_path):
     from ytb_pipeline.agents.editorial_review_agent import run_editorial_review
     import asyncio
@@ -201,12 +245,14 @@ def test_loader_rejects_enabled_review_with_unknown_rubric_prompt_name(tmp_path)
         load_content_profile("bad-review-fixture", profiles_dir=tmp_path)
 
 
-def test_real_profiles_have_no_editorial_review_declared():
-    """ban-so-6/one-cup-cafe-6h opt out for now — P1 adds the mechanism, not
-    a new mandatory LLM call for existing production profiles."""
+def test_real_profiles_declare_a_nine_of_ten_editorial_review_bar():
+    """The production profiles must use the same content gate as test runs."""
     for profile_id in ("ban-so-6", "one-cup-cafe-6h"):
         profile = load_content_profile(profile_id)
-        assert profile.editorial_review is None
+        assert profile.editorial_review is not None
+        assert profile.editorial_review.enabled is True
+        assert profile.editorial_review.minimum_score == 9
+        assert profile.editorial_review.max_rewrites == 2
 
 
 def test_validate_or_repair_script_blocks_release_when_review_fails(tmp_path, monkeypatch):
@@ -287,3 +333,81 @@ def test_validate_or_repair_script_returns_when_review_passes(tmp_path, monkeypa
         _PassingReviewProvider(), payload, tmp_path / "s.json", "", max_attempts=1,
     ))
     assert result["profile_id"] == profile.profile_id
+
+
+def test_editorial_rejection_rewrites_then_re_reviews_until_the_profile_bar(tmp_path, monkeypatch):
+    """A weak but schema-valid draft gets one profile-authorized rewrite.
+
+    This is deliberately an integration test: deterministic QA passes both
+    versions, so only the editorial score can keep the first draft from
+    leaking into the queue.
+    """
+    import asyncio
+    from ytb_pipeline.agents.base import AgentResult, AgentStatus
+    from ytb_pipeline.orchestrator.ideation_script_fix import validate_or_repair_script
+    from ytb_pipeline.config.settings import settings
+    import ytb_pipeline.orchestrator.ideation_script_fix as fix_module
+
+    _write_profile(
+        tmp_path, "rewrite-review-fixture",
+        editorial_review={
+            "enabled": True,
+            "rubric_prompt_name": "review_rubric",
+            "minimum_score": 9,
+            "max_rewrites": 1,
+        },
+    )
+    monkeypatch.setattr(settings, "content_profiles_dir", tmp_path, raising=False)
+    monkeypatch.setattr(settings, "assets_dir", tmp_path / "assets_root", raising=False)
+    profile = load_content_profile("rewrite-review-fixture", profiles_dir=tmp_path)
+
+    async def _fake_qa_run(self, context):
+        return AgentResult(agent_name="qa", status=AgentStatus.SUCCESS, output={"passed": True})
+
+    monkeypatch.setattr(fix_module.QAAgent, "run", _fake_qa_run)
+    original = _valid_review_gate_payload(profile)
+    rewritten = {**original, "title": "Bản đã viết lại"}
+
+    class _ReviewThenRewriteProvider:
+        def __init__(self):
+            self.review_calls = 0
+            self.rewrite_calls = 0
+
+        async def complete(self, prompt, **kwargs):
+            if prompt.startswith("Review this Vietnamese YouTube script JSON"):
+                self.review_calls += 1
+                if self.review_calls == 1:
+                    return json.dumps({
+                        "passed": False,
+                        "overall_score": 6,
+                        "dimension_scores": {
+                            "human_truth": 6, "spoken_naturalness": 6,
+                            "causal_coherence": 8, "role_fidelity": 8,
+                            "useful_restraint": 7,
+                        },
+                        "blocking_findings": ["Đoạn mở nghe như một bản thuyết minh."],
+                        "section_refs": [1],
+                        "repair_brief": "Viết lại toàn bộ transcript thành văn nói cụ thể.",
+                    })
+                return json.dumps({
+                    "passed": True,
+                    "overall_score": 9,
+                    "dimension_scores": {
+                        "human_truth": 9, "spoken_naturalness": 9,
+                        "causal_coherence": 9, "role_fidelity": 9,
+                        "useful_restraint": 9,
+                    },
+                    "blocking_findings": [], "section_refs": [], "repair_brief": "",
+                })
+            assert "Editorial review findings" in prompt
+            self.rewrite_calls += 1
+            return json.dumps(rewritten)
+
+    provider = _ReviewThenRewriteProvider()
+    result = asyncio.run(validate_or_repair_script(
+        provider, original, tmp_path / "s.json", "", max_attempts=2,
+    ))
+
+    assert result["title"] == "Bản đã viết lại"
+    assert provider.rewrite_calls == 1
+    assert provider.review_calls == 2
