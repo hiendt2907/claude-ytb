@@ -32,9 +32,9 @@ amendment ghi rõ ngày + lý do trong chính file đó):
    được không cần internet. LLM và TTS KHÔNG còn nằm trong yêu cầu này —
    cả hai đã là cloud-primary (xKiro) theo chủ đích, MacBook chỉ chạy
    workflow/pipeline orchestration + render.
-2. **Cloud-primary LLM+TTS, local-first phần còn lại (amendment 2026-08-24).**
-   LLM và TTS default là **xKiro** (cloud), cascade tự động sang Codex CLI
-   rồi Claude CLI khi xKiro lỗi (`orchestrator/ideation_provider_cascade.py`).
+2. **Cloud-primary LLM+TTS, local-first phần còn lại (amended 2026-08-26).**
+   Ideation chỉ dùng **xKiro / Gemini 3.7 Flash**. Khi xKiro lỗi, lệnh dừng
+   minh bạch; không được thay thế bằng Codex hoặc Claude. TTS vẫn dùng xKiro.
    Ollama và MLX-LM đã bị GỠ KHỎI CODEBASE — không còn local LLM provider
    nào. Ảnh (Flux), video (Wan2.2) KHÔNG đổi, vẫn **default local**. Mọi
    provider chọn rõ qua config — không bao giờ âm thầm thay default.
@@ -161,11 +161,12 @@ buộc:
 
 ## AI Rules
 
-- **xKiro mặc định cho LLM + Voice.** `llm_provider` và `tts_provider` đều
-  mặc định là `"xkiro"`; `allow_cloud_providers=true` mặc định. Ideation thử
-  xKiro trước, sau đó Codex CLI rồi Claude CLI khi xKiro không khả dụng hoặc
-  lỗi. Không thêm lại Ollama, MLX-LM, `local_stack`, hoặc một local ideation
-  provider mà không có amendment mới trong `PROJECT_VISION.md`.
+- **xKiro/Gemini 3.7 Flash là LLM duy nhất cho ideation; xKiro là TTS mặc
+  định.** `llm_provider` và `tts_provider` đều mặc định là `"xkiro"`;
+  `allow_cloud_providers=true` mặc định. Ideation lỗi phải báo lỗi, không
+  fallback sang Codex/Claude. Không thêm lại Ollama, MLX-LM, `local_stack`,
+  hoặc một local ideation provider mà không có amendment mới trong
+  `PROJECT_VISION.md`.
 - **Voice cast theo content profile.** `Segment.speaker_id` chỉ là identity;
   xKiro tra voice qua `voice_cast` của profile và đưa voice vào content-hash
   cache. Script cũ không khai báo profile/speaker vẫn dùng narrator/default.

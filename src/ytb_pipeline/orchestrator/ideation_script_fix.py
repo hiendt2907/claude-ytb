@@ -695,8 +695,8 @@ async def validate_or_repair_script(
                 system=repair_system_prompt(current),
                 # A bounded delta needs a few thousand tokens, not a whole
                 # script budget. Keeping this at 4k caps xKiro's dynamic
-                # timeout near 102s and lets the provider cascade recover
-                # promptly instead of idling for several minutes per model.
+                # timeout near 102s instead of idling for several minutes
+                # before surfacing an xKiro failure to the operator.
                 max_tokens=4096,
                 temperature=0.2,
                 json_output=True,

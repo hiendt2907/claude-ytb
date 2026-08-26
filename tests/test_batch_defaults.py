@@ -40,26 +40,6 @@ async def test_health_script_is_not_sent_to_legacy_entertainment_gate():
     )
 
 
-def test_claude_batch_provider_uses_cli_default_model(monkeypatch):
-    from ytb_pipeline.orchestrator import ideation_cmd
-
-    captured: list[tuple[str, dict]] = []
-    monkeypatch.setattr(
-        ideation_cmd,
-        "build_claude_cmd",
-        lambda prompt, **kwargs: captured.append((prompt, kwargs)) or ["claude"],
-    )
-
-    provider = ideation_cmd._ClaudeStartProvider()
-    provider._invoke = lambda cmd: "{}"
-    import asyncio
-
-    asyncio.run(provider.complete("write JSON", system="editorial contract"))
-
-    assert captured == [("editorial contract\n\nUser task:\nwrite JSON", {})]
-    assert provider.model_name() == "default"
-
-
 def test_resume_counts_the_requested_batch_only(tmp_path, monkeypatch):
     from ytb_pipeline.orchestrator import ideation_state
 
@@ -149,74 +129,10 @@ def test_financial_repair_prompt_preserves_evidence_contract():
     assert "source_long_slug, source_section_index, source_excerpt" in prompt
 
 
-def test_codex_batch_provider_uses_exec_json_prompt(monkeypatch):
+def test_batch_start_uses_only_xkiro_provider_by_default(monkeypatch):
+    """Amendment 2026-08-26: ideation never substitutes another provider."""
     from ytb_pipeline.orchestrator import ideation_cmd
-
-    monkeypatch.setattr(ideation_cmd, "_cli", lambda: type("CLI", (), {
-        "settings": type("Settings", (), {"codex_bin": "codex"})(),
-        "ROOT": ".",
-    })())
-    provider = ideation_cmd._CodexStartProvider()
-    captured: dict[str, object] = {}
-
-    def fake_run(cmd, **kwargs):
-        captured["cmd"] = cmd
-        captured["kwargs"] = kwargs
-        return type("Result", (), {"stdout": "{}"})()
-
-    monkeypatch.setattr(ideation_cmd.subprocess, "run", fake_run)
-
-    import asyncio
-    asyncio.run(provider.complete("write JSON", system="editorial contract"))
-
-    assert captured["cmd"][:4] == ["codex", "exec", "--full-auto", "--output-last-message"]
-    assert captured["cmd"][-1] == "editorial contract\n\nUser task:\nwrite JSON"
-    assert provider.model_name() == "default"
-
-
-def test_codex_batch_provider_reads_only_last_message_file(monkeypatch):
-    """Codex startup logs must never be mixed into a JSON script response."""
-    from ytb_pipeline.orchestrator import ideation_cmd
-
-    monkeypatch.setattr(ideation_cmd, "_cli", lambda: type("CLI", (), {
-        "settings": type("Settings", (), {"codex_bin": "codex"})(),
-        "ROOT": ".",
-    })())
-
-    def fake_run(cmd, **_kwargs):
-        output_index = cmd.index("--output-last-message") + 1
-        Path(cmd[output_index]).write_text('{"slug":"clean"}', encoding="utf-8")
-        return type("Result", (), {"stdout": "noisy startup logs\n{wrong json}"})()
-
-    monkeypatch.setattr(ideation_cmd.subprocess, "run", fake_run)
-
-    assert ideation_cmd._CodexStartProvider()._invoke(["codex", "exec", "prompt"]) == '{"slug":"clean"}'
-
-
-def test_script_providers_allow_long_generation_budget(monkeypatch):
-    """Long-form generation must not be killed at the legacy five-minute ceiling."""
-    from ytb_pipeline.orchestrator import ideation_cmd
-
-    monkeypatch.setattr(ideation_cmd, "_cli", lambda: type("CLI", (), {"ROOT": "."})())
-    observed: list[int] = []
-
-    def fake_run(*_args, **kwargs):
-        observed.append(kwargs["timeout"])
-        return type("Result", (), {"stdout": "{}"})()
-
-    monkeypatch.setattr(ideation_cmd.subprocess, "run", fake_run)
-    ideation_cmd._ClaudeStartProvider()._invoke(["claude", "prompt"])
-    ideation_cmd._CodexStartProvider()._invoke(["codex", "exec", "prompt"])
-
-    assert observed == [3600, 3600]
-
-
-def test_batch_start_uses_xkiro_cascade_provider_by_default(monkeypatch):
-    """Amendment 2026-08-24 (PROJECT_VISION.md Amendment Log): settings.llm_provider
-    == "xkiro" (default) phải route qua CascadeScriptProvider (xKiro -> Codex CLI
-    -> Claude CLI), không raise SystemExit."""
-    from ytb_pipeline.orchestrator import ideation_cmd
-    from ytb_pipeline.orchestrator.ideation_provider_cascade import CascadeScriptProvider
+    from ytb_pipeline.providers.llm.xkiro_provider import XkiroLLMProvider
 
     monkeypatch.setattr(ideation_cmd, "_cli", lambda: type("CLI", (), {
         "settings": type("Settings", (), {"llm_provider": "xkiro"})(),
@@ -241,9 +157,29 @@ def test_batch_start_uses_xkiro_cascade_provider_by_default(monkeypatch):
         "clear_ledger": False,
     })())
 
-    assert isinstance(captured["provider"], CascadeScriptProvider)
+    assert isinstance(captured["provider"], XkiroLLMProvider)
     assert captured["provider"].name == "xkiro"
     assert captured["strict_qa"] is True
+
+
+def test_batch_start_rejects_non_xkiro_profile_provider(monkeypatch):
+    from ytb_pipeline.orchestrator import ideation_cmd
+
+    monkeypatch.setattr(ideation_cmd, "_cli", lambda: type("CLI", (), {
+        "settings": type("Settings", (), {"llm_provider": "codex"})(),
+    })())
+
+    with pytest.raises(SystemExit, match="chỉ dùng xkiro/Gemini 3.7 Flash"):
+        ideation_cmd.cmd_start(type("Args", (), {
+            "num_of_vid": 1,
+            "type_of_vid": "long",
+            "type_of_rules": "auto",
+            "resume": False,
+            "cloud": False,
+            "local": False,
+            "llm_provider": None,
+            "clear_ledger": False,
+        })())
 
 
 def test_repair_prompt_requires_a_natural_concrete_narrated_example():

@@ -41,11 +41,13 @@ def test_xkiro_llm_provider_registers_and_satisfies_protocol():
 @pytest.mark.unit
 def test_xkiro_script_defaults_pin_gemini_flash_without_model_fallbacks():
     from ytb_pipeline.config.settings import Settings
+    from ytb_pipeline.providers.llm.xkiro_provider import XkiroLLMProvider
 
     defaults = Settings(_env_file=None)
 
-    assert defaults.xkiro_llm_model == "gemini-3.7-flash"
-    assert defaults.xkiro_llm_fallback_models == ""
+    assert defaults.xkiro_llm_model == "google/gemini-3.7-flash"
+    assert not hasattr(defaults, "xkiro_llm_fallback_models")
+    assert XkiroLLMProvider().model_name() == "google/gemini-3.7-flash"
 
 
 @pytest.mark.unit
@@ -66,8 +68,7 @@ async def test_xkiro_llm_sends_openai_compatible_chat_request(monkeypatch):
 
     monkeypatch.setattr(settings, "xkiro_api_key", "test-key", raising=False)
     monkeypatch.setattr(settings, "xkiro_llm_url", "https://voice.example/v1/chat/completions", raising=False)
-    monkeypatch.setattr(settings, "xkiro_llm_model", "deepseek/deepseek-v4-flash", raising=False)
-    monkeypatch.setattr(settings, "xkiro_llm_fallback_models", "", raising=False)
+    monkeypatch.setattr(settings, "xkiro_llm_model", "google/gemini-3.7-flash", raising=False)
     request_seen: dict[str, object] = {}
 
     def fake_urlopen(request: Request, timeout: float):
@@ -83,7 +84,7 @@ async def test_xkiro_llm_sends_openai_compatible_chat_request(monkeypatch):
     assert result == "xin chào"
     assert request_seen["url"] == "https://voice.example/v1/chat/completions"
     assert request_seen["authorization"] == "Bearer test-key"
-    assert request_seen["payload"]["model"] == "deepseek/deepseek-v4-flash"
+    assert request_seen["payload"]["model"] == "google/gemini-3.7-flash"
     assert request_seen["payload"]["messages"] == [
         {"role": "system", "content": "bạn là trợ lý"},
         {"role": "user", "content": "hỏi gì đó"},
@@ -99,7 +100,6 @@ async def test_xkiro_llm_sends_json_schema_when_structured_output_is_requested(m
 
     monkeypatch.setattr(settings, "xkiro_api_key", "test-key", raising=False)
     monkeypatch.setattr(settings, "xkiro_llm_model", "model-a", raising=False)
-    monkeypatch.setattr(settings, "xkiro_llm_fallback_models", "", raising=False)
     seen: dict[str, object] = {}
 
     def fake_urlopen(request: Request, timeout: float):
@@ -126,7 +126,6 @@ async def test_xkiro_llm_omits_response_format_when_json_is_not_requested(monkey
 
     monkeypatch.setattr(settings, "xkiro_api_key", "test-key", raising=False)
     monkeypatch.setattr(settings, "xkiro_llm_model", "model-a", raising=False)
-    monkeypatch.setattr(settings, "xkiro_llm_fallback_models", "", raising=False)
     seen: dict[str, object] = {}
 
     def fake_urlopen(request: Request, timeout: float):
@@ -149,7 +148,6 @@ async def test_xkiro_llm_downgrades_schema_400_to_json_object_on_same_model(monk
 
     monkeypatch.setattr(settings, "xkiro_api_key", "test-key", raising=False)
     monkeypatch.setattr(settings, "xkiro_llm_model", "model-a", raising=False)
-    monkeypatch.setattr(settings, "xkiro_llm_fallback_models", "model-b", raising=False)
     calls: list[tuple[str, str]] = []
 
     def fake_urlopen(request: Request, timeout: float):
@@ -174,7 +172,6 @@ async def test_xkiro_llm_does_not_hide_an_unsupported_response_format_by_changin
 
     monkeypatch.setattr(settings, "xkiro_api_key", "test-key", raising=False)
     monkeypatch.setattr(settings, "xkiro_llm_model", "model-a", raising=False)
-    monkeypatch.setattr(settings, "xkiro_llm_fallback_models", "model-b", raising=False)
     calls: list[str] = []
 
     def fake_urlopen(request: Request, timeout: float):
@@ -190,68 +187,60 @@ async def test_xkiro_llm_does_not_hide_an_unsupported_response_format_by_changin
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_xkiro_llm_uses_next_model_for_a_real_server_error(monkeypatch):
+async def test_xkiro_llm_surfaces_server_error_without_changing_model(monkeypatch):
     from ytb_pipeline.config.settings import settings
     from ytb_pipeline.providers.llm import xkiro_provider
     from ytb_pipeline.providers.llm.xkiro_provider import XkiroLLMProvider
 
     monkeypatch.setattr(settings, "xkiro_api_key", "test-key", raising=False)
     monkeypatch.setattr(settings, "xkiro_llm_model", "model-a", raising=False)
-    monkeypatch.setattr(settings, "xkiro_llm_fallback_models", "model-b", raising=False)
     calls: list[str] = []
 
     def fake_urlopen(request: Request, timeout: float):
         model = json.loads(request.data.decode("utf-8"))["model"]
         calls.append(model)
-        if model == "model-a":
-            raise urllib_error.HTTPError(request.full_url, 500, "Server Error", None, None)
-        return _fake_response({"choices": [{"message": {"content": "ok"}}]})
+        raise urllib_error.HTTPError(request.full_url, 500, "Server Error", None, None)
 
     monkeypatch.setattr(xkiro_provider.urllib_request, "urlopen", fake_urlopen)
 
-    assert await XkiroLLMProvider().complete("script", json_output=True, response_schema={"type": "object"}) == "ok"
-    assert calls == ["model-a", "model-b"]
+    with pytest.raises(ProviderUnavailableError, match="HTTP 500"):
+        await XkiroLLMProvider().complete("script", json_output=True, response_schema={"type": "object"})
+    assert calls == ["model-a"]
 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_xkiro_llm_falls_back_to_next_model_on_error(monkeypatch):
+async def test_xkiro_llm_does_not_retry_with_another_model(monkeypatch):
     from ytb_pipeline.config.settings import settings
     from ytb_pipeline.providers.llm import xkiro_provider
     from ytb_pipeline.providers.llm.xkiro_provider import XkiroLLMProvider
 
     monkeypatch.setattr(settings, "xkiro_api_key", "test-key", raising=False)
     monkeypatch.setattr(settings, "xkiro_llm_model", "model-a", raising=False)
-    monkeypatch.setattr(settings, "xkiro_llm_fallback_models", "model-b,model-c", raising=False)
-
     calls: list[str] = []
 
     def fake_urlopen(request: Request, timeout: float):
         payload = json.loads(request.data.decode("utf-8"))
         model = payload["model"]
         calls.append(model)
-        if model != "model-b":
-            raise urllib_error.HTTPError(request.full_url, 403, "Forbidden", None, None)
-        return _fake_response({"choices": [{"message": {"content": "ok tu model-b"}}]})
+        raise urllib_error.HTTPError(request.full_url, 403, "Forbidden", None, None)
 
     monkeypatch.setattr(xkiro_provider.urllib_request, "urlopen", fake_urlopen)
 
-    result = await XkiroLLMProvider().complete("test")
-
-    assert result == "ok tu model-b"
-    assert calls == ["model-a", "model-b"]
+    with pytest.raises(ProviderUnavailableError, match="HTTP 403"):
+        await XkiroLLMProvider().complete("test")
+    assert calls == ["model-a"]
 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_xkiro_llm_raises_when_all_models_fail(monkeypatch):
+async def test_xkiro_llm_raises_when_the_pinned_model_fails(monkeypatch):
     from ytb_pipeline.config.settings import settings
     from ytb_pipeline.providers.llm import xkiro_provider
     from ytb_pipeline.providers.llm.xkiro_provider import XkiroLLMProvider
 
     monkeypatch.setattr(settings, "xkiro_api_key", "test-key", raising=False)
     monkeypatch.setattr(settings, "xkiro_llm_model", "model-a", raising=False)
-    monkeypatch.setattr(settings, "xkiro_llm_fallback_models", "model-b", raising=False)
 
     def fake_urlopen(request: Request, timeout: float):
         raise urllib_error.HTTPError(request.full_url, 403, "Forbidden", None, None)
@@ -271,7 +260,6 @@ async def test_xkiro_llm_raises_on_empty_content(monkeypatch):
 
     monkeypatch.setattr(settings, "xkiro_api_key", "test-key", raising=False)
     monkeypatch.setattr(settings, "xkiro_llm_model", "model-a", raising=False)
-    monkeypatch.setattr(settings, "xkiro_llm_fallback_models", "", raising=False)
 
     def fake_urlopen(request: Request, timeout: float):
         return _fake_response({"choices": [{"message": {"content": ""}}]})
@@ -300,21 +288,13 @@ async def test_request_timeout_scales_with_the_requested_output_size(monkeypatch
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_xkiro_llm_falls_back_when_a_model_returns_http_200_with_invalid_json(monkeypatch):
-    """A 200 response whose body isn't valid JSON must be treated like any
-    other model failure — try the next model — not crash the whole batch.
-
-    Hit for real generating a Long for ban-so-6: minimax-m2.7 returned a 200
-    whose body failed `json.loads` at character 11, and the bare
-    JSONDecodeError escaped every try/except up to `ytb batch start` itself.
-    """
+async def test_xkiro_llm_surfaces_invalid_json_without_changing_model(monkeypatch):
     from ytb_pipeline.config.settings import settings
     from ytb_pipeline.providers.llm import xkiro_provider
     from ytb_pipeline.providers.llm.xkiro_provider import XkiroLLMProvider
 
     monkeypatch.setattr(settings, "xkiro_api_key", "test-key", raising=False)
     monkeypatch.setattr(settings, "xkiro_llm_model", "model-a", raising=False)
-    monkeypatch.setattr(settings, "xkiro_llm_fallback_models", "model-b", raising=False)
 
     class _BrokenBodyResponse:
         def __enter__(self):
@@ -331,16 +311,13 @@ async def test_xkiro_llm_falls_back_when_a_model_returns_http_200_with_invalid_j
     def fake_urlopen(request: Request, timeout: float):
         model = json.loads(request.data.decode("utf-8"))["model"]
         calls.append(model)
-        if model == "model-a":
-            return _BrokenBodyResponse()
-        return _fake_response({"choices": [{"message": {"content": "ok tu model-b"}}]})
+        return _BrokenBodyResponse()
 
     monkeypatch.setattr(xkiro_provider.urllib_request, "urlopen", fake_urlopen)
 
-    result = await XkiroLLMProvider().complete("test")
-
-    assert result == "ok tu model-b"
-    assert calls == ["model-a", "model-b"]
+    with pytest.raises(ProviderUnavailableError, match="không phải JSON"):
+        await XkiroLLMProvider().complete("test")
+    assert calls == ["model-a"]
 
 
 @pytest.mark.unit
@@ -352,7 +329,6 @@ async def test_xkiro_llm_reports_the_bad_body_when_every_model_returns_invalid_j
 
     monkeypatch.setattr(settings, "xkiro_api_key", "test-key", raising=False)
     monkeypatch.setattr(settings, "xkiro_llm_model", "model-a", raising=False)
-    monkeypatch.setattr(settings, "xkiro_llm_fallback_models", "", raising=False)
 
     class _BrokenBodyResponse:
         def __enter__(self):

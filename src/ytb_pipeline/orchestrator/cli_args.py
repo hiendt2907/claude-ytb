@@ -25,8 +25,7 @@ Các lệnh:
   benchmark-local  Benchmark local AI stack và ghi JSON report
 
 Quy trình thường dùng:
-  ytb batch start -n 5 --type-of-vid long   # Claude mặc định viết kịch bản
-  ytb batch start -n 5 --type-of-vid long --llm codex  # dùng Codex CLI
+  ytb batch start -n 5 --type-of-vid long   # xKiro/Gemini 3.7 Flash viết kịch bản
   ytb doctor                # kiểm tra môi trường trước (shortcut top-level)
   ytb batch status          # xem còn video nào pending
   ytb batch run             # chạy 1 video, lặp lại lệnh này cho video kế
@@ -71,8 +70,8 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
     p_start = _sub(
         sub, "start",
         help="Sinh phần SÁNG TẠO (ideation + viết N kịch bản)",
-        description="Mặc định dùng xKiro (cloud, cascade tự động sang Codex rồi Claude CLI "
-        "khi lỗi); có thể chọn Claude hoặc Codex trực tiếp bằng --llm-provider/--llm, "
+        description="Chỉ dùng xKiro/Gemini 3.7 Flash để sinh kịch bản; khi lỗi lệnh dừng "
+        "minh bạch, không fallback sang Claude hoặc Codex. "
         "để chọn chủ đề "
         "(chống trùng data/ledger.md), viết kịch bản đầy đủ cho N video vào "
         "scripts/<slug>.json, và đăng ký từng video vào assets/auto_state.json. "
@@ -108,9 +107,8 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
     )
     p_start.add_argument(
         "--llm-provider", "--llm", dest="llm_provider",
-        choices=["xkiro", "claude", "codex"], default=None,
-        help="LLM viết kịch bản: xkiro (mặc định, cascade tự động sang codex "
-        "rồi claude khi lỗi), claude, hoặc codex (mặc định theo LLM_PROVIDER).",
+        choices=["xkiro"], default=None,
+        help="LLM viết kịch bản duy nhất: xkiro/Gemini 3.7 Flash.",
     )
     p_start.add_argument(
         "--idea",
@@ -426,7 +424,7 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
     )
     p_doctor.add_argument(
         "--local", action="store_true",
-        help="Kiểm tra stack local còn lại: LLM provider cấu hình (xkiro/claude/codex), "
+        help="Kiểm tra stack local còn lại: LLM xKiro/Gemini cấu hình, "
         "ComfyUI/Flux, TTS provider cấu hình, Wan/LTX, ffmpeg",
     )
     p_doctor.set_defaults(func=cmd_funcs["doctor"])

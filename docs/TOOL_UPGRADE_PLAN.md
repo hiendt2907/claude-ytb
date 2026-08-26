@@ -74,6 +74,11 @@ Không sửa tool chỉ để tăng số lượng video. Mỗi thay đổi phả
   `GET /v1/models` liệt kê tên model trùng khớp bất thường với chính tên
   model Claude hiện tại — đã báo cho User, User xác nhận chấp nhận rủi ro và
   tiếp tục. Ảnh (Flux)/video (Wan2.2) KHÔNG đổi, vẫn local-first.
+- **Amendment 2026-08-26** (chủ sở hữu quyết định: User): ideation chỉ dùng
+  xKiro model `google/gemini-3.7-flash` (Gemini 3.7 Flash). Xóa model
+  fallback và CLI cascade
+  Codex → Claude cho bước sinh kịch bản: lỗi xKiro phải dừng minh bạch, không
+  âm thầm đổi provider/model. TTS xKiro và visual/render không đổi.
 - Không đưa người que hoặc legacy `image_motion` vào production.
 - Publish phải tôn trọng `DRY_RUN`, privacy và publish schedule.
 - Mọi trạng thái phải resume được sau lỗi hoặc dừng graceful.

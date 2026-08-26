@@ -3,13 +3,12 @@
 > **Ghi chú thực trạng (2026-08-24, amendment PROJECT_VISION.md Amendment
 > Log):** Document này mô tả kiến trúc ĐÍCH (`LLMProviderRegistry` đa
 > capability, health-check chain, cost tracking) — CHƯA triển khai. Thực tế
-> hiện tại đơn giản hơn nhiều: `providers/registry.py::get_llm_provider()` +
-> `orchestrator/ideation_provider_cascade.py::CascadeScriptProvider` cho
-> ideation. **Ollama và MLX-LM đã bị GỠ KHỎI CODEBASE** — mọi mô tả "Ollama
-> local là default" bên dưới đã lỗi thời. Default thực tế: **xKiro** (cloud)
-> primary, cascade tự động sang Codex CLI rồi Claude CLI khi lỗi. Không đọc
-> phần "Supported Providers"/"Provider Selection Strategy" bên dưới như thực
-> trạng — chỉ là roadmap tương lai.
+> hiện tại đơn giản hơn nhiều: `providers/registry.py::get_llm_provider()`
+> trực tiếp cho ideation. **Ollama và MLX-LM đã bị GỠ KHỎI CODEBASE** — mọi mô
+> tả "Ollama local là default" bên dưới đã lỗi thời. Default thực tế:
+> **xKiro / Gemini 3.7 Flash** duy nhất; lỗi dừng, không cascade sang Codex
+> hoặc Claude. Không đọc phần "Supported Providers"/"Provider Selection
+> Strategy" bên dưới như thực trạng — chỉ là roadmap tương lai.
 
 ## Purpose
 
@@ -68,15 +67,13 @@ class LLMProvider(Protocol):
 
 | Provider | Type | Notes |
 |---|---|---|
-| **xKiro** | cloud | Default OpenAI-compatible LLM adapter; it has a configured model fallback list. |
-| **Codex CLI** | cloud/CLI session | Second ideation provider when xKiro fails. |
-| **Claude CLI** | cloud/CLI session | Final ideation provider when xKiro and Codex CLI fail. |
+| **xKiro / Gemini 3.7 Flash** | cloud | The sole ideation adapter and pinned model. A failure is surfaced to the operator. |
 
 Each provider is a thin adapter implementing `LLMProvider` — no agent or
 engine code branches on provider name; all branching happens inside the
 selection strategy below.
 
-## Provider Selection Strategy: xKiro-Primary Cascade
+## Provider Selection Strategy: pinned xKiro model
 
 ```python
 class LLMProviderRegistry:
@@ -93,10 +90,10 @@ class LLMProviderRegistry:
         raise NoProviderAvailable(capability)
 ```
 
-The implemented ideation chain is `[xkiro, codex_cli, claude_cli]`.
-`CascadeScriptProvider` tries the next provider when the preceding provider
-is unavailable or fails. There is no offline LLM mode because local LLM
-providers were deliberately removed in the 2026-08-24 amendment.
+The implemented ideation provider is `[xkiro / google/gemini-3.7-flash]`.
+There is no model or cross-provider fallback: an unavailable or failed request
+is surfaced directly. There is no offline LLM mode because local LLM providers
+were deliberately removed in the 2026-08-24 amendment.
 
 ## Prompt Management: Version-Controlled, A/B-Testable
 
@@ -203,17 +200,10 @@ provider.complete(request)
    ┌────┴─────┐
    │ success   │ error / timeout
    ▼           ▼
-return     exponential backoff (1s, 4s, 9s) on same provider, max 2 retries
+return     surface the xKiro/Gemini error to the calling Agent
             │
-            │ still failing
             ▼
-   try next provider in chain (xKiro → Codex CLI → Claude CLI)
-            │
-            │ chain exhausted
-            ▼
-   raise LLMEngineExhausted — propagated to the calling Agent's own
-   retry/escalation logic (06-AGENTS shared failure conventions), never
-   silently swallowed
+   no model or cross-provider fallback for ideation
 ```
 
 This two-level retry (within-provider backoff, then cross-provider fallback)

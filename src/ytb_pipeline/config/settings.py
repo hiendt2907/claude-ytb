@@ -27,22 +27,11 @@ class Settings(BaseSettings):
     xkiro_timeout_sec: float = Field(default=120.0, gt=0)
     xkiro_max_retries: int = Field(default=3, ge=1, le=5)
     # xKiro cũng lộ /v1/chat/completions OpenAI-compatible (LLM), tách endpoint
-    # riêng với TTS dù chung API key. `xkiro_llm_model` là model chính; nếu lỗi
-    # thì thử lần lượt các model trong `xkiro_llm_fallback_models` (CSV theo id
-    # từ GET /v1/models) — danh sách này chốt qua benchmark thật, không đoán.
+    # riêng với TTS dù chung API key. Ideation chỉ dùng một model đã chọn rõ;
+    # lỗi phải dừng để operator biết, không âm thầm đổi chất lượng/nội dung.
     xkiro_llm_url: str = "https://api.xkiro.com/v1/chat/completions"
-    # Benchmark 2026-08-24 (14 model đại diện, prompt JSON test): model gắn
-    # nhãn anthropic/openai/google/qwen trả HTTP 403 với free-tier key hiện
-    # tại — không phải lỗi code, tài khoản không có quyền. z-ai/glm-4.6 trả
-    # content rỗng (lỗi thật). 4 model dưới đây trả JSON hợp lệ 100%, không
-    # lỗi; xếp theo latency (deepseek-v4-flash 3.7s -> kimi-k2.6 11.0s).
-    xkiro_llm_model: str = "deepseek/deepseek-v4-flash"
-    xkiro_llm_fallback_models: str = (
-        "deepseek/deepseek-chat-v3.1,minimax/minimax-m2,moonshotai/kimi-k2.6"
-    )
-    # Cascade cấp CLI khi bản thân xKiro (mọi model) đều lỗi — Codex CLI rồi
-    # Claude CLI, xem `orchestrator/ideation_provider_cascade.py`.
-    xkiro_script_fallback_chain: str = "codex,claude"
+    # xKiro gateway namespace; the upstream Google model is Gemini 3.7 Flash.
+    xkiro_llm_model: str = "google/gemini-3.7-flash"
     # Optional operator override for Edge remote speech rate. Empty keeps the profile rate.
     edge_tts_rate_override: str = ""
     # Explicit local F5 backend. Production keeps Apple Silicon MPS; CPU is a
@@ -202,22 +191,18 @@ class Settings(BaseSettings):
     # Cho phép lệnh /sh chạy shell tùy ý trên máy (mạnh + nguy hiểm). Bật có chủ đích.
     listener_allow_shell: bool = True
 
-    # LLM — xKiro (cloud) là default từ amendment 2026-08-24 (PROJECT_VISION.md
-    # Amendment Log): MacBook chỉ chạy workflow/pipeline, không còn chạy local
-    # LLM inference. Ollama và MLX-LM đã bị gỡ khỏi codebase (xem Amendment
-    # Log lý do đầy đủ). Cascade khi xKiro lỗi: Codex CLI -> Claude CLI, xem
-    # `orchestrator/ideation_provider_cascade.py`.
-    llm_provider: str = "xkiro"          # xkiro | claude | codex
+    # LLM — ideation chỉ dùng xKiro/Gemini 3.7 Flash (amendment 2026-08-26).
+    # MacBook chỉ chạy workflow/pipeline, không còn chạy local LLM inference.
+    llm_provider: str = "xkiro"
     # Explicit opt-in only: shortens the Long contract for local E2E tests.
     # Production remains 12–15 minutes unless this flag is set.
     e2e_test: bool = Field(
         default=False,
         validation_alias=AliasChoices("E2E_TEST", "YTB_E2E_TEST"),
     )
-    # Cascade tự động sang provider kế tiếp (Codex/Claude CLI) khi xKiro lỗi.
-    # Bật mặc định vì mọi provider trong chain đều cloud — không còn rủi ro
-    # "âm thầm chuyển từ local sang cloud" mà cờ này từng canh giữ.
-    llm_fallback_enabled: bool = True
+    # Kept for compatibility with non-ideation adapters. Ideation does not
+    # consult this flag: it must never substitute Codex/Claude for xKiro.
+    llm_fallback_enabled: bool = False
 
     # Video generation
     video_provider: str = "pexels"        # pexels là đường render footage thật mặc định

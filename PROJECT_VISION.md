@@ -39,11 +39,11 @@ to honor them — never the reverse.
    render/publish-prep is still a defect, not a feature.
 
 2. **Cloud-primary inference for LLM + voice; local-first elsewhere (amended
-   2026-08-24 — see Amendment Log).** LLM reasoning and text-to-speech now
-   default to a cloud provider (xKiro, OpenAI-compatible aggregator), with
-   an automatic CLI fallback chain (Codex CLI → Claude CLI) when xKiro
-   errors. Image generation and video generation are unaffected by this
-   amendment and keep local inference as the default (Flux/local diffusion).
+   2026-08-26 — see Amendment Log).** Ideation uses only xKiro with
+   Gemini 3.7 Flash; an xKiro failure stops generation and is never silently
+   substituted with Codex or Claude. Text-to-speech defaults to xKiro. Image
+   generation and video generation are unaffected by this amendment and keep
+   local inference as the default (Flux/local diffusion).
    Any provider substitution must still be explicit via config, never a
    silent runtime branch outside the `Provider` port.
 
@@ -103,14 +103,15 @@ Priority order when choosing or evaluating a dependency, highest first:
 2. **Open weights / open source where local compute is the default** — avoids
    vendor lock and licensing risk for image/video/render paths.
 3. **Swappable behind a `Provider` port** — no direct coupling in domain code.
-4. **Has an explicit configured fallback** appropriate to the capability;
-   ideation's approved chain is xKiro → Codex CLI → Claude CLI.
+4. **Has an explicit failure policy** appropriate to the capability;
+   ideation is intentionally pinned to xKiro/Gemini 3.7 Flash and stops on
+   failure rather than changing model/provider.
 
 Current/target stack by capability:
 
 | Capability | Local option | Cloud option |
 |---|---|---|
-| LLM reasoning (ideation, outline, research synthesis) | — (see Amendment 2026-08-24) | **xKiro (default)**, cascade → Codex CLI → Claude CLI |
+| LLM reasoning (ideation, outline, research synthesis) | — (see Amendment 2026-08-26) | **xKiro / Gemini 3.7 Flash only** |
 | Voice synthesis | F5-TTS (still available, opt-in) | **xKiro (default)**, Edge-TTS, ElevenLabs |
 | Image generation | Flux (local diffusion) | — |
 | Video generation | Local image-to-video / animation pipeline | — |
@@ -208,3 +209,15 @@ section overrides Section 2.*
   catalog (`GET /v1/models`) lists branded model names that 403 on the
   current free-tier key. The operator explicitly accepted this risk after
   review.
+- 2026-08-26 — Amends the LLM ideation policy only. **Rationale:** the
+  operator requires a single known model and must be able to trust the
+  provenance and quality of every generated script. **Change:** ideation is
+  pinned to xKiro model `google/gemini-3.7-flash` (Gemini 3.7 Flash); its
+  model fallback list and the
+  Codex CLI → Claude CLI fallback path are removed. An unavailable or failed
+  xKiro request now stops the command with its original error. This does not
+  alter xKiro TTS, visual generation, rendering, or publishing. **Verified
+  access state:** the configured xKiro key returns HTTP 403 for this gateway
+  model (and HTTP 403 for `GET /v1/models`), so ideation cannot run until the
+  xKiro account grants access; this is an account entitlement, not a fallback
+  condition.

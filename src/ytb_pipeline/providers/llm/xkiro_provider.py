@@ -1,10 +1,10 @@
 """XkiroLLMProvider — bọc endpoint OpenAI-compatible `/v1/chat/completions`
 của xKiro. Tách hẳn khỏi `XkiroVoiceProvider` (TTS) dù dùng chung API key.
 
-Tài khoản free chỉ truy cập được một tập con model trong `GET /v1/models`
-(model gắn nhãn thương hiệu lớn trả HTTP 403). `xkiro_llm_model` +
-`xkiro_llm_fallback_models` được chốt qua benchmark thật (xem
-docs/TOOL_UPGRADE_PLAN.md), không đoán — model nào lỗi/HTTP xấu thì loại.
+Ideation cố ý chỉ gọi model được cấu hình (`google/gemini-3.7-flash` trên
+xKiro, tức Gemini 3.7 Flash).
+Một lỗi phải được trả thẳng về operator: không thử model khác và không che
+nguồn gốc/năng lực thực tế của kịch bản.
 """
 
 from __future__ import annotations
@@ -19,9 +19,7 @@ from ..errors import ProviderUnavailableError
 
 _REQUEST_TIMEOUT_S = 60.0
 # Slowest sustained generation rate we are willing to wait through.  A flat
-# 60s budget was sized for Short-scale requests; a Long asks for ~14k tokens
-# and every model in the cascade reported a read timeout, which the caller
-# then mistook for four separate model failures.
+# 60s budget was sized for Short-scale requests; a Long asks for ~14k tokens.
 _MIN_OUTPUT_TOKENS_PER_SEC = 40.0
 
 
@@ -35,8 +33,7 @@ class _ResponseFormatUnsupportedError(RuntimeError):
 
 
 class XkiroLLMProvider:
-    """LLM cloud qua xKiro; thử `xkiro_llm_model` trước, rồi lần lượt các
-    model trong `xkiro_llm_fallback_models` (CSV) khi model trước lỗi."""
+    """LLM cloud qua xKiro, gọi đúng một model đã được cấu hình."""
 
     name = "xkiro"
 
@@ -45,14 +42,6 @@ class XkiroLLMProvider:
 
     def model_name(self) -> str:
         return settings.xkiro_llm_model
-
-    def _candidate_models(self) -> list[str]:
-        fallbacks = [
-            m.strip()
-            for m in settings.xkiro_llm_fallback_models.split(",")
-            if m.strip()
-        ]
-        return [settings.xkiro_llm_model, *fallbacks]
 
     async def complete(
         self,
@@ -69,39 +58,31 @@ class XkiroLLMProvider:
                 "xKiro chưa khả dụng — cấu hình XKIRO_API_KEY trong .env."
             )
 
-        last_error: Exception | None = None
-        for model in self._candidate_models():
+        model = self.model_name()
+        response_format = self._response_format(json_output, response_schema)
+        try:
             try:
-                response_format = self._response_format(json_output, response_schema)
-                try:
-                    return await asyncio.to_thread(
-                        self._request, model, prompt, system, max_tokens, temperature, response_format
-                    )
-                except _ResponseFormatUnsupportedError:
-                    if response_format is None or response_format["type"] != "json_schema":
-                        raise
-                    # A schema rejection is a capability mismatch, not a model
-                    # failure.  Retry JSON mode on this exact model first.
-                    return await asyncio.to_thread(
-                        self._request,
-                        model,
-                        prompt,
-                        system,
-                        max_tokens,
-                        temperature,
-                        {"type": "json_object"},
-                    )
-            except _ResponseFormatUnsupportedError as exc:
-                # Both structured formats were rejected.  This is a gateway
-                # capability problem, so changing model or cascading to a
-                # different provider would conceal the real integration fault.
-                raise ProviderUnavailableError(str(exc)) from exc
-            except (RuntimeError, urllib_error.URLError, TimeoutError) as exc:
-                last_error = exc
-                continue
-        raise ProviderUnavailableError(
-            f"xKiro LLM: mọi model trong danh sách đều lỗi. Lỗi cuối: {last_error}"
-        )
+                return await asyncio.to_thread(
+                    self._request, model, prompt, system, max_tokens, temperature, response_format
+                )
+            except _ResponseFormatUnsupportedError:
+                if response_format is None or response_format["type"] != "json_schema":
+                    raise
+                # Retry JSON mode on the same pinned model only. This changes
+                # the transport format, never the model or provider.
+                return await asyncio.to_thread(
+                    self._request,
+                    model,
+                    prompt,
+                    system,
+                    max_tokens,
+                    temperature,
+                    {"type": "json_object"},
+                )
+        except _ResponseFormatUnsupportedError as exc:
+            raise ProviderUnavailableError(str(exc)) from exc
+        except (RuntimeError, urllib_error.URLError, TimeoutError) as exc:
+            raise ProviderUnavailableError(f"xKiro LLM ({model}) lỗi: {exc}") from exc
 
     @staticmethod
     def _response_format(json_output: bool, response_schema: dict | None) -> dict | None:
@@ -164,12 +145,9 @@ class XkiroLLMProvider:
         try:
             body = json.loads(raw.decode("utf-8", "replace"))
         except json.JSONDecodeError as exc:
-            # HTTP 200 nhưng body không phải JSON hợp lệ — gặp thật với
-            # minimax-m2.7 (event-stream/gateway rỗng lẫn vào response
-            # non-streaming). Đây vẫn là MỘT model lỗi, không phải lỗi tích
-            # hợp: coi như RuntimeError để vòng cascade thử model kế tiếp,
-            # thay vì để JSONDecodeError thoát ra ngoài và giết cả tiến trình
-            # batch — đúng thứ đã xảy ra khi sinh Long ban-so-6.
+            # HTTP 200 nhưng body không phải JSON hợp lệ là lỗi model/gateway.
+            # Surface it as a provider error rather than leaking JSONDecodeError
+            # out of the batch command.
             snippet = raw.decode("utf-8", "replace")[:300]
             raise RuntimeError(
                 f"xKiro LLM ({model}) trả HTTP 200 nhưng body không phải JSON hợp lệ: {snippet!r}"

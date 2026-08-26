@@ -19,28 +19,18 @@ import asyncio
 import json
 import os
 import shutil
-import subprocess
 import sys
-import tempfile
 from datetime import datetime
 from pathlib import Path
 
-# Long-form scripts (~15-18k ký tự tiếng Việt + silent audit) thường vượt 5
-# Một long-form có thể cần nhiều phút để sinh đủ 15–17k ký tự và qua vòng
-# validate/repair. Timeout áp dụng cho từng script, không phải cả batch.
-# Cho override qua IDEATION_LLM_TIMEOUT; mặc định 1 giờ để không cắt ngang
-# generation hợp lệ.
-SCRIPT_LLM_TIMEOUT_S = int(os.environ.get("IDEATION_LLM_TIMEOUT", "3600"))
 # A 12-minute Vietnamese Long needs materially more than 8k output tokens.
 # One sufficiently-sized first response is cheaper and more reliable than a
 # truncated draft followed by repair calls. Operators may lower this in tests.
 SCRIPT_LLM_MAX_TOKENS = int(os.environ.get("IDEATION_LLM_MAX_TOKENS", "14000"))
 
-from ..claude_cli import build_claude_cmd
 from ..ideation.series import slugify
 from ..content_profiles import load_content_profile
 from ..providers.registry import get_llm_provider
-from .ideation_provider_cascade import CascadeScriptProvider
 from .ideation_prompts import (
     SHORT_MAX_CHARS,
     SHORT_MIN_CHARS,
@@ -294,12 +284,6 @@ def _local_start_log_path() -> Path:
     return PIPELINE_LOG_DIR / f"ideation_{stamp}.log"
 
 
-def _with_system_contract(prompt: str, system: str | None) -> str:
-    """Serialize a system contract into CLI-only providers' single prompt slot."""
-    contract = (system or "").strip()
-    return f"{contract}\n\nUser task:\n{prompt}" if contract else prompt
-
-
 def _validate_short_generation_request(args: argparse.Namespace) -> None:
     """Fail before an LLM call when a new Short cannot enter the v1 funnel."""
     if getattr(args, "type_of_vid", "") != "short":
@@ -343,111 +327,13 @@ def _validate_short_generation_request(args: argparse.Namespace) -> None:
         raise SystemExit("✗ --long-form-slug phải trỏ tới Long đã có trong cùng --batch-key.")
 
 
-class _ClaudeStartProvider:
-    name = "claude"
-
-    def __init__(self, model: str | None = None):
-        self._model = model
-
-    def is_available(self):
-        return shutil.which(_cli().settings.claude_bin) is not None
-
-    def model_name(self):
-        return self._model or "default"
-
-    async def complete(self, prompt: str, **kwargs) -> str:
-        full_prompt = _with_system_contract(prompt, kwargs.get("system"))
-        cmd = build_claude_cmd(full_prompt, **({"model": self._model} if self._model else {}))
-        return await asyncio.to_thread(self._invoke, cmd)
-
-    def _invoke(self, cmd: list[str]) -> str:
-        try:
-            result = subprocess.run(
-                cmd,
-                cwd=_cli().ROOT,
-                capture_output=True,
-                text=True,
-                stdin=subprocess.DEVNULL,
-                timeout=SCRIPT_LLM_TIMEOUT_S,
-                check=True,
-            )
-        except subprocess.TimeoutExpired as exc:
-            raise RuntimeError(
-                f"Claude sinh script quá thời hạn {SCRIPT_LLM_TIMEOUT_S}s; "
-                "chưa ghi script/batch. Tăng IDEATION_LLM_TIMEOUT hoặc dùng --resume."
-            ) from exc
-        except subprocess.CalledProcessError as exc:
-            detail = (exc.stderr or exc.stdout or "").strip()[-1000:]
-            raise RuntimeError(f"Claude CLI lỗi (code {exc.returncode}): {detail}") from exc
-        return result.stdout
-
-
-class _CodexStartProvider:
-    """Codex CLI provider cho structured script generation."""
-
-    name = "codex"
-
-    def __init__(self, model: str | None = None):
-        self._model = model
-
-    def is_available(self):
-        return shutil.which(_cli().settings.codex_bin) is not None
-
-    def model_name(self):
-        return self._model or "default"
-
-    async def complete(self, prompt: str, **kwargs) -> str:
-        full_prompt = _with_system_contract(prompt, kwargs.get("system"))
-        cmd = [
-            _cli().settings.codex_bin,
-            "exec",
-            "--full-auto",
-        ]
-        if self._model:
-            cmd += ["--model", self._model]
-        cmd.append(full_prompt)
-        return await asyncio.to_thread(self._invoke, cmd)
-
-    def _invoke(self, cmd: list[str]) -> str:
-        with tempfile.NamedTemporaryFile(prefix="ytb-codex-", suffix=".json", delete=False) as tmp:
-            output_path = Path(tmp.name)
-        command = [*cmd[:-1], "--output-last-message", str(output_path), cmd[-1]]
-        try:
-            try:
-                result = subprocess.run(
-                    command,
-                    cwd=_cli().ROOT,
-                    capture_output=True,
-                    text=True,
-                    stdin=subprocess.DEVNULL,
-                    timeout=SCRIPT_LLM_TIMEOUT_S,
-                    check=True,
-                )
-            except subprocess.TimeoutExpired as exc:
-                raise RuntimeError(
-                    f"Codex sinh script quá thời hạn {SCRIPT_LLM_TIMEOUT_S}s; "
-                    "chưa ghi script/batch. Tăng IDEATION_LLM_TIMEOUT hoặc dùng --resume."
-                ) from exc
-            except subprocess.CalledProcessError as exc:
-                detail = (exc.stderr or exc.stdout or "").strip()[-1000:]
-                raise RuntimeError(f"Codex CLI lỗi (code {exc.returncode}): {detail}") from exc
-            response = output_path.read_text(encoding="utf-8").strip()
-            return response or result.stdout
-        finally:
-            output_path.unlink(missing_ok=True)
-
-
 def _configured_script_provider(name: str):
-    if name == "claude":
-        return _ClaudeStartProvider()
-    if name == "codex":
-        return _CodexStartProvider()
-    if name == "xkiro":
-        return CascadeScriptProvider(
-            [get_llm_provider("xkiro"), _CodexStartProvider(), _ClaudeStartProvider()],
-            name="xkiro",
+    if name != "xkiro":
+        raise ValueError(
+            "Ideation chỉ hỗ trợ xkiro/Gemini 3.7 Flash; "
+            "không có fallback sang Codex hoặc Claude."
         )
-    return get_llm_provider(name)
+    return get_llm_provider("xkiro")
 
 
 async def _cmd_start_local(args: argparse.Namespace) -> None:
@@ -688,8 +574,7 @@ def cmd_start(args: argparse.Namespace) -> None:
     if getattr(args, "local", False):
         raise SystemExit(
             "✗ --local đã bị gỡ cùng Ollama/MLX-LM (amendment 2026-08-24, "
-            "PROJECT_VISION.md Amendment Log). Dùng `--llm xkiro` (mặc định), "
-            "`--llm claude` hoặc `--llm codex`."
+            "PROJECT_VISION.md Amendment Log). Ideation chỉ dùng xKiro/Gemini 3.7 Flash."
         )
     if getattr(args, "clear_ledger", False):
         if getattr(args, "resume", False):
@@ -698,7 +583,7 @@ def cmd_start(args: argparse.Namespace) -> None:
     if getattr(args, "cloud", False):
         raise SystemExit(
             "✗ --cloud đã bị gỡ vì bỏ qua system prompt và strategy-v1. "
-            "Dùng `--llm claude` hoặc `--llm codex`."
+            "Ideation chỉ dùng xKiro/Gemini 3.7 Flash."
         )
 
     profile_scoped = hasattr(args, "profile_id")
@@ -709,19 +594,16 @@ def cmd_start(args: argparse.Namespace) -> None:
         setattr(args, "profile_id", content_profile.profile_id)
     _validate_short_generation_request(args)
 
-    # requested_provider từ --llm, hoặc settings.llm_provider mặc định
-    # (xkiro — cascade tự động sang Codex CLI rồi Claude CLI khi lỗi).
+    # Ideation có một provider duy nhất để nội dung luôn nhất quán.
     requested_provider = (
         getattr(args, "llm_provider", None)
         or (content_profile.providers.llm if profile_scoped else _cli().settings.llm_provider)
     )
-    if requested_provider in {"claude", "codex", "xkiro"}:
-        setattr(args, "_provider", _configured_script_provider(requested_provider))
-        setattr(args, "_strict_qa", True)
-        asyncio.run(_cmd_start_local(args))
-        return
-    # Provider khác đăng ký qua llm_registry ngoài bộ 3 chuẩn — dùng thẳng,
-    # không bọc cascade CLI (không có script provider tương ứng để cascade).
-    setattr(args, "_provider", get_llm_provider(requested_provider))
+    if requested_provider != "xkiro":
+        raise SystemExit(
+            "✗ Ideation chỉ dùng xkiro/Gemini 3.7 Flash. "
+            "Cập nhật providers.llm của content profile thành `xkiro`."
+        )
+    setattr(args, "_provider", _configured_script_provider("xkiro"))
     setattr(args, "_strict_qa", True)
     asyncio.run(_cmd_start_local(args))
