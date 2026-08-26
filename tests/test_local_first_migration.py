@@ -880,6 +880,20 @@ def test_run_project_resume_publish_rehydrates_rendered_video(tmp_path, monkeypa
             "ruleset_id": CONTRACT_VERSION,
             "script_sha256": script_sha256,
             "qa_decision": "pass",
+            # A resumed publish under the enabled default profile needs the
+            # same current editorial evidence that a fresh input node writes.
+            "editorial_review": {
+                "passed": True,
+                "overall_score": 9,
+                "dimension_scores": {
+                    "human_truth": 9,
+                    "spoken_naturalness": 9,
+                    "causal_coherence": 9,
+                    "role_fidelity": 9,
+                    "useful_restraint": 9,
+                },
+                "script_sha256": script_sha256,
+            },
         },
     )
     project = checkpoint.mark_done(
