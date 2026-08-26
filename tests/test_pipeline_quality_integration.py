@@ -145,6 +145,27 @@ def _prepare_run(monkeypatch, tmp_path, audio_result, voice_scripts=None):
     monkeypatch.setattr(pipeline, "get_render_provider", lambda _name=None: RenderProvider())
     monkeypatch.setattr(pipeline, "validate_audio", lambda _voice: None)
     monkeypatch.setattr(pipeline, "validate_final_video", lambda _video: None)
+    # Most workflow tests exercise later nodes with a deliberately skeletal
+    # legacy fixture.  Editorial behavior has dedicated tests below; keep
+    # those unrelated tests offline and deterministic, while still supplying
+    # the current release manifest required by the default profile.
+    async def passing_editorial_review(*_args, **_kwargs):
+        return SimpleNamespace(
+            passed=True,
+            overall_score=9,
+            dimension_scores={
+                "human_truth": 9,
+                "spoken_naturalness": 9,
+                "causal_coherence": 9,
+                "role_fidelity": 9,
+                "useful_restraint": 9,
+            },
+            blocking_findings=(),
+            section_refs=(),
+            repair_brief="",
+        )
+
+    monkeypatch.setattr(pipeline, "run_editorial_review", passing_editorial_review)
     monkeypatch.setattr(
         pipeline,
         "run_audio_quality_gate",
@@ -192,19 +213,14 @@ def test_voice_provider_receives_project_id_as_artifact_slug(monkeypatch, tmp_pa
     assert received_scripts[0].project_id == "nao-ne-viec-kho"
 
 
-def test_direct_pipeline_blocks_a_profile_script_that_fails_editorial_review(monkeypatch, tmp_path):
-    """`python -m ytb_pipeline` cannot bypass batch-start's content gate."""
+def test_direct_pipeline_blocks_a_default_profile_script_that_fails_editorial_review(monkeypatch, tmp_path):
+    """`python -m ytb_pipeline` resolves legacy scripts to the default review gate."""
     audio_result = SimpleNamespace(
         passed=True, issues=(), cache_key="audio-key", cached=False, metrics={}, repair_payload={},
     )
     project, checkpoint, _ = _prepare_run(monkeypatch, tmp_path, audio_result)
     monkeypatch.setattr(pipeline.settings, "assets_dir", tmp_path / "assets", raising=False)
     payload = _raw_script_payload()
-    payload["profile_id"] = "one-cup-cafe-6h"
-    payload["profile_version"] = "1.1.0"
-    payload["sections"] = payload["sections"][:4]
-    for section, purpose in zip(payload["sections"], ("situation", "core_answer", "application", "payoff")):
-        section["purpose"] = purpose
     Path(project.script_path).write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
 
     class PassingQa:
@@ -228,6 +244,9 @@ def test_direct_pipeline_blocks_a_profile_script_that_fails_editorial_review(mon
 
     monkeypatch.setattr(pipeline, "QAAgent", PassingQa)
     monkeypatch.setattr(pipeline, "get_llm_provider", lambda _name=None: RejectingReviewerProvider())
+    from ytb_pipeline.agents.editorial_review_agent import run_editorial_review
+
+    monkeypatch.setattr(pipeline, "run_editorial_review", run_editorial_review)
 
     from ytb_pipeline.project.workflow import WorkflowError
 
@@ -241,6 +260,16 @@ def test_publish_manifest_requires_an_editorial_approval_for_enabled_profile(tmp
     payload["profile_id"] = "one-cup-cafe-6h"
     payload["profile_version"] = "1.1.0"
     path = tmp_path / "profile-script.json"
+    path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Editorial release manifest"):
+        pipeline.validate_editorial_release_approval(path, {"qa_decision": "pass"})
+
+
+def test_publish_manifest_requires_editorial_approval_for_default_profile(tmp_path):
+    """Legacy scripts inherit the enabled default profile; they cannot bypass review."""
+    payload = _raw_script_payload()
+    path = tmp_path / "legacy-script.json"
     path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
 
     with pytest.raises(ValueError, match="Editorial release manifest"):

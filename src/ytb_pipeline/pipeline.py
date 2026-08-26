@@ -304,9 +304,10 @@ def validate_editorial_release_approval(script_path: Path, input_data: dict[str,
         payload = json.loads(script_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise ValueError(f"Editorial release manifest không đọc được script: {exc}") from exc
-    profile_id = str(payload.get("profile_id") or "").strip()
-    if not profile_id:
-        return
+    # Legacy scripts without an explicit profile are interpreted everywhere
+    # else as the configured default profile.  The release gate must use the
+    # same resolution or an old script could resume past editorial approval.
+    profile_id = str(payload.get("profile_id") or settings.content_profile_id).strip()
     profile = load_content_profile(
         profile_id, version=str(payload.get("profile_version") or "").strip() or None,
     )
@@ -610,31 +611,30 @@ async def run_project(project: Project, checkpoint: CheckpointManager, through: 
             )
             raise ValueError(f"Script QA chặn TTS: {details or 'unknown violation'}")
         editorial_output: dict[str, Any] | None = None
-        profile_id = str(raw_payload.get("profile_id") or "").strip()
-        if profile_id:
-            profile = load_content_profile(
-                profile_id,
-                version=str(raw_payload.get("profile_version") or "").strip() or None,
-            )
-            review = await run_editorial_review(
-                profile,
-                raw_payload,
-                provider=get_llm_provider(profile.providers.llm),
-                cache_dir=settings.assets_dir / "editorial_review_cache" / profile.profile_id,
-            )
-            if review is not None:
-                editorial_output = {
-                    "passed": review.passed,
-                    "overall_score": review.overall_score,
-                    "dimension_scores": dict(review.dimension_scores or {}),
-                    "blocking_findings": list(review.blocking_findings),
-                    "section_refs": list(review.section_refs),
-                    "repair_brief": review.repair_brief,
-                    "script_sha256": _script_sha256(Path(script_path)),
-                }
-                if not review.passed:
-                    details = "; ".join(review.blocking_findings)
-                    raise ValueError(f"Editorial review chặn TTS: {details or 'không đạt rubric profile'}")
+        profile_id = str(raw_payload.get("profile_id") or settings.content_profile_id).strip()
+        profile = load_content_profile(
+            profile_id,
+            version=str(raw_payload.get("profile_version") or "").strip() or None,
+        )
+        review = await run_editorial_review(
+            profile,
+            raw_payload,
+            provider=get_llm_provider(profile.providers.llm),
+            cache_dir=settings.assets_dir / "editorial_review_cache" / profile.profile_id,
+        )
+        if review is not None:
+            editorial_output = {
+                "passed": review.passed,
+                "overall_score": review.overall_score,
+                "dimension_scores": dict(review.dimension_scores or {}),
+                "blocking_findings": list(review.blocking_findings),
+                "section_refs": list(review.section_refs),
+                "repair_brief": review.repair_brief,
+                "script_sha256": _script_sha256(Path(script_path)),
+            }
+            if not review.passed:
+                details = "; ".join(review.blocking_findings)
+                raise ValueError(f"Editorial review chặn TTS: {details or 'không đạt rubric profile'}")
         print(f"[0/3] Input     ✓  {script.title} ({len(script.segments)} đoạn; approved by batch start)")
         state["script"] = script
         return _node_script_path(current), {
