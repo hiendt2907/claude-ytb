@@ -1,24 +1,28 @@
-Viết một câu chuyện đời thường trong thế giới Bàn số 6. Minh và An là người
-thật trong một tình huống cụ thể, không phải hai cái miệng để tác giả giảng
-self-help. Mỗi tập có một mong muốn, một lực cản và một lựa chọn chính. Insight
-phải nảy sinh từ hành động và hệ quả. Narrator nối cảnh nhưng không giải thích
-lại điều nhân vật vừa nói. Continuity của nhân vật, bối cảnh và các thread mở
-phải được giữ qua series bible và continuity ledger của profile.
+Viết một câu chuyện đời thường trong thế giới Bàn số 6. Minh, An và narrator
+là ba con người đang dẫn người xem đi qua một việc thật, không phải ba cái
+miệng để tác giả giảng self-help. Người xem ở lại vì thấy mình trong Minh,
+không phải vì được trao một câu quote đúng.
+
+Mỗi Long cần một mong muốn, lực cản, lựa chọn và hệ quả đáng tin. Có thể để
+nhân vật thất bại, lưỡng lự hoặc chỉ đi được một đoạn. Đừng sắp một phản hồi
+đẹp của thế giới bên ngoài chỉ để câu chuyện kịp chứng minh bài học.
 
 ## Nhịp Long
 
-Một Long vẫn phải là một câu chuyện: sau lựa chọn đầu tiên, hãy tăng cái giá,
-để lựa chọn ấy được thử thách, hoặc cho thấy một hệ quả cụ thể. Không được kết
-thúc cao trào rồi nối thêm một bài luận để đủ thời lượng. Phần giải thích chỉ
-được xuất hiện khi nó làm người xem hiểu rõ hơn một hành động vừa xảy ra; sau
-đó phải quay lại nhân vật, lựa chọn và hệ quả. Nếu tiêu đề hứa một con số, một
-nhịp lặp, hoặc một vật/motif cụ thể, kịch bản phải làm nó quan sát được trong
-các cảnh; nếu không, hãy đổi tiêu đề trước khi trả JSON.
+Bàn số 6 phải xuất hiện ngay từ đầu hoặc là nơi Minh quay lại khi sự việc bên
+ngoài đã chạm tới cậu. Sau lựa chọn đầu tiên, hãy để cái giá tăng, lựa chọn bị
+thử, hoặc cho thấy hệ quả làm Minh nhìn khác đi. Không được kết thúc cao trào
+rồi nối thêm bài luận để đủ thời lượng.
+
+Narrator nối cảnh, thời gian, vật thể và điều chưa ai nói ra; narrator không
+giải thích lại một câu thoại vừa đủ rõ. Phần chốt là phản chiếu khiêm tốn, rút
+từ đúng điều đã xảy ra — không phải một quy luật cho mọi người, chẩn đoán hay
+lời khuyên tuyệt đối. Cầu nối tập sau chỉ được sinh từ một chi tiết đã sống
+trong tập này.
 
 ## Lựa chọn nhỏ phải có phản hồi thật
 
-Khi xung đột là sợ bị đánh giá hay sợ phản hồi, hành động cuối không thể chỉ
-gửi cho chính mình. Nhân vật cần đưa một phần việc nhỏ cho người có thể phản
-hồi, hoặc nói rõ vì sao ở tập này chưa thể làm điều đó. Việc nhỏ phải giảm rủi
-ro nhưng vẫn chạm đúng nỗi sợ của tập, không phải một nghi thức an toàn vô
-nghĩa.
+Khi xung đột là sợ bị đánh giá hay sợ phản hồi, một hành động nhỏ chỉ có ý nghĩa
+nếu nó chạm đúng nỗi sợ và có người/hoàn cảnh thật để phản hồi. Nhưng không phải
+tập nào cũng cần người ngoài trả lời ngay. Im lặng, một phản hồi không như ý,
+hoặc một việc còn dang dở cũng là hệ quả hợp lệ nếu câu chuyện đối diện với nó.

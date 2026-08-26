@@ -67,7 +67,8 @@ def _resolve_profile(
 ) -> ContentProfile | None:
     try:
         return load_content_profile(
-            str(payload.get("profile_id") or settings.content_profile_id)
+            str(payload.get("profile_id") or settings.content_profile_id),
+            version=str(payload.get("profile_version") or "").strip() or None,
         )
     except ContentProfileError as exc:
         if not any(failure.code == "profile.valid" for failure in failures):
@@ -114,7 +115,7 @@ def _validate_runtime(script: Any, failures: list[PreflightFailure]) -> None:
     if script is None:
         return
     profile = (
-        load_content_profile(script.content_profile_id)
+        load_content_profile(script.content_profile_id, version=script.content_profile_version)
         if script.content_profile_version else None
     )
     estimated = estimate_duration_sec(
@@ -147,7 +148,7 @@ def _validate_required_purposes(script: Any, failures: list[PreflightFailure]) -
     if script is None:
         return
     profile = (
-        load_content_profile(script.content_profile_id)
+        load_content_profile(script.content_profile_id, version=script.content_profile_version)
         if script.content_profile_version else None
     )
     required_purposes = (

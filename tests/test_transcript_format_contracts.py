@@ -137,7 +137,7 @@ def test_story_series_qa_requires_both_roles_narrator_lesson_and_next_episode(tm
 
     profile_id = _write_story_profile(tmp_path)
     profile = load_content_profile(profile_id, profiles_dir=tmp_path)
-    monkeypatch.setattr(qa_agent, "load_content_profile", lambda _profile_id: profile)
+    monkeypatch.setattr(qa_agent, "load_content_profile", lambda _profile_id, **_kwargs: profile)
     script = SimpleNamespace(
         content_profile_id=profile_id,
         content_profile_version="1.0.0",

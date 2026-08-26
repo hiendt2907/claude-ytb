@@ -217,6 +217,10 @@ class ContentProfile:
     topic: str
     narrative_mode: str
     root: Path
+    # Historical profile snapshots own their prompt/configuration files, while
+    # approved render assets remain shared with the profile directory.  This
+    # keeps an old script replayable without duplicating binary images.
+    assets_root: Path
     prompts: Mapping[str, str]
     formats: Mapping[str, FormatProfile]
     providers: ProviderProfile
@@ -305,7 +309,7 @@ class ContentProfile:
 
     @property
     def assets_dir(self) -> Path:
-        return _safe_child(self.root, self.render.assets_dir_name, field="render.assets_dir")
+        return _safe_child(self.assets_root, self.render.assets_dir_name, field="render.assets_dir")
 
     @property
     def visual_asset_names(self) -> tuple[str, ...]:
@@ -398,8 +402,18 @@ def profiles_root(profiles_dir: Path | str | None = None) -> Path:
 
 
 def load_content_profile(
-    profile_id: str | None = None, *, profiles_dir: Path | str | None = None
+    profile_id: str | None = None,
+    *,
+    version: str | None = None,
+    profiles_dir: Path | str | None = None,
 ) -> ContentProfile:
+    """Load the active profile, or an immutable versioned snapshot.
+
+    A script stores both identifiers.  Resolving only the active profile makes
+    a later editorial/visual release strand queued or already-rendered work;
+    snapshots therefore live at ``profiles/<id>/versions/<version>/`` and
+    share only approved binary assets with their active profile directory.
+    """
     if profile_id is None:
         from .config.settings import settings
 
@@ -412,7 +426,19 @@ def load_content_profile(
     folder = (root / profile_id).resolve()
     if folder.parent != root:
         raise ContentProfileError(f"Content profile id không hợp lệ: {profile_id!r}.")
-    config_path = _safe_child(folder, "profile.json", field="profile.json")
+    requested_version = str(version or "").strip()
+    if requested_version and ("/" in requested_version or "\\" in requested_version):
+        raise ContentProfileError(f"Content profile version không hợp lệ: {requested_version!r}.")
+    snapshot_root = (
+        _safe_child(_safe_child(folder, "versions", field="versions"), requested_version,
+                    field="profile_version")
+        if requested_version else None
+    )
+    # Current releases live in the profile root.  Only a non-current version
+    # needs a snapshot; the version comparison below keeps a missing snapshot
+    # fail-closed instead of accidentally accepting a different active config.
+    profile_root = snapshot_root if snapshot_root and (snapshot_root / "profile.json").is_file() else folder
+    config_path = _safe_child(profile_root, "profile.json", field="profile.json")
     try:
         raw = json.loads(config_path.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
@@ -464,7 +490,8 @@ def load_content_profile(
         display_name=_required_text(raw, "display_name"),
         topic=_required_text(raw, "topic"),
         narrative_mode=_required_text(raw, "narrative_mode"),
-        root=folder,
+        root=profile_root,
+        assets_root=folder,
         prompts=prompts,
         formats=formats,
         providers=ProviderProfile(
@@ -566,6 +593,10 @@ def load_content_profile(
         raise ContentProfileError(
             f"Profile '{profile_id}' bật visual_generation nhưng narrative_mode không phải "
             "'character_story'. Tính năng chỉ áp dụng cho profile series kể truyện."
+        )
+    if requested_version and profile.version != requested_version:
+        raise ContentProfileError(
+            f"Snapshot '{profile_id}@{requested_version}' khai version={profile.version!r}."
         )
     for name in prompts:
         profile.prompt_text(name)
@@ -685,10 +716,22 @@ def profile_fingerprint(profile: ContentProfile) -> str:
         if profile.visual_generation.duo_reference_image:
             paths.append(profile.duo_reference_path())
     digest = hashlib.sha256()
-    for path in sorted(paths, key=lambda item: item.relative_to(profile.root).as_posix()):
-        relative = path.relative_to(profile.root).as_posix().encode("utf-8")
-        digest.update(len(relative).to_bytes(4, "big"))
-        digest.update(relative)
+    def fingerprint_label(path: Path) -> str:
+        try:
+            return path.relative_to(profile.root).as_posix()
+        except ValueError:
+            # Historical snapshots keep their own config/prompts but share
+            # the original binary asset tree. Retain the logical asset path
+            # so the same config+assets have a stable identity on replay.
+            return path.relative_to(profile.assets_root).as_posix()
+
+    labelled_paths = sorted(
+        ((fingerprint_label(path), path) for path in paths), key=lambda item: item[0],
+    )
+    for label_text, path in labelled_paths:
+        label = label_text.encode("utf-8")
+        digest.update(len(label).to_bytes(4, "big"))
+        digest.update(label)
         digest.update(hashlib.sha256(path.read_bytes()).digest())
     return digest.hexdigest()
 
@@ -699,7 +742,10 @@ def profile_environment(profile: ContentProfile) -> dict[str, str]:
     long = profile.format_for("long")
     return {
         "CONTENT_PROFILE_ID": profile.profile_id,
-        "CONTENT_PROFILES_DIR": str(profile.root.parent),
+        # Snapshots live below ``<profiles>/<id>/versions/<version>``.  A
+        # child worker must still receive the top-level profiles directory so
+        # it can resolve the script's profile id and version afresh.
+        "CONTENT_PROFILES_DIR": str(profile.assets_root.parent),
         "LLM_PROVIDER": profile.providers.llm,
         "TTS_PROVIDER": profile.providers.tts,
         "RENDER_PROVIDER": profile.providers.render,

@@ -40,7 +40,9 @@ def validate_hook_timing(voiceover: Voiceover) -> None:
     if answer_segment is None:
         raise ValueError("Hook strategy thiếu segment purpose='core_answer'.")
     profile = (
-        load_content_profile(voiceover.content_profile_id)
+        load_content_profile(
+            voiceover.content_profile_id, version=voiceover.content_profile_version,
+        )
         if voiceover.content_profile_version else None
     )
     deadline = (
@@ -91,7 +93,9 @@ def validate_audio(
         )
 
     profile = (
-        load_content_profile(voiceover.content_profile_id)
+        load_content_profile(
+            voiceover.content_profile_id, version=voiceover.content_profile_version,
+        )
         if voiceover.content_profile_version else None
     )
     contract_for(voiceover.video_type, profile).validate_audio_runtime(

@@ -56,7 +56,9 @@ _EVIDENCE_FIELDS = ("claim", "source_title", "publisher", "published_year", "url
 
 def _explicit_profile(payload: dict) -> ContentProfile | None:
     profile_id = str(payload.get("profile_id") or "").strip()
-    return load_content_profile(profile_id) if profile_id else None
+    return load_content_profile(
+        profile_id, version=str(payload.get("profile_version") or "").strip() or None,
+    ) if profile_id else None
 
 
 def repair_system_prompt(payload: dict) -> str:
@@ -676,7 +678,8 @@ async def validate_or_repair_script(
                 )
             validate_release_purposes(current)
             content_profile = load_content_profile(
-                str(current.get("profile_id") or "") or None
+                str(current.get("profile_id") or "") or None,
+                version=str(current.get("profile_version") or "").strip() or None,
             )
             if (
                 expected_video_type == "short"

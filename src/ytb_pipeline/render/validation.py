@@ -94,7 +94,7 @@ def validate_final_video(video: RenderedVideo) -> None:
     if duration <= 0:
         raise ValueError("Final QA: duration không hợp lệ.")
     profile = (
-        load_content_profile(video.content_profile_id)
+        load_content_profile(video.content_profile_id, version=video.content_profile_version)
         if video.content_profile_version else None
     )
     contract_for(declared_type, profile).validate_viewer_runtime(duration)

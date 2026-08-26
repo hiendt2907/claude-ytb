@@ -14,26 +14,24 @@ nguyên văn. Trước khi trả JSON, hãy lập thầm từng cảnh theo sáu
 5. **Hành động nằm ở đâu?** Người kể hoặc `visual_intent` ghi hành động;
    Minh và An chỉ nói điều một người trong cảnh có lý do nói thành tiếng.
 6. **Cảnh kết thúc bằng thay đổi nào?** Một thông tin mới, một lựa chọn, hoặc
-   một hệ quả — điều đã thay đổi trong câu chuyện, thứ narrator sẽ khái quát
-   hoá thành bài học ở section cuối cùng (xem "Đúc kết bài học").
+   một hệ quả — điều đã thay đổi trong câu chuyện, thứ narrator chỉ được phản
+   chiếu sau khi câu chuyện đã kiếm được nó.
 
 ## Quy ước cho Bàn số 6
 
-- Minh nói ngắn, cụ thể, có xu hướng trì hoãn bằng việc sửa thêm hoặc kiểm tra
-  thêm. Khi cậu tiến lên, đó phải là một đề nghị nhỏ có đối tượng nhận thật,
-  không phải một câu tự khích lệ.
-- An không diễn vai chuyên gia. Cô hỏi về vật, thời gian, hoặc lựa chọn đang
-  diễn ra; đôi khi cô nói về việc riêng của mình. Cô có thể không đồng ý hoặc
-  chưa có đáp án ngay.
+- Minh nói ngắn, cụ thể, có xu hướng né vào việc sửa thêm, kiểm tra thêm hoặc
+  tính cái giá trước mắt. Khi cậu tiến lên, đó là một lựa chọn có người/thực tế
+  để phản hồi, không phải một câu tự khích lệ.
+- An là chủ quán đã thấy Minh ngồi bàn số 6 đủ lâu để nhận ra điều khác thường.
+  Cô không diễn vai chuyên gia và không nói thay người xem. An hỏi về vật,
+  thời gian hoặc lựa chọn đang diễn ra; cô có đời sống riêng, có thể không đồng
+  ý, và có thể chưa có đáp án ngay.
 - Narrator là người dẫn chuyện bắt buộc, không phải một nhãn hành động câm.
   Người kể mở cảnh, giữ nhịp qua các thay đổi thời gian/không gian, cho thấy
   chi tiết mà nhân vật chưa nói ra, và dẫn dắt người xem đi hết câu chuyện.
   Giữa các lượt thoại, giọng kể có thể quan sát và gợi mở, nhưng không dịch
-  lại nghĩa của câu thoại vừa nói, và không đọc hộ lời nói trực tiếp của Minh
-  hoặc An — đó là hai việc khác nhau: một là tường thuật câu chuyện, một là
-  nói hộ lời nhân vật; chỉ việc thứ hai bị cấm. Riêng section chốt (xem mục
-  "Đúc kết bài học" bên dưới) là ngoại lệ có chủ đích: ở đó narrator ĐƯỢC YÊU
-  CẦU khái quát hoá câu chuyện thành một bài học, nói thẳng với người xem.
+  lại nghĩa của câu thoại vừa nói, không đọc hộ lời trực tiếp của Minh/An, và
+  không rút đạo lý thay khán giả trước khi hành động có hệ quả.
 - Một đoạn hội thoại cần có tối thiểu hai lượt trực tiếp có quan hệ nhân quả
   khi có Minh hoặc An trong cảnh. Tách từng lượt thành section riêng với đúng
   `speaker_id`; không ghép cả hai người vào cùng một `voiceover`.
@@ -46,23 +44,21 @@ Sau khi viết xong, tự đọc liên tiếp tất cả section có Minh/An: n�
 nhân vật mà nghĩa không đổi, hoặc bỏ một lượt mà đoạn vẫn y nguyên, hội thoại
 chưa có quan hệ người-với-người và phải viết lại.
 
-## Đúc kết bài học — bắt buộc ở section cuối cùng
+## Phản chiếu cuối tập — bắt buộc ở section cuối cùng
 
-Từ bản duyệt gần nhất, cấu trúc tập đã đổi: 1 narrator dẫn dắt, 1 nhân vật
-chính (Minh), 1 nhân vật phụ (An), một cuộc trò chuyện có chiều sâu, và
-narrator dẫn người xem đi hết câu chuyện rồi đúc kết thành một bài học —
-không còn kết bằng một hành động cụ thể do Minh hoặc An làm.
+Section cuối cùng phải có `speaker_id` là narrator (`"narrator"`). Sau khi câu
+chuyện đã đi tới lựa chọn và hệ quả, narrator nói trực tiếp với người xem trong
+2–3 câu để phản chiếu điều vừa xảy ra. Đây là phản chiếu khiêm tốn, không phải
+một quy luật cho mọi người, chẩn đoán hay lời khuyên tuyệt đối.
 
-- Section cuối cùng của kịch bản phải có `speaker_id` là narrator
-  (`"narrator"`).
-- Nội dung là 2-3 câu, nói thẳng với người xem (xưng "bạn"/ngôi thứ hai),
-  khái quát hoá điều vừa xảy ra trong cảnh thành một nguyên tắc hoặc lời
-  khuyên áp dụng được — ví dụ dạng "Lần tới khi [tình huống tương tự], hãy
-  [nguyên tắc]" — không phải một mệnh lệnh hành động tức thời kiểu "hãy làm
-  X trong 10 phút tới", và không phải lời của Minh hay An.
-- Bài học phải bắt nguồn trực tiếp từ đúng chọn lựa/hệ quả vừa diễn ra trong
-  cảnh (mục 6 ở trên); không lặp lại một slogan chung chung tách rời khỏi
-  câu chuyện vừa kể.
+- Có thể dùng "bạn", "có lẽ", "trong những lúc như vậy" hoặc "lần tới" để
+  mở khoảng cho góc nhìn của người xem. Không biến đoạn chốt thành "cách duy
+  nhất", "ai cũng", hay mệnh lệnh hành động tức thời.
+- Phản chiếu phải bắt nguồn từ chính lựa chọn/hệ quả của tập; không lặp slogan
+  tách khỏi cảnh vừa xem và không gọi tên Minh/An trong phần phản chiếu.
+- Cầu nối tập sau chỉ được nhắc sau phản chiếu, từ một vật, câu hỏi hoặc lựa
+  chọn đã xuất hiện trong tập. Phải có tinh thần hẹn gặp lại, không dán trailer
+  rỗng lên một câu chuyện đã kết.
 
 ## Turn card bắt buộc trong JSON
 

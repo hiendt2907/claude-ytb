@@ -18,7 +18,9 @@ from ytb_pipeline.agents import qa_agent
 from ytb_pipeline.content_profiles import load_content_profile
 
 
-def _script(opening: str, *, profile_id: str = "ban-so-6", version: str = "1.0.0"):
+def _script(opening: str, *, profile_id: str = "ban-so-6", version: str | None = None):
+    if version is None:
+        version = load_content_profile(profile_id).version
     return SimpleNamespace(
         video_type="short",
         target_minutes=None,
@@ -78,7 +80,9 @@ def test_shipped_story_fixture_passes_the_gate():
     payload = json.loads(
         (profile.root / "fixtures" / "episode-01-short.json").read_text(encoding="utf-8")
     )
-    script = _script(payload["sections"][0]["voiceover"])
+    script = _script(
+        payload["sections"][0]["voiceover"], version=payload["profile_version"],
+    )
 
     assert qa_agent._check_hook_strength(script) == []
 
@@ -92,7 +96,7 @@ def _story_script(sections):
         video_type="short",
         target_minutes=None,
         content_profile_id="ban-so-6",
-        content_profile_version="1.0.0",
+        content_profile_version=load_content_profile("ban-so-6").version,
         segments=tuple(
             SimpleNamespace(narration=text, purpose=purpose, speaker_id=speaker)
             for purpose, speaker, text in sections
@@ -100,19 +104,14 @@ def _story_script(sections):
     )
 
 
-def test_story_ending_counts_a_bounded_action_the_character_performs():
-    """A story earns its takeaway by showing it, not by issuing an order.
-
-    `_check_immediate_action` demanded the literal "Hãy ", which is an
-    explainer convention; a scene that ends on a concrete, bounded action is
-    the story equivalent and must pass.
-    """
+def test_story_profile_with_narrator_reflection_does_not_accept_a_bounded_action_as_its_closing():
+    """A profile that opts into narrator reflection cannot bypass it with an action."""
     script = _story_script([
         ("situation", "narrator", "Bảy giờ, Minh mở hộp thư lần thứ tư. Vẫn phải chờ."),
         ("payoff", "narrator", "Minh úp điện thoại xuống và làm việc kế tiếp trong hai mươi phút."),
     ])
 
-    assert qa_agent._check_immediate_action(script) == []
+    assert [v["rule"] for v in qa_agent._check_immediate_action(script)] == ["narrator_reflection"]
 
 
 def test_story_ending_without_any_concrete_action_is_still_rejected():
@@ -121,7 +120,7 @@ def test_story_ending_without_any_concrete_action_is_still_rejected():
         ("payoff", "narrator", "Buổi sáng trôi qua và Minh cảm thấy nhẹ nhõm hơn một chút."),
     ])
 
-    assert [v["rule"] for v in qa_agent._check_immediate_action(script)] == ["immediate_action"]
+    assert [v["rule"] for v in qa_agent._check_immediate_action(script)] == ["narrator_reflection"]
 
 
 def test_unconfigured_explainer_still_requires_an_imperative(monkeypatch):

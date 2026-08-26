@@ -63,13 +63,15 @@ def validate_script_payload(payload: Mapping[str, Any] | object) -> ScriptContra
     findings: list[ScriptContractFinding] = []
     content_profile = None
     declared_profile_id = _text(payload.get("profile_id"))
+    declared_version = _text(payload.get("profile_version"))
     if declared_profile_id:
         try:
-            content_profile = load_content_profile(declared_profile_id)
+            content_profile = load_content_profile(
+                declared_profile_id, version=declared_version or None,
+            )
         except ContentProfileError as exc:
             _add(findings, "profile.valid", "profile_id", str(exc))
             return ScriptContractResult("current", False, tuple(findings))
-    declared_version = _text(payload.get("profile_version"))
     if content_profile is not None:
         if not declared_version:
             _add(

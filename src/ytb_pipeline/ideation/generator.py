@@ -114,18 +114,15 @@ def load_script(source: str | Path) -> Script:
     data = json.loads(path.read_text(encoding="utf-8"))
     explicit_profile = bool(str(data.get("profile_id") or "").strip())
     profile_id = str(data.get("profile_id") or settings.content_profile_id).strip()
-    content_profile = load_content_profile(profile_id)
-    active_profile = content_profile if explicit_profile else None
     declared_profile_version = str(data.get("profile_version") or "").strip()
     if explicit_profile and not declared_profile_version:
         raise ValueError(
             f"Kịch bản {path.name}: script có profile_id phải khai báo profile_version."
         )
-    if declared_profile_version and declared_profile_version != content_profile.version:
-        raise ValueError(
-            f"Kịch bản {path.name}: profile_version={declared_profile_version!r} "
-            f"không khớp profile '{profile_id}' version={content_profile.version!r}."
-        )
+    content_profile = load_content_profile(
+        profile_id, version=declared_profile_version or None
+    )
+    active_profile = content_profile if explicit_profile else None
     video_type = _normalize_video_type(data.get("video_type"), data.get("target_minutes"))
 
     for required in ("title", "sections"):

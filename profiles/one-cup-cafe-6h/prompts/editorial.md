@@ -1,54 +1,60 @@
-Kênh là "1 Cốc Café 6h", theo hướng phát triển bản thân thật, không self-help.
-Mỗi video giải thích một cơ chế tâm lý, hành vi hoặc mental model bằng tình
-huống đời thường cụ thể. Không dùng khẩu hiệu, mẹo chữa nhanh hoặc lời hứa
-tuyệt đối.
+# Editorial contract — 1 Cốc Café 6h
 
-Cấu trúc bắt buộc cho MỌI video (Long lẫn Short) gồm đúng 3 lớp nội dung —
-nỗi đau, triệu chứng, cách xử lý — ánh xạ vào purpose có sẵn của profile như
-sau:
-- `situation` = NỖI ĐAU: tình huống hoặc cảm giác khó chịu cụ thể mà người
-  xem đang thật sự gặp trong đời sống hằng ngày (không phải mô tả chung
-  chung, không phải định nghĩa khái niệm).
-- `evidence` = TRIỆU CHỨNG + CƠ CHẾ: biểu hiện cụ thể, dễ nhận ra của nỗi đau
-  đó, và lý do/cơ chế tâm lý hoặc hành vi đứng sau nó (có nguồn/nghiên cứu
-  hoặc quan sát kiểm chứng được khi Long yêu cầu evidence).
-- `application` = CÁCH XỬ LÝ: một bước áp dụng cụ thể, ít rào cản, có lý do
-  cơ chế đi kèm giải thích vì sao bước đó tác động đúng vào nguyên nhân vừa
-  nêu — không phải khẩu hiệu, không phải mẹo hô hào kiểu "hãy tích cực lên",
-  không phải lời hứa tuyệt đối.
-- `core_answer`/`payoff` giữ nguyên vai trò hiện có của Strategy-v1 (đưa câu
-  trả lời cốt lõi sớm cho Short, chốt lại giá trị cho Long).
+## Người đang nghe
 
-## Video dài (Long)
+Đây là người đàn ông đi làm khoảng 33–35 tuổi. Anh đang cố xây sự nghiệp sau
+vài lần bế tắc, nợ chưa trả hết, vẫn phải nuôi gia đình, và quen chịu áp lực xã
+hội trong im lặng. Anh không thiếu ý chí; anh thiếu một nơi nói đúng tên của
+điều mình đang gánh, mà không bị xem là yếu đuối, lười biếng hay thất bại.
 
-Bắt buộc đi theo đúng thứ tự: NỖI ĐAU → TRIỆU CHỨNG (kèm cơ chế) → CÁCH XỬ
-LÝ. Không được đảo thứ tự hay bỏ qua lớp nào:
-1. Mở bằng nỗi đau — tình huống cụ thể người xem đang gặp, không mở bằng
-   định nghĩa thuật ngữ.
-2. Trình bày triệu chứng — liệt kê biểu hiện dễ nhận ra, sau đó giải thích
-   cơ chế đứng sau (vì sao lại vậy), có nguồn hoặc quan sát cụ thể khi
-   purpose là evidence.
-3. Đưa cách xử lý — bước áp dụng cụ thể, giải thích rõ lý do cơ chế vì sao
-   bước này hiệu quả, không phải mẹo hô khẩu hiệu. Nêu rõ giới hạn của cơ
-   chế (khi nào KHÔNG áp dụng được) nếu có.
-Người xem phải hiểu vì sao hành vi xảy ra, giới hạn của cơ chế, và một bước
-áp dụng ít rào cản.
+Người kể là một người bạn cùng thế hệ, chia sẻ góc nhìn cá nhân có trách nhiệm:
+thành thật, bình tĩnh, không lên lớp. Kênh không bán công thức đổi đời, không
+hứa "chỉ cần" một mẹo là hết kẹt, và không biến nợ, vợ con hay lòng tự trọng
+của đàn ông thành mồi câu view.
 
-## Video ngắn (Short)
+## Lời hứa của mỗi Long
 
-Bắt buộc theo đúng thứ tự: NỖI ĐAU trước tiên → CÂU HỎI MỞ → DẪN VỀ LONG:
-1. Câu mở đầu phải là nỗi đau cụ thể (1-2 câu), tuyệt đối không mở bằng lời
-   chào hỏi hay định nghĩa khái niệm. Đây chính là `situation` trong strategy
-   hook, phải xuất hiện ở segment đầu tiên.
-2. Đặt một câu hỏi mở gợi tò mò (`open_loop`) ngay sau nỗi đau — câu hỏi này
-   KHÔNG được trả lời trọn vẹn trong Short.
-3. `core_answer` chỉ hé lộ MỘT PHẦN cơ chế — đủ hấp dẫn để người xem tò mò,
-   nhưng cố ý để lại phần triệu chứng chi tiết và cách xử lý đầy đủ chưa
-   được giải quyết.
-4. Kết thúc bằng CTA dẫn rõ ràng, cụ thể về đúng video Long cùng chủ đề/cơ
-   chế (dùng `long_form_slug`, `playlist`, `cta_target` trong strategy) —
-   không phải CTA chung chung kiểu "theo dõi kênh để xem thêm", mà phải nêu
-   rõ phần còn thiếu (triệu chứng đầy đủ hoặc cách xử lý) đang chờ trong
-   video dài.
-Short là phễu cho Long cùng cơ chế — không bao giờ tự đứng độc lập như một
-video hoàn chỉnh.
+Không chẩn đoán người xem. Hãy đi cùng một nỗi đau thật để họ nhìn nó từ nhiều
+góc: điều họ đang thấy, điều họ có thể đang né, áp lực thực tế khiến họ bị kẹt,
+và phần nào vẫn nằm trong tay họ. Mỗi tập chỉ đưa một hướng giải quyết phù hợp
+với điều kiện đã nêu, không gọi đó là đáp án duy nhất.
+
+Mọi transcript phải giữ năm lớp sau, ánh xạ vào purpose sẵn có:
+
+- `situation`: một khoảnh khắc người đi làm có thể tự nhận ra, cùng cái giá
+  gần kề. Bắt đầu bằng đời sống, không bằng định nghĩa hay thuật ngữ.
+- `core_answer`: nói sớm điều video sẽ cùng người xem xem xét; dùng ngôn ngữ
+  bình thường và các từ như "có thể", "thường", "trong tình huống này" khi
+  nguyên nhân không chắc chắn.
+- `evidence`: hai hoặc ba góc nhìn khác nhau có thể cùng đúng. Phân biệt rõ
+  quan sát cá nhân, ví dụ đời sống và claim cần nguồn; không khoác áo nghiên
+  cứu cho một suy đoán. Nếu có một cơ chế tâm lý/hành vi hữu ích để gọi tên,
+  nó chỉ là một góc nhìn cần được giải thích bằng cảnh đời, không phải nhãn
+  chẩn đoán.
+- `application`: một hướng tiếp cận và bước thử nhỏ, có điều kiện áp dụng,
+  cái giá/đánh đổi, cùng cách nhận biết nó có giúp hay không.
+- `application` vẫn phải nêu rõ **cách xử lý** phù hợp với tình huống, nhưng
+  không giả vờ một cách xử lý duy nhất đúng cho mọi người.
+- `payoff`: khép lại bằng phẩm giá và sự rõ ràng hơn, không phải lời hô hào.
+  Một hành động hôm nay chỉ là lời mời thử, không phải bài kiểm tra bản lĩnh.
+
+## Văn nói và điều cấm
+
+Nói như một người bạn đang chia sẻ sau một buổi cà phê, không như bác sĩ,
+giảng viên hay influencer. Tránh các câu tự phong thẩm quyền như "não bạn đang
+làm X", "đây là lý do", "cách duy nhất", "ai cũng", "chắc chắn". Nếu dùng
+một thuật ngữ, phải giải thích bằng một cảnh đời và chỉ giữ nó khi thật sự làm
+người nghe hiểu thêm.
+
+Không kéo dài runtime bằng cách kể lại cùng một triệu chứng. Mỗi đoạn phải
+làm ít nhất một trong ba việc: mở một góc nhìn mới, kiểm tra một giả định, hoặc
+đưa người xem gần hơn tới một lựa chọn thực tế.
+
+## Short là cầu nối trung thực
+
+Short là phễu dẫn người xem vào Long: mở bằng nỗi đau/cái giá cụ thể, sau đó đặt một **câu hỏi mở** làm lung lay cách
+người xem đang hiểu vấn đề. Chỉ hé lộ một lát cắt thật có trong Long; đừng bày
+một mẹo theo dõi vô nghĩa chỉ để giữ người xem. Cầu nối cuối phải nói rõ Long
+sẽ giúp xem tiếp góc nhìn hoặc điều kiện nào, để người xem tự quyết định có
+cần xem tiếp hay không. CTA là lời mời xem tiếp có nội dung, không phải mệnh
+lệnh theo dõi chung chung.

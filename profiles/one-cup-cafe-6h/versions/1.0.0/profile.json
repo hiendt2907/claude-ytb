@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "profile_id": "one-cup-cafe-6h",
+  "version": "1.0.0",
+  "display_name": "1 Cốc Café 6h — Giải thích cơ chế",
+  "topic": "Phát triển bản thân thật, không self-help",
+  "narrative_mode": "mechanism_explainer",
+  "prompts": {"editorial": "prompts/editorial.md", "long_transcript_structure": "prompts/long-transcript-structure.md", "short_funnel_structure": "prompts/short-funnel-structure.md"},
+  "format_prompts": {"long": "long_transcript_structure", "short": "short_funnel_structure"},
+  "formats": {
+    "short": {"viewer_min_sec": 30, "viewer_max_sec": 45, "min_sections": 4, "max_sections": 4},
+    "long": {"viewer_min_sec": 300, "viewer_max_sec": 420, "min_sections": 10, "max_sections": 15}
+  },
+  "providers": {"llm": "xkiro", "tts": "xkiro", "render": "ai", "broll_strategy": "pexels", "broll_allow_downloads": false},
+  "voice_cast": {"narrator": "confident-male-vietnamese"},
+  "content_rules": {"require_pexels_query": true, "require_short_source_trace": true, "long_opening_mode": "pain_first", "short_ending_mode": "funnel_bridge"},
+  "render": {"assets_dir": "assets", "show_captions": false, "inter_segment_gap_sec": 0.0, "transition_overlap_sec": 0.4, "scene_assets": []}
+}

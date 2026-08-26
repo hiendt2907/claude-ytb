@@ -45,6 +45,7 @@ _STAGE_DIRECTION_PATTERNS = (
     "]",
 )
 _IMMEDIATE_ACTION_HINTS = ("hãy ", "thử ngay", "ngay hôm nay", "ngay bây giờ", "làm ngay")
+_NARRATOR_REFLECTION_IMPERATIVES = ("hãy ", "đừng ", "bạn phải ", "cần phải ")
 _ABSOLUTE_CLAIM_HINTS = ("chắc chắn", "đảm bảo", "100%", "luôn luôn", "mọi người")
 _HEALTH_FINANCE_HINTS = (
     "chữa khỏi", "điều trị", "lo âu", "trầm cảm", "bệnh", "thuốc",
@@ -131,7 +132,10 @@ def _segments_of(script: Any) -> list[Any]:
 def _content_profile(script: Any):
     if not _get(script, "content_profile_version", ""):
         return None
-    return load_content_profile(_get(script, "content_profile_id", "") or None)
+    return load_content_profile(
+        _get(script, "content_profile_id", "") or None,
+        version=_get(script, "content_profile_version", "") or None,
+    )
 
 
 def _narration_of(segment: Any) -> str:
@@ -702,6 +706,24 @@ def _check_immediate_action(script: Any) -> list[dict[str, str]]:
     profile = _content_profile(script)
     if (
         profile is not None
+        and profile.narrative_mode == "character_story"
+        and profile.content_rules.narrator_lesson_closing
+    ):
+        if any(marker in final_text for marker in _NARRATOR_REFLECTION_IMPERATIVES):
+            return [_repair(
+                "narrator_reflection",
+                "Lời chốt của narrator phải là phản chiếu khiêm tốn, không phải mệnh lệnh.",
+                "Nói với người xem bằng một nhận xét có điều kiện, bám đúng lựa chọn/hệ quả vừa xảy ra.",
+            )]
+        if segments and _is_narrator_lesson_closing(profile, segments[-1], final_text):
+            return []
+        return [_repair(
+            "narrator_reflection",
+            "Lời chốt story cần là phản chiếu trực tiếp, khiêm tốn của narrator.",
+            "Dùng 2-3 câu nói với người xem, không nêu tên cast ngoài cầu nối tập sau và không biến thành lời khuyên ra lệnh.",
+        )]
+    if (
+        profile is not None
         and _script_video_type(script) == "short"
         and profile.content_rules.short_ending_mode == "funnel_bridge"
     ):
@@ -730,8 +752,6 @@ def _check_immediate_action(script: Any) -> list[dict[str, str]]:
     ):
         # Truyện kiếm được phần chốt bằng cách CHO THẤY hành động, không bằng
         # cách ra lệnh. Bắt buộc chữ "Hãy" là quy ước của kênh giải thích.
-        return []
-    if segments and _is_narrator_lesson_closing(profile, segments[-1], final_text):
         return []
     return [_repair(
         "immediate_action",

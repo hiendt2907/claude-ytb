@@ -1,13 +1,17 @@
-# Mini-season 01 — Những việc chưa bắt đầu
+# Season 02 — Những năm không được phép ngã
 
-1. **Bảy lần mở laptop** — càng lập kế hoạch càng khó bắt đầu. Minh gửi bản
-   nháp ba dòng; file `ban-nhap-xau-dau-tien` và đôi giày giảm giá mở thread.
-2. **Đôi giày còn mười hai phút** — mua sắm khi mệt như cách lấy lại quyền
-   quyết định. Minh chờ qua ngày và sửa quai túi canvas cũ.
-3. **Tin nhắn nằm đó ba ngày** — xấu hổ vì im lặng làm câu trả lời càng khó.
-   Minh xin thêm hai ngày rồi thử dự án phụ trong một tuần.
-4. **Căn phòng không thể dọn trong một buổi** — Minh chỉ dọn mặt bàn và lối đi.
-   An cuối cùng gọi chủ nhà về chỗ dột.
+Season này không kể về việc Minh "sửa bản thân". Nó theo những buổi sáng khi
+cậu phải chọn giữa giữ thể diện, giữ tiền, giữ thời gian cho gia đình và nói
+thật với một người khác.
 
-Short là một scene hoặc lựa chọn có giá trị tự thân. Long cho thấy hệ quả và cơ
-chế đầy đủ. Không dùng Short như trailer rỗng hoặc giữ insight làm mồi câu.
+1. **Một tin nhắn từ ngân hàng trước giờ làm** — Minh giấu một khoản nhắc nợ,
+   rồi phải quyết định nói chuyện với vợ trước hay chờ đủ tiền mới nói.
+2. **Cuộc họp mà Minh không còn muốn phát biểu** — cậu thấy mình bị chậm hơn
+   đồng nghiệp trẻ và đứng trước lựa chọn im lặng hay nêu một rủi ro thật.
+3. **Một buổi tối bỏ lỡ cuộc gọi về nhà** — việc làm thêm kéo dài, Minh nhận ra
+   điều mình gọi là trách nhiệm cũng đang lấy đi điều gì.
+4. **Một lời mời công việc nghe có vẻ tốt** — lương cao hơn nhưng thời gian và
+   sự ổn định bị đánh đổi; An không quyết thay cậu.
+
+Mỗi tập Long tự đứng được. Không có Story Short mới; series cần thời gian để
+người xem ở lại với nhân vật thay vì bị ép sang một cliffhanger rỗng.

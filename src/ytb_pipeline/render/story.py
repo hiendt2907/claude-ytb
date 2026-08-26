@@ -42,7 +42,9 @@ def render_story_video(voiceover: Voiceover, output_dir: Path) -> RenderedVideo:
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
         raise RuntimeError("Story renderer cần ffmpeg trong PATH.")
-    profile = load_content_profile(voiceover.content_profile_id)
+    profile = load_content_profile(
+        voiceover.content_profile_id, version=voiceover.content_profile_version or None,
+    )
     if profile.providers.render != "story":
         raise ValueError(
             f"Profile '{profile.profile_id}' không chọn story renderer."

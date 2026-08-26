@@ -1,11 +1,23 @@
-# Long giải thích: một nỗi đau, một cơ chế, một cách xử lý
+# Long: một nỗi đau có nhiều mặt, một hướng đi đủ thật để thử
 
-Đây là khung của transcript, không phải các đoạn phải lặp lại.
+Đây là khung tư duy, không phải công thức câu chữ.
 
-1. Mở ngay bằng một tình huống đau thật: người xem đang kẹt ở đâu, cái giá gì đang tới gần. Đừng mở bằng định nghĩa hoặc lời chào dài.
-2. Nhận diện 2–3 triệu chứng đời thường để người xem tự thấy mình trong đó. Triệu chứng phải là hành vi quan sát được, không phải nhãn tâm lý mơ hồ.
-3. Giải thích một cơ chế nhân quả duy nhất: điều gì làm triệu chứng xuất hiện, vì sao giải pháp quen thuộc lại chưa chạm đúng chỗ. Nếu dùng thuật ngữ, giải thích bằng ngôn ngữ nói.
-4. Chuyển cơ chế thành cách xử lý theo thứ tự: bước nhỏ để bắt đầu, ranh giới/điều kiện để tránh quay lại, và một cách hỏi hoặc nhận phản hồi phù hợp. Nêu giới hạn khi điều đó không áp dụng.
-5. Kết bằng một việc người xem có thể làm hôm nay, với kết quả thực tế họ sẽ quan sát. Có thể mở một câu hỏi còn lại cho video sau, nhưng không biến đoạn kết thành quảng cáo.
+1. Mở bằng một cảnh có trách nhiệm thật: cuộc gọi chưa dám trả lời, khoản tiền
+   phải đến hạn, một quyết định nghề nghiệp, bữa cơm im lặng, hoặc khoảnh khắc
+   người xem thấy mình vẫn đang cố nhưng không đi lên. Nêu cái giá, nhưng không
+   cường điệu hoá thành thảm hoạ.
+2. Cho người xem nhận ra bản thân qua vài hành vi cụ thể. Đừng biến mọi biểu
+   hiện thành bệnh hay một nhãn tâm lý.
+3. Mở ít nhất hai góc nhìn: có thể là nỗi sợ mất mặt, áp lực tiền bạc, một
+   niềm tin cũ, hoặc vấn đề thực tế chưa được xử lý. Nêu vì sao chúng khác nhau
+   và khi nào mỗi góc nhìn không đủ.
+4. Người kể chia sẻ một cách tiếp cận có điều kiện: bước đầu, câu hỏi cần hỏi,
+   hoặc ranh giới cần đặt. Nói rõ cái bước đó không giải quyết điều gì và dấu
+   hiệu cho thấy cần nhờ người khác/chuyên môn hơn.
+5. Khép lại bằng một thử nghiệm nhỏ có thể làm hôm nay, gắn với cảnh mở đầu.
+   Người xem cần biết quan sát điều gì sau khi thử, không phải tin rằng đời sẽ
+   đổi ngay.
 
-Nhịp kể phải đi từ trải nghiệm → nhận diện → hiểu nguyên nhân → thử một cách khác. Mỗi phần phải đẩy phần sau; không liệt kê mẹo, không hứa thay đổi tức thì.
+Nhịp kể là: nhìn thẳng → hiểu nhiều mặt → chọn một bước vừa sức. Không lặp
+triệu chứng, không biến góc nhìn cá nhân thành chân lý, không giấu phần khó để
+đổi lấy một cái kết dễ chịu.

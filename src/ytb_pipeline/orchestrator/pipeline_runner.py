@@ -114,7 +114,7 @@ def build_env(item: QueueItem, *, publish: bool = False) -> dict:
     """Env bắt buộc cho mỗi lần chạy pipeline — TELEGRAM_APPROVAL=false để tránh
     đụng getUpdates với listener daemon (nguyên nhân lỗi 409 thực tế đã gặp)."""
     env = os.environ.copy()
-    profile = load_content_profile(item.profile_id or None)
+    profile = load_content_profile(item.profile_id or None, version=item.profile_version or None)
     env.update(profile_environment(profile))
     env.update(
         {

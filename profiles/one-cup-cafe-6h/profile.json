@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "profile_id": "one-cup-cafe-6h",
-  "version": "1.0.0",
-  "display_name": "1 Cốc Café 6h — Giải thích cơ chế",
-  "topic": "Phát triển bản thân thật, không self-help",
+  "version": "1.1.0",
+  "display_name": "1 Cốc Café 6h — Góc nhìn cho những năm gánh vác",
+  "topic": "Góc nhìn thực tế về áp lực sự nghiệp, gia đình và lựa chọn của người đi làm",
   "narrative_mode": "mechanism_explainer",
   "prompts": {
     "editorial": "prompts/editorial.md",

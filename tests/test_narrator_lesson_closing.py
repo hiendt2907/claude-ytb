@@ -36,8 +36,9 @@ from ytb_pipeline.content_profiles import load_content_profile
 # imperative viewer-command hint and no bounded/measurable character action,
 # so today's rule must reject it.
 NARRATOR_LESSON_ENDING = (
-    "Đừng chờ đối phương lên tiếng trước. Câu hỏi bị bỏ lỡ hôm nay chính là "
-    "câu trả lời người kia đang mong đợi."
+    "Có lẽ khi bạn chưa biết phải hỏi gì, điều đáng giữ lại là khoảng dừng để "
+    "nhìn xem mình đang né điều nào. Nó không giải quyết mọi chuyện ngay, nhưng "
+    "có thể làm cuộc trò chuyện sau bớt thành một cuộc đoán mò."
 )
 
 
@@ -144,6 +145,23 @@ def test_narrator_lesson_ending_passes_when_profile_opts_in(tmp_path, monkeypatc
     assert violations == []
 
 
+def test_narrator_lesson_rejects_an_imperative_even_if_legacy_action_hint_matches(
+    tmp_path, monkeypatch,
+):
+    """The opted-in story closing is reflection, never an action CTA."""
+    profile = _load(tmp_path, monkeypatch, "lesson-imperative-fixture", narrator_lesson_closing=True)
+    script = _script(
+        "Hãy gọi ngay cho người đó và nói hết điều bạn đang giấu. Tập sau, câu "
+        "chuyện này sẽ còn một lựa chọn khác.",
+        profile_id=profile.profile_id,
+        version=profile.version,
+    )
+
+    violations = qa_agent._check_immediate_action(script)
+
+    assert [v["rule"] for v in violations] == ["narrator_reflection"]
+
+
 def test_narrator_lesson_may_name_a_cast_member_only_in_its_next_episode_bridge(tmp_path, monkeypatch):
     """The lesson itself addresses viewers; its separate trailer may set up cast action."""
     profile = _load(tmp_path, monkeypatch, "lesson-bridge-fixture", narrator_lesson_closing=True)
@@ -171,4 +189,4 @@ def test_narrator_lesson_ending_still_rejected_for_non_narrator_speaker(tmp_path
 
     violations = qa_agent._check_immediate_action(script)
 
-    assert [v["rule"] for v in violations] == ["immediate_action"]
+    assert [v["rule"] for v in violations] == ["narrator_reflection"]

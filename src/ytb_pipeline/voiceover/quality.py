@@ -471,7 +471,9 @@ def _target_duration(voiceover: Voiceover) -> float | None:
         from ..content_profiles import load_content_profile
 
         profile = (
-            load_content_profile(voiceover.content_profile_id)
+            load_content_profile(
+                voiceover.content_profile_id, version=voiceover.content_profile_version,
+            )
             if voiceover.content_profile_version else None
         )
         lower, upper = contract_for(
@@ -500,7 +502,9 @@ def _duration_tolerance(voiceover: Voiceover, fallback_sec: float) -> float:
     from ..content_profiles import load_content_profile
 
     profile = (
-        load_content_profile(voiceover.content_profile_id)
+        load_content_profile(
+            voiceover.content_profile_id, version=voiceover.content_profile_version,
+        )
         if voiceover.content_profile_version else None
     )
     contract = contract_for(voiceover.video_type, profile)

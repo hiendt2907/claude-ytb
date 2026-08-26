@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
+import subprocess
+import sys
 
 import pytest
 
@@ -146,9 +149,9 @@ def test_story_system_prompt_includes_declared_series_memory():
 
     system = script_generation_system_prompt(load_content_profile("ban-so-6"))
 
-    assert "29 tuổi" in system
-    assert "chỗ dột" in system
-    assert "Bảy lần mở laptop" in system
+    assert "34 tuổi" in system
+    assert "chủ quán" in system
+    assert "mỗi sáng lúc 6 giờ" in system
 
 
 def test_story_system_prompt_requires_story_pacing_and_real_dialogue():
@@ -159,9 +162,9 @@ def test_story_system_prompt_requires_story_pacing_and_real_dialogue():
     system = script_generation_system_prompt(load_content_profile("ban-so-6"))
     normalized = " ".join(system.split()).casefold()
 
-    assert "không được kết thúc cao trào rồi nối thêm một bài luận" in normalized
+    assert "không được kết thúc cao trào rồi nối thêm bài luận" in normalized
     assert "thoại trực tiếp" in normalized
-    assert "người có thể phản hồi" in normalized
+    assert "một lựa chọn có người/thực tế để phản hồi" in normalized
 
 
 def test_queue_loads_profile_and_legacy_item_uses_configured_default(tmp_path, monkeypatch):
@@ -210,6 +213,50 @@ def test_batch_environment_is_resolved_from_profile_not_hardcoded(tmp_path, monk
     assert env["BROLL_ALLOW_DOWNLOADS"] == "false"
     assert env["SHORT_VIEWER_MIN_SEC"] == "30.0"
     assert env["LONG_VIEWER_MAX_SEC"] == "420.0"
+
+
+def test_batch_environment_keeps_profiles_root_for_a_versioned_snapshot(monkeypatch):
+    from ytb_pipeline.config.settings import settings
+    from ytb_pipeline.orchestrator.pipeline_runner import build_env
+    from ytb_pipeline.orchestrator.queue_manager import QueueItem
+
+    monkeypatch.setattr(settings, "content_profiles_dir", Path("profiles"), raising=False)
+    item = QueueItem(
+        1, "chin-ban-nhap-mot-nut-gui", "", "queued", "portrait",
+        profile_id="ban-so-6", profile_version="1.6.0",
+    )
+
+    env = build_env(item)
+
+    assert Path(env["CONTENT_PROFILES_DIR"]).resolve() == Path("profiles").resolve()
+
+
+def test_versioned_batch_environment_loads_its_script_in_a_fresh_process(monkeypatch):
+    from ytb_pipeline.config.settings import settings
+    from ytb_pipeline.orchestrator.pipeline_runner import build_env
+    from ytb_pipeline.orchestrator.queue_manager import QueueItem
+
+    monkeypatch.setattr(settings, "content_profiles_dir", Path("profiles"), raising=False)
+    item = QueueItem(
+        1, "chin-ban-nhap-mot-nut-gui", "", "queued", "portrait",
+        profile_id="ban-so-6", profile_version="1.6.0",
+    )
+    env = build_env(item)
+    env["PYTHONPATH"] = str(Path("src").resolve())
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from ytb_pipeline.ideation.generator import load_script; "
+            "script = load_script('scripts/chin-ban-nhap-mot-nut-gui.json'); "
+            "print(script.content_profile_version)",
+        ],
+        cwd=Path.cwd(), env={**os.environ, **env}, text=True, capture_output=True, check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "1.6.0"
 
 
 def test_queue_and_explicit_script_profile_must_match(tmp_path):
@@ -393,6 +440,47 @@ def test_loader_rejects_explicit_profile_without_version_but_reads_disabled_stor
     assert load_script(path).video_type == "short"
 
 
+def test_loader_resolves_a_real_archived_profile_version_without_rewriting_script():
+    """A profile version is an immutable rendering contract, not a display label.
+
+    Season-one scripts must remain readable after the active profile advances to
+    a later season; otherwise a retry silently becomes impossible or, worse,
+    renders with the wrong cast/continuity.
+    """
+    from ytb_pipeline.ideation.generator import load_script
+
+    fixture = Path("profiles/ban-so-6/fixtures/episode-01-short.json")
+    payload = json.loads(fixture.read_text(encoding="utf-8"))
+
+    assert payload["profile_version"] == "1.6.0"
+    script = load_script(fixture)
+
+    assert script.content_profile_id == "ban-so-6"
+    assert script.content_profile_version == "1.6.0"
+
+
+@pytest.mark.parametrize(
+    ("profile_id", "version"),
+    (
+        ("one-cup-cafe-6h", "1.0.0"),
+        ("ban-so-6", "1.0.0"),
+        ("ban-so-6", "1.1.0"),
+        ("ban-so-6", "1.3.0"),
+        ("ban-so-6", "1.4.0"),
+        ("ban-so-6", "1.5.0"),
+        ("ban-so-6", "1.6.0"),
+    ),
+)
+def test_every_profile_version_referenced_by_tracked_work_is_resolvable(profile_id, version):
+    """No queued script may become unreadable when the active profile advances."""
+    from ytb_pipeline.content_profiles import load_content_profile
+
+    profile = load_content_profile(profile_id, version=version)
+
+    assert profile.profile_id == profile_id
+    assert profile.version == version
+
+
 def test_profile_loader_rejects_string_booleans_nonfinite_numbers_and_dialogue_overlap(
     tmp_path,
 ):
@@ -477,11 +565,11 @@ def test_repair_followup_uses_declared_profile_system_prompt():
     from ytb_pipeline.orchestrator.ideation_script_fix import repair_system_prompt
 
     system = repair_system_prompt({
-        "profile_id": "ban-so-6", "profile_version": "1.0.0"
+        "profile_id": "ban-so-6", "profile_version": "2.0.0"
     })
 
     assert "Bàn số 6" in system
-    assert "chỗ dột" in system
+    assert "chủ quán" in system
 
 
 def test_story_script_loads_profile_speaker_and_visual_asset(tmp_path, write_script, monkeypatch):

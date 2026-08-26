@@ -134,10 +134,10 @@ def _character_story_closing_instruction(content_profile: "ContentProfile | None
         narrator_id = content_profile.editorial_contract.narration_speaker_id
         instruction = (
             f"End on a section whose speaker_id is \"{narrator_id}\": the narrator "
-            "generalises what just happened into a lesson spoken directly to the "
-            "viewer (2-3 sentences, addressed to \"you\"/\"bạn\", not to a character) "
-            "— state the principle the story demonstrated, not a command to act "
-            "right now and not another character's dialogue."
+            "offers a 2-3 sentence, direct-to-viewer reflection rooted in the exact "
+            "choice and consequence the scene earned. It must be modest and conditional, "
+            "not a universal moral, diagnosis, or command to act right now; do not turn "
+            "the narrator into another character's dialogue."
         )
         if content_profile.content_rules.require_next_episode_bridge:
             instruction += (
@@ -1068,7 +1068,9 @@ def short_expansion_allowed_indexes(
         return ()
     if content_profile is None:
         profile_id = str(payload.get("profile_id") or "").strip()
-        content_profile = load_content_profile(profile_id) if profile_id else None
+        content_profile = load_content_profile(
+            profile_id, version=str(payload.get("profile_version") or "").strip() or None,
+        ) if profile_id else None
     repairable_purposes = {
         purpose.strip().casefold()
         for purpose in (
@@ -1157,7 +1159,9 @@ def repair_prompt(
     )
     financial_schema = "editorial_profile, evidence_register, " if is_financial_psychology else ""
     repair_profile_id = str(payload.get("profile_id") or "").strip()
-    repair_profile = load_content_profile(repair_profile_id) if repair_profile_id else None
+    repair_profile = load_content_profile(
+        repair_profile_id, version=str(payload.get("profile_version") or "").strip() or None,
+    ) if repair_profile_id else None
     hook_repair_rule = (
         "Rewrite the first narration section whenever the QA issues include rule "
         f"'hook': {_hook_repair_directive(repair_profile)}\n"

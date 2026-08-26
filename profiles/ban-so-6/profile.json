@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "profile_id": "ban-so-6",
-  "version": "1.6.0",
+  "version": "2.0.0",
   "display_name": "Bàn số 6 — Truyện đời thường",
   "topic": "Những lựa chọn nhỏ của Minh và An tại Bàn số 6",
   "narrative_mode": "character_story",
@@ -13,7 +13,7 @@
     "series_bible": "series-bible.md",
     "visual_bible": "visual-bible.md",
     "season_plan": "season-01.md",
-    "continuity": "continuity-ledger.json"
+    "continuity": "continuity-ledger-season-02.json"
   },
   "format_prompts": {
     "long": "long_transcript_structure"
@@ -60,8 +60,8 @@
   },
   "visual_generation": {
     "enabled": true,
-    "style_prompt": "2D editorial illustration, soft line art, light paper texture, limited animation still, warm muted palette (cream #E9DFC8, navy #26394A, slate teal #667C7A, burnt orange #B96842, brown #5A4032, ochre #D8B26E), no neon, no 3D shading, no exaggerated expression, youthful mid-20s faces, smooth young skin, no wrinkles, no aged features",
-    "negative_prompt": "3d render, glossy, photo, photorealistic, neon, watermark, text, logo, gibberish text, extra fingers, deformed hands, anime eyes, exaggerated expression, comic panel grid, multiple panels, character turnaround sheet, reference sheet, collage, multiple views of same character, model sheet, old, aged, wrinkles, tired face, middle-aged",
+    "style_prompt": "2D editorial illustration, soft line art, light paper texture, limited animation still, warm muted palette (cream #E9DFC8, navy #26394A, slate teal #667C7A, burnt orange #B96842, brown #5A4032, ochre #D8B26E), no neon, no 3D shading, no exaggerated expression, Vietnamese adults in their early-to-mid thirties, lived-in but not aged faces",
+    "negative_prompt": "3d render, glossy, photo, photorealistic, neon, watermark, text, logo, gibberish text, extra fingers, deformed hands, anime eyes, exaggerated expression, comic panel grid, multiple panels, character turnaround sheet, reference sheet, collage, multiple views of same character, model sheet, teenage, early-twenties face, old, aged, deep wrinkles, middle-aged",
     "steps": 30,
     "cfg": 6.5,
     "solo_weight": 0.45,

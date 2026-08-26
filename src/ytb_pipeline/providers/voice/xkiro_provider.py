@@ -77,7 +77,9 @@ class XkiroVoiceProvider:
 
         total = sum(segment.duration_sec for segment in voiced)
         content_profile = (
-            load_content_profile(script.content_profile_id)
+            load_content_profile(
+                script.content_profile_id, version=script.content_profile_version,
+            )
             if script.content_profile_version else None
         )
         lower, _ = contract_for(script.video_type, content_profile).audio_runtime_bounds_sec(
@@ -137,12 +139,9 @@ class XkiroVoiceProvider:
         """Resolve a cast voice from immutable script/profile identity."""
         if not script.content_profile_version:
             return settings.xkiro_voice
-        profile = load_content_profile(script.content_profile_id)
-        if script.content_profile_version and script.content_profile_version != profile.version:
-            raise ValueError(
-                f"Content profile '{profile.profile_id}' đã đổi version; "
-                "không được tái dùng TTS cache của script cũ."
-            )
+        profile = load_content_profile(
+            script.content_profile_id, version=script.content_profile_version,
+        )
         return profile.voice_for(segment.speaker_id)
 
     @staticmethod

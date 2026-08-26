@@ -282,7 +282,9 @@ def _script_profile(path: Path) -> dict[str, str]:
     except json.JSONDecodeError as exc:
         raise ValueError(f"Kịch bản không phải JSON hợp lệ: {path}") from exc
     profile_id = str(raw.get("profile_id") or settings.content_profile_id).strip()
-    profile = load_content_profile(profile_id)
+    profile = load_content_profile(
+        profile_id, version=str(raw.get("profile_version") or "").strip() or None,
+    )
     return {
         "content_profile_id": profile_id,
         "content_profile_version": str(raw.get("profile_version") or "").strip(),
@@ -402,7 +404,8 @@ def _record_continuity(current: Project, result: PublishResult) -> None:
     try:
         payload = json.loads(Path(_node_script_path(current)).read_text(encoding="utf-8"))
         profile = load_content_profile(
-            str(payload.get("profile_id") or "").strip() or None
+            str(payload.get("profile_id") or "").strip() or None,
+            version=str(payload.get("profile_version") or "").strip() or None,
         )
         changed = record_published_episode(
             profile,
@@ -628,7 +631,9 @@ async def run_project(project: Project, checkpoint: CheckpointManager, through: 
         # but a direct or resumed DAG run must honour the script contract on its
         # own.  Otherwise a character story can pass preflight for `story` and
         # still render stock B-roll through the global `ai` default.
-        profile = load_content_profile(voiceover.content_profile_id)
+        profile = load_content_profile(
+            voiceover.content_profile_id, version=voiceover.content_profile_version or None,
+        )
         renderer_name = profile.providers.render
         renderer = get_render_provider(renderer_name)
         print(f"[3/4] Render    ▶  đang dựng video ({renderer_name}/{settings.orientation})...")
