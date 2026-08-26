@@ -16,6 +16,12 @@
    "thứ hai", "thứ ba" hay đọc ra một dàn ý. Người nghe phải cảm thấy một
    người bạn đang lần lượt nhận ra các mặt của việc mình vừa kể, không phải
    đang nghe một bài giảng.
+   Không thay nhãn số bằng nhãn cấu trúc như "một phía", "phía khác", "ba
+   phía này" hoặc "điều thứ hai". Mỗi góc chỉ được mở ra khi nó đổi cách hiểu
+   của cảnh trước: một chi tiết, một câu hỏi, một phản bác, hoặc một giới hạn
+   cụ thể khiến người kể phải nhìn lại. Không khái quát hóa thay cho cảnh đời
+   bằng các câu như "nhiều người đều vậy", "ai cũng quen", hoặc phỏng đoán
+   người quản lý/người thân sẽ nghĩ gì khi câu chuyện chưa cho thấy điều đó.
 4. Người kể chia sẻ một cách tiếp cận có điều kiện: bước đầu, câu hỏi cần hỏi,
    hoặc ranh giới cần đặt. Nói rõ cái bước đó không giải quyết điều gì và dấu
    hiệu cho thấy nó chưa đủ. Chỉ nhắc đến việc nhờ thêm hỗ trợ khi cảnh trước
