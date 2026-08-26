@@ -409,13 +409,29 @@ def test_validate_or_repair_script_returns_when_review_passes(tmp_path, monkeypa
     class _PassingReviewProvider:
         async def complete(self, prompt, **kwargs):
             return json.dumps({
-                "passed": True, "blocking_findings": [], "section_refs": [], "repair_brief": "",
+                "passed": True,
+                "overall_score": 9,
+                "dimension_scores": {
+                    "human_truth": 9,
+                    "spoken_naturalness": 9,
+                    "causal_coherence": 9,
+                    "role_fidelity": 9,
+                    "useful_restraint": 9,
+                },
+                "blocking_findings": [],
+                "section_refs": [],
+                "repair_brief": "",
             })
 
+    log_path = tmp_path / "ideation.log"
     result = asyncio.run(validate_or_repair_script(
         _PassingReviewProvider(), payload, tmp_path / "s.json", "", max_attempts=1,
+        log_path=log_path,
     ))
     assert result["profile_id"] == profile.profile_id
+    assert result["_editorial_review"]["passed"] is True
+    assert result["_editorial_review"]["overall_score"] == 9
+    assert 'EDITORIAL_REVIEW_RESULT 1' in log_path.read_text(encoding="utf-8")
 
 
 def test_editorial_rejection_rewrites_then_re_reviews_until_the_profile_bar(tmp_path, monkeypatch):

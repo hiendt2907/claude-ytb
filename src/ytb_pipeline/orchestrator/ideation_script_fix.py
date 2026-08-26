@@ -7,6 +7,7 @@ có giới hạn số lần.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import re
@@ -60,6 +61,27 @@ def _explicit_profile(payload: dict) -> ContentProfile | None:
     return load_content_profile(
         profile_id, version=str(payload.get("profile_version") or "").strip() or None,
     ) if profile_id else None
+
+
+def _editorial_review_evidence(payload: dict, review: object) -> dict:
+    """Persist the exact editorial verdict that admitted a generated script.
+
+    This is deliberately attached only after the reviewer passes, so it does
+    not alter the payload the reviewer scores or leak into rewrite prompts.
+    The canonical payload digest makes a later human audit able to tell which
+    transcript bytes the verdict covered.
+    """
+    reviewed_payload_sha256 = hashlib.sha256(
+        json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    ).hexdigest()
+    return {
+        "passed": bool(getattr(review, "passed", False)),
+        "overall_score": getattr(review, "overall_score", None),
+        "dimension_scores": dict(getattr(review, "dimension_scores", None) or {}),
+        "profile_id": str(payload.get("profile_id") or ""),
+        "profile_version": str(payload.get("profile_version") or ""),
+        "reviewed_payload_sha256": reviewed_payload_sha256,
+    }
 
 
 def repair_system_prompt(payload: dict) -> str:
@@ -861,7 +883,17 @@ async def validate_or_repair_script(
                         if review_profile is not None
                         else None
                     )
-                    if review is None or review.passed:
+                    if review is None:
+                        return current
+                    review_evidence = _editorial_review_evidence(current, review)
+                    if log_path:
+                        append_local_start_log(
+                            log_path,
+                            f"EDITORIAL_REVIEW_RESULT {attempt}",
+                            json.dumps(review_evidence, ensure_ascii=False, indent=2),
+                        )
+                    if review.passed:
+                        current["_editorial_review"] = review_evidence
                         return current
                     last_qa_output = {
                         "passed": False,
