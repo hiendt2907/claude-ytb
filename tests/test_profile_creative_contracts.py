@@ -75,6 +75,21 @@ def test_explainer_prompt_keeps_one_listener_viewpoint_and_scene_bound_evidence(
     assert "mỗi beat evidence phải bắt đầu từ một chi tiết đã có trong cảnh" in prompt
 
 
+def test_explainer_prompt_defines_a_real_nine_without_episode_outline_or_mind_reading():
+    """A self-awarded 9 must not survive template narration in the full prompt."""
+    from ytb_pipeline.content_profiles import load_content_profile
+    from ytb_pipeline.orchestrator.ideation_prompts import script_generation_system_prompt
+
+    prompt = " ".join(
+        script_generation_system_prompt(
+            load_content_profile("one-cup-cafe-6h"), video_type="long"
+        ).split()
+    ).casefold()
+
+    assert "không được dùng lời dẫn dàn ý kiểu \"tập này sẽ\"" in prompt
+    assert "không suy diễn câu chuyện trong đầu người nghe" in prompt
+
+
 def test_story_prompt_keeps_table_six_as_a_real_relationship_not_a_stage_prop():
     from ytb_pipeline.content_profiles import load_content_profile
     from ytb_pipeline.orchestrator.ideation_prompts import script_generation_system_prompt
