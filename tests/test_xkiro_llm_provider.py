@@ -39,15 +39,15 @@ def test_xkiro_llm_provider_registers_and_satisfies_protocol():
 
 
 @pytest.mark.unit
-def test_xkiro_script_defaults_pin_gemini_flash_without_model_fallbacks():
+def test_xkiro_script_defaults_pin_deepseek_v4_pro_without_model_fallbacks():
     from ytb_pipeline.config.settings import Settings
     from ytb_pipeline.providers.llm.xkiro_provider import XkiroLLMProvider
 
     defaults = Settings(_env_file=None)
 
-    assert defaults.xkiro_llm_model == "google/gemini-3.7-flash"
+    assert defaults.xkiro_llm_model == "deepseek/deepseek-v4-pro"
     assert not hasattr(defaults, "xkiro_llm_fallback_models")
-    assert XkiroLLMProvider().model_name() == "google/gemini-3.7-flash"
+    assert XkiroLLMProvider().model_name() == "deepseek/deepseek-v4-pro"
 
 
 @pytest.mark.unit
@@ -68,7 +68,7 @@ async def test_xkiro_llm_sends_openai_compatible_chat_request(monkeypatch):
 
     monkeypatch.setattr(settings, "xkiro_api_key", "test-key", raising=False)
     monkeypatch.setattr(settings, "xkiro_llm_url", "https://voice.example/v1/chat/completions", raising=False)
-    monkeypatch.setattr(settings, "xkiro_llm_model", "google/gemini-3.7-flash", raising=False)
+    monkeypatch.setattr(settings, "xkiro_llm_model", "deepseek/deepseek-v4-pro", raising=False)
     request_seen: dict[str, object] = {}
 
     def fake_urlopen(request: Request, timeout: float):
@@ -84,7 +84,7 @@ async def test_xkiro_llm_sends_openai_compatible_chat_request(monkeypatch):
     assert result == "xin chào"
     assert request_seen["url"] == "https://voice.example/v1/chat/completions"
     assert request_seen["authorization"] == "Bearer test-key"
-    assert request_seen["payload"]["model"] == "google/gemini-3.7-flash"
+    assert request_seen["payload"]["model"] == "deepseek/deepseek-v4-pro"
     assert request_seen["payload"]["messages"] == [
         {"role": "system", "content": "bạn là trợ lý"},
         {"role": "user", "content": "hỏi gì đó"},
