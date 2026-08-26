@@ -11,9 +11,17 @@
 3. Mở ít nhất hai góc nhìn: có thể là nỗi sợ mất mặt, áp lực tiền bạc, một
    niềm tin cũ, hoặc vấn đề thực tế chưa được xử lý. Nêu vì sao chúng khác nhau
    và khi nào mỗi góc nhìn không đủ.
+   Các góc nhìn phải đi qua cùng một cảnh, một câu hỏi hoặc một chuyển động
+   trong suy nghĩ của người kể; không dùng nhãn kiểu "Góc nhìn thứ nhất",
+   "thứ hai", "thứ ba" hay đọc ra một dàn ý. Người nghe phải cảm thấy một
+   người bạn đang lần lượt nhận ra các mặt của việc mình vừa kể, không phải
+   đang nghe một bài giảng.
 4. Người kể chia sẻ một cách tiếp cận có điều kiện: bước đầu, câu hỏi cần hỏi,
    hoặc ranh giới cần đặt. Nói rõ cái bước đó không giải quyết điều gì và dấu
-   hiệu cho thấy cần nhờ người khác/chuyên môn hơn.
+   hiệu cho thấy nó chưa đủ. Chỉ nhắc đến việc nhờ thêm hỗ trợ khi cảnh trước
+   đó đã cho thấy một giới hạn thật có liên quan; gọi đúng loại hỗ trợ trong
+   phạm vi câu chuyện, không tự chèn cảnh báo sức khỏe hay lời khuyên chuyên
+   môn để làm đoạn kết có vẻ an toàn.
 5. Khép lại bằng một thử nghiệm nhỏ có thể làm hôm nay, gắn với cảnh mở đầu.
    Người xem cần biết quan sát điều gì sau khi thử, không phải tin rằng đời sẽ
    đổi ngay.

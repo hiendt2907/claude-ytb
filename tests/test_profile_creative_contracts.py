@@ -12,8 +12,10 @@ def test_explainer_prompt_names_the_midcareer_burdened_man_and_friend_voice():
     from ytb_pipeline.content_profiles import load_content_profile
     from ytb_pipeline.orchestrator.ideation_prompts import script_generation_system_prompt
 
-    prompt = script_generation_system_prompt(
-        load_content_profile("one-cup-cafe-6h"), video_type="long"
+    prompt = " ".join(
+        script_generation_system_prompt(
+            load_content_profile("one-cup-cafe-6h"), video_type="long"
+        ).split()
     ).casefold()
 
     assert "33–35" in prompt
@@ -33,8 +35,10 @@ def test_explainer_prompt_requires_lived_transitions_not_outline_labels():
     from ytb_pipeline.content_profiles import load_content_profile
     from ytb_pipeline.orchestrator.ideation_prompts import script_generation_system_prompt
 
-    prompt = script_generation_system_prompt(
-        load_content_profile("one-cup-cafe-6h"), video_type="long"
+    prompt = " ".join(
+        script_generation_system_prompt(
+            load_content_profile("one-cup-cafe-6h"), video_type="long"
+        ).split()
     ).casefold()
 
     assert "không dùng nhãn kiểu \"góc nhìn thứ nhất\"" in prompt
