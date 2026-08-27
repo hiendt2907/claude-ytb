@@ -330,6 +330,15 @@ from `Timeline.narration_clips`, then emits sibling `<slug>.srt` and
 distinct from the existing burned caption cards and do not provide translation
 or word-level alignment.
 
+## Deterministic local audio mixing (Phase 6)
+
+`render.audio` optionally configures one local background music track and
+explicit local SFX events. Timeline owns start, trim/loop, fades and gain,
+while narration remains authoritative and optional layers cannot extend it.
+`render/audio_mixer.py` validates local audio streams and mixes narration once
+with FFmpeg `amix=duration=first`; the existing TTS loudnorm remains the only
+narration normalization. No AI or network media selection is involved.
+
 ## Asset Registry — character_story visuals (Phase 3.2, added 2026-08-27)
 
 `src/ytb_pipeline/render/asset_registry.py` adds a durable provenance/

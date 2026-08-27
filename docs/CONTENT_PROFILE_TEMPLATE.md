@@ -103,6 +103,10 @@ Phải có ít nhất `"narrator"` (hoặc đúng tên đã khai ở
 - `inter_segment_gap_sec`, `transition_overlap_sec` — khoảng trong `[0, 2]`
   giây, canh giữa các section khi ghép render.
 - `scene_assets` (tuỳ chọn) — danh sách cố định tên file asset hợp lệ; bỏ
+
+- `audio` (tuỳ chọn) — local background music và SFX rõ ràng cho story render;
+  gồm `background_music` (`asset`, `gain_db`, fade, `mode`) và `sfx` events
+  (`asset`, `at_sec`, `gain_db`, `duration_sec`). Không có `audio` giữ narration-only.
   trống thì mọi file trong `assets_dir` đều hợp lệ.
 
 ### `editorial_contract` (tuỳ chọn — bỏ qua thì dùng bộ mặc định legacy)
