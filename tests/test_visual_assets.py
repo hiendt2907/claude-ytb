@@ -509,6 +509,51 @@ def test_missing_judge_instance_is_treated_as_infrastructure_failure(tmp_path):
         resolver.resolve(_story_request(), _story_segment(), None, video_slug="vid")
 
 
+def test_vlm_ranked_resolves_configured_production_judge_when_not_injected(tmp_path, monkeypatch):
+    """Production preparation must resolve the registered vision adapter.
+
+    Tests may still inject a fake directly, but an opted-in profile cannot
+    require application callers to construct provider infrastructure by hand.
+    """
+    from ytb_pipeline.providers import vision
+
+    model = "qwen/qwen3.8-max:free"
+    profile = _NS(
+        profile_id="p",
+        version="1",
+        visual_generation=_vlm_visual_generation(
+            judge_cfg=_judge_cfg(
+                provider="xkiro",
+                model=model,
+                hard_fail_on_judge_error=True,
+            )
+        ),
+    )
+    resolved = []
+    judge = _FakeVisualJudge(provider="xkiro", model=model)
+
+    def _resolve(provider, configured_model):
+        resolved.append((provider, configured_model))
+        return judge
+
+    monkeypatch.setattr(vision, "get_visual_judge", _resolve)
+    resolver = VisualAssetResolver(
+        profile,
+        registry=AssetRegistry(tmp_path / "registry.json"),
+        cache_dir=tmp_path / "cache",
+        provider=_CountingProvider(),
+        judge=None,
+    )
+
+    record = resolver.resolve(
+        _story_request(), _story_segment(), None, video_slug="vid"
+    )
+
+    assert record["asset_id"] is not None
+    assert resolved == [("xkiro", model)]
+    assert judge.calls == 1
+
+
 def test_valid_persisted_evaluation_avoids_a_second_judge_call(tmp_path):
     profile = _NS(profile_id="p", version="1", visual_generation=_vlm_visual_generation())
     registry = AssetRegistry(tmp_path / "registry.json")
