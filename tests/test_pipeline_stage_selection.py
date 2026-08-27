@@ -11,7 +11,7 @@ def test_voiceover_stage_runs_only_approved_input_and_voiceover():
 
 
 def test_publish_stage_runs_the_full_production_chain():
-    assert pipeline.stage_names("publish") == ("input", "voiceover", "visual_assets", "render", "publish")
+    assert pipeline.stage_names("publish") == ("input", "voiceover", "scene_plan", "visual_assets", "render", "publish")
 
 
 def test_long_cannot_enter_renderer_with_portrait_orientation(monkeypatch):

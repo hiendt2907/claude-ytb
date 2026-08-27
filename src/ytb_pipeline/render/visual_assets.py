@@ -170,12 +170,16 @@ class VisualAssetResolver:
         return record
 
 
-def prepare_visual_assets(voiceover: "Voiceover", profile: "ContentProfile", *, project_dir: Path, dimensions: tuple[int, int], registry: AssetRegistry | None = None, cache_dir: Path | None = None, provider: Any = None) -> tuple["ScenePlan", VisualManifest, dict[str, Path]]:
-    """Checkpoint each resolved shot; failures preserve earlier completed shots."""
+def prepare_visual_assets(voiceover: "Voiceover", profile: "ContentProfile", *, project_dir: Path, dimensions: tuple[int, int], scene_plan: "ScenePlan | None" = None, registry: AssetRegistry | None = None, cache_dir: Path | None = None, provider: Any = None) -> tuple["ScenePlan", VisualManifest, dict[str, Path]]:
+    """Checkpoint each resolved shot; failures preserve earlier completed shots.
+
+    The optional fallback is a compatibility convenience for direct legacy
+    callers.  Production DAG callers must supply the already-persisted plan:
+    visual preparation never invokes the Director or chooses a replacement.
+    """
     from .scene_plan import build_story_scene_plan
     project_dir.mkdir(parents=True, exist_ok=True)
-    plan = build_story_scene_plan(voiceover, profile)
-    plan.write_json(project_dir / "scene_plan.json")
+    plan = scene_plan or build_story_scene_plan(voiceover, profile)
     requests = build_visual_requests(plan, profile, dimensions=dimensions)
     manifest_path = project_dir / "visual_manifest.json"
     manifest = VisualManifest.read_json(manifest_path) if manifest_path.is_file() else VisualManifest(plan.source_fingerprint)

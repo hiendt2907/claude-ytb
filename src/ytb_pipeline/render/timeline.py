@@ -73,6 +73,19 @@ class VideoClip:
 
 
 @dataclass(frozen=True)
+class ShotClip:
+    """A visual Shot placed inside its owning narration-aligned Scene."""
+    scene_id: str
+    shot_id: str
+    start_sec: float
+    duration_sec: float
+
+    def __post_init__(self) -> None:
+        if not self.scene_id or not self.shot_id or self.start_sec < 0 or self.duration_sec <= 0:
+            raise TimelineError("ShotClip phải có identity, start không âm và duration dương.")
+
+
+@dataclass(frozen=True)
 class NarrationClip:
     """One section's narration-track slot — the authoritative timing input."""
 
@@ -164,6 +177,7 @@ class Timeline:
     source_fingerprint: str = ""
     music_clips: tuple[AudioLayerClip, ...] = ()
     sfx_clips: tuple[AudioLayerClip, ...] = ()
+    shot_clips: tuple[ShotClip, ...] = ()
 
     def __post_init__(self) -> None:
         if self.fps <= 0:
@@ -203,6 +217,8 @@ class Timeline:
                     "Timeline.narration_clips phải đơn điệu tăng và không chồng lấn "
                     f"(clip {index} bắt đầu trước khi clip {index - 1} kết thúc)."
                 )
+        if self.shot_clips and len({clip.shot_id for clip in self.shot_clips}) != len(self.shot_clips):
+            raise TimelineError("Timeline.shot_clips có shot_id trùng lặp.")
         tolerance = _DEFAULT_FPS_TOLERANCE_DIVISOR / self.fps
         drift = abs(self.video_expected_duration_sec - self.narration_expected_duration_sec)
         if drift > tolerance:
@@ -252,6 +268,7 @@ class Timeline:
             "transitions": [asdict(t) for t in self.transitions],
             "music_clips": [clip_dict(clip) for clip in self.music_clips],
             "sfx_clips": [clip_dict(clip) for clip in self.sfx_clips],
+            "shot_clips": [clip_dict(clip) for clip in self.shot_clips],
         }
 
     def write_json(self, path: Path) -> None:
@@ -283,6 +300,7 @@ class Timeline:
             transitions=tuple(Transition(**t) for t in data["transitions"]),
             music_clips=tuple(AudioLayerClip(**{**clip, "asset_path": Path(clip["asset_path"])}) for clip in data.get("music_clips", ())),
             sfx_clips=tuple(AudioLayerClip(**{**clip, "asset_path": Path(clip["asset_path"])}) for clip in data.get("sfx_clips", ())),
+            shot_clips=tuple(ShotClip(**clip) for clip in data.get("shot_clips", ())),
         )
 
     @classmethod
@@ -357,6 +375,7 @@ def build_story_timeline_from_scene_plan(
     video_clips: list[VideoClip] = []
     narration_clips: list[NarrationClip] = []
     transitions: list[Transition] = []
+    shot_clips: list[ShotClip] = []
     cursor = 0.0
     for scene in scene_plan.scenes:
         index = scene.source_segment_index
@@ -364,6 +383,10 @@ def build_story_timeline_from_scene_plan(
         if segment.audio_path is None:
             raise TimelineError(f"Segment {index} thiếu audio_path — chưa qua TTS.")
         duration = scene.narration_end_sec - scene.narration_start_sec
+        for shot in scene.shots:
+            shot_clips.append(ShotClip(
+                scene.scene_id, shot.shot_id, cursor + shot.relative_start_sec, shot.duration_sec,
+            ))
         video_clips.append(
             VideoClip(index=index, segment_index=index, start_sec=cursor, duration_sec=duration)
         )
@@ -413,4 +436,5 @@ def build_story_timeline_from_scene_plan(
         transitions=tuple(transitions), expected_duration_sec=expected_duration,
         source_fingerprint=_source_fingerprint(profile, segments, fps=fps, width=width, height=height),
         music_clips=music_clips, sfx_clips=sfx_clips,
+        shot_clips=tuple(shot_clips),
     )

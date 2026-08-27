@@ -121,15 +121,21 @@ class ScenePlan:
 
     scenes: tuple[Scene, ...]
     source_fingerprint: str = ""
+    planner_provenance: dict[str, str] | None = None
 
     def __post_init__(self) -> None:
         if not self.scenes:
             raise ScenePlanError("ScenePlan cần ít nhất một scene.")
         seen_ids: set[str] = set()
+        seen_shot_ids: set[str] = set()
         for scene in self.scenes:
             if scene.scene_id in seen_ids:
                 raise ScenePlanError(f"scene_id trùng lặp: {scene.scene_id!r}.")
             seen_ids.add(scene.scene_id)
+            for shot in scene.shots:
+                if shot.shot_id in seen_shot_ids:
+                    raise ScenePlanError(f"shot_id trùng lặp: {shot.shot_id!r}.")
+                seen_shot_ids.add(shot.shot_id)
         expected_indices = list(range(len(self.scenes)))
         actual_indices = [scene.source_segment_index for scene in self.scenes]
         if actual_indices != expected_indices:
@@ -157,6 +163,7 @@ class ScenePlan:
 
         return {
             "source_fingerprint": self.source_fingerprint,
+            "planner_provenance": self.planner_provenance,
             "scenes": [scene_dict(scene) for scene in self.scenes],
         }
 
@@ -189,6 +196,7 @@ class ScenePlan:
 
         return cls(
             source_fingerprint=data.get("source_fingerprint", ""),
+            planner_provenance=data.get("planner_provenance"),
             scenes=tuple(scene_from_dict(scene) for scene in data["scenes"]),
         )
 
@@ -215,11 +223,19 @@ def normalize_directed_shots(scene_id: str, duration_sec: float, directed_shots,
     if not directed_shots or duration_sec < len(directed_shots) * min_shot_sec:
         raise ScenePlanError("Director shots không đủ narration duration tối thiểu.")
     weights = sum(item.duration_weight for item in directed_shots)
+    # Reserve the minimum useful duration before distributing the remaining
+    # window by semantic weights.  This is exact, avoids a short final shot,
+    # and leaves all absolute timing to deterministic code.
+    remaining = duration_sec - len(directed_shots) * min_shot_sec
     cursor = 0.0
     shots = []
     occurrences: dict[tuple[str, tuple[str, ...]], int] = {}
     for index, item in enumerate(directed_shots):
-        duration = duration_sec - cursor if index == len(directed_shots) - 1 else max(min_shot_sec, duration_sec * item.duration_weight / weights)
+        duration = (
+            duration_sec - cursor
+            if index == len(directed_shots) - 1
+            else min_shot_sec + remaining * item.duration_weight / weights
+        )
         key = (item.visual_intent.strip(), item.characters)
         occurrence = occurrences.get(key, 0)
         occurrences[key] = occurrence + 1

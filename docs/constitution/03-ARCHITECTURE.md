@@ -296,6 +296,36 @@ always-rebuildable debug/postmortem artifact, never read back by any stage
 as a source of truth; a legacy project missing `scene_plan.json` is
 unaffected, since every render rebuilds it fresh.
 
+## Director ScenePlan v2 (Phase 7)
+
+Story production now has an explicit persisted planning boundary:
+
+```
+Narration -> scene_plan -> visual_assets -> VisualManifest -> Timeline -> prepared renderer
+```
+
+`scene_planning.mode` defaults to `legacy_single_shot`; that mode remains
+LLM-free and yields the historical one-shot Scene.  Opt-in `director` mode
+uses the configured existing LLM provider once per semantic Scene.  Its strict
+JSON contract accepts only `visual_intent`, allowed `characters`, and positive
+`duration_weight`; malformed output receives at most one repair attempt.
+
+`prepare_scene_plan()` persists `assets/projects/<slug>/scene_plan.json` and
+reuses it only when its planning fingerprint matches narration semantics and
+timing, profile policy, planner contract/ruleset, and provider identity.  The
+fingerprint intentionally excludes rendered files, manifests, ComfyUI state,
+and optional audio.  Each Director shot gets a deterministic semantic hash
+(`scene + intent + characters + duplicate occurrence`), rather than an
+ordinal ID, so inserting/reordering an unrelated shot does not remap an
+existing asset.
+
+The deterministic normalizer—not the LLM—allocates the Scene's exact narration
+window. `Timeline.shot_clips` records every resolved Shot within that window;
+their durations sum to the scene duration and never multiply narration.  The
+prepared renderer consumes these persisted semantics and prepared assets only;
+it does not call Director, an LLM, or ComfyUI.  `compose_ai.py` remains outside
+this story-only capability.
+
 ## Visual Assets — prepared story boundary (Phase 4)
 
 For `character_story`, `visual_assets` runs between audio quality and render.

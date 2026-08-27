@@ -47,7 +47,7 @@ from .render.validation import validate_final_video
 from .voiceover.quality import AudioQualityResult, FasterWhisperSttAdapter, run_audio_quality_gate
 from .voiceover.validation import validate_audio
 
-STAGE_ORDER = ("input", "voiceover", "visual_assets", "render", "publish")
+STAGE_ORDER = ("input", "voiceover", "scene_plan", "visual_assets", "render", "publish")
 
 
 def enforce_audio_quality(result: AudioQualityResult) -> None:
@@ -351,7 +351,7 @@ def _reset_stale_nodes(project: Project) -> Project:
         if not any(entry.get("uploaded") for entry in platforms.values()):
             current = current.with_node(_pending_again(publish))
 
-    for node_id, next_id in (("render", "publish"), ("visual_assets", "render"), ("voiceover", "visual_assets")):
+    for node_id, next_id in (("render", "publish"), ("visual_assets", "render"), ("scene_plan", "visual_assets"), ("voiceover", "scene_plan")):
         node = current.nodes.get(node_id)
         nxt = current.nodes.get(next_id)
         next_done = nxt is not None and nxt.status == NodeStatus.DONE
@@ -707,13 +707,15 @@ async def run_project(project: Project, checkpoint: CheckpointManager, through: 
         renderer = get_render_provider(renderer_name)
         print(f"[3/4] Render    ▶  đang dựng video ({renderer_name}/{settings.orientation})...")
         if renderer_name == "story":
-            from .render.scene_plan import ScenePlan, build_story_scene_plan
+            from .render.scene_plan import ScenePlan
             from .render.visual_assets import VisualManifest, build_visual_requests, validate_prepared_manifest
             from .render.asset_registry import AssetRegistry
             dimensions = (1920, 1080) if settings.orientation == "landscape" else (1080, 1920)
             project_dir = settings.projects_dir / current.project_id
             plan_path = project_dir / "scene_plan.json"
-            scene_plan = ScenePlan.read_json(plan_path) if plan_path.is_file() else build_story_scene_plan(voiceover, profile)
+            if not plan_path.is_file():
+                raise ValueError("Thiếu ScenePlan đã chuẩn bị; render không được tự planning.")
+            scene_plan = ScenePlan.read_json(plan_path)
             manifest_path = project_dir / "visual_manifest.json"
             if not manifest_path.is_file():
                 raise ValueError("Thiếu VisualManifest đã chuẩn bị; không được generate trong render.")
@@ -733,13 +735,28 @@ async def run_project(project: Project, checkpoint: CheckpointManager, through: 
         if profile.providers.render != "story":
             return "not-applicable", {"status": "not_applicable"}
         from .render.story import LANDSCAPE, PORTRAIT
+        from .render.scene_plan import ScenePlan
         from .render.visual_assets import prepare_visual_assets
         dimensions = LANDSCAPE if settings.orientation == "landscape" else PORTRAIT
+        plan_path = settings.projects_dir / current.project_id / "scene_plan.json"
+        if not plan_path.is_file():
+            raise ValueError("Thiếu ScenePlan; visual_assets không được tự planning.")
         _plan, manifest, _prepared = prepare_visual_assets(
             voiceover, profile, project_dir=settings.projects_dir / current.project_id, dimensions=dimensions,
+            scene_plan=ScenePlan.read_json(plan_path),
         )
         manifest_path = settings.projects_dir / current.project_id / "visual_manifest.json"
         return str(manifest_path), {"status": "done", "source_fingerprint": manifest.source_fingerprint}
+
+    async def scene_plan_fn(current: Project):
+        voiceover = voiceover_for(current)
+        profile = load_content_profile(voiceover.content_profile_id, version=voiceover.content_profile_version or None)
+        if profile.providers.render != "story":
+            return "not-applicable", {"status": "not_applicable"}
+        from .render.scene_planning import prepare_scene_plan
+        plan_path = settings.projects_dir / current.project_id / "scene_plan.json"
+        plan = await prepare_scene_plan(voiceover, profile, project_dir=plan_path.parent)
+        return str(plan_path), {"status": "done", "source_fingerprint": plan.source_fingerprint}
 
     async def render_quality_fn(current: Project):
         """Persist QA artifacts after render without risking the video checkpoint."""
@@ -801,7 +818,8 @@ async def run_project(project: Project, checkpoint: CheckpointManager, through: 
         "input": NodeDef(node_id="input", stage="input", fn=input_fn, deps=[]),
         "voiceover": NodeDef(node_id="voiceover", stage="voiceover", fn=voiceover_fn, deps=["input"]),
         "audio_quality": NodeDef(node_id="audio_quality", stage="quality", fn=audio_quality_fn, deps=["voiceover"]),
-        "visual_assets": NodeDef(node_id="visual_assets", stage="render", fn=visual_assets_fn, deps=["audio_quality"]),
+        "scene_plan": NodeDef(node_id="scene_plan", stage="render", fn=scene_plan_fn, deps=["audio_quality"]),
+        "visual_assets": NodeDef(node_id="visual_assets", stage="render", fn=visual_assets_fn, deps=["scene_plan"]),
         "render": NodeDef(node_id="render", stage="render", fn=render_fn, deps=["visual_assets"]),
         "render_quality": NodeDef(node_id="render_quality", stage="quality", fn=render_quality_fn, deps=["render"]),
         "publish": NodeDef(node_id="publish", stage="publish", fn=publish_fn, deps=["render_quality"]),

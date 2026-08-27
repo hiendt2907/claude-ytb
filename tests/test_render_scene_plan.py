@@ -22,6 +22,8 @@ from ytb_pipeline.render.scene_plan import (
     Shot,
     build_story_scene_plan,
 )
+from ytb_pipeline.agents.director_agent import validate_directed_shots
+from ytb_pipeline.render.scene_plan import normalize_directed_shots
 from ytb_pipeline.render.timeline import (
     Timeline,
     build_story_timeline,
@@ -199,6 +201,22 @@ def test_scene_plan_produces_the_same_timeline_as_the_legacy_builder():
     )
 
     assert via_legacy == via_scene_plan
+
+
+def test_multishot_scene_is_flattened_into_timeline_without_multiplying_duration():
+    voiceover = _voiceover(_segment(6.0))
+    profile = _profile()
+    base = build_story_scene_plan(voiceover, profile)
+    directed = validate_directed_shots([
+        {"visual_intent": "wide", "characters": [], "duration_weight": 1},
+        {"visual_intent": "close", "characters": [], "duration_weight": 2},
+    ], allowed_characters=(), max_shots=3)
+    scene = base.scenes[0]
+    plan = ScenePlan((Scene(**{**scene.__dict__, "shots": normalize_directed_shots(scene.scene_id, 6.0, directed, min_shot_sec=1.0)}),), source_fingerprint="x")
+    timeline = build_story_timeline_from_scene_plan(plan, voiceover, profile, fps=30, width=1920, height=1080)
+    assert len(timeline.shot_clips) == 2
+    assert sum(clip.duration_sec for clip in timeline.shot_clips) == pytest.approx(6.0)
+    assert timeline.expected_duration_sec == pytest.approx(6.0)
 
 
 def test_mismatched_scene_plan_and_voiceover_length_is_rejected():

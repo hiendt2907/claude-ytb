@@ -17,6 +17,9 @@ class DirectedShot:
 def validate_directed_shots(raw: list[dict], *, allowed_characters: tuple[str, ...], max_shots: int) -> tuple[DirectedShot, ...]:
     if not 1 <= len(raw) <= max_shots:
         raise ValueError("Director output có số shot ngoài giới hạn.")
+    required = {"visual_intent", "characters", "duration_weight"}
+    if any(not isinstance(item, dict) or set(item) != required for item in raw):
+        raise ValueError("Director output chứa field không thuộc structured shot contract.")
     shots = tuple(DirectedShot(str(item.get("visual_intent", "")).strip(), tuple(item.get("characters", ())), float(item.get("duration_weight", 0))) for item in raw)
     if any(not shot.visual_intent or shot.duration_weight <= 0 or not set(shot.characters).issubset(allowed_characters) for shot in shots):
         raise ValueError("Director output không hợp lệ.")

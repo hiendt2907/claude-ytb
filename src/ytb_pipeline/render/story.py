@@ -54,6 +54,10 @@ def render_story_video(voiceover: Voiceover, output_dir: Path) -> RenderedVideo:
     slug = _slugify(voiceover.project_id or voiceover.title) or "story"
     project_dir = settings.projects_dir / slug
     scene_plan = build_story_scene_plan(voiceover, profile)
+    project_dir.mkdir(parents=True, exist_ok=True)
+    # Direct legacy callers retain the historical recoverable artifact. The
+    # production DAG instead supplies its separately persisted planning plan.
+    scene_plan.write_json(project_dir / "scene_plan.json")
     manifest_path = project_dir / "visual_manifest.json"
     if manifest_path.is_file():
         prepared_assets = validate_prepared_manifest(
@@ -132,16 +136,20 @@ def render_prepared_story_video(
             # Một section Long dài ~450 ký tự: chia thành nhiều thẻ caption thay
             # vì để một tấm chữ đứng yên suốt cả section.
             cards = _segment_cards(segment, profile, dims)
-            # Resolve MỘT lần cho cả section: mọi thẻ caption của cùng section
-            # dùng chung một tấm nền, và asset cố định/generate+cache đều đắt
-            # hơn việc gọi lại nhiều lần trong vòng lặp thẻ.
+            # The persisted ScenePlan may contain several semantic shots.  A
+            # caption card chooses the Shot covering its deterministic seek;
+            # cards remain presentation details and do not create timing.
             scene = scene_plan.scenes[index]
-            image_path = prepared_assets[scene.shots[0].shot_id]
             frame_counts = _frame_counts([length for (_, _, length) in cards], fps=30)
             if frame_counts:
                 frame_counts[-1] += round(gap * 30)
             card_clips: list[Path] = []
-            for card_index, ((text, _seek, _length), frames) in enumerate(zip(cards, frame_counts)):
+            for card_index, ((text, seek, _length), frames) in enumerate(zip(cards, frame_counts)):
+                shot = next(
+                    (item for item in reversed(scene.shots) if seek >= item.relative_start_sec),
+                    scene.shots[0],
+                )
+                image_path = prepared_assets[shot.shot_id]
                 frame = work / f"frame-{index:03d}-{card_index:02d}.jpg"
                 _story_frame(segment, profile, dims, image_path, caption=text).save(frame, quality=92)
                 if first_frame is None:
