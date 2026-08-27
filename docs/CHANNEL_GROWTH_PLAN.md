@@ -14,6 +14,16 @@
 
 Batch đang chạy phải được để hoàn tất. Không thêm queue mới cho tới khi batch hiện tại được audit.
 
+**Phạm vi áp dụng (thêm 2026-08-27):** mục tiêu và mô hình phễu Short→Long
+trong tài liệu này áp dụng cho content profile giải thích cơ chế
+(`one-cup-cafe-6h`). Series kể chuyện `ban-so-6` (content_rules
+`allow_short_generation: false`) là **ngoại lệ vĩnh viễn, Long-only theo
+quyết định chủ sở hữu** — không chạy phễu Short→Long, không cần
+`--long-form-slug`/`--playlist`/`--cta-target` khi lên batch. Đừng áp mục
+tiêu "40-50 Shorts + 4 Long" hay lịch "1 Long + 2 Short/ngày" ở mục 1 và 3
+cho series này. Bối cảnh quyết định:
+`docs/handoffs/2026-08-27-content-profile-engine-refactor-plan.md`.
+
 ## 2. Định vị kênh
 
 Lời hứa của kênh:
