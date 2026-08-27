@@ -16,10 +16,13 @@ import base64
 import hashlib
 import json
 import logging
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 from urllib import error as urllib_error
 from urllib import request as urllib_request
+
+from PIL import Image, UnidentifiedImageError
 
 from ...config.settings import settings
 from ...render.visual_judge import (
@@ -35,6 +38,7 @@ from ...render.visual_judge import (
 logger = logging.getLogger(__name__)
 
 DEFAULT_MAX_IMAGE_BYTES = 8 * 1024 * 1024
+DEFAULT_MAX_IMAGE_PIXELS = 16_000_000
 DEFAULT_TIMEOUT_SEC = 90.0
 _PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 _JPEG_SIGNATURE = b"\xff\xd8\xff"
@@ -173,7 +177,12 @@ class XkiroVisionTransport:
         return content_text
 
 
-def _mime_and_bytes(candidate: JudgeCandidate, *, max_image_bytes: int) -> tuple[str, bytes]:
+def _mime_and_bytes(
+    candidate: JudgeCandidate,
+    *,
+    max_image_bytes: int,
+    max_image_pixels: int,
+) -> tuple[str, bytes]:
     path = Path(candidate.local_path)
     try:
         payload = path.read_bytes()
@@ -192,12 +201,33 @@ def _mime_and_bytes(candidate: JudgeCandidate, *, max_image_bytes: int) -> tuple
             f"({len(payload)} > {max_image_bytes} bytes)."
         )
     if payload.startswith(_PNG_SIGNATURE):
-        return "image/png", payload
-    if payload.startswith(_JPEG_SIGNATURE):
-        return "image/jpeg", payload
-    raise JudgeInfrastructureError(
-        f"Candidate {candidate.asset_id} không phải PNG/JPEG được Phase 11 hỗ trợ."
-    )
+        mime, expected_format = "image/png", "PNG"
+    elif payload.startswith(_JPEG_SIGNATURE):
+        mime, expected_format = "image/jpeg", "JPEG"
+    else:
+        raise JudgeInfrastructureError(
+            f"Candidate {candidate.asset_id} không phải PNG/JPEG được Phase 11 hỗ trợ."
+        )
+    try:
+        with Image.open(BytesIO(payload)) as image:
+            if image.format != expected_format:
+                raise OSError(
+                    f"magic bytes là {expected_format} nhưng decoder nhận {image.format}"
+                )
+            width, height = image.size
+            if width <= 0 or height <= 0 or width * height > max_image_pixels:
+                raise JudgeInfrastructureError(
+                    f"Candidate {candidate.asset_id} vượt giới hạn Judge transport "
+                    f"({width}x{height} > {max_image_pixels} pixels)."
+                )
+            image.verify()
+    except JudgeInfrastructureError:
+        raise
+    except (Image.DecompressionBombError, UnidentifiedImageError, OSError, SyntaxError) as exc:
+        raise JudgeInfrastructureError(
+            f"Candidate {candidate.asset_id} không giải mã được thành ảnh hợp lệ."
+        ) from exc
+    return mime, payload
 
 
 def _request_intro(request: Any, context: JudgeContext) -> str:
@@ -239,14 +269,18 @@ class XkiroVisualJudge:
         *,
         transport: XkiroVisionTransport | Any | None = None,
         max_image_bytes: int = DEFAULT_MAX_IMAGE_BYTES,
+        max_image_pixels: int = DEFAULT_MAX_IMAGE_PIXELS,
     ) -> None:
         if not model.strip():
             raise ValueError("xKiro VisualJudge model không được rỗng.")
         if max_image_bytes <= 0:
             raise ValueError("max_image_bytes phải > 0.")
+        if max_image_pixels <= 0:
+            raise ValueError("max_image_pixels phải > 0.")
         self.model = model
         self.transport = transport or XkiroVisionTransport()
         self.max_image_bytes = max_image_bytes
+        self.max_image_pixels = max_image_pixels
 
     def evaluate(
         self,
@@ -262,7 +296,9 @@ class XkiroVisualJudge:
         ]
         for candidate in candidates:
             mime, payload = _mime_and_bytes(
-                candidate, max_image_bytes=self.max_image_bytes
+                candidate,
+                max_image_bytes=self.max_image_bytes,
+                max_image_pixels=self.max_image_pixels,
             )
             content.append(
                 {
