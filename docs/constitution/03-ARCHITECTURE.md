@@ -605,6 +605,81 @@ described) and only generates the two new slots; lowering it back to 1
 never deletes the now-unused slot 1/2 `AssetRecord`s (garbage collection
 is explicitly out of scope for Phase 9).
 
+## Semantic visual evaluation and ranked selection (Phase 10)
+
+Phase 10 extends only the selection half of Phase 9. Generation, technical
+validation, semantic evaluation, selection, and rendering are separate
+boundaries:
+
+```
+VisualRequest
+    -> Phase 8 derivative reuse?       YES -> selected AssetRecord
+    -> profile_local?                  YES -> direct AssetRecord
+    -> CandidateSet
+    -> technical validation
+    -> technically-valid AssetRecords
+    -> VisualJudge (optional, provider-neutral port)
+    -> CandidateEvaluation[]
+    -> Selector
+    -> VisualManifest
+    -> Timeline
+    -> prepared Renderer
+```
+
+`first_valid` remains the default and makes zero Judge calls, including for
+multi-candidate sets. `vlm_ranked` is explicit profile opt-in and requires an
+enabled `visual_judge` policy. Phase 10 v1 judges one complete candidate set
+per Shot: one bounded comparative result contains exactly one strict
+evaluation for every technically-valid candidate. Candidate media that does
+not pass the Phase 9 SHA/decoding/dimension checks is never sent to the Judge.
+
+`CandidateEvaluation` is contextual, not intrinsic media provenance. It uses
+four bounded `[0.0, 1.0]` request-fidelity dimensions—semantic, character,
+composition, and continuity—plus controlled hard-failure codes and bounded
+reasons. The deterministic aggregate is `0.50 semantic + 0.25 character +
+0.15 composition + 0.10 continuity`; hard failures and candidates below the
+profile's `minimum_score` are ineligible before ranking, and score ties use
+the lowest `candidate_index`. Appearance, attractiveness, body, age, gender,
+or racial desirability are never scoring dimensions.
+
+Evaluations persist project-locally at
+`assets/projects/<slug>/visual_evaluations.json`. Reuse requires an exact
+match on request fingerprint, every `(asset_id, content_sha256)`, Judge
+provider/model, Judge policy version, and evaluation contract version. This
+state never enters `AssetRegistry`: the registry continues to answer only
+what concrete bytes were produced, with immutable provenance, while an
+evaluation answers how one project/request/policy judged those bytes.
+
+Selection has its own `selector_fingerprint`, persisted in
+`visual_candidates.json`, independent of candidate generation identity. A
+selection policy, candidate-count, score-threshold, Judge policy, provider,
+model, or contract change invalidates the selected resolution and updates
+`VisualManifest`, but preserves every valid candidate and `AssetRecord`.
+Thus `first_valid -> vlm_ranked` reselects without another ComfyUI call.
+
+Judge infrastructure failure (timeout/provider unavailable/malformed output
+after one repair) is not semantic rejection. A profile with
+`hard_fail_on_judge_error=false` records `fallback_first_valid` plus the error
+and may use deterministic `first_valid`; that fallback is retried on resume.
+With the flag true, visual preparation fails. Conversely, a successful Judge
+result where every candidate hard-fails or falls below threshold always fails
+closed—there is no semantic-rejection fallback and no regeneration loop.
+
+The repository currently has no production provider port capable of attaching
+and inspecting images: its configured `LLMProvider.complete()` adapters are
+text-only. Phase 10 therefore provides the strict `VisualJudge` port,
+set-level orchestration/repair contract, persistence, selector, and test fake,
+but deliberately does not misrepresent a text model as a VLM adapter. A real
+adapter must be added only when an authorized provider exposes actual vision
+input. Until then, an explicitly configured `vlm_ranked` production run has no
+Judge instance and follows its declared infrastructure-failure policy.
+
+No top-level DAG node was added. Judging is bounded inside `visual_assets`
+preparation after candidate validation and before manifest selection. Phase 8
+reuse and `profile_local` stay Judge-free. `VisualManifest` still stores only
+Shot -> selected `asset_id`; the prepared renderer imports neither Judge nor
+candidate machinery and remains ComfyUI/Judge-free after preparation.
+
 ## Extension Points
 
 - **New AI provider for an existing capability**: implement the relevant

@@ -144,8 +144,8 @@ shot thay vì 1 ảnh; ChỈ bật khi profile thực sự cần "sinh vài, ch�
 nhất", vì mỗi candidate tăng thời gian ComfyUI tuyến tính), `selection_policy`
 (mặc định `"first_valid"` — duy nhất chính sách hợp lệ ở Phase 9, chọn
 candidate hợp lệ theo index thấp nhất; chấm điểm ngữ nghĩa/VLM thật là Phase
-10), `candidate_policy_version` (mặc định `"phase9-v1"` — đổi giá trị này để
-buộc re-selection mà không bắt buộc sinh lại candidate đã hợp lệ). Trạng thái
+10), `candidate_policy_version` (mặc định `"phase9-v1"` — nhận diện policy sinh
+candidate nhưng không tự xoá candidate đã hợp lệ). Trạng thái
 candidate lưu riêng mỗi project tại
 `assets/projects/<slug>/visual_candidates.json` — không ghi vào
 `AssetRegistry` hay `visual_manifest.json`. Xem
