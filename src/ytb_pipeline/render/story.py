@@ -17,15 +17,10 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 
-import hashlib
-
 from ..config.settings import settings
 from ..content_profiles import ContentProfile, load_content_profile
 from ..pkg.models import RenderedVideo, Segment, Voiceover
 from ..voiceover.tts import _slugify
-from ..providers.image.comfyui_story_provider import SAMPLER, SCHEDULER
-from .asset_registry import AssetRegistry
-from .scene_plan import build_story_scene_plan
 from .timeline import build_story_timeline_from_scene_plan
 
 STORY_FPS = 30
@@ -44,13 +39,42 @@ _FONT_PATHS = (
 
 
 def render_story_video(voiceover: Voiceover, output_dir: Path) -> RenderedVideo:
-    """Compose real per-segment audio over local profile illustrations."""
+    """Compatibility wrapper for direct callers outside the production DAG.
+
+    The pipeline prepares visuals in its dedicated node.  Only this legacy
+    convenience entrypoint may prepare a missing manifest before delegating
+    to :func:`render_prepared_story_video`.
+    """
+    from .asset_registry import AssetRegistry
+    from .scene_plan import build_story_scene_plan
+    from .visual_assets import VisualManifest, build_visual_requests, prepare_visual_assets, validate_prepared_manifest
+
+    profile = load_content_profile(voiceover.content_profile_id, version=voiceover.content_profile_version or None)
+    dims = LANDSCAPE if settings.orientation == "landscape" else PORTRAIT
+    slug = _slugify(voiceover.project_id or voiceover.title) or "story"
+    project_dir = settings.projects_dir / slug
+    scene_plan = build_story_scene_plan(voiceover, profile)
+    manifest_path = project_dir / "visual_manifest.json"
+    if manifest_path.is_file():
+        prepared_assets = validate_prepared_manifest(
+            VisualManifest.read_json(manifest_path),
+            build_visual_requests(scene_plan, profile, dimensions=dims), AssetRegistry(),
+        )
+    else:
+        scene_plan, _manifest, prepared_assets = prepare_visual_assets(
+            voiceover, profile, project_dir=project_dir, dimensions=dims,
+        )
+    return render_prepared_story_video(voiceover, output_dir, profile=profile, scene_plan=scene_plan, prepared_assets=prepared_assets)
+
+
+def render_prepared_story_video(
+    voiceover: Voiceover, output_dir: Path, *, profile: ContentProfile,
+    scene_plan, prepared_assets: dict[str, Path],
+) -> RenderedVideo:
+    """Compose verified prepared visuals. This core has no generation path."""
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
         raise RuntimeError("Story renderer cần ffmpeg trong PATH.")
-    profile = load_content_profile(
-        voiceover.content_profile_id, version=voiceover.content_profile_version or None,
-    )
     if profile.providers.render != "story":
         raise ValueError(
             f"Profile '{profile.profile_id}' không chọn story renderer."
@@ -68,35 +92,6 @@ def render_story_video(voiceover: Voiceover, output_dir: Path) -> RenderedVideo:
     slug = _slugify(voiceover.project_id or voiceover.title) or "story"
     video_path = output_dir / f"{slug}.mp4"
     thumbnail_path = output_dir / f"{slug}_thumb.jpg"
-
-    # ScenePlan is the deterministic semantic/visual plan this render implies
-    # (one scene per segment, one shot per scene in this v1 — see
-    # render/scene_plan.py), and Timeline is the validated execution plan
-    # derived FROM it — built and checked BEFORE any ffmpeg call, not
-    # reconstructed inline while encoding. Persisted as project-specific
-    # debug/postmortem artifacts, never read back as a source of truth: both
-    # are always deterministically rebuildable from Script + Voiceover +
-    # profile, so a missing file (legacy project) never blocks a render.
-    scene_plan_path = settings.projects_dir / slug / "scene_plan.json"
-    # Production arrives here only after the ``visual_assets`` DAG node.  It
-    # validates and consumes its manifest; it never resolves or generates a
-    # scene image.  The absent-manifest branch is intentionally a legacy
-    # convenience path for callers that invoke render_story_video directly.
-    from .visual_assets import (
-        VisualManifest, build_visual_requests, prepare_visual_assets,
-        validate_prepared_manifest,
-    )
-    scene_plan = build_story_scene_plan(voiceover, profile)
-    manifest_path = scene_plan_path.parent / "visual_manifest.json"
-    if manifest_path.is_file():
-        manifest = VisualManifest.read_json(manifest_path)
-        prepared_assets = validate_prepared_manifest(
-            manifest, build_visual_requests(scene_plan, profile, dimensions=dims), AssetRegistry(),
-        )
-    else:
-        scene_plan, _manifest, prepared_assets = prepare_visual_assets(
-            voiceover, profile, project_dir=scene_plan_path.parent, dimensions=dims,
-        )
 
     timeline = build_story_timeline_from_scene_plan(
         scene_plan, voiceover, profile, fps=STORY_FPS, width=dims[0], height=dims[1],
@@ -325,128 +320,23 @@ def _merge_short_lines(lines: list[str], *, total_sec: float, min_sec: float) ->
     return merged
 
 
-def _asset_path(profile: ContentProfile, relative: str) -> Path:
-    return profile.visual_asset_path(relative)
-
-
-_SDXL_GENERATION_DIMS = {LANDSCAPE: (1344, 768), PORTRAIT: (832, 1216)}
-_GENERATION_MODE_BY_CHARACTER_COUNT = {0: "establishing", 1: "solo", 2: "duo"}
-
-
-def _generation_mode(unique_characters: tuple[str, ...]) -> str:
-    """Provenance label mirroring `ComfyUIStoryProvider.generate_scene`'s own
-    branching (0/1/2 named characters) — labelling only, no generation
-    behaviour lives here."""
-    return _GENERATION_MODE_BY_CHARACTER_COUNT.get(len(unique_characters), "duo")
-
-
-def _generation_cache_key(
-    segment: Segment, profile: ContentProfile, dims: tuple[int, int]
-) -> str:
-    """Nội dung nào làm ảnh khác đi phải làm hash khác đi — không hơn không kém.
-
-    profile_fingerprint đã bao gồm ảnh neo nhận dạng + duo reference, nên đổi
-    ảnh neo tự động invalidate cache mà không cần liệt kê lại ở đây.
-    """
-    vg = profile.visual_generation
-    payload = "\x1f".join((
-        profile.profile_id, profile.version,
-        f"{dims[0]}x{dims[1]}",
-        ",".join(sorted(segment.scene_characters)),
-        segment.visual_intent.strip(),
-        vg.style_prompt, vg.negative_prompt,
-        str(vg.steps), str(vg.cfg), str(vg.solo_weight), str(vg.duo_weight), str(vg.duo_denoise),
-    ))
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
-
-
 def resolve_scene_image(
     segment: Segment, profile: ContentProfile, dims: tuple[int, int],
     *, cache_dir: Path | None = None, provider=None,
     scene_id: str | None = None, shot_id: str | None = None,
     video_slug: str = "", registry: "AssetRegistry | None" = None,
 ) -> Path:
-    """Ảnh cho MỘT section: asset cố định nếu có, không thì auto-generate + cache.
-
-    Fail-closed theo chủ đích: nếu ComfyUI không phản hồi, lỗi của provider
-    (`ProviderUnavailableError`) được để nguyên bay lên — KHÔNG âm thầm rơi về
-    asset khác. Cache là write-through: file chỉ xuất hiện sau khi provider
-    trả về THÀNH CÔNG, nên một lần fail không để lại file rỗng/hỏng.
-
-    `scene_id`/`shot_id` are optional (Phase 3 Asset Registry): every
-    existing caller — including all pre-Phase-3 tests — omits them and gets
-    the exact prior behaviour with zero registry I/O. Only `scene_id=None`
-    is checked; passing it opts a caller into recording provenance for the
-    resolved path, keyed by the Phase 2 deterministic Scene/Shot IDs.
-    """
-    if segment.visual_asset:
-        path = _asset_path(profile, segment.visual_asset)
-        if scene_id is not None:
-            (registry or AssetRegistry()).record_local_asset(
-                profile_id=profile.profile_id, profile_version=profile.version,
-                relative_path=segment.visual_asset, local_path=path,
-                scene_id=scene_id, shot_id=shot_id or "", video_slug=video_slug,
-            )
-        return path
-
-    vg = profile.visual_generation
-    if vg is None or not vg.enabled:
-        raise ValueError(
-            f"Section thiếu visual_asset và profile '{profile.profile_id}' "
-            "không bật visual_generation — không có ảnh nào để dùng."
-        )
-
-    cache_dir = cache_dir or (settings.assets_dir / "generated_visuals" / profile.profile_id)
-    cache_dir = Path(cache_dir)
-    key = _generation_cache_key(segment, profile, dims)
-    cached = cache_dir / f"{key}.png"
-    gen_width, gen_height = _SDXL_GENERATION_DIMS[dims]
-    seed = int(key[:16], 16) % (2**32)
-    unique_characters = tuple(dict.fromkeys(segment.scene_characters))
-
-    def _record_generated(*, is_fresh_generation: bool) -> None:
-        if scene_id is None:
-            return
-        (registry or AssetRegistry()).record_generated(
-            generation_key=key, local_path=cached, is_fresh_generation=is_fresh_generation,
-            profile_id=profile.profile_id, profile_version=profile.version,
-            seed=seed, prompt=segment.visual_intent.strip(),
-            style_prompt=vg.style_prompt, negative_prompt=vg.negative_prompt,
-            steps=vg.steps, cfg=vg.cfg, width=gen_width, height=gen_height,
-            characters=unique_characters, generation_mode=_generation_mode(unique_characters),
-            checkpoint=settings.comfyui_sdxl_checkpoint,
-            clip_vision_model=settings.comfyui_clip_vision_model,
-            ipadapter_model=settings.comfyui_ipadapter_model,
-            solo_weight=vg.solo_weight, duo_weight=vg.duo_weight, duo_denoise=vg.duo_denoise,
-            sampler=SAMPLER, scheduler=SCHEDULER,
-            scene_id=scene_id, shot_id=shot_id or "", video_slug=video_slug,
-        )
-
-    if cached.is_file():
-        # Cache hit: `_record_generated` itself decides what to persist —
-        # if this physical file is already registered, only a `uses` entry
-        # is added (its historical provenance, whatever it is, is left
-        # untouched); if not, it becomes `legacy_generated` with
-        # `provenance_status="legacy_unknown"`, since a file already
-        # sitting in the cache may predate this registry or a checkpoint
-        # change and its true original generation parameters aren't
-        # certain — see `AssetRegistry.record_generated`.
-        _record_generated(is_fresh_generation=False)
-        return cached
-
-    if provider is None:
-        from ..providers.registry import get_story_image_provider
-        provider = get_story_image_provider()
-
-    provider.generate_scene(
-        profile,
-        characters_present=tuple(segment.scene_characters),
-        prompt=segment.visual_intent.strip(),
-        width=gen_width, height=gen_height, seed=seed,
-        output_path=cached,
-    )
-    _record_generated(is_fresh_generation=True)
-    return cached
+    """Deprecated compatibility adapter; resolution belongs to visual_assets."""
+    from .scene_plan import Shot
+    from .visual_assets import VisualAssetResolver, VisualRequest
+    request = VisualRequest("legacy", "legacy", scene_id or "legacy", shot_id or "legacy", segment.visual_intent, segment.scene_characters, dims, "profile_local" if segment.visual_asset else "generated_image")
+    shot = Shot(request.shot_id, 0, max(segment.duration_sec, 0.001), "generated", segment.visual_intent, segment.visual_asset, segment.scene_characters)
+    if scene_id is None:
+        # Preserve pre-registry direct lookup behaviour without fabricated use IDs.
+        from tempfile import TemporaryDirectory
+        with TemporaryDirectory() as unused:
+            return Path(VisualAssetResolver(profile, cache_dir=cache_dir, provider=provider).resolve(request, segment, shot, video_slug=video_slug)["local_path"])
+    return Path(VisualAssetResolver(profile, registry=registry, cache_dir=cache_dir, provider=provider).resolve(request, segment, shot, video_slug=video_slug)["local_path"])
 
 
 _CAPTION_MAX_CHARS = {PORTRAIT: 30, LANDSCAPE: 52}

@@ -351,7 +351,7 @@ def _reset_stale_nodes(project: Project) -> Project:
         if not any(entry.get("uploaded") for entry in platforms.values()):
             current = current.with_node(_pending_again(publish))
 
-    for node_id, next_id in (("render", "publish"), ("voiceover", "render")):
+    for node_id, next_id in (("render", "publish"), ("visual_assets", "render"), ("voiceover", "visual_assets")):
         node = current.nodes.get(node_id)
         nxt = current.nodes.get(next_id)
         next_done = nxt is not None and nxt.status == NodeStatus.DONE
@@ -706,7 +706,21 @@ async def run_project(project: Project, checkpoint: CheckpointManager, through: 
         renderer_name = profile.providers.render
         renderer = get_render_provider(renderer_name)
         print(f"[3/4] Render    ▶  đang dựng video ({renderer_name}/{settings.orientation})...")
-        video = await renderer.render(voiceover, Path("assets/output"))
+        if renderer_name == "story":
+            from .render.scene_plan import ScenePlan, build_story_scene_plan
+            from .render.visual_assets import VisualManifest, build_visual_requests, validate_prepared_manifest
+            from .render.asset_registry import AssetRegistry
+            dimensions = (1920, 1080) if settings.orientation == "landscape" else (1080, 1920)
+            project_dir = settings.projects_dir / current.project_id
+            plan_path = project_dir / "scene_plan.json"
+            scene_plan = ScenePlan.read_json(plan_path) if plan_path.is_file() else build_story_scene_plan(voiceover, profile)
+            manifest_path = project_dir / "visual_manifest.json"
+            if not manifest_path.is_file():
+                raise ValueError("Thiếu VisualManifest đã chuẩn bị; không được generate trong render.")
+            prepared_assets = validate_prepared_manifest(VisualManifest.read_json(manifest_path), build_visual_requests(scene_plan, profile, dimensions=dimensions), AssetRegistry())
+            video = await renderer.render_prepared(voiceover, Path("assets/output"), profile=profile, scene_plan=scene_plan, prepared_assets=prepared_assets)
+        else:
+            video = await renderer.render(voiceover, Path("assets/output"))
         validate_final_video(video)
         print(f"[3/4] Render    ✓  ({renderer_name}/{settings.orientation}) {video.video_path}")
         state["video"] = video
