@@ -92,6 +92,7 @@ def test_story_renderer_uses_profile_assets_and_real_segment_audio(tmp_path, mon
     profiles = tmp_path / "profiles"
     _profile(profiles)
     monkeypatch.setattr(settings, "projects_dir", tmp_path / "projects", raising=False)
+    monkeypatch.setattr(settings, "asset_registry_path", tmp_path / "asset_registry.json", raising=False)
     monkeypatch.setattr(settings, "content_profiles_dir", profiles, raising=False)
     monkeypatch.setattr(settings, "orientation", "portrait", raising=False)
     first_audio = tmp_path / "first.wav"
@@ -149,6 +150,7 @@ def test_story_renderer_preserves_audio_timeline_when_a_section_has_many_caption
     monkeypatch.setattr(settings, "content_profiles_dir", profiles, raising=False)
     monkeypatch.setattr(settings, "orientation", "landscape", raising=False)
     monkeypatch.setattr(settings, "projects_dir", tmp_path / "projects", raising=False)
+    monkeypatch.setattr(settings, "asset_registry_path", tmp_path / "asset_registry.json", raising=False)
     first_audio = tmp_path / "first.wav"
     second_audio = tmp_path / "second.wav"
     _tone(first_audio, duration=2.0)
@@ -204,6 +206,21 @@ def test_story_renderer_preserves_audio_timeline_when_a_section_has_many_caption
     assert scene_plan_path.exists()
     scene_plan = ScenePlan.read_json(scene_plan_path)
     assert len(scene_plan.scenes) == 2
+
+    # Asset Registry v1 (Phase 3): both sections use fixed profile assets
+    # (visual_asset="opening.png"/"reply.png"), so both register as
+    # provenance_complete=False local assets, each used by exactly this
+    # video's own scene_id — not inflated by the 4 caption cards this
+    # fixture's narration produces.
+    from ytb_pipeline.render.asset_registry import AssetRegistry
+
+    registry_records = AssetRegistry().assets()
+    assert len(registry_records) == 2
+    for record in registry_records:
+        assert record["source"] == "profile_local_asset"
+        assert record["generation_key"] is None
+        assert len(record["uses"]) == 1
+        assert record["uses"][0]["video_slug"] == slug
 
 
 def _stream_duration(path: Path, stream: str) -> float:
@@ -328,6 +345,7 @@ def test_story_renderer_keeps_video_and_audio_streams_in_sync_with_many_cards_an
     monkeypatch.setattr(settings, "content_profiles_dir", profiles, raising=False)
     monkeypatch.setattr(settings, "orientation", "landscape", raising=False)
     monkeypatch.setattr(settings, "projects_dir", tmp_path / "projects", raising=False)
+    monkeypatch.setattr(settings, "asset_registry_path", tmp_path / "asset_registry.json", raising=False)
 
     solo_audio = tmp_path / "solo.wav"
     _tone(solo_audio, duration=1.517)

@@ -296,6 +296,55 @@ always-rebuildable debug/postmortem artifact, never read back by any stage
 as a source of truth; a legacy project missing `scene_plan.json` is
 unaffected, since every render rebuilds it fresh.
 
+## Asset Registry — character_story visuals (Phase 3 v1, added 2026-08-27)
+
+`src/ytb_pipeline/render/asset_registry.py` adds a durable provenance/
+catalog layer for `character_story` generated visuals. It is purely
+additive observability/reproducibility — NOT a provider redesign:
+`render/story.py`'s existing generation, caching, and ComfyUI call
+behaviour is byte-for-byte unchanged; `resolve_scene_image()` still
+resolves and returns a `Path` exactly as before, and the renderer keeps
+consuming paths (see "Locked architecture" in
+`docs/handoffs/2026-08-27-asset-registry-phase3-handoff.md` for the full
+before/after data-flow diagram).
+
+```
+asset_id           stable opaque identity for THIS REGISTERED RECORD
+content_sha256     hash of the actual asset bytes on disk right now
+generation_key     deterministic identity of the generation/reuse request
+                   (== the existing `_generation_cache_key` in story.py)
+```
+
+These three are kept deliberately distinct. `asset_id` is derived from
+`generation_key` through a separately-namespaced hash — so it is never
+literally equal to either `generation_key` or `content_sha256` — which lets
+the same generation request (e.g. two different projects reusing the same
+generated character illustration) upsert the SAME registry record instead
+of creating a duplicate, while `content_sha256` is re-read from disk on
+every upsert and can independently reveal drift (the same request
+producing different bytes after a model/checkpoint change) without that
+drift changing the record's identity.
+
+Fixed, hand-placed profile assets (`Segment.visual_asset`) have no
+generation request to derive from; they are recorded via
+`record_local_asset()` with `generation_key=None` and
+`provenance_complete=False` rather than inventing a seed/prompt that was
+never used. Every record's `uses` list carries the Phase 2 deterministic
+`scene_id`/`shot_id` plus the video's slug — the same append-only,
+dedup-on-repeat pattern `render/asset_catalog.py` already uses for Pexels
+stock-footage reuse tracking.
+
+Persistence: `assets/asset_registry.json` (sibling to, and structurally
+independent from, `asset_catalog.json` which only tracks licensed Pexels
+reuse), written through `orchestrator/state_io.py::locked_json_update` —
+the same exclusive-`flock` + atomic-rename helper `asset_catalog.py` uses,
+so two batch workers rendering different projects at once cannot corrupt
+or interleave writes to the shared file. `scene_id`/`shot_id`/`video_slug`
+are optional keyword arguments on `resolve_scene_image()`; every caller
+that omits them (every pre-Phase-3 test, and any future caller that
+doesn't care about provenance) gets zero registry I/O and the exact prior
+behaviour — only `render_story_video()`'s own call site passes them.
+
 ## Extension Points
 
 - **New AI provider for an existing capability**: implement the relevant

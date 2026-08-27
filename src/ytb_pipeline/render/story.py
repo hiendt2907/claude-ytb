@@ -23,6 +23,7 @@ from ..config.settings import settings
 from ..content_profiles import ContentProfile, load_content_profile
 from ..pkg.models import RenderedVideo, Segment, Voiceover
 from ..voiceover.tts import _slugify
+from .asset_registry import AssetRegistry
 from .scene_plan import build_story_scene_plan
 from .timeline import build_story_timeline_from_scene_plan
 
@@ -118,7 +119,11 @@ def render_story_video(voiceover: Voiceover, output_dir: Path) -> RenderedVideo:
             # Resolve MỘT lần cho cả section: mọi thẻ caption của cùng section
             # dùng chung một tấm nền, và asset cố định/generate+cache đều đắt
             # hơn việc gọi lại nhiều lần trong vòng lặp thẻ.
-            image_path = resolve_scene_image(segment, profile, dims)
+            scene = scene_plan.scenes[index]
+            image_path = resolve_scene_image(
+                segment, profile, dims,
+                scene_id=scene.scene_id, shot_id=scene.shots[0].shot_id, video_slug=slug,
+            )
             frame_counts = _frame_counts([length for (_, _, length) in cards], fps=30)
             if frame_counts:
                 frame_counts[-1] += round(gap * 30)
@@ -336,6 +341,8 @@ def _generation_cache_key(
 def resolve_scene_image(
     segment: Segment, profile: ContentProfile, dims: tuple[int, int],
     *, cache_dir: Path | None = None, provider=None,
+    scene_id: str | None = None, shot_id: str | None = None,
+    video_slug: str = "", registry: "AssetRegistry | None" = None,
 ) -> Path:
     """Ảnh cho MỘT section: asset cố định nếu có, không thì auto-generate + cache.
 
@@ -343,9 +350,22 @@ def resolve_scene_image(
     (`ProviderUnavailableError`) được để nguyên bay lên — KHÔNG âm thầm rơi về
     asset khác. Cache là write-through: file chỉ xuất hiện sau khi provider
     trả về THÀNH CÔNG, nên một lần fail không để lại file rỗng/hỏng.
+
+    `scene_id`/`shot_id` are optional (Phase 3 Asset Registry): every
+    existing caller — including all pre-Phase-3 tests — omits them and gets
+    the exact prior behaviour with zero registry I/O. Only `scene_id=None`
+    is checked; passing it opts a caller into recording provenance for the
+    resolved path, keyed by the Phase 2 deterministic Scene/Shot IDs.
     """
     if segment.visual_asset:
-        return _asset_path(profile, segment.visual_asset)
+        path = _asset_path(profile, segment.visual_asset)
+        if scene_id is not None:
+            (registry or AssetRegistry()).record_local_asset(
+                profile_id=profile.profile_id, profile_version=profile.version,
+                relative_path=segment.visual_asset, local_path=path,
+                scene_id=scene_id, shot_id=shot_id or "", video_slug=video_slug,
+            )
+        return path
 
     vg = profile.visual_generation
     if vg is None or not vg.enabled:
@@ -358,15 +378,30 @@ def resolve_scene_image(
     cache_dir = Path(cache_dir)
     key = _generation_cache_key(segment, profile, dims)
     cached = cache_dir / f"{key}.png"
+    gen_width, gen_height = _SDXL_GENERATION_DIMS[dims]
+    seed = int(key[:16], 16) % (2**32)
+
+    def _record_generated() -> None:
+        if scene_id is None:
+            return
+        (registry or AssetRegistry()).record_generated(
+            generation_key=key, local_path=cached,
+            profile_id=profile.profile_id, profile_version=profile.version,
+            seed=seed, prompt=segment.visual_intent.strip(),
+            style_prompt=vg.style_prompt, negative_prompt=vg.negative_prompt,
+            steps=vg.steps, cfg=vg.cfg, width=gen_width, height=gen_height,
+            characters=tuple(segment.scene_characters),
+            scene_id=scene_id, shot_id=shot_id or "", video_slug=video_slug,
+        )
+
     if cached.is_file():
+        _record_generated()
         return cached
 
     if provider is None:
         from ..providers.registry import get_story_image_provider
         provider = get_story_image_provider()
 
-    gen_width, gen_height = _SDXL_GENERATION_DIMS[dims]
-    seed = int(key[:16], 16) % (2**32)
     provider.generate_scene(
         profile,
         characters_present=tuple(segment.scene_characters),
@@ -374,6 +409,7 @@ def resolve_scene_image(
         width=gen_width, height=gen_height, seed=seed,
         output_path=cached,
     )
+    _record_generated()
     return cached
 
 

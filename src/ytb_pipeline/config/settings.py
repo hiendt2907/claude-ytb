@@ -134,6 +134,10 @@ class Settings(BaseSettings):
     assets_dir: Path = Field(default=Path("assets"))
     output_dir: Path = Field(default=Path("assets/output"))
     asset_catalog_path: Path = Field(default=Path("assets/asset_catalog.json"))
+    # Durable provenance/catalog for character_story generated visuals (Phase
+    # 3 Asset Registry) — separate file from asset_catalog.json above, which
+    # only tracks licensed Pexels stock-footage reuse.
+    asset_registry_path: Path = Field(default=Path("assets/asset_registry.json"))
     analytics_path: Path = Field(default=Path("assets/analytics.json"))
     # Checkpoint DAG: mỗi video 1 file <projects_dir>/<slug>/project.json —
     # resume skip node đã DONE (xem project/workflow.py).
