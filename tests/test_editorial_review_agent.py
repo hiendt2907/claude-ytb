@@ -625,6 +625,116 @@ def test_editorial_only_retry_never_spends_a_contract_repair_call(tmp_path, monk
     assert not any(prompt.startswith("Rewrite ONLY the opening narration") for prompt in provider.prompts)
 
 
+def test_hook_repair_can_run_again_after_an_editorial_rewrite_touches_the_opening(tmp_path, monkeypatch):
+    """`hook_repair_attempted` is single-shot per QA violation, but an editorial
+    rewrite that legitimately re-touches the cited opening section can
+    reintroduce a hook violation on brand-new text.
+
+    Production 2026-08-27: exactly this happened — hook_repair fixed the
+    opening once, an editorial rewrite (correctly bounded to its own cited
+    sections, including section 1) then rewrote that same opening again for
+    a role_fidelity/spoken_naturalness fix, and the new opening no longer
+    satisfied the hook gate. With a global single-shot flag, the candidate
+    was rejected with a leftover repair budget unused. Re-arming hook repair
+    specifically when an editorial rewrite touches section 1 fixes this
+    without ever looping unboundedly — editorial rewrites are themselves
+    capped by `max_rewrites`.
+    """
+    import asyncio
+    from ytb_pipeline.agents.base import AgentResult, AgentStatus
+    from ytb_pipeline.orchestrator.ideation_script_fix import validate_or_repair_script
+    from ytb_pipeline.config.settings import settings
+    import ytb_pipeline.orchestrator.ideation_script_fix as fix_module
+
+    _write_profile(
+        tmp_path, "hook-then-editorial-fixture",
+        editorial_review={
+            "enabled": True, "rubric_prompt_name": "review_rubric",
+            "minimum_score": 9, "max_rewrites": 1,
+        },
+    )
+    monkeypatch.setattr(settings, "content_profiles_dir", tmp_path, raising=False)
+    monkeypatch.setattr(settings, "assets_dir", tmp_path / "assets_root", raising=False)
+    profile = load_content_profile("hook-then-editorial-fixture", profiles_dir=tmp_path)
+    # Sized so the total stays inside this profile's Short duration window
+    # ([504, 762] chars, measured directly against `_repair_character_bounds`)
+    # even after section 0 shrinks to a short canned repair string twice —
+    # a smaller total previously fell below the floor after normalization
+    # trimmed it, derailing the attempt sequence this test drives.
+    original = _valid_review_gate_payload(profile)
+    for tag, section in zip(("Hai", "Ba", "Bốn"), original["sections"][1:]):
+        section["voiceover"] = (
+            f"{tag}, đây là nội dung đệm đủ dài cho section này để không "
+            "chạm ngưỡng thời lượng khi phần mở đầu bị thay ngắn lại, hoàn "
+            "toàn không liên quan tới nội dung repair đang được xác nhận."
+        )
+    original["sections"][0]["voiceover"] = (
+        "Sáu giờ tối, quán vắng khách, Lan đứng lau quầy nhìn ra cửa."
+    )
+
+    qa_calls = 0
+
+    async def _qa_sequence(self, _context):
+        nonlocal qa_calls
+        qa_calls += 1
+        # 1: hook violation (first opening). 2: passes structurally (post
+        # hook-repair) -> editorial review runs and fails, citing section 1.
+        # 3: hook violation AGAIN (the editorial-rewritten opening). 4: passes
+        # structurally -> editorial review runs and passes.
+        if qa_calls in (1, 3):
+            return AgentResult(
+                agent_name="qa", status=AgentStatus.SUCCESS,
+                output={"passed": False, "violations": [{"rule": "hook", "detail": "opening weak"}]},
+            )
+        return AgentResult(agent_name="qa", status=AgentStatus.SUCCESS, output={"passed": True})
+
+    monkeypatch.setattr(fix_module.QAAgent, "run", _qa_sequence)
+
+    review_calls = 0
+
+    class Provider:
+        def __init__(self):
+            self.hook_repair_calls = 0
+
+        async def complete(self, prompt, **_kwargs):
+            nonlocal review_calls
+            if prompt.startswith("Rewrite ONLY the opening narration"):
+                self.hook_repair_calls += 1
+                return json.dumps({"voiceover": f"Opening fixed, lần {self.hook_repair_calls}."})
+            if prompt.startswith("Review this Vietnamese YouTube script JSON"):
+                review_calls += 1
+                if review_calls == 1:
+                    return json.dumps({
+                        "passed": False, "overall_score": 6,
+                        "dimension_scores": {
+                            "human_truth": 9, "spoken_naturalness": 6,
+                            "causal_coherence": 9, "role_fidelity": 6, "useful_restraint": 9,
+                        },
+                        "blocking_findings": ["Đoạn mở nghe như thuyết minh."],
+                        "section_refs": [1], "repair_brief": "Viết lại tự nhiên hơn.",
+                    })
+                return json.dumps({
+                    "passed": True, "overall_score": 9,
+                    "dimension_scores": {
+                        "human_truth": 9, "spoken_naturalness": 9,
+                        "causal_coherence": 9, "role_fidelity": 9, "useful_restraint": 9,
+                    },
+                    "blocking_findings": [], "section_refs": [], "repair_brief": "",
+                })
+            assert "Editorial review findings" in prompt
+            return json.dumps({
+                "sections": [{"section_index": 1, "voiceover": "Đoạn mở đã viết lại theo rubric."}],
+            })
+
+    provider = Provider()
+    result = asyncio.run(validate_or_repair_script(
+        provider, original, tmp_path / "s.json", "", max_attempts=3,
+    ))
+
+    assert provider.hook_repair_calls == 2
+    assert result["sections"][0]["voiceover"] == "Opening fixed, lần 2."
+
+
 def _editorial_rewrite_payload():
     return {
         "slug": "fixture", "topic": "Một tình huống công việc", "profile_id": "one-cup-cafe-6h",

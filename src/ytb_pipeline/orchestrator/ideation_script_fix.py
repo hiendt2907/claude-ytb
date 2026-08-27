@@ -977,9 +977,21 @@ async def validate_or_repair_script(
                         if log_path:
                             append_local_start_log(log_path, "EDITORIAL_REWRITE_RESPONSE", rewrite_text)
                         try:
-                            current = apply_editorial_rewrite(
-                                current, json_from_llm(rewrite_text),
-                            )
+                            rewrite_delta = json_from_llm(rewrite_text)
+                            current = apply_editorial_rewrite(current, rewrite_delta)
+                            # An editorial rewrite legitimately touching the
+                            # opening section can reintroduce a hook
+                            # violation on brand-new text — a single-shot
+                            # flag from an EARLIER, unrelated hook fix must
+                            # not block fixing THIS one. Bounded: editorial
+                            # rewrites are themselves capped by max_rewrites.
+                            rewritten_indices = {
+                                item.get("section_index")
+                                for item in (rewrite_delta.get("sections") or [])
+                                if isinstance(item, dict)
+                            }
+                            if 1 in rewritten_indices:
+                                hook_repair_attempted = False
                         except (ValueError, json.JSONDecodeError) as exc:
                             last_validation_error = f"Editorial rewrite không dùng được: {exc}"
                             if log_path:
