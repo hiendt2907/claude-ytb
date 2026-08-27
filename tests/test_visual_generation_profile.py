@@ -215,3 +215,46 @@ def test_tts_pace_factor_out_of_range_is_rejected(tmp_path, value):
 
     with pytest.raises(ContentProfileError):
         load_content_profile("ban-so-6", profiles_dir=tmp_path)
+
+
+# --- Phase 9: candidate_count / selection_policy config -------------------
+
+def test_candidate_count_defaults_to_one_and_selection_policy_defaults_to_first_valid(tmp_path):
+    from ytb_pipeline.content_profiles import load_content_profile
+
+    _write_profile(tmp_path, "ban-so-6", visual_generation=_vg())
+
+    profile = load_content_profile("ban-so-6", profiles_dir=tmp_path)
+
+    assert profile.visual_generation.candidate_count == 1
+    assert profile.visual_generation.selection_policy == "first_valid"
+    assert profile.visual_generation.candidate_policy_version == "phase9-v1"
+
+
+def test_candidate_count_can_be_raised_within_the_hard_maximum(tmp_path):
+    from ytb_pipeline.content_profiles import load_content_profile
+
+    _write_profile(tmp_path, "ban-so-6", visual_generation=_vg(candidate_count=3))
+
+    profile = load_content_profile("ban-so-6", profiles_dir=tmp_path)
+
+    assert profile.visual_generation.candidate_count == 3
+
+
+@pytest.mark.parametrize("value", [0, -1, 5, 100])
+def test_candidate_count_outside_the_bound_is_rejected(tmp_path, value):
+    from ytb_pipeline.content_profiles import ContentProfileError, load_content_profile
+
+    _write_profile(tmp_path, "ban-so-6", visual_generation=_vg(candidate_count=value))
+
+    with pytest.raises(ContentProfileError, match="candidate_count"):
+        load_content_profile("ban-so-6", profiles_dir=tmp_path)
+
+
+def test_unknown_selection_policy_is_rejected(tmp_path):
+    from ytb_pipeline.content_profiles import ContentProfileError, load_content_profile
+
+    _write_profile(tmp_path, "ban-so-6", visual_generation=_vg(selection_policy="best_of_n_vlm"))
+
+    with pytest.raises(ContentProfileError, match="selection_policy"):
+        load_content_profile("ban-so-6", profiles_dir=tmp_path)
