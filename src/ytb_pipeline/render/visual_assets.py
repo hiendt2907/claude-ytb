@@ -209,12 +209,12 @@ class VisualAssetResolver:
     def __init__(self, profile: "ContentProfile", *, registry: AssetRegistry | None = None, cache_dir: Path | None = None, provider: Any = None, candidate_store: VisualCandidateStore | None = None, judge: Any = None, evaluation_store: VisualEvaluationStore | None = None) -> None:
         self.profile, self.registry, self.cache_dir, self.provider = profile, registry or AssetRegistry(), cache_dir, provider
         self.candidate_store = candidate_store
-        # Phase 10 — only consulted when a profile opts into
-        # selection_policy="vlm_ranked". No production VisualJudge exists
-        # yet (see render/visual_judge.py module docstring); a caller must
-        # inject one explicitly (tests do), otherwise a missing judge is
-        # itself treated as a judge infrastructure failure, governed by the
-        # same `hard_fail_on_judge_error` policy as a real transport error.
+        # Only consulted when a profile opts into
+        # selection_policy="vlm_ranked". Tests may inject a deterministic
+        # fake; production resolves the configured vision capability lazily
+        # inside `_select_vlm_ranked`, after cache reuse has been checked.
+        # first_valid/profile_local/parent-reuse therefore never even
+        # instantiate a Judge adapter.
         self.judge = judge
         self.evaluation_store = evaluation_store
 
@@ -365,9 +365,12 @@ class VisualAssetResolver:
         else:
             context = JudgeContext(scene_id=request.scene_id, shot_id=request.shot_id, video_slug=video_slug)
             try:
-                if self.judge is None:
-                    raise ValueError("Không có VisualJudge khả dụng cho selection_policy='vlm_ranked'.")
-                result = self.judge.evaluate(request, tuple(candidates), context)
+                judge = self.judge
+                if judge is None:
+                    from ..providers.vision import get_visual_judge
+
+                    judge = get_visual_judge(judge_cfg.provider, judge_cfg.model)
+                result = judge.evaluate(request, tuple(candidates), context)
             except Exception as exc:
                 if not judge_cfg.hard_fail_on_judge_error:
                     _judge_logger.info("visual_judge.fallback shot_id=%s error=%s", request.shot_id, exc)
