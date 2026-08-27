@@ -233,6 +233,13 @@ def test_adapter_rejects_changed_oversized_and_unsupported_candidate_media(tmp_p
             _request(), (_candidate(unsupported, 0),), _context()
         )
 
+    corrupt = tmp_path / "corrupt.png"
+    corrupt.write_bytes(b"\x89PNG\r\n\x1a\nnot-a-real-image")
+    with pytest.raises(JudgeInfrastructureError, match="không giải mã được"):
+        XkiroVisualJudge("qwen/qwen3.8-max:free", transport=transport).evaluate(
+            _request(), (_candidate(corrupt, 0),), _context()
+        )
+
     large = tmp_path / "large.png"
     large.write_bytes(b"\x89PNG\r\n\x1a\n" + b"x" * 100)
     with pytest.raises(JudgeInfrastructureError, match="quá lớn"):
