@@ -258,3 +258,94 @@ def test_unknown_selection_policy_is_rejected(tmp_path):
 
     with pytest.raises(ContentProfileError, match="selection_policy"):
         load_content_profile("ban-so-6", profiles_dir=tmp_path)
+
+
+# --- Phase 10: visual_judge config -----------------------------------------
+
+def _vg_with_judge(**judge_overrides):
+    judge = {
+        "enabled": True, "provider": "fake", "model": "fake-v1", "policy_version": "v1",
+    }
+    judge.update(judge_overrides)
+    return _vg(candidate_count=3, selection_policy="vlm_ranked", visual_judge=judge)
+
+
+def test_visual_judge_absent_by_default(tmp_path):
+    from ytb_pipeline.content_profiles import load_content_profile
+
+    _write_profile(tmp_path, "ban-so-6", visual_generation=_vg())
+
+    profile = load_content_profile("ban-so-6", profiles_dir=tmp_path)
+
+    assert profile.visual_generation.visual_judge is None
+
+
+def test_vlm_ranked_with_visual_judge_enabled_loads(tmp_path):
+    from ytb_pipeline.content_profiles import load_content_profile
+
+    _write_profile(tmp_path, "ban-so-6", visual_generation=_vg_with_judge())
+
+    profile = load_content_profile("ban-so-6", profiles_dir=tmp_path)
+
+    assert profile.visual_generation.selection_policy == "vlm_ranked"
+    assert profile.visual_generation.visual_judge.enabled is True
+    assert profile.visual_generation.visual_judge.provider == "fake"
+    assert profile.visual_generation.visual_judge.minimum_score == 0.5
+    assert profile.visual_generation.visual_judge.hard_fail_on_judge_error is False
+
+
+def test_vlm_ranked_without_visual_judge_block_is_rejected(tmp_path):
+    from ytb_pipeline.content_profiles import ContentProfileError, load_content_profile
+
+    _write_profile(tmp_path, "ban-so-6", visual_generation=_vg(candidate_count=3, selection_policy="vlm_ranked"))
+
+    with pytest.raises(ContentProfileError, match="visual_judge"):
+        load_content_profile("ban-so-6", profiles_dir=tmp_path)
+
+
+def test_vlm_ranked_with_visual_judge_disabled_is_rejected(tmp_path):
+    from ytb_pipeline.content_profiles import ContentProfileError, load_content_profile
+
+    _write_profile(tmp_path, "ban-so-6", visual_generation=_vg_with_judge(enabled=False))
+
+    with pytest.raises(ContentProfileError, match="visual_judge"):
+        load_content_profile("ban-so-6", profiles_dir=tmp_path)
+
+
+def test_visual_judge_enabled_requires_provider_and_model(tmp_path):
+    from ytb_pipeline.content_profiles import ContentProfileError, load_content_profile
+
+    _write_profile(tmp_path, "ban-so-6", visual_generation=_vg_with_judge(provider=""))
+
+    with pytest.raises(ContentProfileError, match="provider"):
+        load_content_profile("ban-so-6", profiles_dir=tmp_path)
+
+
+@pytest.mark.parametrize("value", [-0.1, 1.1])
+def test_visual_judge_minimum_score_out_of_range_is_rejected(tmp_path, value):
+    from ytb_pipeline.content_profiles import ContentProfileError, load_content_profile
+
+    _write_profile(tmp_path, "ban-so-6", visual_generation=_vg_with_judge(minimum_score=value))
+
+    with pytest.raises(ContentProfileError, match="minimum_score"):
+        load_content_profile("ban-so-6", profiles_dir=tmp_path)
+
+
+def test_visual_judge_hard_fail_on_judge_error_can_be_enabled(tmp_path):
+    from ytb_pipeline.content_profiles import load_content_profile
+
+    _write_profile(tmp_path, "ban-so-6", visual_generation=_vg_with_judge(hard_fail_on_judge_error=True))
+
+    profile = load_content_profile("ban-so-6", profiles_dir=tmp_path)
+
+    assert profile.visual_generation.visual_judge.hard_fail_on_judge_error is True
+
+
+def test_first_valid_selection_policy_does_not_require_visual_judge(tmp_path):
+    from ytb_pipeline.content_profiles import load_content_profile
+
+    _write_profile(tmp_path, "ban-so-6", visual_generation=_vg(candidate_count=3, selection_policy="first_valid"))
+
+    profile = load_content_profile("ban-so-6", profiles_dir=tmp_path)
+
+    assert profile.visual_generation.visual_judge is None

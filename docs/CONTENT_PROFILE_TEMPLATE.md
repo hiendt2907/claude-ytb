@@ -151,6 +151,20 @@ candidate lưu riêng mỗi project tại
 `AssetRegistry` hay `visual_manifest.json`. Xem
 `docs/handoffs/2026-08-27-visual-candidates-phase9-handoff.md`.
 
+Phase 10 — `selection_policy: "vlm_ranked"` (tuỳ chọn, yêu cầu khối
+`visual_judge` con): `enabled`, `provider`, `model`, `policy_version` (bắt
+buộc khi `enabled=true`), `minimum_score` (mặc định `0.5`, khoảng
+`[0.0, 1.0]` — candidate dưới ngưỡng này không đủ điều kiện được chọn dù kỹ
+thuật hợp lệ), `hard_fail_on_judge_error` (mặc định `false` — khi `false`,
+lỗi hạ tầng VisualJudge (timeout/provider lỗi/response hỏng sau 1 lần repair)
+rơi về `first_valid`; khi `true`, `visual_assets` fail closed thay vì fallback).
+VisualJudge KHÔNG chấm điểm vẻ đẹp/sức hấp dẫn/tuổi/giới tính/chủng tộc — chỉ
+chấm mức khớp yêu cầu và bố cục/kỹ thuật. Kết quả đánh giá lưu riêng mỗi
+project tại `assets/projects/<slug>/visual_evaluations.json` — không ghi vào
+`AssetRegistry` (provenance bất biến) hay `visual_manifest.json` (chỉ giữ
+asset đã chọn cuối cùng). Xem
+`docs/handoffs/2026-08-27-visual-judge-phase10-handoff.md`.
+
 ## Quy ước version snapshot
 
 Mỗi lần bump `version` trong `profile.json`, copy nguyên trạng thái cũ (kể cả

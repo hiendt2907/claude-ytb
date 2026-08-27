@@ -23,6 +23,15 @@ from .visual_candidates import (
     resolve_selection_policy,
     validate_candidate_image,
 )
+from .visual_evaluation_store import ShotEvaluationSet, VisualEvaluationStore
+from .visual_judge import (
+    CONTRACT_VERSION as _JUDGE_CONTRACT_VERSION,
+    JudgeCandidate,
+    JudgeContext,
+    JudgeResult,
+    logger as _judge_logger,
+    select_vlm_ranked,
+)
 
 if TYPE_CHECKING:
     from ..content_profiles import ContentProfile
@@ -147,9 +156,17 @@ def _generation_mode(characters: tuple[str, ...]) -> str:
 class VisualAssetResolver:
     """The single local/cache/ComfyUI/registry decision owner."""
 
-    def __init__(self, profile: "ContentProfile", *, registry: AssetRegistry | None = None, cache_dir: Path | None = None, provider: Any = None, candidate_store: VisualCandidateStore | None = None) -> None:
+    def __init__(self, profile: "ContentProfile", *, registry: AssetRegistry | None = None, cache_dir: Path | None = None, provider: Any = None, candidate_store: VisualCandidateStore | None = None, judge: Any = None, evaluation_store: VisualEvaluationStore | None = None) -> None:
         self.profile, self.registry, self.cache_dir, self.provider = profile, registry or AssetRegistry(), cache_dir, provider
         self.candidate_store = candidate_store
+        # Phase 10 — only consulted when a profile opts into
+        # selection_policy="vlm_ranked". No production VisualJudge exists
+        # yet (see render/visual_judge.py module docstring); a caller must
+        # inject one explicitly (tests do), otherwise a missing judge is
+        # itself treated as a judge infrastructure failure, governed by the
+        # same `hard_fail_on_judge_error` policy as a real transport error.
+        self.judge = judge
+        self.evaluation_store = evaluation_store
 
     def resolve(self, request: VisualRequest, segment: "Segment", shot: "Shot", *, video_slug: str) -> dict[str, Any]:
         if request.resolution_kind == "profile_local":
@@ -220,8 +237,20 @@ class VisualAssetResolver:
             except Exception as exc:
                 slot.status, slot.last_error = "failed", str(exc)
             store.write()
-        selector = resolve_selection_policy(policy_name)
-        selected_asset_id = selector(candidate_set, self.registry)
+        # Selection is ALWAYS recomputed here — never cached/skipped based
+        # on a prior `selected_asset_id` — so a changed `selection_policy`
+        # or judge policy reselects on the very next call with no explicit
+        # invalidation step (see `VisualCandidateSet.selection_policy`
+        # docstring / Phase 10 handoff §16). Only candidate GENERATION
+        # above is checkpointed/skipped.
+        if policy_name == "vlm_ranked":
+            selected_asset_id = self._select_vlm_ranked(request, candidate_set, video_slug=video_slug)
+        elif policy_name == "first_valid":
+            selected_asset_id = resolve_selection_policy(policy_name)(candidate_set, self.registry)
+            candidate_set.selection_mode = "policy"
+        else:
+            raise ValueError(f"selection_policy không hợp lệ: {policy_name!r}")
+        candidate_set.selection_policy = policy_name
         if selected_asset_id is None:
             candidate_set.selection_status = "failed"
             store.write()
@@ -232,6 +261,95 @@ class VisualAssetResolver:
         record = self.registry.find_by_asset_id(selected_asset_id)
         assert record is not None
         return record
+
+    def _select_vlm_ranked(self, request: VisualRequest, candidate_set, *, video_slug: str) -> str | None:
+        """Phase 10 opt-in ranked selection. Returns `None` only when there
+        is truly nothing eligible to select (zero technically-valid
+        candidates, or a successfully-judged set with zero eligible
+        candidates) — the caller fails closed in both cases, exactly like
+        `first_valid`'s own zero-valid-candidates behaviour."""
+        visual = self.profile.visual_generation
+        judge_cfg = getattr(visual, "visual_judge", None)
+        if judge_cfg is None:
+            raise ValueError(
+                f"Profile '{self.profile.profile_id}': selection_policy='vlm_ranked' "
+                "yêu cầu visual_judge được cấu hình."
+            )
+        valid_slots = [
+            candidate_set.slot(index) for index in range(candidate_set.target_candidate_count)
+            if candidate_is_valid(candidate_set.slot(index), self.registry)
+        ]
+        if not valid_slots:
+            return None
+        candidates: list[JudgeCandidate] = []
+        for slot in valid_slots:
+            record = self.registry.find_by_asset_id(slot.asset_id)
+            assert record is not None
+            candidates.append(JudgeCandidate(
+                asset_id=slot.asset_id, local_path=record["local_path"],
+                content_sha256=record["content_sha256"], candidate_index=slot.candidate_index,
+            ))
+        candidate_identity = {candidate.asset_id: candidate.content_sha256 for candidate in candidates}
+        candidate_index_by_asset = {candidate.asset_id: candidate.candidate_index for candidate in candidates}
+
+        store = self.evaluation_store or VisualEvaluationStore(Path(self.cache_dir or ".") / "visual_evaluations.json")
+        existing = store.get(request.shot_id)
+        can_reuse = (
+            existing is not None and not existing.fallback_used
+            and existing.matches_context(
+                request_fingerprint=request.request_fingerprint, judge_provider=judge_cfg.provider,
+                judge_model=judge_cfg.model, judge_policy_version=judge_cfg.policy_version,
+                judge_contract_version=_JUDGE_CONTRACT_VERSION,
+            )
+            and existing.matches_candidate_identity(candidate_identity)
+        )
+        if can_reuse:
+            _judge_logger.info("visual_judge.reuse shot_id=%s candidates=%s", request.shot_id, len(candidates))
+            result = JudgeResult(
+                tuple(existing.evaluations[asset_id] for asset_id in candidate_identity),
+                existing.judge_provider, existing.judge_model, existing.judge_contract_version,
+            )
+        else:
+            context = JudgeContext(scene_id=request.scene_id, shot_id=request.shot_id, video_slug=video_slug)
+            try:
+                if self.judge is None:
+                    raise ValueError("Không có VisualJudge khả dụng cho selection_policy='vlm_ranked'.")
+                result = self.judge.evaluate(request, tuple(candidates), context)
+            except Exception as exc:
+                if not judge_cfg.hard_fail_on_judge_error:
+                    _judge_logger.info("visual_judge.fallback shot_id=%s error=%s", request.shot_id, exc)
+                    store.save(ShotEvaluationSet(
+                        shot_id=request.shot_id, request_fingerprint=request.request_fingerprint,
+                        judge_provider=judge_cfg.provider, judge_model=judge_cfg.model,
+                        judge_policy_version=judge_cfg.policy_version, judge_contract_version=_JUDGE_CONTRACT_VERSION,
+                        candidate_identity=candidate_identity, evaluations={}, fallback_used=True, judge_error=str(exc),
+                    ))
+                    store.write()
+                    candidate_set.selection_mode = "fallback_first_valid"
+                    return resolve_selection_policy("first_valid")(candidate_set, self.registry)
+                raise ValueError(
+                    f"VisualJudge lỗi hạ tầng và hard_fail_on_judge_error=true cho shot "
+                    f"{request.shot_id}: {exc}"
+                ) from exc
+            store.save(ShotEvaluationSet(
+                shot_id=request.shot_id, request_fingerprint=request.request_fingerprint,
+                judge_provider=result.judge_provider, judge_model=result.judge_model,
+                judge_policy_version=judge_cfg.policy_version, judge_contract_version=result.judge_contract_version,
+                candidate_identity=candidate_identity,
+                evaluations={evaluation.asset_id: evaluation for evaluation in result.evaluations},
+                fallback_used=False, judge_error=None,
+            ))
+            store.write()
+            hard_failed = sum(1 for evaluation in result.evaluations if evaluation.is_hard_failed())
+            _judge_logger.info(
+                "visual_judge.evaluated shot_id=%s candidates=%s hard_failures=%s",
+                request.shot_id, len(candidates), hard_failed,
+            )
+        candidate_set.selection_mode = "policy"
+        # `None` here means every candidate was hard-failed or below
+        # threshold — NEVER falls back to first_valid (semantic rejection,
+        # not infrastructure failure; see module docstring).
+        return select_vlm_ranked(result, candidate_index_by_asset, minimum_score=judge_cfg.minimum_score)
 
 
 def _parent_reuse(request: VisualRequest, lineage, registry: AssetRegistry, *, video_slug: str) -> tuple[dict[str, Any], dict[str, str]] | None:
@@ -252,7 +370,7 @@ def _parent_reuse(request: VisualRequest, lineage, registry: AssetRegistry, *, v
     return None
 
 
-def prepare_visual_assets(voiceover: "Voiceover", profile: "ContentProfile", *, project_dir: Path, dimensions: tuple[int, int], scene_plan: "ScenePlan | None" = None, registry: AssetRegistry | None = None, cache_dir: Path | None = None, provider: Any = None, lineage=None) -> tuple["ScenePlan", VisualManifest, dict[str, Path]]:
+def prepare_visual_assets(voiceover: "Voiceover", profile: "ContentProfile", *, project_dir: Path, dimensions: tuple[int, int], scene_plan: "ScenePlan | None" = None, registry: AssetRegistry | None = None, cache_dir: Path | None = None, provider: Any = None, lineage=None, judge: Any = None) -> tuple["ScenePlan", VisualManifest, dict[str, Path]]:
     """Checkpoint each resolved shot; failures preserve earlier completed shots.
 
     The optional fallback is a compatibility convenience for direct legacy
@@ -267,7 +385,8 @@ def prepare_visual_assets(voiceover: "Voiceover", profile: "ContentProfile", *, 
     manifest = VisualManifest.read_json(manifest_path) if manifest_path.is_file() else VisualManifest(plan.source_fingerprint)
     registry = registry or AssetRegistry()
     candidate_store = VisualCandidateStore(project_dir / "visual_candidates.json")
-    resolver = VisualAssetResolver(profile, registry=registry, cache_dir=cache_dir, provider=provider, candidate_store=candidate_store)
+    evaluation_store = VisualEvaluationStore(project_dir / "visual_evaluations.json")
+    resolver = VisualAssetResolver(profile, registry=registry, cache_dir=cache_dir, provider=provider, candidate_store=candidate_store, judge=judge, evaluation_store=evaluation_store)
     shots = {shot.shot_id: (scene, shot) for scene in plan.scenes for shot in scene.shots}
     prepared: dict[str, Path] = {}
     for request in requests:

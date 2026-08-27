@@ -132,6 +132,15 @@ class VisualCandidateSet:
     candidates: dict[str, CandidateSlot] = field(default_factory=dict)
     selected_asset_id: str | None = None
     selection_status: str = "pending"  # pending | selected | failed
+    # Phase 10 — diagnostic only. Selection itself is ALWAYS recomputed on
+    # every `resolve()` call (never cached/skipped), so a changed
+    # `selection_policy` or judge policy reselects on its own without any
+    # explicit invalidation step — these two fields just record what
+    # produced the current `selected_asset_id` for inspection/resume
+    # diagnostics. See `docs/handoffs/2026-08-27-visual-judge-phase10-
+    # handoff.md` §16.
+    selection_policy: str = ""
+    selection_mode: str = "policy"  # policy | fallback_first_valid
 
     def slot(self, candidate_index: int) -> CandidateSlot:
         slot_id = f"{self.shot_id}::candidate-{candidate_index:02d}"
@@ -153,6 +162,8 @@ class VisualCandidateSet:
             "candidates": {key: asdict(value) for key, value in self.candidates.items()},
             "selected_asset_id": self.selected_asset_id,
             "selection_status": self.selection_status,
+            "selection_policy": self.selection_policy,
+            "selection_mode": self.selection_mode,
         }
 
     @classmethod
@@ -162,6 +173,7 @@ class VisualCandidateSet:
             data["candidate_policy_version"], data["target_candidate_count"],
             {key: CandidateSlot(**value) for key, value in data.get("candidates", {}).items()},
             data.get("selected_asset_id"), data.get("selection_status", "pending"),
+            data.get("selection_policy", ""), data.get("selection_mode", "policy"),
         )
 
 

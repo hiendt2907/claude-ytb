@@ -424,7 +424,38 @@ class EditorialReviewProfile:
 # generate sequentially (never in parallel), so cost multiplies linearly
 # with count; 4 keeps a "generate a few, pick the best" profile affordable.
 MAX_CANDIDATE_COUNT = 4
-_KNOWN_SELECTION_POLICIES = {"first_valid"}
+# Phase 10 adds "vlm_ranked" — opt-in, requires `visual_judge.enabled=true`
+# (see `VisualGenerationProfile.__post_init__`). "first_valid" stays the
+# default, zero-judge-call policy.
+_KNOWN_SELECTION_POLICIES = {"first_valid", "vlm_ranked"}
+
+
+@dataclass(frozen=True)
+class VisualJudgeProfile:
+    """Opt-in semantic evaluation of already-generated, technically-valid
+    candidates (Phase 10). Absent or `enabled=False` means zero judge calls
+    and zero `visual_evaluations.json` writes — see `render/visual_judge.py`
+    for the provider-neutral contract and
+    `docs/handoffs/2026-08-27-visual-judge-phase10-handoff.md` for why no
+    production vision-capable provider is wired yet.
+    """
+
+    enabled: bool
+    provider: str
+    model: str
+    policy_version: str
+    minimum_score: float = 0.5
+    hard_fail_on_judge_error: bool = False
+
+    def __post_init__(self) -> None:
+        if self.enabled and not self.provider.strip():
+            raise ContentProfileError("visual_judge.provider không được rỗng khi enabled=true.")
+        if self.enabled and not self.model.strip():
+            raise ContentProfileError("visual_judge.model không được rỗng khi enabled=true.")
+        if not (0.0 <= self.minimum_score <= 1.0):
+            raise ContentProfileError("visual_judge.minimum_score phải nằm trong [0.0, 1.0].")
+        if self.enabled and not self.policy_version.strip():
+            raise ContentProfileError("visual_judge.policy_version không được rỗng khi enabled=true.")
 
 
 @dataclass(frozen=True)
@@ -454,6 +485,9 @@ class VisualGenerationProfile:
     candidate_count: int = 1
     selection_policy: str = "first_valid"
     candidate_policy_version: str = "phase9-v1"
+    # Phase 10 — opt-in semantic judging, only consulted when
+    # selection_policy == "vlm_ranked" (enforced below).
+    visual_judge: "VisualJudgeProfile | None" = None
 
     def __post_init__(self) -> None:
         if self.steps < 1:
@@ -476,6 +510,11 @@ class VisualGenerationProfile:
             )
         if not self.candidate_policy_version.strip():
             raise ContentProfileError("visual_generation.candidate_policy_version không được rỗng.")
+        if self.selection_policy == "vlm_ranked" and not (self.visual_judge and self.visual_judge.enabled):
+            raise ContentProfileError(
+                "visual_generation.selection_policy='vlm_ranked' yêu cầu "
+                "visual_judge.enabled=true."
+            )
 
 
 def profiles_root(profiles_dir: Path | str | None = None) -> Path:
@@ -749,6 +788,20 @@ def _candidate_count(mapping: Mapping[str, Any]) -> int:
     return raw
 
 
+def _visual_judge_profile(raw: Any) -> "VisualJudgeProfile | None":
+    if raw is None:
+        return None
+    mapping = _mapping(raw, "visual_judge")
+    return VisualJudgeProfile(
+        enabled=_exact_bool(mapping, "enabled", prefix="visual_judge"),
+        provider=str(mapping.get("provider") or "").strip(),
+        model=str(mapping.get("model") or "").strip(),
+        policy_version=str(mapping.get("policy_version") or "").strip(),
+        minimum_score=_finite_number(mapping, "minimum_score", prefix="visual_judge", default=0.5),
+        hard_fail_on_judge_error=_exact_bool(mapping, "hard_fail_on_judge_error", prefix="visual_judge", default=False),
+    )
+
+
 def _visual_generation_profile(raw: Any, profile_id: str) -> "VisualGenerationProfile | None":
     if raw is None:
         return None
@@ -767,6 +820,7 @@ def _visual_generation_profile(raw: Any, profile_id: str) -> "VisualGenerationPr
         candidate_count=_candidate_count(mapping),
         selection_policy=str(mapping.get("selection_policy") or "first_valid").strip(),
         candidate_policy_version=str(mapping.get("candidate_policy_version") or "phase9-v1").strip(),
+        visual_judge=_visual_judge_profile(mapping.get("visual_judge")),
     )
 
 

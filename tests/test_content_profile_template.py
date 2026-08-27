@@ -22,6 +22,7 @@ from ytb_pipeline.content_profiles import (
     PurposePolicy,
     RenderProfile,
     VisualGenerationProfile,
+    VisualJudgeProfile,
     load_content_profile,
 )
 
@@ -56,7 +57,7 @@ def test_template_guide_documents_every_declared_field():
     documented_dataclasses = (
         FormatProfile, ProviderProfile, ContentRules, PurposePolicy,
         EditorialContractProfile, RenderProfile, EditorialReviewProfile,
-        VisualGenerationProfile,
+        VisualGenerationProfile, VisualJudgeProfile,
     )
     missing: list[str] = []
     for klass in documented_dataclasses:
