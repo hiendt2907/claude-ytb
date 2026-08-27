@@ -47,7 +47,7 @@ from .render.validation import validate_final_video
 from .voiceover.quality import AudioQualityResult, FasterWhisperSttAdapter, run_audio_quality_gate
 from .voiceover.validation import validate_audio
 
-STAGE_ORDER = ("input", "voiceover", "render", "publish")
+STAGE_ORDER = ("input", "voiceover", "visual_assets", "render", "publish")
 
 
 def enforce_audio_quality(result: AudioQualityResult) -> None:
@@ -712,6 +712,21 @@ async def run_project(project: Project, checkpoint: CheckpointManager, through: 
         state["video"] = video
         return str(video.video_path), _rendered_output_data(video)
 
+    async def visual_assets_fn(current: Project):
+        """Prepare character-story visuals before render; other profiles stay unchanged."""
+        voiceover = voiceover_for(current)
+        profile = load_content_profile(voiceover.content_profile_id, version=voiceover.content_profile_version or None)
+        if profile.providers.render != "story":
+            return "not-applicable", {"status": "not_applicable"}
+        from .render.story import LANDSCAPE, PORTRAIT
+        from .render.visual_assets import prepare_visual_assets
+        dimensions = LANDSCAPE if settings.orientation == "landscape" else PORTRAIT
+        _plan, manifest, _prepared = prepare_visual_assets(
+            voiceover, profile, project_dir=settings.projects_dir / current.project_id, dimensions=dimensions,
+        )
+        manifest_path = settings.projects_dir / current.project_id / "visual_manifest.json"
+        return str(manifest_path), {"status": "done", "source_fingerprint": manifest.source_fingerprint}
+
     async def render_quality_fn(current: Project):
         """Persist QA artifacts after render without risking the video checkpoint."""
         video = rendered_for(current)
@@ -772,7 +787,8 @@ async def run_project(project: Project, checkpoint: CheckpointManager, through: 
         "input": NodeDef(node_id="input", stage="input", fn=input_fn, deps=[]),
         "voiceover": NodeDef(node_id="voiceover", stage="voiceover", fn=voiceover_fn, deps=["input"]),
         "audio_quality": NodeDef(node_id="audio_quality", stage="quality", fn=audio_quality_fn, deps=["voiceover"]),
-        "render": NodeDef(node_id="render", stage="render", fn=render_fn, deps=["audio_quality"]),
+        "visual_assets": NodeDef(node_id="visual_assets", stage="render", fn=visual_assets_fn, deps=["audio_quality"]),
+        "render": NodeDef(node_id="render", stage="render", fn=render_fn, deps=["visual_assets"]),
         "render_quality": NodeDef(node_id="render_quality", stage="quality", fn=render_quality_fn, deps=["render"]),
         "publish": NodeDef(node_id="publish", stage="publish", fn=publish_fn, deps=["render_quality"]),
     }

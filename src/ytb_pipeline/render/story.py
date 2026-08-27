@@ -77,10 +77,26 @@ def render_story_video(voiceover: Voiceover, output_dir: Path) -> RenderedVideo:
     # debug/postmortem artifacts, never read back as a source of truth: both
     # are always deterministically rebuildable from Script + Voiceover +
     # profile, so a missing file (legacy project) never blocks a render.
-    scene_plan = build_story_scene_plan(voiceover, profile)
     scene_plan_path = settings.projects_dir / slug / "scene_plan.json"
-    scene_plan_path.parent.mkdir(parents=True, exist_ok=True)
-    scene_plan.write_json(scene_plan_path)
+    # Production arrives here only after the ``visual_assets`` DAG node.  It
+    # validates and consumes its manifest; it never resolves or generates a
+    # scene image.  The absent-manifest branch is intentionally a legacy
+    # convenience path for callers that invoke render_story_video directly.
+    from .visual_assets import (
+        VisualManifest, build_visual_requests, prepare_visual_assets,
+        validate_prepared_manifest,
+    )
+    scene_plan = build_story_scene_plan(voiceover, profile)
+    manifest_path = scene_plan_path.parent / "visual_manifest.json"
+    if manifest_path.is_file():
+        manifest = VisualManifest.read_json(manifest_path)
+        prepared_assets = validate_prepared_manifest(
+            manifest, build_visual_requests(scene_plan, profile, dimensions=dims), AssetRegistry(),
+        )
+    else:
+        scene_plan, _manifest, prepared_assets = prepare_visual_assets(
+            voiceover, profile, project_dir=scene_plan_path.parent, dimensions=dims,
+        )
 
     timeline = build_story_timeline_from_scene_plan(
         scene_plan, voiceover, profile, fps=STORY_FPS, width=dims[0], height=dims[1],
@@ -121,10 +137,7 @@ def render_story_video(voiceover: Voiceover, output_dir: Path) -> RenderedVideo:
             # dùng chung một tấm nền, và asset cố định/generate+cache đều đắt
             # hơn việc gọi lại nhiều lần trong vòng lặp thẻ.
             scene = scene_plan.scenes[index]
-            image_path = resolve_scene_image(
-                segment, profile, dims,
-                scene_id=scene.scene_id, shot_id=scene.shots[0].shot_id, video_slug=slug,
-            )
+            image_path = prepared_assets[scene.shots[0].shot_id]
             frame_counts = _frame_counts([length for (_, _, length) in cards], fps=30)
             if frame_counts:
                 frame_counts[-1] += round(gap * 30)
