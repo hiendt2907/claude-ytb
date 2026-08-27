@@ -736,14 +736,19 @@ async def run_project(project: Project, checkpoint: CheckpointManager, through: 
             return "not-applicable", {"status": "not_applicable"}
         from .render.story import LANDSCAPE, PORTRAIT
         from .render.scene_plan import ScenePlan
+        from .render.derivative_lineage import derive_lineage
         from .render.visual_assets import prepare_visual_assets
         dimensions = LANDSCAPE if settings.orientation == "landscape" else PORTRAIT
         plan_path = settings.projects_dir / current.project_id / "scene_plan.json"
         if not plan_path.is_file():
             raise ValueError("Thiếu ScenePlan; visual_assets không được tự planning.")
+        scene_plan = ScenePlan.read_json(plan_path)
+        lineage = derive_lineage(voiceover, scene_plan, projects_dir=settings.projects_dir)
+        if lineage is not None:
+            lineage.write_json(settings.projects_dir / current.project_id / "derivative_lineage.json")
         _plan, manifest, _prepared = prepare_visual_assets(
             voiceover, profile, project_dir=settings.projects_dir / current.project_id, dimensions=dimensions,
-            scene_plan=ScenePlan.read_json(plan_path),
+            scene_plan=scene_plan, lineage=lineage,
         )
         manifest_path = settings.projects_dir / current.project_id / "visual_manifest.json"
         return str(manifest_path), {"status": "done", "source_fingerprint": manifest.source_fingerprint}

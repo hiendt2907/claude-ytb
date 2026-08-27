@@ -69,6 +69,7 @@ class VisualManifestEntry:
     asset_id: str | None = None
     attempt_count: int = 0
     last_error: str | None = None
+    reuse_source: dict[str, str] | None = None
 
 
 @dataclass
@@ -82,8 +83,8 @@ class VisualManifest:
     def mark_running(self, shot_id: str, *, request_id: str, request_fingerprint: str) -> None:
         self.shots[shot_id] = VisualManifestEntry(request_id, request_fingerprint, "running", None, self._attempts(shot_id))
 
-    def mark_done(self, shot_id: str, *, request_id: str, request_fingerprint: str, asset_id: str) -> None:
-        self.shots[shot_id] = VisualManifestEntry(request_id, request_fingerprint, "done", asset_id, self._attempts(shot_id))
+    def mark_done(self, shot_id: str, *, request_id: str, request_fingerprint: str, asset_id: str, reuse_source: dict[str, str] | None = None) -> None:
+        self.shots[shot_id] = VisualManifestEntry(request_id, request_fingerprint, "done", asset_id, self._attempts(shot_id), None, reuse_source)
 
     def mark_failed(self, shot_id: str, *, request_id: str, request_fingerprint: str, error: str) -> None:
         self.shots[shot_id] = VisualManifestEntry(request_id, request_fingerprint, "failed", None, self._attempts(shot_id), error)
@@ -170,7 +171,25 @@ class VisualAssetResolver:
         return record
 
 
-def prepare_visual_assets(voiceover: "Voiceover", profile: "ContentProfile", *, project_dir: Path, dimensions: tuple[int, int], scene_plan: "ScenePlan | None" = None, registry: AssetRegistry | None = None, cache_dir: Path | None = None, provider: Any = None) -> tuple["ScenePlan", VisualManifest, dict[str, Path]]:
+def _parent_reuse(request: VisualRequest, lineage, registry: AssetRegistry, *, video_slug: str) -> tuple[dict[str, Any], dict[str, str]] | None:
+    """Validate an explicitly linked concrete parent asset; never search."""
+    if lineage is None or (source := lineage.source_for(request.shot_id)) is None:
+        return None
+    for record in registry.assets():
+        if not any(use.get("video_slug") == source.parent_project_id and use.get("scene_id") == source.parent_scene_id and use.get("shot_id") == source.parent_shot_id for use in record.get("uses", ())):
+            continue
+        path = Path(record.get("local_path", ""))
+        if (record.get("asset_class") not in {"generated", "legacy_generated", "profile_local"} or
+            not path.is_file() or observed_content_sha256(path) != record.get("content_sha256") or
+            record.get("width") != _SDXL_GENERATION_DIMS[request.dimensions][0] or record.get("height") != _SDXL_GENERATION_DIMS[request.dimensions][1]):
+            continue
+        updated = registry.record_existing_use(record["asset_id"], scene_id=request.scene_id, shot_id=request.shot_id, video_slug=video_slug)
+        if updated is not None:
+            return updated, {"parent_project_id": source.parent_project_id, "parent_scene_id": source.parent_scene_id, "parent_shot_id": source.parent_shot_id, "parent_asset_id": record["asset_id"], "reuse_policy": source.policy_version}
+    return None
+
+
+def prepare_visual_assets(voiceover: "Voiceover", profile: "ContentProfile", *, project_dir: Path, dimensions: tuple[int, int], scene_plan: "ScenePlan | None" = None, registry: AssetRegistry | None = None, cache_dir: Path | None = None, provider: Any = None, lineage=None) -> tuple["ScenePlan", VisualManifest, dict[str, Path]]:
     """Checkpoint each resolved shot; failures preserve earlier completed shots.
 
     The optional fallback is a compatibility convenience for direct legacy
@@ -198,8 +217,9 @@ def prepare_visual_assets(voiceover: "Voiceover", profile: "ContentProfile", *, 
         manifest.mark_running(request.shot_id, request_id=request.request_id, request_fingerprint=request.request_fingerprint)
         manifest.write_json(manifest_path)
         try:
-            record = resolver.resolve(request, voiceover.segments[scene.source_segment_index], shot, video_slug=voiceover.project_id or project_dir.name)
-            manifest.mark_done(request.shot_id, request_id=request.request_id, request_fingerprint=request.request_fingerprint, asset_id=record["asset_id"])
+            reused = _parent_reuse(request, lineage, registry, video_slug=voiceover.project_id or project_dir.name)
+            record, reuse_source = reused if reused is not None else (resolver.resolve(request, voiceover.segments[scene.source_segment_index], shot, video_slug=voiceover.project_id or project_dir.name), None)
+            manifest.mark_done(request.shot_id, request_id=request.request_id, request_fingerprint=request.request_fingerprint, asset_id=record["asset_id"], reuse_source=reuse_source)
             manifest.write_json(manifest_path)
             prepared[request.shot_id] = Path(record["local_path"])
         except Exception as exc:

@@ -326,6 +326,24 @@ prepared renderer consumes these persisted semantics and prepared assets only;
 it does not call Director, an LLM, or ComfyUI.  `compose_ai.py` remains outside
 this story-only capability.
 
+## Derivative visual reuse (Phase 8)
+
+An editorially rewritten Short remains independent: it has its own Script,
+Narration, ScenePlan, VisualRequests, VisualManifest and Timeline. When its
+existing `strategy.source_long_slug/source_section_index` identifies a parent
+Long, `visual_assets` persists `derivative_lineage.json` beside the child
+project state. A child Shot gets a reuse source only when a Shot in that exact
+parent Scene has identical visual intent and character semantics; there is no
+ordinal, filename, generation-key, byte-hash, or similarity-search fallback.
+
+Before reuse the resolver validates the parent AssetRecord/use, physical bytes
+and SHA-256, supported asset class, and exact prepared media dimensions. This
+is deliberately fail-safe across 16:9 and 9:16: it performs no crop, reframing
+or parent-MP4 use. A miss calls the normal local/cache/ComfyUI resolver. A hit
+adds an idempotent Short use to the same global AssetRecord and records mutable
+reuse provenance only in the Short manifest. The renderer remains unaware of
+whether its prepared image originated locally, was generated, or was reused.
+
 ## Visual Assets — prepared story boundary (Phase 4)
 
 For `character_story`, `visual_assets` runs between audio quality and render.

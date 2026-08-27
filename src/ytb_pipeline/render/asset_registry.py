@@ -257,6 +257,15 @@ class AssetRegistry:
                 "video_slug": video_slug, "used_at": used_at,
             })
 
+    def record_existing_use(self, asset_id: str, *, scene_id: str, shot_id: str, video_slug: str) -> dict[str, Any] | None:
+        """Attach an idempotent project/shot use without changing provenance."""
+        with locked_json_update(self.path) as data:
+            record = data.get("assets", {}).get(asset_id)
+            if not isinstance(record, dict):
+                return None
+            self._record_use(record, scene_id=scene_id, shot_id=shot_id, video_slug=video_slug)
+            return dict(record)
+
     def record_generated(
         self,
         *,
