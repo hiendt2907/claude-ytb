@@ -1,0 +1,153 @@
+# Content profile authoring template
+
+Mục đích: dựng một profile mới **chỉ bằng dữ liệu** (`profile.json` + prompt
+markdown), không sửa một dòng code engine nào — đúng nguyên tắc "Một DAG, N
+content profile" trong `CLAUDE.md` và Giai đoạn 5 của
+`docs/handoffs/2026-08-27-content-profile-engine-refactor-plan.md`.
+
+File này được một test tự-kiểm-chứng
+(`tests/test_content_profile_template.py::test_template_guide_documents_every_declared_field`)
+đối chiếu với chính danh sách field trong `content_profiles.py` — nếu code
+thêm field mới mà tài liệu này không được cập nhật, test đó FAIL. Đừng sửa
+danh sách field bên dưới mà không chạy lại test đó.
+
+Fixture loadable minh hoạ (chỉ field bắt buộc): `tests/fixtures/content_profiles/template-fixture/`.
+
+## Khung tối thiểu (chỉ field bắt buộc)
+
+```json
+{
+  "schema_version": 1,
+  "profile_id": "ten-profile-cua-ban",
+  "version": "1.0.0",
+  "display_name": "Tên hiển thị",
+  "topic": "Chủ đề tổng quát của profile",
+  "narrative_mode": "mechanism_explainer",
+  "prompts": { "editorial": "prompts/editorial.md" },
+  "formats": {
+    "short": {"viewer_min_sec": 30, "viewer_max_sec": 45, "min_sections": 4},
+    "long": {"viewer_min_sec": 300, "viewer_max_sec": 420, "min_sections": 10}
+  },
+  "providers": {
+    "llm": "xkiro", "tts": "xkiro", "render": "ai",
+    "broll_strategy": "pexels", "broll_allow_downloads": false
+  },
+  "voice_cast": { "narrator": "confident-male-vietnamese" },
+  "content_rules": {
+    "require_pexels_query": true,
+    "require_short_source_trace": true
+  },
+  "render": {
+    "assets_dir": "assets",
+    "show_captions": false,
+    "inter_segment_gap_sec": 0.0,
+    "transition_overlap_sec": 0.4
+  }
+}
+```
+
+`narrative_mode`: `"mechanism_explainer"` (không nhân vật tái diễn) hoặc
+`"character_story"` (có cast tái diễn qua nhiều tập).
+
+## Field-by-field (mọi field dataclass hiện có trong `content_profiles.py`)
+
+### `formats.<short|long>` → `FormatProfile`
+- `viewer_min_sec`, `viewer_max_sec` — cửa sổ thời lượng cho phép (giây).
+- `min_sections` — số section tối thiểu.
+- `max_sections` — tối đa; **bỏ qua thì mặc định bằng `min_sections`**.
+- `runtime_tolerance_sec` (tuỳ chọn, mặc định `0.0`) — dung sai đo thời lượng
+  thật so với sàn, dùng khi có sai lệch hệ thống đã đo được (không phải chỗ
+  để nới lỏng gate tuỳ tiện).
+
+### `providers` → `ProviderProfile`
+- `llm`, `tts` — tên provider (hiện chỉ `"xkiro"`).
+- `render` — chiến lược render: `"ai"` (mechanism_explainer), `"story"`
+  (character_story), `"slide"` (legacy).
+- `broll_strategy` — `"pexels"` hoặc `"none"`. Pexels KHÔNG BAO GIỜ là mặc
+  định ngầm cho profile mới nếu không cố ý chọn (xem Key Invariants trong
+  `CLAUDE.md`).
+- `broll_allow_downloads` — luôn `false` trừ khi có lý do rõ ràng.
+- `tts_pace_factor` (tuỳ chọn, mặc định `1.0`, khoảng `(0, 2]`) — hệ số bù
+  tốc độ đọc thật đo được của giọng/kịch bản profile này so với hằng số CPM
+  chung; chỉ đổi khi đã đo thật qua vài lần render, không đoán.
+
+### `content_rules` → `ContentRules`
+- `require_pexels_query` (bắt buộc) — mỗi section có cần `pexels_query`.
+- `require_short_source_trace` (bắt buộc) — Short có cần trace về đúng một
+  đoạn Long nguồn (strategy-v1) hay không.
+- `require_conversation_turns` (mặc định `false`) — có cần cấu trúc lượt
+  hội thoại (`turn`) giữa các cast hay không; thường `true` cho
+  `character_story`.
+- `allow_short_generation` (mặc định `true`) — `false` nếu series này chỉ
+  còn sinh Long, không sinh Short mới (Short cũ vẫn đọc được).
+- `story_primary_speaker_id` / `story_supporting_speaker_id` (mặc định
+  rỗng) — key trong `voice_cast` cho vai chính/phụ của một
+  `character_story`; để trống giữ hợp đồng cast cũ, lỏng hơn.
+- `require_next_episode_bridge` (mặc định `false`) — đoạn kết một Long có
+  bắt buộc nhắc điều tiếp diễn ở tập sau hay không.
+- `narrator_lesson_closing` (mặc định `false`) — opt-in: đoạn kết là NGƯỜI
+  DẪN CHUYỆN đúc kết bài học nói thẳng với người xem, thay vì hành động cụ
+  thể của nhân vật. Chỉ bật cho `character_story`.
+- `long_opening_mode` (mặc định `"channel_greeting"`, hoặc `"pain_first"` /
+  `"story_context"`) — cách một Long mở đầu.
+- `short_ending_mode` (mặc định `"final_action"`, hoặc `"funnel_bridge"`) —
+  Short kết bằng hành động ngay hay bằng vòng lặp mở + CTA về Long nguồn.
+
+### `voice_cast` — map `speaker_id` (lowercase) → tên giọng TTS.
+Phải có ít nhất `"narrator"` (hoặc đúng tên đã khai ở
+`editorial_contract.narration_speaker_id` nếu đổi khỏi mặc định).
+
+### `render` → `RenderProfile`
+- `assets_dir` — tên thư mục con chứa asset của profile (thường `"assets"`).
+- `show_captions` — có hiện caption trên video không.
+- `inter_segment_gap_sec`, `transition_overlap_sec` — khoảng trong `[0, 2]`
+  giây, canh giữa các section khi ghép render.
+- `scene_assets` (tuỳ chọn) — danh sách cố định tên file asset hợp lệ; bỏ
+  trống thì mọi file trong `assets_dir` đều hợp lệ.
+
+### `editorial_contract` (tuỳ chọn — bỏ qua thì dùng bộ mặc định legacy)
+- `purpose_vocabulary` — tập purpose hợp lệ cho section (mặc định legacy:
+  `situation, core_answer, evidence, application, payoff`).
+- `required_purposes.short` / `.long` — purpose bắt buộc phải có theo format.
+- `narration_speaker_id` (mặc định `"narrator"`) — speaker_id được coi là
+  "người dẫn chuyện" xuyên suốt engine (QA, purpose gate, closing check).
+- `short_expansion_purposes` — purpose được phép nhận thêm câu khi Short
+  thiếu thời lượng cần vá.
+
+### `format_prompts` (tuỳ chọn) → `{"short": "<tên prompt>", "long": "<tên prompt>"}`
+Cho Long và Short dùng prompt cấu trúc RIÊNG thay vì gộp chung
+`editorial`. Tên phải là một key đã khai trong `prompts`.
+
+### `editorial_review` (tuỳ chọn) → `EditorialReviewProfile`
+Cổng LLM chấm điểm rubric — đọc
+`docs/constitution/38-EDITORIAL_QUALITY_LAYERS.md` trước khi bật, để biết
+luật nào nên nằm ở đây thay vì ở QA heuristic.
+- `enabled` — bật/tắt.
+- `rubric_prompt_name` — key trong `prompts` chứa nội dung rubric.
+- `minimum_score` (mặc định `0`) — điểm sàn `[0, 10]`.
+- `max_rewrites` (mặc định `0`) — số lần cho phép LLM viết lại theo phản hồi
+  rubric.
+
+### `visual_generation` (tuỳ chọn, chỉ hợp lệ khi `narrative_mode == "character_story"`)
+Sinh ảnh cảnh local qua ComfyUI/IPAdapter, neo danh tính nhân vật —
+`enabled`, `style_prompt`, `negative_prompt`, `steps` (≥1), `cfg` `(0,30]`,
+`solo_weight`/`duo_weight` `[0,2]`, `duo_denoise` `(0,1]`, `characters` (map
+character id → đường dẫn ảnh neo trong `assets_dir`), `duo_reference_image`.
+
+## Quy ước version snapshot
+
+Mỗi lần bump `version` trong `profile.json`, copy nguyên trạng thái cũ (kể cả
+prompt/bible file liên quan) vào `profiles/<profile_id>/versions/<semver-cũ>/`
+trước khi sửa bản active — xem `docs/constitution/03-ARCHITECTURE.md` mục
+"Profile version snapshots".
+
+## Sau khi tạo profile
+
+1. Chạy `load_content_profile("<profile_id>")` (hoặc test tương đương) để
+   xác nhận parse sạch, không lỗi `ContentProfileError`.
+2. Nếu profile mới cần MỘT luật content chưa có trong `qa_agent.py` hay
+   `editorial_review`, đọc `docs/constitution/38-EDITORIAL_QUALITY_LAYERS.md`
+   trước khi quyết định thêm ở đâu.
+3. KHÔNG sửa code trong `src/ytb_pipeline/` để "cho profile này chạy được".
+   Nếu bắt buộc phải sửa code — đó là dấu hiệu bộ khung profile còn thiếu
+   một field/flag generic, không phải chỗ để hardcode riêng cho profile này.
