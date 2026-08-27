@@ -385,9 +385,32 @@ def build_story_timeline_from_scene_plan(
         scene.narration_end_sec - scene.narration_start_sec for scene in scene_plan.scenes
     ) + len(transitions) * (gap - overlap)
 
+    audio_profile = getattr(profile.render, "audio", None)
+    music_clips: tuple[AudioLayerClip, ...] = ()
+    sfx_clips: tuple[AudioLayerClip, ...] = ()
+    if audio_profile and audio_profile.background_music:
+        music = audio_profile.background_music
+        music_clips = (AudioLayerClip(
+            asset_path=profile.assets_dir / music.asset, start_sec=0.0,
+            duration_sec=expected_duration, gain_db=music.gain_db,
+            fade_in_sec=music.fade_in_sec, fade_out_sec=music.fade_out_sec,
+            loop=music.mode == "loop",
+        ),)
+    if audio_profile:
+        if any(effect.at_sec >= expected_duration for effect in audio_profile.sfx):
+            raise TimelineError("SFX bắt đầu ngoài authoritative narration timeline.")
+        sfx_clips = tuple(
+            AudioLayerClip(
+                asset_path=profile.assets_dir / effect.asset, start_sec=effect.at_sec,
+                duration_sec=min(effect.duration_sec or max(0.001, expected_duration - effect.at_sec), max(0.001, expected_duration - effect.at_sec)),
+                gain_db=effect.gain_db,
+            ) for effect in audio_profile.sfx
+        )
+
     return Timeline(
         fps=fps, width=width, height=height,
         video_clips=tuple(video_clips), narration_clips=tuple(narration_clips),
         transitions=tuple(transitions), expected_duration_sec=expected_duration,
         source_fingerprint=_source_fingerprint(profile, segments, fps=fps, width=width, height=height),
+        music_clips=music_clips, sfx_clips=sfx_clips,
     )

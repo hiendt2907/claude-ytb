@@ -193,6 +193,11 @@ def render_prepared_story_video(
             audio_durations=audio_durations,
             overlap=profile.render.transition_overlap_sec,
         )
+        if timeline.music_clips or timeline.sfx_clips:
+            from .audio_mixer import mix_timeline_audio
+            mixed = work / "final-mixed.mp4"
+            mix_timeline_audio(ffmpeg, video_path, mixed, timeline)
+            shutil.move(str(mixed), str(video_path))
         # Each section's own video/audio streams matched within one frame
         # (see `_reconcile_section_streams` above), but `xfade`/`acrossfade`
         # snap their offsets to their own codec's frame grid at EVERY

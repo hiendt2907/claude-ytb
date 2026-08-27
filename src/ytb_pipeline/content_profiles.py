@@ -195,12 +195,48 @@ _LEGACY_EDITORIAL_CONTRACT = EditorialContractProfile(
 
 
 @dataclass(frozen=True)
+class BackgroundMusicProfile:
+    asset: str
+    gain_db: float = -20.0
+    fade_in_sec: float = 0.0
+    fade_out_sec: float = 0.0
+    mode: str = "loop"
+
+    def __post_init__(self) -> None:
+        if not self.asset.strip() or self.mode not in {"loop", "trim"}:
+            raise ContentProfileError("audio.background_music asset/mode không hợp lệ.")
+        if not -60 <= self.gain_db <= 12 or self.fade_in_sec < 0 or self.fade_out_sec < 0:
+            raise ContentProfileError("audio.background_music gain/fade không hợp lệ.")
+
+
+@dataclass(frozen=True)
+class SoundEffectProfile:
+    asset: str
+    at_sec: float
+    gain_db: float = 0.0
+    duration_sec: float | None = None
+
+    def __post_init__(self) -> None:
+        if not self.asset.strip() or self.at_sec < 0 or not -60 <= self.gain_db <= 12:
+            raise ContentProfileError("audio.sfx asset/at_sec/gain_db không hợp lệ.")
+        if self.duration_sec is not None and self.duration_sec <= 0:
+            raise ContentProfileError("audio.sfx duration_sec phải dương.")
+
+
+@dataclass(frozen=True)
+class AudioProfile:
+    background_music: BackgroundMusicProfile | None = None
+    sfx: tuple[SoundEffectProfile, ...] = ()
+
+
+@dataclass(frozen=True)
 class RenderProfile:
     assets_dir_name: str
     show_captions: bool
     inter_segment_gap_sec: float
     transition_overlap_sec: float
     scene_assets: tuple[str, ...]
+    audio: AudioProfile = field(default_factory=AudioProfile)
 
     def __post_init__(self) -> None:
         if not isfinite(self.inter_segment_gap_sec) or not 0 <= self.inter_segment_gap_sec <= 2:
@@ -568,6 +604,7 @@ def load_content_profile(
                 render_raw, "transition_overlap_sec", prefix="render"
             ),
             scene_assets=_string_tuple(render_raw.get("scene_assets", ()), "render.scene_assets"),
+            audio=_audio_profile(render_raw.get("audio")),
         ),
         visual_generation=_visual_generation_profile(raw.get("visual_generation"), profile_id),
         editorial_contract=editorial_contract,
@@ -798,6 +835,32 @@ def _mapping(value: Any, field: str) -> Mapping[str, Any]:
     if not isinstance(value, dict):
         raise ContentProfileError(f"{field} phải là object.")
     return value
+
+
+def _audio_profile(value: Any) -> AudioProfile:
+    if value is None:
+        return AudioProfile()
+    raw = _mapping(value, "render.audio")
+    music_raw = raw.get("background_music")
+    music = None
+    if music_raw is not None:
+        item = _mapping(music_raw, "render.audio.background_music")
+        music = BackgroundMusicProfile(
+            asset=_required_text(item, "asset", prefix="render.audio.background_music"),
+            gain_db=_finite_number(item, "gain_db", prefix="render.audio.background_music") if "gain_db" in item else -20.0,
+            fade_in_sec=_finite_number(item, "fade_in_sec", prefix="render.audio.background_music") if "fade_in_sec" in item else 0.0,
+            fade_out_sec=_finite_number(item, "fade_out_sec", prefix="render.audio.background_music") if "fade_out_sec" in item else 0.0,
+            mode=str(item.get("mode", "loop")).strip(),
+        )
+    effects = tuple(
+        SoundEffectProfile(
+            asset=_required_text(_mapping(item, "render.audio.sfx[]"), "asset", prefix="render.audio.sfx[]"),
+            at_sec=_finite_number(_mapping(item, "render.audio.sfx[]"), "at_sec", prefix="render.audio.sfx[]"),
+            gain_db=_finite_number(_mapping(item, "render.audio.sfx[]"), "gain_db", prefix="render.audio.sfx[]") if "gain_db" in item else 0.0,
+            duration_sec=_finite_number(_mapping(item, "render.audio.sfx[]"), "duration_sec", prefix="render.audio.sfx[]") if "duration_sec" in item else None,
+        ) for item in raw.get("sfx", ())
+    )
+    return AudioProfile(music, effects)
 
 
 def _string_map(value: Any, field: str) -> Mapping[str, str]:
