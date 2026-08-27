@@ -42,8 +42,8 @@ scene-plan, timeline, Short editorial and renderer tests remain in the full
 suite. Tests use temporary registry/project/cache paths and do not write media
 to repository assets.
 
-Commits: `8b9bd37` RED test checkpoint plus the implementation/docs commit that
-follows this handoff. Full suite: **1122 passed, 3 skipped, 1 deselected, 0 failed**
+Commits: `8b9bd37` (RED test checkpoint) and `6e31bab` (implementation,
+pipeline integration, architecture and handoff). Full suite: **1122 passed, 3 skipped, 1 deselected, 0 failed**
 from 1126 collected items.
 Deferred: semantic embedding search, smart crop/reframing, video clipping,
 candidate ranking/QC, new providers, and Phase 9. Definition of done: explicit
