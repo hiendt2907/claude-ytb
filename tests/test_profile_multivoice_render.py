@@ -225,6 +225,30 @@ def test_story_renderer_preserves_audio_timeline_when_a_section_has_many_caption
         assert len(record["uses"]) == 1
         assert record["uses"][0]["video_slug"] == slug
 
+    # Phase 4 acceptance: after preparation, the final MP4 may disappear and
+    # ComfyUI/generation may be unavailable; prepared rendering still rebuilds it.
+    from ytb_pipeline.render.story import render_prepared_story_video
+    from ytb_pipeline.render.visual_assets import (
+        VisualAssetResolver, VisualManifest, build_visual_requests,
+        validate_prepared_manifest,
+    )
+
+    def generation_must_not_run(*_args, **_kwargs):
+        raise AssertionError("generation must not happen during prepared render")
+
+    monkeypatch.setattr(VisualAssetResolver, "resolve", generation_must_not_run)
+    result.video_path.unlink()
+    prepared = validate_prepared_manifest(
+        VisualManifest.read_json(settings.projects_dir / slug / "visual_manifest.json"),
+        build_visual_requests(scene_plan, profile, dimensions=(1920, 1080)),
+        AssetRegistry(),
+    )
+    rebuilt = render_prepared_story_video(
+        voiceover, tmp_path / "rebuilt", profile=profile,
+        scene_plan=scene_plan, prepared_assets=prepared,
+    )
+    assert rebuilt.video_path.is_file()
+
 
 def _stream_duration(path: Path, stream: str) -> float:
     return float(subprocess.run([
