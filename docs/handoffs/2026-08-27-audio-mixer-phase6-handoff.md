@@ -26,9 +26,9 @@ stay narration-derived; prepared render still does not need ComfyUI;
 mechanism_explainer/compose_ai are unchanged. The render node is deliberately
 the deterministic mixing boundary—no extra checkpoint node is needed.
 
-Verification: focused tests pass; full `make test` was rerun after Phase 6 and
-all test failures were resolved. Test media/state remains isolated and no
-runtime assets are committed.
+Verification: focused tests pass; full `make test` = **1111 passed, 3 skipped,
+1 deselected, 0 failed**. Test media/state remains isolated and no runtime
+assets are committed.
 
 Commits: `65c1705 feat: add deterministic local media audio mixer`; this
 documentation commit. Deferred: local-media profile adoption fixtures,
