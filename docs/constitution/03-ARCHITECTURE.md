@@ -665,20 +665,51 @@ With the flag true, visual preparation fails. Conversely, a successful Judge
 result where every candidate hard-fails or falls below threshold always fails
 closed—there is no semantic-rejection fallback and no regeneration loop.
 
-The repository currently has no production provider port capable of attaching
-and inspecting images: its configured `LLMProvider.complete()` adapters are
-text-only. Phase 10 therefore provides the strict `VisualJudge` port,
-set-level orchestration/repair contract, persistence, selector, and test fake,
-but deliberately does not misrepresent a text model as a VLM adapter. A real
-adapter must be added only when an authorized provider exposes actual vision
-input. Until then, an explicitly configured `vlm_ranked` production run has no
-Judge instance and follows its declared infrastructure-failure policy.
+Phase 11 activates one production adapter without changing the Phase-10 port:
+`providers/vision/xkiro_provider.py::XkiroVisualJudge`. It uses the already
+authorized xKiro gateway and its existing credential, but is distinct from the
+text-only `LLMProvider.complete()` adapters. Before sending images, it queries
+xKiro's model catalog and requires the exact configured Judge model to
+advertise `capabilities.vision=true`; the current ideation model
+`deepseek/deepseek-v4-pro` therefore remains ineligible and unchanged.
+
+The adapter sends one whole-Shot comparative Chat Completions request. Every
+candidate is labeled by `candidate_index` and exact `asset_id`, then attached
+as a PNG/JPEG base64 `image_url` data URI. It verifies the original candidate
+SHA-256 immediately before transport and enforces an 8 MiB per-image bound.
+No original file is modified, no preview becomes an `AssetRecord`, local paths
+are not sent in prompt text, and no binary/base64 content is logged. Response
+text still passes through the unchanged strict Phase-10 parser and one-repair
+limit. Authentication, timeout/network, rate-limit, payload-size, catalog,
+unsupported-media, and provider failures map to infrastructure errors; a
+successful semantic rejection remains a distinct fail-closed outcome.
+
+The provider registry resolves this adapter lazily only after evaluation-cache
+reuse fails on an opted-in multi-candidate `vlm_ranked` path. Unchanged cached
+evaluations therefore cause zero provider calls. Changing Judge provider/model
+invalidates only evaluation/selection, never candidate media. Text-only models
+are never silently treated as image-capable.
 
 No top-level DAG node was added. Judging is bounded inside `visual_assets`
 preparation after candidate validation and before manifest selection. Phase 8
 reuse and `profile_local` stay Judge-free. `VisualManifest` still stores only
 Shot -> selected `asset_id`; the prepared renderer imports neither Judge nor
 candidate machinery and remains ComfyUI/Judge-free after preparation.
+
+Operators verify configuration and real pixel transport outside the automated
+suite with:
+
+```bash
+PYTHONPATH=src VISUAL_JUDGE_PROVIDER=xkiro \
+VISUAL_JUDGE_MODEL='qwen/qwen3.8-max:free' \
+.venv/bin/python -m ytb_pipeline.tools.smoke_visual_judge --generate-probe
+```
+
+The command generates a temporary blue-triangle PNG, asks the provider for
+bounded observed facts without placing the answer in the prompt, requires a
+strict `JudgeResult`, verifies the observed facts, cleans the temp directory,
+and exits non-zero on any capability/transport/schema/observation failure. It
+is intentionally not part of `make test` because it uses a live provider.
 
 ## Extension Points
 

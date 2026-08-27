@@ -10,18 +10,11 @@ generates media (that stays in `visual_candidates.py`/ComfyUI provider),
 never touches `AssetRegistry` provenance (immutable, generation-time
 facts), and never renders (the renderer never imports this module).
 
-No production vision-capable provider is configured in this repository as
-of Phase 10 (`xkiro`/DeepSeek V4 Pro and the Claude CLI wrapper are both
-text-only `LLMProvider.complete(prompt: str) -> str`, with no image
-attachment in their signatures — see `providers/llm/*.py`). This module
-therefore ships the full provider-neutral contract, strict schema
-validation, the generic single-call-per-shot repair-driving orchestration
-(`evaluate_via_transport`) any future adapter can implement against, and
-a scoring/ranking implementation — but no adapter that claims to actually
-see an image. `docs/handoffs/2026-08-27-visual-judge-phase10-handoff.md`
-documents this blocker explicitly; `FakeVisualJudge` in
-`tests/test_visual_judge.py` is a test double only, never wired into a
-production code path.
+Phase 11 activates the port through the separately registered production
+adapter in `providers/vision/xkiro_provider.py`. The configured ideation model
+remains text-only and unchanged; only an explicitly configured Judge model
+whose live xKiro catalog entry advertises `vision=true` may receive candidate
+image bytes. `FakeVisualJudge` in tests remains a test double only.
 
 Judge output is judged strictly: unknown top-level/evaluation fields,
 unknown candidate `asset_id`s, missing candidates, duplicate candidate

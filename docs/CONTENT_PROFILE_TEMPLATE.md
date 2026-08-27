@@ -165,6 +165,20 @@ project tại `assets/projects/<slug>/visual_evaluations.json` — không ghi v�
 asset đã chọn cuối cùng). Xem
 `docs/handoffs/2026-08-27-visual-judge-phase10-handoff.md`.
 
+Phase 11 — production vision opt-in: đặt `provider: "xkiro"` và một `model`
+được live xKiro catalog xác nhận `vision=true` (operator smoke đã xác minh
+`qwen/qwen3.8-max:free`). Adapter dùng `XKIRO_API_KEY` hiện hữu, gửi byte
+PNG/JPEG thật dưới dạng base64 `image_url`, và từ chối model text-only (bao gồm
+model ideation mặc định `deepseek/deepseek-v4-pro`). Không profile nào tự động
+được bật Judge; `candidate_count=1`, `first_valid`, `profile_local`, parent
+reuse và prepared render vẫn zero-Judge. Kiểm tra ngoài test suite:
+
+```bash
+PYTHONPATH=src VISUAL_JUDGE_PROVIDER=xkiro \
+VISUAL_JUDGE_MODEL='qwen/qwen3.8-max:free' \
+.venv/bin/python -m ytb_pipeline.tools.smoke_visual_judge --generate-probe
+```
+
 ## Quy ước version snapshot
 
 Mỗi lần bump `version` trong `profile.json`, copy nguyên trạng thái cũ (kể cả

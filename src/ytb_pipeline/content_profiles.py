@@ -435,9 +435,9 @@ class VisualJudgeProfile:
     """Opt-in semantic evaluation of already-generated, technically-valid
     candidates (Phase 10). Absent or `enabled=False` means zero judge calls
     and zero `visual_evaluations.json` writes — see `render/visual_judge.py`
-    for the provider-neutral contract and
-    `docs/handoffs/2026-08-27-visual-judge-phase10-handoff.md` for why no
-    production vision-capable provider is wired yet.
+    for the provider-neutral contract. Phase 11 registers the opt-in xKiro
+    vision adapter; no adapter is resolved for first_valid/profile-local/
+    derivative-reuse paths.
     """
 
     enabled: bool
