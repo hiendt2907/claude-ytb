@@ -23,6 +23,7 @@ from ..config.settings import settings
 from ..content_profiles import ContentProfile, load_content_profile
 from ..pkg.models import RenderedVideo, Segment, Voiceover
 from ..voiceover.tts import _slugify
+from ..providers.image.comfyui_story_provider import SAMPLER, SCHEDULER
 from .asset_registry import AssetRegistry
 from .scene_plan import build_story_scene_plan
 from .timeline import build_story_timeline_from_scene_plan
@@ -316,6 +317,14 @@ def _asset_path(profile: ContentProfile, relative: str) -> Path:
 
 
 _SDXL_GENERATION_DIMS = {LANDSCAPE: (1344, 768), PORTRAIT: (832, 1216)}
+_GENERATION_MODE_BY_CHARACTER_COUNT = {0: "establishing", 1: "solo", 2: "duo"}
+
+
+def _generation_mode(unique_characters: tuple[str, ...]) -> str:
+    """Provenance label mirroring `ComfyUIStoryProvider.generate_scene`'s own
+    branching (0/1/2 named characters) — labelling only, no generation
+    behaviour lives here."""
+    return _GENERATION_MODE_BY_CHARACTER_COUNT.get(len(unique_characters), "duo")
 
 
 def _generation_cache_key(
@@ -380,22 +389,36 @@ def resolve_scene_image(
     cached = cache_dir / f"{key}.png"
     gen_width, gen_height = _SDXL_GENERATION_DIMS[dims]
     seed = int(key[:16], 16) % (2**32)
+    unique_characters = tuple(dict.fromkeys(segment.scene_characters))
 
-    def _record_generated() -> None:
+    def _record_generated(*, is_fresh_generation: bool) -> None:
         if scene_id is None:
             return
         (registry or AssetRegistry()).record_generated(
-            generation_key=key, local_path=cached,
+            generation_key=key, local_path=cached, is_fresh_generation=is_fresh_generation,
             profile_id=profile.profile_id, profile_version=profile.version,
             seed=seed, prompt=segment.visual_intent.strip(),
             style_prompt=vg.style_prompt, negative_prompt=vg.negative_prompt,
             steps=vg.steps, cfg=vg.cfg, width=gen_width, height=gen_height,
-            characters=tuple(segment.scene_characters),
+            characters=unique_characters, generation_mode=_generation_mode(unique_characters),
+            checkpoint=settings.comfyui_sdxl_checkpoint,
+            clip_vision_model=settings.comfyui_clip_vision_model,
+            ipadapter_model=settings.comfyui_ipadapter_model,
+            solo_weight=vg.solo_weight, duo_weight=vg.duo_weight, duo_denoise=vg.duo_denoise,
+            sampler=SAMPLER, scheduler=SCHEDULER,
             scene_id=scene_id, shot_id=shot_id or "", video_slug=video_slug,
         )
 
     if cached.is_file():
-        _record_generated()
+        # Cache hit: `_record_generated` itself decides what to persist —
+        # if this physical file is already registered, only a `uses` entry
+        # is added (its historical provenance, whatever it is, is left
+        # untouched); if not, it becomes `legacy_generated` with
+        # `provenance_status="legacy_unknown"`, since a file already
+        # sitting in the cache may predate this registry or a checkpoint
+        # change and its true original generation parameters aren't
+        # certain — see `AssetRegistry.record_generated`.
+        _record_generated(is_fresh_generation=False)
         return cached
 
     if provider is None:
@@ -409,7 +432,7 @@ def resolve_scene_image(
         width=gen_width, height=gen_height, seed=seed,
         output_path=cached,
     )
-    _record_generated()
+    _record_generated(is_fresh_generation=True)
     return cached
 
 

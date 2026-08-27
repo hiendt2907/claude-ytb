@@ -207,9 +207,11 @@ def test_story_renderer_preserves_audio_timeline_when_a_section_has_many_caption
     scene_plan = ScenePlan.read_json(scene_plan_path)
     assert len(scene_plan.scenes) == 2
 
-    # Asset Registry v1 (Phase 3): both sections use fixed profile assets
+    # Asset Registry v1 (Phase 3.1): both sections use fixed profile assets
     # (visual_asset="opening.png"/"reply.png"), so both register as
-    # provenance_complete=False local assets, each used by exactly this
+    # asset_class="profile_local" (provenance_status="complete" — the
+    # asset's OWN provenance is fully known, it simply has no generation
+    # metadata because nothing was generated), each used by exactly this
     # video's own scene_id — not inflated by the 4 caption cards this
     # fixture's narration produces.
     from ytb_pipeline.render.asset_registry import AssetRegistry
@@ -217,7 +219,8 @@ def test_story_renderer_preserves_audio_timeline_when_a_section_has_many_caption
     registry_records = AssetRegistry().assets()
     assert len(registry_records) == 2
     for record in registry_records:
-        assert record["source"] == "profile_local_asset"
+        assert record["asset_class"] == "profile_local"
+        assert record["provenance_status"] == "complete"
         assert record["generation_key"] is None
         assert len(record["uses"]) == 1
         assert record["uses"][0]["video_slug"] == slug

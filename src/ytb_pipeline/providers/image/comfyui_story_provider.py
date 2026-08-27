@@ -45,8 +45,8 @@ _PING_TIMEOUT_S = 3.0
 _REQUEST_TIMEOUT_S = 60.0
 _POLL_INTERVAL_S = 1.5
 _POLL_ATTEMPTS = 240  # ~6 minutes; an SDXL/IPAdapter step on M4 Pro is far faster
-_SAMPLER = "dpmpp_2m"
-_SCHEDULER = "karras"
+SAMPLER = "dpmpp_2m"
+SCHEDULER = "karras"
 
 
 class ComfyUIStoryProvider:
@@ -226,7 +226,7 @@ class ComfyUIStoryProvider:
             "class_type": "KSampler",
             "inputs": {
                 "seed": seed, "steps": vg.steps, "cfg": vg.cfg,
-                "sampler_name": _SAMPLER, "scheduler": _SCHEDULER, "denoise": denoise,
+                "sampler_name": SAMPLER, "scheduler": SCHEDULER, "denoise": denoise,
                 "model": model, "positive": ["pos", 0], "negative": ["neg", 0],
                 "latent_image": latent,
             },

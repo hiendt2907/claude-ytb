@@ -1,3 +1,12 @@
+> **SUPERSEDED 2026-08-27 bởi Phase 3.1** (`docs/handoffs/2026-08-27-asset-
+> registry-phase3.1-handoff.md`). User phát hiện defect kiến trúc: `asset_id`
+> ở phiên bản Phase 3 này derive DETERMINISTIC từ `generation_key`, khiến
+> hai khái niệm 1:1 trong thực tế — vi phạm yêu cầu "một `generation_key`
+> phải cho phép map tới nhiều `AssetRecord`". Giữ file này nguyên vẹn làm
+> lịch sử; đọc Phase 3.1 handoff để biết trạng thái ĐÚNG hiện tại của
+> `asset_registry.py` (asset_id giờ là uuid4 cơ hội, matching theo
+> content_sha256, 3 asset_class rõ ràng, provenance immutable).
+
 # Handoff — Asset Registry Phase 3 v1 (character_story generated visuals)
 
 Ngày: 2026-08-27
