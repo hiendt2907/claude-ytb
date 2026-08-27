@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     xkiro_llm_url: str = "https://api.xkiro.com/v1/chat/completions"
     # xKiro gateway namespace; DeepSeek V4 Pro supports up to 65k output tokens.
     xkiro_llm_model: str = "deepseek/deepseek-v4-pro"
+    # Phase 11 operator-smoke defaults. Production selection remains owned by
+    # each content profile's `visual_generation.visual_judge` block; these
+    # values do not enable `vlm_ranked` globally.
+    visual_judge_provider: str = ""
+    visual_judge_model: str = ""
     # Optional operator override for Edge remote speech rate. Empty keeps the profile rate.
     edge_tts_rate_override: str = ""
     # Explicit local F5 backend. Production keeps Apple Silicon MPS; CPU is a
@@ -247,6 +252,10 @@ class Settings(BaseSettings):
         """
         if self.quality_stt_device == "cpu" and self.quality_stt_compute_type in {"float16", "int8_float16"}:
             raise ValueError("quality_stt_compute_type is not supported with quality_stt_device=cpu")
+        if bool(self.visual_judge_provider.strip()) != bool(self.visual_judge_model.strip()):
+            raise ValueError(
+                "VISUAL_JUDGE_PROVIDER và VISUAL_JUDGE_MODEL phải được cấu hình cùng nhau."
+            )
         if self.allow_cloud_providers:
             return
         if self.tts_provider in {"edge", "elevenlabs", "xkiro"}:
