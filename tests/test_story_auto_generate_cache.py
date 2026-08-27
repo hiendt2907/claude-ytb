@@ -32,7 +32,12 @@ class _FakeProvider:
 
 
 @pytest.fixture
-def profile():
+def profile(tmp_path, monkeypatch):
+    from ytb_pipeline.config.settings import settings
+    # `resolve_scene_image` with no `scene_id` defaults `AssetRegistry()` to
+    # `settings.asset_registry_path` — without this, these unit tests would
+    # write into the real repository's `assets/asset_registry.json`.
+    monkeypatch.setattr(settings, "asset_registry_path", tmp_path / "asset_registry.json", raising=False)
     return load_content_profile("ban-so-6")
 
 

@@ -177,6 +177,14 @@ def _prepare_run(monkeypatch, tmp_path, audio_result, voice_scripts=None):
         lambda _video: pipeline.RenderEvidence(width=1080, height=1920, duration_sec=8.0),
     )
     monkeypatch.setattr(pipeline.settings, "quality_reports_dir", tmp_path / "quality-reports")
+    # A `story` renderer script (see
+    # test_render_uses_renderer_declared_by_script_content_profile) drives
+    # the DAG's own scene_plan/visual_assets nodes for real, which default
+    # to `settings.projects_dir`/`settings.asset_registry_path` when not
+    # overridden — without this, that run would leak into the real
+    # repository `assets/` directory.
+    monkeypatch.setattr(pipeline.settings, "projects_dir", tmp_path / "projects", raising=False)
+    monkeypatch.setattr(pipeline.settings, "asset_registry_path", tmp_path / "asset_registry.json", raising=False)
 
     script_path = tmp_path / "approved.json"
     script_path.write_text(json.dumps(_raw_script_payload(), ensure_ascii=False), encoding="utf-8")
