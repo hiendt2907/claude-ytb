@@ -91,6 +91,7 @@ def test_story_renderer_uses_profile_assets_and_real_segment_audio(tmp_path, mon
 
     profiles = tmp_path / "profiles"
     _profile(profiles)
+    monkeypatch.setattr(settings, "projects_dir", tmp_path / "projects", raising=False)
     monkeypatch.setattr(settings, "content_profiles_dir", profiles, raising=False)
     monkeypatch.setattr(settings, "orientation", "portrait", raising=False)
     first_audio = tmp_path / "first.wav"
@@ -147,6 +148,7 @@ def test_story_renderer_preserves_audio_timeline_when_a_section_has_many_caption
     _profile(profiles)
     monkeypatch.setattr(settings, "content_profiles_dir", profiles, raising=False)
     monkeypatch.setattr(settings, "orientation", "landscape", raising=False)
+    monkeypatch.setattr(settings, "projects_dir", tmp_path / "projects", raising=False)
     first_audio = tmp_path / "first.wav"
     second_audio = tmp_path / "second.wav"
     _tone(first_audio, duration=2.0)
@@ -190,6 +192,18 @@ def test_story_renderer_preserves_audio_timeline_when_a_section_has_many_caption
     assert len(timeline.video_clips) == 2
     assert len(timeline.transitions) == 1
     assert timeline.expected_duration_sec == pytest.approx(expected_duration)
+
+    # ScenePlan v2: the semantic/visual plan Timeline was derived FROM is
+    # persisted per-project (not per-output) and its scene count matches the
+    # real narrative section count (2), never the caption card count this
+    # same fixture is specifically designed to inflate.
+    from ytb_pipeline.render.scene_plan import ScenePlan
+
+    slug = result.video_path.stem
+    scene_plan_path = settings.projects_dir / slug / "scene_plan.json"
+    assert scene_plan_path.exists()
+    scene_plan = ScenePlan.read_json(scene_plan_path)
+    assert len(scene_plan.scenes) == 2
 
 
 def _stream_duration(path: Path, stream: str) -> float:
@@ -313,6 +327,7 @@ def test_story_renderer_keeps_video_and_audio_streams_in_sync_with_many_cards_an
     _profile(profiles, gap=0.4, overlap=0.15)
     monkeypatch.setattr(settings, "content_profiles_dir", profiles, raising=False)
     monkeypatch.setattr(settings, "orientation", "landscape", raising=False)
+    monkeypatch.setattr(settings, "projects_dir", tmp_path / "projects", raising=False)
 
     solo_audio = tmp_path / "solo.wav"
     _tone(solo_audio, duration=1.517)

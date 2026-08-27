@@ -240,11 +240,61 @@ JSON next to the render's own output (`assets/output/<slug>_timeline.json`,
 alongside the existing `<slug>_thumb.jpg` convention) — never inside
 `scripts/<slug>.json` or `assets/projects/<slug>/project.json`.
 
-Scope note: v1 derives directly from the existing `Voiceover`/`Segment`
-structure (one clip per script section — no `ScenePlan` yet, see
-`docs/handoffs/2026-08-27-ai-content-factory-architecture-assessment.md`
-§N/O for that later phase). Only `render/story.py` consumes it in this
-phase; `compose.py`/`compose_ai.py` are unchanged.
+Scope note: only `render/story.py` consumes `Timeline` in this phase;
+`compose.py`/`compose_ai.py` are unchanged.
+
+## ScenePlan — story renderer (Phase 2 MVP, added 2026-08-27)
+
+`src/ytb_pipeline/render/scene_plan.py` makes explicit a decision the story
+renderer already made implicitly before Phase 2: what each section's visual
+should be, independent of when it plays. The full authoritative hierarchy
+for the `story` renderer is now:
+
+```
+Script      = WHAT is being said
+Narration   = HOW LONG it actually lasts (Segment.duration_sec)
+ScenePlan   = WHAT should visually represent each narration window (render/scene_plan.py)
+Timeline    = WHEN every renderable element appears  (render/timeline.py)
+Renderer    = HOW those Timeline elements become media (render/story.py -> FFmpeg)
+```
+
+`ScenePlan` is deliberately **not** a second `Timeline`: a `Scene`'s
+`narration_start_sec`/`narration_end_sec` window is the segment's own raw
+narration span only (no `inter_segment_gap_sec`, no
+`transition_overlap_sec` — those stay exclusively Timeline/renderer
+transition arithmetic). `ScenePlan.__post_init__` enforces the same class of
+invariant `Timeline` enforces for transitions: the number of `Scene`s must
+equal the number of narrative segments, in order, never the number of
+presentation elements (caption cards) — a caption card never becomes a
+`Scene`, a `Shot`, or a scene boundary.
+
+v1 scope is intentionally a 1:1 passthrough of the existing renderer
+behaviour: one `Scene` per script segment, exactly one `Shot` per `Scene`
+covering the whole scene window, reusing existing `Segment` semantic fields
+(`purpose`, `visual_intent`, `scene_characters`, `visual_asset`,
+`video_type`) rather than a parallel master-script schema. No LLM call is
+introduced — `build_story_scene_plan()` is pure and deterministic, with
+stable `scene_id`/`shot_id` values derived from segment index (not random
+UUIDs), so an identical `Script`+`Narration`+profile always rebuilds an
+identical `ScenePlan`. A future Director phase may enrich or replace how
+`ScenePlan` is populated (e.g. one section -> multiple shots); it should not
+require another renderer rewrite, only a different builder behind the same
+contract.
+
+`build_story_timeline()` (the Phase 1 public boundary) is now a thin
+compatibility wrapper: it builds the implied `ScenePlan` and delegates to
+`build_story_timeline_from_scene_plan(scene_plan, voiceover, profile, ...)`,
+which is what `render/story.py` actually calls. Timeline genuinely consumes
+`ScenePlan`'s scene boundaries rather than independently rediscovering them
+from `voiceover.segments`.
+
+Persistence: `ScenePlan` is written to `assets/projects/<slug>/scene_plan.json`
+(the existing per-project state root, alongside `project.json`) — unlike
+`Timeline`'s per-output artifact, `ScenePlan` is project-specific rather than
+a reusable render-output cache. Like `Timeline`, it is a derived,
+always-rebuildable debug/postmortem artifact, never read back by any stage
+as a source of truth; a legacy project missing `scene_plan.json` is
+unaffected, since every render rebuilds it fresh.
 
 ## Extension Points
 

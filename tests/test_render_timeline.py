@@ -15,6 +15,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from ytb_pipeline.render.scene_plan import ScenePlanError
 from ytb_pipeline.render.timeline import (
     NarrationClip,
     Timeline,
@@ -26,7 +27,15 @@ from ytb_pipeline.render.timeline import (
 
 
 def _segment(duration_sec: float, *, audio_path: str = "a.wav") -> SimpleNamespace:
-    return SimpleNamespace(audio_path=Path(audio_path), duration_sec=duration_sec)
+    return SimpleNamespace(
+        audio_path=Path(audio_path),
+        duration_sec=duration_sec,
+        purpose="core_answer",
+        visual_intent="nhân vật đứng trong quán cà phê",
+        video_type="image_motion",
+        visual_asset="",
+        scene_characters=(),
+    )
 
 
 def _voiceover(*durations: float) -> SimpleNamespace:
@@ -226,10 +235,15 @@ def test_building_the_same_inputs_twice_is_deterministic():
 
 def test_build_story_timeline_requires_segments_with_audio():
     profile = _profile()
-    with pytest.raises(TimelineError):
+    # Empty segments now fail one boundary earlier, inside ScenePlan
+    # construction (ScenePlanError, itself a ValueError) — the public
+    # build_story_timeline contract of "raises before any ffmpeg call" is
+    # unchanged, only the specific error class moved with the boundary.
+    with pytest.raises(ScenePlanError):
         build_story_timeline(_voiceover(), profile, fps=30, width=1920, height=1080)
 
-    voiceover = SimpleNamespace(segments=(SimpleNamespace(audio_path=None, duration_sec=1.0),))
+    voiceover = _voiceover(1.0)
+    voiceover.segments[0].audio_path = None
     with pytest.raises(TimelineError):
         build_story_timeline(voiceover, profile, fps=30, width=1920, height=1080)
 

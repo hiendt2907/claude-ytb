@@ -23,7 +23,8 @@ from ..config.settings import settings
 from ..content_profiles import ContentProfile, load_content_profile
 from ..pkg.models import RenderedVideo, Segment, Voiceover
 from ..voiceover.tts import _slugify
-from .timeline import build_story_timeline
+from .scene_plan import build_story_scene_plan
+from .timeline import build_story_timeline_from_scene_plan
 
 STORY_FPS = 30
 
@@ -66,12 +67,21 @@ def render_story_video(voiceover: Voiceover, output_dir: Path) -> RenderedVideo:
     video_path = output_dir / f"{slug}.mp4"
     thumbnail_path = output_dir / f"{slug}_thumb.jpg"
 
-    # Timeline is the authoritative, validated execution plan derived from
-    # narration (Segment.duration_sec, already measured by TTS) — built and
-    # checked BEFORE any ffmpeg call, not reconstructed inline while encoding.
-    # See render/timeline.py for the invariants this construction enforces.
-    timeline = build_story_timeline(
-        voiceover, profile, fps=STORY_FPS, width=dims[0], height=dims[1],
+    # ScenePlan is the deterministic semantic/visual plan this render implies
+    # (one scene per segment, one shot per scene in this v1 — see
+    # render/scene_plan.py), and Timeline is the validated execution plan
+    # derived FROM it — built and checked BEFORE any ffmpeg call, not
+    # reconstructed inline while encoding. Persisted as project-specific
+    # debug/postmortem artifacts, never read back as a source of truth: both
+    # are always deterministically rebuildable from Script + Voiceover +
+    # profile, so a missing file (legacy project) never blocks a render.
+    scene_plan = build_story_scene_plan(voiceover, profile)
+    scene_plan_path = settings.projects_dir / slug / "scene_plan.json"
+    scene_plan_path.parent.mkdir(parents=True, exist_ok=True)
+    scene_plan.write_json(scene_plan_path)
+
+    timeline = build_story_timeline_from_scene_plan(
+        scene_plan, voiceover, profile, fps=STORY_FPS, width=dims[0], height=dims[1],
     )
     timeline.write_json(output_dir / f"{slug}_timeline.json")
 

@@ -42,6 +42,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from ..content_profiles import ContentProfile
     from ..pkg.models import Voiceover
+    from .scene_plan import ScenePlan
 
 
 class TimelineError(ValueError):
@@ -281,17 +282,44 @@ def build_story_timeline(
 ) -> Timeline:
     """The TimelineBuilder boundary: `Voiceover` + `Segment` -> validated `Timeline`.
 
-    Deterministic and pure — no FFmpeg, no I/O, no LLM. Narration
-    (`Segment.duration_sec`, already measured by TTS) is the authoritative
-    timing input; the video track is built to match it 1-1 by construction.
-    Gap and overlap come from the profile's own `render` contract, applied
-    uniformly between every adjacent pair — exactly the two knobs
+    Compatibility wrapper (Phase 1 public signature, kept stable): builds the
+    `ScenePlan` this render implies and delegates to
+    `build_story_timeline_from_scene_plan`. Deterministic and pure — no
+    FFmpeg, no I/O, no LLM.
+    """
+    from .scene_plan import build_story_scene_plan
+
+    scene_plan = build_story_scene_plan(voiceover, profile)
+    return build_story_timeline_from_scene_plan(
+        scene_plan, voiceover, profile, fps=fps, width=width, height=height,
+    )
+
+
+def build_story_timeline_from_scene_plan(
+    scene_plan: "ScenePlan", voiceover: "Voiceover", profile: "ContentProfile",
+    *, fps: int, width: int, height: int,
+) -> Timeline:
+    """`ScenePlan` + `Voiceover` -> validated `Timeline`.
+
+    Narration (`Segment.duration_sec`, already measured by TTS) is the
+    authoritative timing input; the video track is built to match each
+    Scene's own narration window 1-1 by construction — Timeline consumes the
+    Scene boundaries `ScenePlan` already validated, it does not rediscover
+    them. Gap and overlap come from the profile's own `render` contract,
+    applied uniformly between every adjacent pair — exactly the two knobs
     `render_story_video` already reads today, just no longer computed inline
     with index-boundary conditionals scattered through the render loop.
+
+    `ScenePlan` does not carry audio paths (that is Timeline's concern, not
+    a visual planning concern), so the original segments are still consulted
+    for `audio_path` by `source_segment_index`.
     """
     segments = voiceover.segments
-    if not segments:
-        raise TimelineError("build_story_timeline cần ít nhất một segment.")
+    if len(scene_plan.scenes) != len(segments):
+        raise TimelineError(
+            f"ScenePlan có {len(scene_plan.scenes)} scene nhưng Voiceover có "
+            f"{len(segments)} segment — hai bên phải khớp 1-1."
+        )
 
     gap = profile.render.inter_segment_gap_sec
     overlap = profile.render.transition_overlap_sec
@@ -300,16 +328,19 @@ def build_story_timeline(
     narration_clips: list[NarrationClip] = []
     transitions: list[Transition] = []
     cursor = 0.0
-    for index, segment in enumerate(segments):
+    for scene in scene_plan.scenes:
+        index = scene.source_segment_index
+        segment = segments[index]
         if segment.audio_path is None:
             raise TimelineError(f"Segment {index} thiếu audio_path — chưa qua TTS.")
+        duration = scene.narration_end_sec - scene.narration_start_sec
         video_clips.append(
-            VideoClip(index=index, segment_index=index, start_sec=cursor, duration_sec=segment.duration_sec)
+            VideoClip(index=index, segment_index=index, start_sec=cursor, duration_sec=duration)
         )
         narration_clips.append(
             NarrationClip(
                 index=index, segment_index=index, start_sec=cursor,
-                duration_sec=segment.duration_sec, audio_path=Path(segment.audio_path),
+                duration_sec=duration, audio_path=Path(segment.audio_path),
             )
         )
         if index < len(segments) - 1:
@@ -318,11 +349,11 @@ def build_story_timeline(
         # shortens the FINAL composited output (`expected_duration_sec`
         # below), it never makes one clip's own declared start precede the
         # previous clip's own declared end.
-        cursor += segment.duration_sec + gap
+        cursor += duration + gap
 
-    expected_duration = sum(segment.duration_sec for segment in segments) + len(
-        transitions
-    ) * (gap - overlap)
+    expected_duration = sum(
+        scene.narration_end_sec - scene.narration_start_sec for scene in scene_plan.scenes
+    ) + len(transitions) * (gap - overlap)
 
     return Timeline(
         fps=fps, width=width, height=height,
