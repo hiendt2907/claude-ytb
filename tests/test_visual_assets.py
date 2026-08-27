@@ -599,6 +599,57 @@ def test_reselection_without_regeneration_when_selection_policy_changes(tmp_path
     assert len(registry.assets()) == 3  # all 3 candidates still registered
 
 
+def test_prepare_reselects_manifest_when_selection_policy_changes(tmp_path):
+    """The production preparation boundary must not let a reusable manifest
+    hide a selector-policy change. Candidate media is reused; only selection
+    and the manifest resolution change."""
+    plan = _acceptance_plan()
+    voiceover = _NS(project_id="prepare-reselection", segments=(_story_segment(),))
+    project_dir = tmp_path / "project"
+    cache_dir = tmp_path / "cache"
+    registry = AssetRegistry(tmp_path / "registry.json")
+    provider = _CountingProvider()
+
+    first_valid_profile = _NS(
+        profile_id="p", version="1",
+        visual_generation=_story_visual_generation(
+            candidate_count=3, selection_policy="first_valid",
+        ),
+    )
+    _, first_manifest, _ = prepare_visual_assets(
+        voiceover, first_valid_profile, project_dir=project_dir,
+        dimensions=(1080, 1920), scene_plan=plan, registry=registry,
+        cache_dir=cache_dir, provider=provider,
+    )
+    shot_id = plan.scenes[0].shots[0].shot_id
+    first_asset_id = first_manifest.shots[shot_id].asset_id
+    assert provider.calls == 3
+
+    class _PreferCandidateTwoJudge(_FakeVisualJudge):
+        def evaluate(self, request, candidates, context):
+            self.scores = {
+                candidate.asset_id: (0.95 if candidate.candidate_index == 2 else 0.5)
+                for candidate in candidates
+            }
+            return super().evaluate(request, candidates, context)
+
+    judge = _PreferCandidateTwoJudge()
+    ranked_profile = _NS(
+        profile_id="p", version="1",
+        visual_generation=_vlm_visual_generation(),
+    )
+    _, ranked_manifest, _ = prepare_visual_assets(
+        voiceover, ranked_profile, project_dir=project_dir,
+        dimensions=(1080, 1920), scene_plan=plan, registry=registry,
+        cache_dir=cache_dir, provider=provider, judge=judge,
+    )
+
+    assert provider.calls == 3
+    assert judge.calls == 1
+    assert ranked_manifest.shots[shot_id].asset_id != first_asset_id
+    assert len(registry.assets()) == 3
+
+
 # --- Zero-judge-call paths (§54) --------------------------------------------
 
 def test_candidate_count_gt_one_with_first_valid_makes_zero_judge_calls(tmp_path):
