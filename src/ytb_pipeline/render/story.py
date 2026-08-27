@@ -97,6 +97,10 @@ def render_prepared_story_video(
         scene_plan, voiceover, profile, fps=STORY_FPS, width=dims[0], height=dims[1],
     )
     timeline.write_json(output_dir / f"{slug}_timeline.json")
+    # Accessibility/platform captions are a derived deliverable, separate
+    # from the existing burned caption cards rendered into the video frames.
+    from .subtitle import build_subtitle_track, write_subtitle_artifacts
+    write_subtitle_artifacts(build_subtitle_track(voiceover, timeline), video_path)
 
     with tempfile.TemporaryDirectory(prefix=f"{slug}-story-", dir=output_dir) as raw_work:
         work = Path(raw_work)

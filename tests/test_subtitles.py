@@ -6,13 +6,13 @@ import pytest
 from ytb_pipeline.render.subtitle import (
     SubtitleCue, SubtitleTrack, build_subtitle_track, write_subtitle_artifacts,
 )
-from ytb_pipeline.render.timeline import NarrationClip, Timeline, VideoClip
+from ytb_pipeline.render.timeline import NarrationClip, Timeline, Transition, VideoClip
 
 
 def _timeline() -> Timeline:
     clips = tuple(VideoClip(i, i, float(i * 2), 2.0) for i in range(2))
     narration = tuple(NarrationClip(i, i, float(i * 2), 2.0, Path(f"{i}.wav")) for i in range(2))
-    return Timeline(30, 1920, 1080, clips, narration, (), 4.0)
+    return Timeline(30, 1920, 1080, clips, narration, (Transition(0),), 4.0)
 
 
 def test_subtitles_are_deterministic_and_follow_narration_timing():

@@ -17,6 +17,7 @@ import pytest
 
 from ytb_pipeline.render.scene_plan import ScenePlanError
 from ytb_pipeline.render.timeline import (
+    AudioLayerClip,
     NarrationClip,
     Timeline,
     TimelineError,
@@ -24,6 +25,24 @@ from ytb_pipeline.render.timeline import (
     VideoClip,
     build_story_timeline,
 )
+
+
+def test_optional_audio_layers_are_validated_without_changing_narration_duration():
+    clip = AudioLayerClip(Path("music.wav"), 0.0, 4.0, gain_db=-18.0, fade_in_sec=0.5, fade_out_sec=0.5, loop=True)
+    timeline = _timeline_with_audio_layer(clip)
+    assert timeline.music_clips == (clip,)
+    assert timeline.expected_duration_sec == pytest.approx(4.0)
+    with pytest.raises(TimelineError):
+        AudioLayerClip(Path("bad.wav"), 0.0, 1.0, fade_in_sec=0.8, fade_out_sec=0.8)
+
+
+def _timeline_with_audio_layer(clip):
+    return Timeline(
+        fps=30, width=1920, height=1080,
+        video_clips=(VideoClip(0, 0, 0.0, 4.0),),
+        narration_clips=(NarrationClip(0, 0, 0.0, 4.0, Path("n.wav")),),
+        transitions=(), expected_duration_sec=4.0, music_clips=(clip,),
+    )
 
 
 def _segment(duration_sec: float, *, audio_path: str = "a.wav") -> SimpleNamespace:

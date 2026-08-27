@@ -92,6 +92,29 @@ class NarrationClip:
 
 
 @dataclass(frozen=True)
+class AudioLayerClip:
+    """Optional local music/SFX placement; narration remains separate."""
+
+    asset_path: Path
+    start_sec: float
+    duration_sec: float
+    gain_db: float = 0.0
+    fade_in_sec: float = 0.0
+    fade_out_sec: float = 0.0
+    loop: bool = False
+
+    def __post_init__(self) -> None:
+        if self.start_sec < 0 or self.duration_sec <= 0:
+            raise TimelineError("AudioLayerClip phải có start >= 0 và duration dương.")
+        if not -60.0 <= self.gain_db <= 12.0:
+            raise TimelineError("AudioLayerClip.gain_db phải nằm trong [-60, 12].")
+        if self.fade_in_sec < 0 or self.fade_out_sec < 0:
+            raise TimelineError("AudioLayerClip fade không được âm.")
+        if self.fade_in_sec + self.fade_out_sec > self.duration_sec:
+            raise TimelineError("Tổng fade của AudioLayerClip không được dài hơn clip.")
+
+
+@dataclass(frozen=True)
 class Transition:
     """The boundary right after `after_clip_index`, before the next clip.
 
@@ -139,6 +162,8 @@ class Timeline:
     transitions: tuple[Transition, ...]
     expected_duration_sec: float
     source_fingerprint: str = ""
+    music_clips: tuple[AudioLayerClip, ...] = ()
+    sfx_clips: tuple[AudioLayerClip, ...] = ()
 
     def __post_init__(self) -> None:
         if self.fps <= 0:
@@ -211,8 +236,9 @@ class Timeline:
     def to_json_dict(self) -> dict:
         def clip_dict(clip) -> dict:
             data = asdict(clip)
-            if "audio_path" in data:
-                data["audio_path"] = str(data["audio_path"])
+            for path_field in ("audio_path", "asset_path"):
+                if path_field in data:
+                    data[path_field] = str(data[path_field])
             return data
 
         return {
@@ -224,6 +250,8 @@ class Timeline:
             "video_clips": [clip_dict(clip) for clip in self.video_clips],
             "narration_clips": [clip_dict(clip) for clip in self.narration_clips],
             "transitions": [asdict(t) for t in self.transitions],
+            "music_clips": [clip_dict(clip) for clip in self.music_clips],
+            "sfx_clips": [clip_dict(clip) for clip in self.sfx_clips],
         }
 
     def write_json(self, path: Path) -> None:
@@ -253,6 +281,8 @@ class Timeline:
                 for clip in data["narration_clips"]
             ),
             transitions=tuple(Transition(**t) for t in data["transitions"]),
+            music_clips=tuple(AudioLayerClip(**{**clip, "asset_path": Path(clip["asset_path"])}) for clip in data.get("music_clips", ())),
+            sfx_clips=tuple(AudioLayerClip(**{**clip, "asset_path": Path(clip["asset_path"])}) for clip in data.get("sfx_clips", ())),
         )
 
     @classmethod
