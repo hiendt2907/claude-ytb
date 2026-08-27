@@ -63,6 +63,20 @@ amendment ghi rõ ngày + lý do trong chính file đó):
   thế nào) hoàn toàn khác PlatformProfile (đăng lên đâu). Không hardcode tên
   chủ đề, nhân vật, giọng hay renderer trong pipeline.
 
+- **Content profile — contract mở rộng (2026-08-26/27).** `profile.json` có
+  thể khai `format_prompts` (Short/Long dùng prompt cấu trúc khác nhau thay
+  vì gộp chung 1 prompt `editorial`), `editorial_review` (cổng LLM chấm điểm
+  rubric 5 tiêu chí, **opt-in**, xem `docs/constitution/38-EDITORIAL_QUALITY_LAYERS.md`
+  cho ranh giới với QA heuristic), và các `content_rules` mới:
+  `allow_short_generation` (series có thể ngừng SINH Short mới mà vẫn đọc
+  được Short cũ), `story_primary_speaker_id`/`story_supporting_speaker_id`
+  (profile tự khai vai trò 2-cast thay vì engine giả định key cố định),
+  `long_opening_mode`/`short_ending_mode`, `require_next_episode_bridge`.
+  Mỗi lần bump `version`, giữ snapshot tại `profiles/<id>/versions/<semver>/`
+  để script cũ luôn load lại đúng contract đã sinh ra nó. Chi tiết đầy đủ:
+  `docs/constitution/03-ARCHITECTURE.md` mục "Content profile — extended
+  contract".
+
 - **Clean + Hexagonal.** Dependency luôn hướng vào trong: Interface →
   Application → Domain. Domain layer (frozen dataclasses) không phụ thuộc
   gì bên ngoài — không Pillow, không FFmpeg, không SDK Google hay SDK provider
@@ -279,6 +293,14 @@ ytb cache warm
 - `secrets/` không commit; mọi path qua `settings`, không hardcode.
 - `script.json` cũ phải luôn load được qua compatibility loader sau khi
   `project.json` thành canonical.
+- Không hardcode tên profile/nhân vật cụ thể (vd `"ban-so-6"`, `"minh"`,
+  `"an"`) trong `src/ytb_pipeline/`. Vai trò 2-cast của một profile kể
+  chuyện khai qua `content_rules.story_primary_speaker_id`/
+  `story_supporting_speaker_id`, không suy ra từ `voice_cast` cố định.
+- Một luật content mới chỉ được thêm vào ĐÚNG MỘT trong hai lớp QA
+  (`qa_agent.py` heuristic tất định, hoặc `editorial_review` LLM rubric) —
+  theo quyết định cây hỏi trong `docs/constitution/38-EDITORIAL_QUALITY_LAYERS.md`,
+  không thêm trùng ở cả hai lớp cho cùng một loại lỗi.
 
 # Repository Evolution Rules
 

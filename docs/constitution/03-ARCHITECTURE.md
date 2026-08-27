@@ -128,6 +128,52 @@ and how to tell; a platform profile answers where and under which publishing
 constraints to deliver it. Adding a topic must be a data-directory operation,
 not a branch in pipeline/domain code.
 
+### Content profile — extended contract (added 2026-08-26/27, generalized 71-commit line)
+
+A `profile.json` may declare, beyond the base fields above:
+
+- **`format_prompts`** (`{"short": "<prompt name>", "long": "<prompt name>"}`)
+  — lets a profile give the Short and the Long transcript a *different*
+  structural prompt (e.g. `long-transcript-structure.md` vs
+  `short-funnel-structure.md`) instead of one undifferentiated `editorial`
+  prompt for both. Validated at load time: every name referenced must exist
+  in `prompts`; only `short`/`long` are legal keys.
+- **`editorial_review`** (`{"enabled", "rubric_prompt_name", "minimum_score",
+  "max_rewrites"}`) — an **opt-in** LLM-judged quality gate, separate from
+  the deterministic `qa_agent.py` heuristics (see
+  `38-EDITORIAL_QUALITY_LAYERS.md` for the boundary between the two).
+  Implemented in `agents/editorial_review_agent.py`: scores a script 0-10 on
+  five fixed dimensions (`human_truth`, `spoken_naturalness`,
+  `causal_coherence`, `role_fidelity`, `useful_restraint`), cached by
+  `(profile_fingerprint, script content hash)` so an unchanged script is
+  never re-reviewed. A profile that never declares this block triggers zero
+  extra LLM calls — existing profiles are unaffected unless they opt in.
+- **`content_rules.allow_short_generation`** (default `true`) — a series can
+  stop producing *new* Shorts while keeping every already-rendered Short
+  readable (`ContentProfile.supports_generation()` separates "can this
+  format still be generated" from "can this format still be loaded").
+- **`content_rules.story_primary_speaker_id` /
+  `story_supporting_speaker_id`** — a `character_story` profile names its own
+  two-cast role contract instead of the engine assuming any fixed speaker
+  keys; empty (default) keeps the older, more permissive cast contract.
+- **`content_rules.long_opening_mode`** (`channel_greeting` | `pain_first` |
+  `story_context`) and **`short_ending_mode`** (`final_action` |
+  `funnel_bridge`) — the opening/closing shape of a Long or Short is a
+  per-profile editorial choice, not a hardcoded channel-wide convention.
+- **`content_rules.require_next_episode_bridge`** — a serialized story can
+  require its closing to name what continues into the next episode.
+
+### Profile version snapshots
+
+`profiles/<profile_id>/versions/<semver>/` holds an immutable copy of
+`profile.json` (and any versioned prompt/bible files) taken at the moment the
+active `version` field was bumped. `load_content_profile(profile_id,
+version=...)` resolves a specific snapshot so an already-rendered or archived
+script keeps working against the exact contract it was produced under, even
+after the active profile has moved on. Every profile that bumps its version
+is expected to keep a matching snapshot directory — this is a convention
+enforced by consistent authoring, not (yet) a loader-level check.
+
 Each port is a small, focused interface (Interface Segregation per
 `02-PRINCIPLES.md`) — e.g. `VoiceProvider` exposes `synthesize(script:
 VoiceScript) -> Asset` and a `capabilities()` descriptor (supports cloning?
