@@ -66,8 +66,9 @@ multi-shot Timeline coverage, and the explicit DAG stage. All state uses
 temporary test project paths; no runtime asset is intentionally written under
 the repository asset roots.
 
-Commits: `b2d4214`, `30519e7`, plus the completion commit following this
-handoff. Final full suite: **1120 passed, 3 skipped, 1 deselected, 0 failed**
+Commits: `b2d4214` (contracts), `30519e7` (initial persistence boundary),
+`a93e19f` (DAG integration, stable identity, multi-shot Timeline, tests and
+architecture). Final full suite: **1120 passed, 3 skipped, 1 deselected, 0 failed**
 from 1124 collected items. Deferred:
 candidate generation/ranking, VLM QC, new visual providers, short reuse, smart
 crop, approval UI, compose_ai Timeline migration, AI music/SFX and Phase 8.
