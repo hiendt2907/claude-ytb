@@ -138,6 +138,19 @@ Sinh ảnh cảnh local qua ComfyUI/IPAdapter, neo danh tính nhân vật —
 `solo_weight`/`duo_weight` `[0,2]`, `duo_denoise` `(0,1]`, `characters` (map
 character id → đường dẫn ảnh neo trong `assets_dir`), `duo_reference_image`.
 
+Phase 9 — đa candidate (tuỳ chọn, mặc định giữ nguyên hành vi 1-candidate cũ):
+`candidate_count` (mặc định `1`, tối đa `4` — sinh N ứng viên tuần tự cho mỗi
+shot thay vì 1 ảnh; ChỈ bật khi profile thực sự cần "sinh vài, chọn ảnh tốt
+nhất", vì mỗi candidate tăng thời gian ComfyUI tuyến tính), `selection_policy`
+(mặc định `"first_valid"` — duy nhất chính sách hợp lệ ở Phase 9, chọn
+candidate hợp lệ theo index thấp nhất; chấm điểm ngữ nghĩa/VLM thật là Phase
+10), `candidate_policy_version` (mặc định `"phase9-v1"` — đổi giá trị này để
+buộc re-selection mà không bắt buộc sinh lại candidate đã hợp lệ). Trạng thái
+candidate lưu riêng mỗi project tại
+`assets/projects/<slug>/visual_candidates.json` — không ghi vào
+`AssetRegistry` hay `visual_manifest.json`. Xem
+`docs/handoffs/2026-08-27-visual-candidates-phase9-handoff.md`.
+
 ## Quy ước version snapshot
 
 Mỗi lần bump `version` trong `profile.json`, copy nguyên trạng thái cũ (kể cả

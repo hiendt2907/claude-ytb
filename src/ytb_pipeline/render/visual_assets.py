@@ -15,6 +15,14 @@ from typing import TYPE_CHECKING, Any
 from ..config.settings import settings
 from ..providers.image.comfyui_story_provider import SAMPLER, SCHEDULER
 from .asset_registry import AssetRegistry, content_sha256 as observed_content_sha256
+from .visual_candidates import (
+    VisualCandidateStore,
+    candidate_cache_path,
+    candidate_is_valid,
+    logger as _candidate_logger,
+    resolve_selection_policy,
+    validate_candidate_image,
+)
 
 if TYPE_CHECKING:
     from ..content_profiles import ContentProfile
@@ -139,8 +147,9 @@ def _generation_mode(characters: tuple[str, ...]) -> str:
 class VisualAssetResolver:
     """The single local/cache/ComfyUI/registry decision owner."""
 
-    def __init__(self, profile: "ContentProfile", *, registry: AssetRegistry | None = None, cache_dir: Path | None = None, provider: Any = None) -> None:
+    def __init__(self, profile: "ContentProfile", *, registry: AssetRegistry | None = None, cache_dir: Path | None = None, provider: Any = None, candidate_store: VisualCandidateStore | None = None) -> None:
         self.profile, self.registry, self.cache_dir, self.provider = profile, registry or AssetRegistry(), cache_dir, provider
+        self.candidate_store = candidate_store
 
     def resolve(self, request: VisualRequest, segment: "Segment", shot: "Shot", *, video_slug: str) -> dict[str, Any]:
         if request.resolution_kind == "profile_local":
@@ -154,19 +163,73 @@ class VisualAssetResolver:
             raise ValueError(f"Section thiếu visual_asset và profile '{self.profile.profile_id}' không bật visual_generation — không có ảnh nào để dùng.")
         key = _generation_key(segment, self.profile, request.dimensions)
         cache_dir = self.cache_dir or settings.assets_dir / "generated_visuals" / self.profile.profile_id
-        asset_path = Path(cache_dir) / f"{key}.png"
         generated_dimensions = _SDXL_GENERATION_DIMS[request.dimensions]
-        seed = int(key[:16], 16) % (2**32)
         characters = tuple(dict.fromkeys(segment.scene_characters))
-        fresh = not asset_path.is_file()
-        if fresh:
-            provider = self.provider
-            if provider is None:
-                from ..providers.registry import get_story_image_provider
-                provider = get_story_image_provider()
-            provider.generate_scene(self.profile, characters_present=tuple(segment.scene_characters), prompt=segment.visual_intent.strip(), width=generated_dimensions[0], height=generated_dimensions[1], seed=seed, output_path=asset_path)
-        asset_id = self.registry.record_generated(generation_key=key, local_path=asset_path, is_fresh_generation=fresh, profile_id=self.profile.profile_id, profile_version=self.profile.version, seed=seed, prompt=segment.visual_intent.strip(), style_prompt=visual.style_prompt, negative_prompt=visual.negative_prompt, steps=visual.steps, cfg=visual.cfg, width=generated_dimensions[0], height=generated_dimensions[1], characters=characters, generation_mode=_generation_mode(characters), checkpoint=settings.comfyui_sdxl_checkpoint, clip_vision_model=settings.comfyui_clip_vision_model, ipadapter_model=settings.comfyui_ipadapter_model, solo_weight=visual.solo_weight, duo_weight=visual.duo_weight, duo_denoise=visual.duo_denoise, sampler=SAMPLER, scheduler=SCHEDULER, scene_id=request.scene_id, shot_id=request.shot_id, video_slug=video_slug)
-        record = self.registry.find_by_asset_id(asset_id)
+        candidate_count = getattr(visual, "candidate_count", 1)
+        if candidate_count <= 1:
+            # Unchanged Phase 8 single-candidate path — same filename, same
+            # seed formula, same call shape as before Phase 9 existed.
+            asset_path = Path(cache_dir) / f"{key}.png"
+            seed = int(key[:16], 16) % (2**32)
+            fresh = not asset_path.is_file()
+            if fresh:
+                provider = self.provider
+                if provider is None:
+                    from ..providers.registry import get_story_image_provider
+                    provider = get_story_image_provider()
+                provider.generate_scene(self.profile, characters_present=tuple(segment.scene_characters), prompt=segment.visual_intent.strip(), width=generated_dimensions[0], height=generated_dimensions[1], seed=seed, output_path=asset_path)
+            asset_id = self.registry.record_generated(generation_key=key, local_path=asset_path, is_fresh_generation=fresh, profile_id=self.profile.profile_id, profile_version=self.profile.version, seed=seed, prompt=segment.visual_intent.strip(), style_prompt=visual.style_prompt, negative_prompt=visual.negative_prompt, steps=visual.steps, cfg=visual.cfg, width=generated_dimensions[0], height=generated_dimensions[1], characters=characters, generation_mode=_generation_mode(characters), checkpoint=settings.comfyui_sdxl_checkpoint, clip_vision_model=settings.comfyui_clip_vision_model, ipadapter_model=settings.comfyui_ipadapter_model, solo_weight=visual.solo_weight, duo_weight=visual.duo_weight, duo_denoise=visual.duo_denoise, sampler=SAMPLER, scheduler=SCHEDULER, scene_id=request.scene_id, shot_id=request.shot_id, video_slug=video_slug)
+            record = self.registry.find_by_asset_id(asset_id)
+            assert record is not None
+            return record
+        return self._resolve_candidates(request, segment, visual, key, cache_dir, generated_dimensions, characters, video_slug)
+
+    def _resolve_candidates(self, request: VisualRequest, segment: "Segment", visual: Any, generation_key: str, cache_dir: Path, generated_dimensions: tuple[int, int], characters: tuple[str, ...], video_slug: str) -> dict[str, Any]:
+        """Opt-in Phase 9 multi-candidate path (`candidate_count > 1`)."""
+        target_count = visual.candidate_count
+        policy_version = getattr(visual, "candidate_policy_version", "phase9-v1")
+        policy_name = getattr(visual, "selection_policy", "first_valid")
+        store = self.candidate_store or VisualCandidateStore(Path(cache_dir) / "visual_candidates.json")
+        candidate_set = store.get_or_create(
+            shot_id=request.shot_id, request_id=request.request_id, request_fingerprint=request.request_fingerprint,
+            generation_key=generation_key, candidate_policy_version=policy_version, target_candidate_count=target_count,
+        )
+        _candidate_logger.info(
+            "visual_candidates.prepare shot_id=%s target_count=%s policy=%s policy_version=%s",
+            request.shot_id, target_count, policy_name, policy_version,
+        )
+        for index in range(target_count):
+            slot = candidate_set.slot(index)
+            if candidate_is_valid(slot, self.registry):
+                continue
+            slot.attempt_count += 1
+            asset_path = candidate_cache_path(cache_dir, generation_key, index)
+            seed = slot.seed
+            fresh = not asset_path.is_file()
+            try:
+                if fresh:
+                    provider = self.provider
+                    if provider is None:
+                        from ..providers.registry import get_story_image_provider
+                        provider = get_story_image_provider()
+                    provider.generate_scene(self.profile, characters_present=tuple(segment.scene_characters), prompt=segment.visual_intent.strip(), width=generated_dimensions[0], height=generated_dimensions[1], seed=seed, output_path=asset_path)
+                if not validate_candidate_image(asset_path):
+                    raise ValueError(f"Candidate ảnh không hợp lệ (technical validation thất bại): {asset_path}")
+                asset_id = self.registry.record_generated(generation_key=generation_key, local_path=asset_path, is_fresh_generation=fresh, profile_id=self.profile.profile_id, profile_version=self.profile.version, seed=seed, prompt=segment.visual_intent.strip(), style_prompt=visual.style_prompt, negative_prompt=visual.negative_prompt, steps=visual.steps, cfg=visual.cfg, width=generated_dimensions[0], height=generated_dimensions[1], characters=characters, generation_mode=_generation_mode(characters), checkpoint=settings.comfyui_sdxl_checkpoint, clip_vision_model=settings.comfyui_clip_vision_model, ipadapter_model=settings.comfyui_ipadapter_model, solo_weight=visual.solo_weight, duo_weight=visual.duo_weight, duo_denoise=visual.duo_denoise, sampler=SAMPLER, scheduler=SCHEDULER, scene_id=request.scene_id, shot_id=request.shot_id, video_slug=video_slug)
+                slot.status, slot.asset_id, slot.last_error = "done", asset_id, None
+            except Exception as exc:
+                slot.status, slot.last_error = "failed", str(exc)
+            store.write()
+        selector = resolve_selection_policy(policy_name)
+        selected_asset_id = selector(candidate_set, self.registry)
+        if selected_asset_id is None:
+            candidate_set.selection_status = "failed"
+            store.write()
+            raise ValueError(f"Không có candidate hợp lệ nào cho shot {request.shot_id} (target_count={target_count}).")
+        candidate_set.selected_asset_id = selected_asset_id
+        candidate_set.selection_status = "selected"
+        store.write()
+        record = self.registry.find_by_asset_id(selected_asset_id)
         assert record is not None
         return record
 
@@ -203,7 +266,8 @@ def prepare_visual_assets(voiceover: "Voiceover", profile: "ContentProfile", *, 
     manifest_path = project_dir / "visual_manifest.json"
     manifest = VisualManifest.read_json(manifest_path) if manifest_path.is_file() else VisualManifest(plan.source_fingerprint)
     registry = registry or AssetRegistry()
-    resolver = VisualAssetResolver(profile, registry=registry, cache_dir=cache_dir, provider=provider)
+    candidate_store = VisualCandidateStore(project_dir / "visual_candidates.json")
+    resolver = VisualAssetResolver(profile, registry=registry, cache_dir=cache_dir, provider=provider, candidate_store=candidate_store)
     shots = {shot.shot_id: (scene, shot) for scene in plan.scenes for shot in scene.shots}
     prepared: dict[str, Path] = {}
     for request in requests:

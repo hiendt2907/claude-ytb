@@ -419,6 +419,14 @@ class EditorialReviewProfile:
             raise ContentProfileError("editorial_review.max_rewrites phải >= 0.")
 
 
+# Phase 9 — conservative hard bound on opt-in multi-candidate generation.
+# ComfyUI runs on one constrained-unified-memory Mac and candidate slots
+# generate sequentially (never in parallel), so cost multiplies linearly
+# with count; 4 keeps a "generate a few, pick the best" profile affordable.
+MAX_CANDIDATE_COUNT = 4
+_KNOWN_SELECTION_POLICIES = {"first_valid"}
+
+
 @dataclass(frozen=True)
 class VisualGenerationProfile:
     """Local ComfyUI/IPAdapter identity-anchored scene generation.
@@ -438,6 +446,14 @@ class VisualGenerationProfile:
     duo_denoise: float
     characters: Mapping[str, str]
     duo_reference_image: str
+    # Phase 9 — multi-candidate visual generation. Defaulting to 1 preserves
+    # the exact Phase 8 single-candidate generation path byte-for-byte;
+    # multi-candidate is strictly opt-in per profile. `MAX_CANDIDATE_COUNT`
+    # is a conservative hard bound (constrained unified-memory Mac target —
+    # see `docs/handoffs/2026-08-27-visual-candidates-phase9-handoff.md`).
+    candidate_count: int = 1
+    selection_policy: str = "first_valid"
+    candidate_policy_version: str = "phase9-v1"
 
     def __post_init__(self) -> None:
         if self.steps < 1:
@@ -450,6 +466,16 @@ class VisualGenerationProfile:
             raise ContentProfileError("visual_generation.duo_weight phải nằm trong [0, 2].")
         if not (0 < self.duo_denoise <= 1):
             raise ContentProfileError("visual_generation.duo_denoise phải nằm trong (0, 1].")
+        if not (1 <= self.candidate_count <= MAX_CANDIDATE_COUNT):
+            raise ContentProfileError(
+                f"visual_generation.candidate_count phải nằm trong [1, {MAX_CANDIDATE_COUNT}]."
+            )
+        if self.selection_policy not in _KNOWN_SELECTION_POLICIES:
+            raise ContentProfileError(
+                f"visual_generation.selection_policy không hợp lệ: {self.selection_policy!r}."
+            )
+        if not self.candidate_policy_version.strip():
+            raise ContentProfileError("visual_generation.candidate_policy_version không được rỗng.")
 
 
 def profiles_root(profiles_dir: Path | str | None = None) -> Path:
@@ -713,6 +739,16 @@ def _editorial_review_profile(raw: Any) -> "EditorialReviewProfile | None":
     )
 
 
+def _candidate_count(mapping: Mapping[str, Any]) -> int:
+    """Defaults to 1 (single-candidate, pre-Phase-9 behaviour) when absent."""
+    raw = mapping.get("candidate_count", 1)
+    if isinstance(raw, bool) or not isinstance(raw, int) or not 1 <= raw <= MAX_CANDIDATE_COUNT:
+        raise ContentProfileError(
+            f"visual_generation.candidate_count phải là số nguyên trong [1, {MAX_CANDIDATE_COUNT}]."
+        )
+    return raw
+
+
 def _visual_generation_profile(raw: Any, profile_id: str) -> "VisualGenerationProfile | None":
     if raw is None:
         return None
@@ -728,6 +764,9 @@ def _visual_generation_profile(raw: Any, profile_id: str) -> "VisualGenerationPr
         duo_denoise=_finite_number(mapping, "duo_denoise", prefix="visual_generation"),
         characters=_string_map(mapping.get("characters"), "visual_generation.characters"),
         duo_reference_image=str(mapping.get("duo_reference_image") or "").strip(),
+        candidate_count=_candidate_count(mapping),
+        selection_policy=str(mapping.get("selection_policy") or "first_valid").strip(),
+        candidate_policy_version=str(mapping.get("candidate_policy_version") or "phase9-v1").strip(),
     )
 
 
