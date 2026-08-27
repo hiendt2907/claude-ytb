@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from ytb_pipeline.render.visual_judge import CandidateEvaluation, JudgeResult
 
 
@@ -48,6 +50,7 @@ def test_status_reports_explicit_provider_model_and_adapter_state(monkeypatch, c
     output = capsys.readouterr().out
     assert "semantic judge configured: yes" in output
     assert "vision-capable adapter registered: yes" in output
+    assert "vision-capable adapter active: yes" in output
     assert "provider: xkiro" in output
     assert "model: qwen/qwen3.8-max:free" in output
 
@@ -113,3 +116,16 @@ def test_smoke_requires_explicit_config(monkeypatch, capsys):
 
     assert smoke_visual_judge.main(["--generate-probe"]) == 2
     assert "VISUAL_JUDGE_PROVIDER" in capsys.readouterr().err
+
+
+def test_settings_fail_fast_when_only_one_smoke_setting_is_configured():
+    from pydantic import ValidationError
+
+    from ytb_pipeline.config.settings import Settings
+
+    with pytest.raises(ValidationError, match="VISUAL_JUDGE_PROVIDER"):
+        Settings(
+            _env_file=None,
+            visual_judge_provider="xkiro",
+            visual_judge_model="",
+        )

@@ -60,12 +60,14 @@ def _status(provider: str, model: str) -> bool:
     configured = bool(provider and model)
     registered = bool(provider and provider in available_visual_judges())
     credential = bool(settings.xkiro_api_key.strip()) if provider == "xkiro" else False
+    active = configured and registered and credential
     print(f"semantic judge configured: {'yes' if configured else 'no'}")
     print(f"vision-capable adapter registered: {'yes' if registered else 'no'}")
+    print(f"vision-capable adapter active: {'yes' if active else 'no'}")
     print(f"credential configured: {'yes' if credential else 'no'}")
     print(f"provider: {provider or '(unset)'}")
     print(f"model: {model or '(unset)'}")
-    return configured and registered and credential
+    return active
 
 
 def _generate_probe(path: Path) -> None:

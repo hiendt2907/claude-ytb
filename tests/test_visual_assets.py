@@ -554,6 +554,83 @@ def test_vlm_ranked_resolves_configured_production_judge_when_not_injected(tmp_p
     assert judge.calls == 1
 
 
+def test_actual_xkiro_adapter_selects_ranked_candidate_into_visual_manifest(tmp_path):
+    """Phase-11 mocked-transport acceptance through the production adapter."""
+    import json
+
+    from ytb_pipeline.providers.vision.xkiro_provider import XkiroVisualJudge
+
+    class _ComparativeTransport:
+        def __init__(self):
+            self.calls = 0
+            self.verified = []
+
+        def verify_vision_model(self, model):
+            self.verified.append(model)
+
+        def complete(self, *, model, system, content):
+            self.calls += 1
+            labels = [
+                part["text"]
+                for part in content
+                if part["type"] == "text"
+                and part["text"].startswith("candidate_index=")
+            ]
+            evaluations = []
+            for label in labels:
+                fields = dict(token.split("=", 1) for token in label.split())
+                index = int(fields["candidate_index"])
+                score = {0: 0.65, 1: 0.92, 2: 0.99}[index]
+                evaluations.append({
+                    "asset_id": fields["asset_id"],
+                    "semantic_score": score,
+                    "character_score": score,
+                    "composition_score": score,
+                    "continuity_score": score,
+                    "hard_failures": ["semantic_contradiction"] if index == 2 else [],
+                    "reasons": ["mocked production transport"],
+                })
+            return json.dumps({"evaluations": evaluations})
+
+    model = "qwen/qwen3.8-max:free"
+    profile = _NS(
+        profile_id="p",
+        version="1",
+        visual_generation=_vlm_visual_generation(
+            judge_cfg=_judge_cfg(provider="xkiro", model=model)
+        ),
+    )
+    plan = _acceptance_plan()
+    voiceover = _NS(project_id="xkiro-adapter-acceptance", segments=(_story_segment(),))
+    project_dir = tmp_path / "project"
+    registry = AssetRegistry(tmp_path / "registry.json")
+    generator = _CountingProvider()
+    transport = _ComparativeTransport()
+    judge = XkiroVisualJudge(model, transport=transport)
+
+    _, manifest, _ = prepare_visual_assets(
+        voiceover,
+        profile,
+        project_dir=project_dir,
+        dimensions=(1080, 1920),
+        scene_plan=plan,
+        registry=registry,
+        cache_dir=tmp_path / "cache",
+        provider=generator,
+        judge=judge,
+    )
+
+    shot_id = plan.scenes[0].shots[0].shot_id
+    candidate_set = VisualCandidateStore(project_dir / "visual_candidates.json").get(shot_id)
+    assert candidate_set is not None
+    assert manifest.shots[shot_id].asset_id == candidate_set.slot(1).asset_id
+    assert candidate_set.slot(2).asset_id != manifest.shots[shot_id].asset_id
+    assert generator.calls == 3
+    assert len(registry.assets()) == 3
+    assert transport.verified == [model]
+    assert transport.calls == 1
+
+
 def test_valid_persisted_evaluation_avoids_a_second_judge_call(tmp_path):
     profile = _NS(profile_id="p", version="1", visual_generation=_vlm_visual_generation())
     registry = AssetRegistry(tmp_path / "registry.json")
