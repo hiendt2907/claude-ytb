@@ -505,7 +505,7 @@ def test_editorial_rejection_rewrites_then_re_reviews_until_the_profile_bar(tmp_
 
     monkeypatch.setattr(fix_module.QAAgent, "run", _fake_qa_run)
     original = _valid_review_gate_payload(profile)
-    rewritten = {**original, "title": "Bản đã viết lại"}
+    rewritten_opening = "Đoạn mở đã được viết lại thành lời kể cụ thể, không còn giọng thuyết minh."
 
     class _ReviewThenRewriteProvider:
         def __init__(self):
@@ -539,8 +539,9 @@ def test_editorial_rejection_rewrites_then_re_reviews_until_the_profile_bar(tmp_
                     "blocking_findings": [], "section_refs": [], "repair_brief": "",
                 })
             assert "Editorial review findings" in prompt
+            assert "do not rewrite the entire script" in prompt.casefold()
             self.rewrite_calls += 1
-            return json.dumps(rewritten)
+            return json.dumps({"sections": [{"section_index": 1, "voiceover": rewritten_opening}]})
 
     provider = _ReviewThenRewriteProvider()
     result = asyncio.run(validate_or_repair_script(
@@ -549,7 +550,13 @@ def test_editorial_rejection_rewrites_then_re_reviews_until_the_profile_bar(tmp_
         provider, original, tmp_path / "s.json", "", max_attempts=1,
     ))
 
-    assert result["title"] == "Bản đã viết lại"
+    # Bounded: only the cited section's spoken text was asked to change, title
+    # is untouched, and section structure/order/count survives — a full
+    # rewrite is not what this LLM response shape can do.
+    assert result["title"] == original["title"]
+    assert rewritten_opening in result["sections"][0]["voiceover"]
+    assert [s["purpose"] for s in result["sections"]] == [s["purpose"] for s in original["sections"]]
+    assert len(result["sections"]) == len(original["sections"])
     assert provider.rewrite_calls == 1
     assert provider.review_calls == 2
 
@@ -604,7 +611,11 @@ def test_editorial_only_retry_never_spends_a_contract_repair_call(tmp_path, monk
                     "repair_brief": "Viết lại tự nhiên hơn.",
                 })
             assert "Editorial review findings" in prompt
-            return json.dumps(original)
+            # A "bad" rewrite: the bounded delta is well-formed but returns
+            # the same opening text unchanged, so the hook violation persists.
+            return json.dumps({
+                "sections": [{"section_index": 1, "voiceover": original["sections"][0]["voiceover"]}],
+            })
 
     provider = Provider()
     with pytest.raises(IdeationQualityFailure):
@@ -614,17 +625,25 @@ def test_editorial_only_retry_never_spends_a_contract_repair_call(tmp_path, monk
     assert not any(prompt.startswith("Rewrite ONLY the opening narration") for prompt in provider.prompts)
 
 
-def test_editorial_rewrite_prompt_gives_xkiro_dimension_level_feedback():
-    """A rejected writer gets actionable evidence, not a vague retry order."""
-    from types import SimpleNamespace
-    from ytb_pipeline.orchestrator.ideation_prompts import editorial_rewrite_prompt
-
-    payload = {
+def _editorial_rewrite_payload():
+    return {
         "slug": "fixture", "topic": "Một tình huống công việc", "profile_id": "one-cup-cafe-6h",
         "profile_version": "1.1.0", "video_type": "long", "target_minutes": 5,
         "_editorial_review": {"passed": True, "overall_score": 10},
+        "sections": [
+            {"purpose": "situation", "voiceover": "Section 1 giữ nguyên."},
+            {"purpose": "evidence", "voiceover": "Section 2 giữ nguyên."},
+            {"purpose": "evidence", "voiceover": "Section 3 bị liệt kê như dàn bài."},
+            {"purpose": "application", "voiceover": "Section 4 cũng bị liệt kê như dàn bài."},
+            {"purpose": "payoff", "voiceover": "Section 5 giữ nguyên."},
+        ],
     }
-    review = SimpleNamespace(
+
+
+def _editorial_rewrite_review():
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
         overall_score=8,
         dimension_scores={
             "human_truth": 9, "spoken_naturalness": 7,
@@ -635,10 +654,34 @@ def test_editorial_rewrite_prompt_gives_xkiro_dimension_level_feedback():
         repair_brief="Bỏ đánh số góc nhìn, chuyển thành lời kể liền mạch.",
     )
 
-    prompt = editorial_rewrite_prompt(payload, review)
+
+def test_editorial_rewrite_prompt_gives_xkiro_dimension_level_feedback():
+    """A rejected writer gets actionable evidence, not a vague retry order."""
+    from ytb_pipeline.orchestrator.ideation_prompts import editorial_rewrite_prompt
+
+    prompt = editorial_rewrite_prompt(_editorial_rewrite_payload(), _editorial_rewrite_review())
 
     assert "target bar: every dimension and overall score must reach 9/10" in prompt
     assert '"spoken_naturalness": 7' in prompt
     assert "sections: [3, 4]" in prompt
     assert "Bỏ đánh số góc nhìn" in prompt
     assert "_editorial_review" not in prompt
+
+
+def test_editorial_rewrite_prompt_is_bounded_to_the_cited_sections_only():
+    """A full-transcript rewrite risks regressing a section the reviewer
+    never flagged (production 2026-08-27: an editorial rewrite silently
+    broke the opening hook, burning the whole repair budget on a violation
+    nobody asked it to touch). The prompt must give full context but demand
+    output for ONLY the cited section indices, in a bounded, mergeable shape
+    — the same discipline `apply_hook_repair`/`apply_short_expansion` already
+    use for their own narrow repairs.
+    """
+    from ytb_pipeline.orchestrator.ideation_prompts import editorial_rewrite_prompt
+
+    prompt = editorial_rewrite_prompt(_editorial_rewrite_payload(), _editorial_rewrite_review())
+
+    assert "do not rewrite the entire script" in prompt.casefold()
+    assert '"section_index"' in prompt
+    assert "Section 3 bị liệt kê như dàn bài." in prompt  # full context still supplied
+    assert "Section 1 giữ nguyên." in prompt  # untouched sections still visible as context

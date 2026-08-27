@@ -1215,13 +1215,17 @@ def repair_prompt(
 
 
 def editorial_rewrite_prompt(payload: dict, review: object) -> str:
-    """Ask for one bounded full rewrite after a profile editorial rejection.
+    """Ask for a bounded rewrite of ONLY the sections an editorial review cited.
 
-    Schema/identity repair stays deliberately narrow elsewhere.  This path is
-    different: a bad conversation or a generic peer voice cannot be fixed by
-    swapping one sentence, so an opted-in profile may authorize a complete
-    transcript rewrite.  The profile's system prompt still supplies all
-    format/cast rules; this prompt only carries the concrete reviewer evidence.
+    A prior version asked for a complete transcript rewrite after any editorial
+    rejection. Production 2026-08-27: that full rewrite silently regressed the
+    opening hook — a section the reviewer never flagged — burning the whole
+    repair budget on a violation nobody asked it to fix. This prompt keeps the
+    full script as READ context (so continuity and callbacks stay coherent)
+    but demands output for only the cited `section_refs`, mirroring the same
+    narrow-delta discipline `apply_hook_repair`/`apply_short_expansion` already
+    use. The profile's system prompt still supplies all format/cast rules;
+    this prompt only carries the concrete reviewer evidence.
     """
     # `_editorial_review` is a receipt produced *after* a previous editorial
     # verdict.  It is not story material.  Passing it back to the writer can
@@ -1249,18 +1253,17 @@ def editorial_rewrite_prompt(payload: dict, review: object) -> str:
         f"target bar: every dimension and overall score must reach {minimum_score}/10"
         if minimum_score else "target bar: satisfy the active profile editorial contract"
     )
-    immutable = {
-        key: payload.get(key)
-        for key in ("slug", "topic", "profile_id", "profile_version", "video_type", "target_minutes", "strategy")
-        if key in payload
-    }
     return (
-        "Rewrite the entire Vietnamese YouTube script JSON after an editorial review failure. "
-        "Return ONLY one complete corrected JSON object, never markdown or a patch. "
-        "Do not merely polish the cited sentences: rebuild the scene, turns, and payoff where needed "
-        "so the finished transcript sounds like people rather than a content template. "
-        "Keep these immutable production fields exactly unchanged; if a field is absent, do not invent it:\n"
-        f"{json.dumps(immutable, ensure_ascii=False, indent=2)}\n\n"
+        "An editorial review found this Vietnamese YouTube script below the profile's quality bar. "
+        "The full current script is given below as READ CONTEXT ONLY, so you understand the scene, "
+        "continuity, and callbacks around the cited problem — do not rewrite the entire script. "
+        "Fix ONLY the sections listed in `sections` below (one-based indices, matching the script's own "
+        "section order). Return ONLY one JSON object shaped "
+        '{"sections": [{"section_index": <int>, "voiceover": "<corrected Vietnamese text>"}, ...]}, '
+        "with exactly one entry per cited section index and no other field or section. "
+        "Do not merely polish the cited sentences: rebuild the scene, turn, or payoff for THAT section "
+        "so it sounds like people rather than a content template — but its purpose, speaker, and place "
+        "in the story must stay the one already shown in the context below.\n\n"
         "Editorial review findings:\n"
         f"- score: {score!r}/10\n"
         f"- {target_bar}\n"
@@ -1269,9 +1272,10 @@ def editorial_rewrite_prompt(payload: dict, review: object) -> str:
         f"- findings: {json.dumps(findings, ensure_ascii=False)}\n"
         f"- repair brief: {repair_brief}\n\n"
         "Treat the review packet as the diagnosis: repair the cited weak dimensions and cited sections, "
-        "do not invent a different problem or answer with generic motivational language. Preserve any "
-        "dimension already at the target bar unless changing it is necessary to fix a cited dependency.\n\n"
-        "Before returning, silently re-read every spoken line aloud, check that every claimed consequence "
+        "do not invent a different problem or answer with generic motivational language. Do not touch any "
+        "section index not listed above, even if you think it could also be improved.\n\n"
+        "Before returning, silently re-read each corrected line aloud, check that every claimed consequence "
         "is earned by an earlier action, and apply the full profile system contract.\n\n"
-        f"Current JSON:\n{json.dumps(rewrite_context, ensure_ascii=False, indent=2)}"
+        f"Full current script (context only, non-cited sections must remain exactly as shown):\n"
+        f"{json.dumps(rewrite_context, ensure_ascii=False, indent=2)}"
     )

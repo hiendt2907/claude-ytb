@@ -625,22 +625,46 @@ def apply_hook_repair(payload: dict, delta: dict) -> dict:
     return enriched
 
 
-def validate_editorial_rewrite_identity(original: dict, rewritten: dict) -> dict:
-    """Reject a full editorial rewrite that changes queue/provenance identity.
+def apply_editorial_rewrite(payload: dict, delta: dict) -> dict:
+    """Replace ONLY the voiceover of the sections an editorial review cited.
 
-    A profile explicitly permits this full rewrite only for human quality. It
-    must not quietly retarget the profile, topic, runtime or Short provenance
-    while doing so. Title/description remain editorial and can improve.
+    A full-transcript rewrite (the prior design) could silently regress a
+    section the reviewer never flagged — production 2026-08-27 saw one break
+    the opening hook, burning the whole repair budget on a violation nobody
+    asked it to touch. Bounded the same way `apply_hook_repair` bounds itself
+    to `sections[0]`: the delta may only name section indices, and every
+    other field of the payload — title, structure, other sections' content,
+    strategy, provenance — is copied through untouched. `narration` is kept
+    in sync only because `ideation.generator._section_voiceover` reads
+    `voiceover` first.
     """
-    if not isinstance(rewritten, dict):
+    if not isinstance(delta, dict):
         raise ValueError("Editorial rewrite phải trả một JSON object.")
-    immutable = (
-        "slug", "topic", "profile_id", "profile_version", "video_type", "target_minutes", "strategy",
-    )
-    for field in immutable:
-        if field in original and rewritten.get(field) != original[field]:
-            raise ValueError(f"Editorial rewrite không được đổi {field}.")
-    return rewritten
+    section_deltas = delta.get("sections")
+    if not isinstance(section_deltas, list) or not section_deltas:
+        raise ValueError("Editorial rewrite phải trả về ít nhất một section trong `sections`.")
+    sections = payload.get("sections")
+    if not isinstance(sections, list) or not sections:
+        raise ValueError("Script không có sections để sửa.")
+    enriched = deepcopy(payload)
+    enriched_sections = enriched["sections"]
+    for item in section_deltas:
+        if not isinstance(item, dict):
+            raise ValueError("Mỗi phần tử `sections` trong editorial rewrite phải là object.")
+        index = item.get("section_index")
+        if not isinstance(index, int) or isinstance(index, bool):
+            raise ValueError("Editorial rewrite: section_index phải là số nguyên.")
+        zero_based = index - 1
+        if zero_based < 0 or zero_based >= len(enriched_sections):
+            raise ValueError(f"Editorial rewrite: section_index {index} ngoài phạm vi script.")
+        new_voiceover = str(item.get("voiceover") or "").strip()
+        if not new_voiceover:
+            raise ValueError(f"Editorial rewrite: section_index {index} thiếu voiceover không rỗng.")
+        target = enriched_sections[zero_based]
+        target["voiceover"] = new_voiceover
+        if "narration" in target:
+            target["narration"] = new_voiceover
+    return enriched
 
 
 async def validate_or_repair_script(
@@ -938,17 +962,22 @@ async def validate_or_repair_script(
                             print(f"{console_prefix} rewrite: editorial score below profile bar", flush=True)
                         if log_path:
                             append_local_start_log(log_path, "EDITORIAL_REWRITE_PROMPT", rewrite_request)
+                        cited_sections = list(getattr(review, "section_refs", ()) or ())
+                        # The response is now bounded to only the cited
+                        # sections' voiceover, not a full script — size the
+                        # budget to that, not to a whole-Long response.
+                        rewrite_max_tokens = min(8192, max(1024, 700 * max(1, len(cited_sections))))
                         rewrite_text = await provider.complete(
                             rewrite_request,
                             system=repair_system_prompt(current),
-                            max_tokens=8192,
+                            max_tokens=rewrite_max_tokens,
                             temperature=0.35,
                             json_output=True,
                         )
                         if log_path:
                             append_local_start_log(log_path, "EDITORIAL_REWRITE_RESPONSE", rewrite_text)
                         try:
-                            current = validate_editorial_rewrite_identity(
+                            current = apply_editorial_rewrite(
                                 current, json_from_llm(rewrite_text),
                             )
                         except (ValueError, json.JSONDecodeError) as exc:
