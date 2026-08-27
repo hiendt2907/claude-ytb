@@ -45,3 +45,15 @@ có giới hạn của người kể; nếu đang đi cùng người nghe bằng
 có vẻ thật hơn. Mỗi beat evidence phải bắt đầu từ một chi tiết đã có trong
 cảnh, một câu người khác nói, hoặc một lựa chọn/hậu quả vừa xảy ra; sau đó mới
 được mở ra một nhận định. Đừng dùng xã hội học thay cho câu chuyện.
+
+## Không tự chấm điểm giả
+
+Không được dùng lời dẫn dàn ý kiểu "tập này sẽ" hay bất kỳ câu giới thiệu nào
+báo trước cấu trúc tập trước khi cảnh mở ra — người nghe phải bước thẳng vào
+cảnh, không phải nghe tóm tắt những gì sắp xảy ra. Một điểm số cao là do cảnh
+và lời kể tự chứng minh, không phải do câu dẫn nói nó sẽ hay.
+
+Không suy diễn câu chuyện trong đầu người nghe: đừng viết thay cảm xúc, phản
+ứng, hay kết luận mà người nghe "chắc đang nghĩ" hoặc "chắc đang cảm thấy" khi
+cảnh chưa cho thấy điều đó. Chỉ được nêu điều nhân vật/người kể quan sát hoặc
+trải qua thật trong cảnh.
