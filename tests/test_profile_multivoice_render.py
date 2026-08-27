@@ -179,6 +179,18 @@ def test_story_renderer_preserves_audio_timeline_when_a_section_has_many_caption
 
     assert actual_duration == pytest.approx(expected_duration, abs=0.20)
 
+    # Timeline v1: the validated execution plan is persisted next to the
+    # render output as a debug/postmortem artifact and agrees with the same
+    # formula this test already asserts against.
+    from ytb_pipeline.render.timeline import Timeline
+
+    timeline_path = result.video_path.parent / f"{result.video_path.stem}_timeline.json"
+    assert timeline_path.exists()
+    timeline = Timeline.read_json(timeline_path)
+    assert len(timeline.video_clips) == 2
+    assert len(timeline.transitions) == 1
+    assert timeline.expected_duration_sec == pytest.approx(expected_duration)
+
 
 def _stream_duration(path: Path, stream: str) -> float:
     return float(subprocess.run([

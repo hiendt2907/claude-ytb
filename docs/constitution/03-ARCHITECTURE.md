@@ -207,6 +207,45 @@ the exact node list and checkpoint contract. The `Project` object accumulates
 state as it flows top to bottom; nothing downstream is recomputed from raw
 inputs if its upstream checkpoint already exists.
 
+## Timeline — story renderer (Phase 1 MVP, added 2026-08-27)
+
+`src/ytb_pipeline/render/timeline.py` introduces the ordering the render
+layer must follow for the `story` renderer (`render/story.py`):
+
+```
+Narration  = timing authority   (Segment.duration_sec, measured by TTS)
+Timeline   = deterministic derived execution plan (render/timeline.py)
+Renderer   = Timeline consumer  (render/story.py translates it into FFmpeg)
+```
+
+`Timeline` (and its `VideoClip`/`NarrationClip`/`Transition` parts) is plain
+domain data — no shell strings, no FFmpeg filter graphs, no LLM prose, no
+provider configuration — built once via `build_story_timeline(voiceover,
+profile, ...)` before any FFmpeg call, and validated at construction time
+(`Timeline.__post_init__`): clip counts must match 1-1 between the video and
+narration tracks, `transitions` must cover every clip boundary exactly once,
+overlap must be shorter than its neighbouring clips, and the video/narration
+tracks' computed expected durations must agree within one frame. This is a
+structural fix for the production 2026-08-26 incident (162 caption-card
+crossfades applied as if they were 20 section boundaries, silently dropping
+55s/14% of narration, see `docs/handoffs/2026-08-26-story-renderer-caption-
+transition-fix-handoff.md`) — that specific shape of bug is now a
+`TimelineError` raised before any `ffmpeg` process starts, not a discrepancy
+discovered by probing the finished `.mp4`.
+
+`Timeline` is a **derived artifact, not a competing source of truth**: it is
+rebuilt deterministically from `Voiceover`/`Segment` + the profile's
+`render` contract on every render, and persisted only as a debug/postmortem
+JSON next to the render's own output (`assets/output/<slug>_timeline.json`,
+alongside the existing `<slug>_thumb.jpg` convention) — never inside
+`scripts/<slug>.json` or `assets/projects/<slug>/project.json`.
+
+Scope note: v1 derives directly from the existing `Voiceover`/`Segment`
+structure (one clip per script section — no `ScenePlan` yet, see
+`docs/handoffs/2026-08-27-ai-content-factory-architecture-assessment.md`
+§N/O for that later phase). Only `render/story.py` consumes it in this
+phase; `compose.py`/`compose_ai.py` are unchanged.
+
 ## Extension Points
 
 - **New AI provider for an existing capability**: implement the relevant

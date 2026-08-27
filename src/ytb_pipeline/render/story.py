@@ -23,6 +23,9 @@ from ..config.settings import settings
 from ..content_profiles import ContentProfile, load_content_profile
 from ..pkg.models import RenderedVideo, Segment, Voiceover
 from ..voiceover.tts import _slugify
+from .timeline import build_story_timeline
+
+STORY_FPS = 30
 
 # Kích thước sinh ảnh — kích thước SDXL native đã kiểm chứng cho nhận dạng ổn
 # định, KHÔNG phải kích thước render cuối (1920x1080/1080x1920). _story_frame
@@ -63,6 +66,15 @@ def render_story_video(voiceover: Voiceover, output_dir: Path) -> RenderedVideo:
     video_path = output_dir / f"{slug}.mp4"
     thumbnail_path = output_dir / f"{slug}_thumb.jpg"
 
+    # Timeline is the authoritative, validated execution plan derived from
+    # narration (Segment.duration_sec, already measured by TTS) — built and
+    # checked BEFORE any ffmpeg call, not reconstructed inline while encoding.
+    # See render/timeline.py for the invariants this construction enforces.
+    timeline = build_story_timeline(
+        voiceover, profile, fps=STORY_FPS, width=dims[0], height=dims[1],
+    )
+    timeline.write_json(output_dir / f"{slug}_timeline.json")
+
     with tempfile.TemporaryDirectory(prefix=f"{slug}-story-", dir=output_dir) as raw_work:
         work = Path(raw_work)
         # Caption cards are a VIDEO-ONLY presentation detail inside a section,
@@ -84,9 +96,11 @@ def render_story_video(voiceover: Voiceover, output_dir: Path) -> RenderedVideo:
         for index, segment in enumerate(voiceover.segments):
             if segment.audio_path is None or not Path(segment.audio_path).is_file():
                 raise FileNotFoundError("Story segment thiếu audio_path thật.")
+            # Read from the already-validated Timeline instead of
+            # recomputing the index-boundary condition here.
             gap = (
-                profile.render.inter_segment_gap_sec
-                if index < len(voiceover.segments) - 1 else 0.0
+                timeline.transitions[index].gap_sec
+                if index < len(timeline.transitions) else 0.0
             )
             # Một section Long dài ~450 ký tự: chia thành nhiều thẻ caption thay
             # vì để một tấm chữ đứng yên suốt cả section.
@@ -129,6 +143,19 @@ def render_story_video(voiceover: Voiceover, output_dir: Path) -> RenderedVideo:
             section_clips.append(section_clip)
             video_durations.append(_video_duration(section_clip))
             audio_durations.append(_audio_duration(section_clip))
+        # Structural guard, right before the final composite encode: the
+        # number of REAL section clips built must match the Timeline's own
+        # plan exactly. This is the same class of check `Timeline.__post_init__`
+        # already enforces on `transitions` vs. clip count — repeated here
+        # against what the render loop actually produced, so a future
+        # regression in the loop above (e.g. one clip per caption CARD
+        # again, not per section) fails loudly here instead of silently
+        # cross-fading the wrong number of boundaries.
+        if len(section_clips) != len(timeline.video_clips):
+            raise ValueError(
+                f"Story renderer dựng {len(section_clips)} section clip nhưng "
+                f"Timeline khai {len(timeline.video_clips)} — không được compose."
+            )
         _compose_clips(
             ffmpeg,
             section_clips,
