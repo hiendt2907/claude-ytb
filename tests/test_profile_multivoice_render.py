@@ -115,6 +115,8 @@ def test_story_renderer_uses_profile_assets_and_real_segment_audio(tmp_path, mon
     result = __import__("asyncio").run(StoryRenderProvider().render(video, tmp_path / "output"))
 
     assert result.video_path is not None and result.video_path.exists()
+    assert result.video_path.with_suffix(".srt").is_file()
+    assert result.video_path.with_suffix(".vtt").is_file()
     assert result.thumbnail_path is not None and result.thumbnail_path.exists()
     probe = subprocess.run([
         "ffprobe", "-v", "error", "-show_entries", "stream=width,height",
