@@ -303,6 +303,9 @@ def test_render_uses_renderer_declared_by_script_content_profile(monkeypatch, tm
             video_path.write_bytes(b"story")
             return replace(RenderedVideo(**vars(voiceover)), video_path=video_path)
 
+        async def render_prepared(self, voiceover, output_dir, **_prepared):
+            return await self.render(voiceover, output_dir)
+
     class PassingQAAgent:
         async def run(self, _context):
             return SimpleNamespace(status=pipeline.AgentStatus.SUCCESS, output={"passed": True})
