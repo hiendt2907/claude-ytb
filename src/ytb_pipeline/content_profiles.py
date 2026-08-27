@@ -230,6 +230,17 @@ class AudioProfile:
 
 
 @dataclass(frozen=True)
+class ScenePlanningProfile:
+    mode: str = "legacy_single_shot"
+    max_shots_per_scene: int = 4
+    min_shot_sec: float = 1.0
+
+    def __post_init__(self) -> None:
+        if self.mode not in {"legacy_single_shot", "director"} or self.max_shots_per_scene < 1 or self.min_shot_sec <= 0:
+            raise ContentProfileError("scene_planning policy không hợp lệ.")
+
+
+@dataclass(frozen=True)
 class RenderProfile:
     assets_dir_name: str
     show_captions: bool
@@ -270,6 +281,7 @@ class ContentProfile:
     # general editorial bundle and injected only for the requested video type,
     # so a Short writer never sees a Long's structure (and vice versa).
     format_prompts: Mapping[str, str] = field(default_factory=dict)
+    scene_planning: ScenePlanningProfile = field(default_factory=ScenePlanningProfile)
 
     def editorial_review_rubric_text(self) -> str:
         if self.editorial_review is None:
@@ -610,6 +622,7 @@ def load_content_profile(
         editorial_contract=editorial_contract,
         editorial_review=_editorial_review_profile(raw.get("editorial_review")),
         format_prompts=format_prompts,
+        scene_planning=ScenePlanningProfile(**_mapping(raw.get("scene_planning", {}), "scene_planning")) if raw.get("scene_planning") else ScenePlanningProfile(),
     )
     primary = profile.content_rules.story_primary_speaker_id
     supporting = profile.content_rules.story_supporting_speaker_id
