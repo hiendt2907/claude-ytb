@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from ytb_pipeline.render.scene_plan import Scene, ScenePlan, Shot
 
 from ytb_pipeline.render.visual_assets import (
-    VisualManifest, VisualRequest, build_visual_requests,
+    VisualAssetResolver, VisualManifest, VisualRequest, build_visual_requests,
 )
 
 
@@ -27,3 +27,19 @@ def test_manifest_done_entry_validates_registered_bytes(tmp_path: Path):
     manifest = VisualManifest(source_fingerprint="source")
     manifest.mark_done("shot-1", request_id="req", request_fingerprint="fp", asset_id="ast")
     assert manifest.is_reusable("shot-1", request_fingerprint="fp", asset_path=image, content_sha256="invalid") is False
+
+
+def test_manifest_round_trip_preserves_failed_checkpoint(tmp_path: Path):
+    path = tmp_path / "project" / "visual_manifest.json"
+    manifest = VisualManifest(source_fingerprint="source")
+    manifest.mark_failed("shot-1", request_id="req", request_fingerprint="fp", error="ComfyUI down")
+    manifest.write_json(path)
+    restored = VisualManifest.read_json(path)
+    assert restored.shots["shot-1"].status == "failed"
+    assert restored.shots["shot-1"].attempt_count == 1
+    assert restored.shots["shot-1"].last_error == "ComfyUI down"
+
+
+def test_resolver_is_controlled_component():
+    """The resolver is the explicit Phase-4 generation boundary."""
+    assert callable(VisualAssetResolver.resolve)
