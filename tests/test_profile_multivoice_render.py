@@ -252,6 +252,162 @@ def test_story_renderer_preserves_audio_timeline_when_a_section_has_many_caption
     assert rebuilt.video_path.is_file()
 
 
+@pytest.mark.skipif(not Path("/opt/homebrew/bin/ffmpeg").exists(), reason="ffmpeg required")
+def test_vlm_ranked_selection_rerenders_from_prepared_assets_without_judge_or_generation(
+    tmp_path, monkeypatch,
+):
+    """Phase 10 acceptance: rank three generated candidates once, then
+    rebuild a deleted MP4 from the selected manifest resolution only."""
+    from ytb_pipeline.config.settings import settings
+    from ytb_pipeline.content_profiles import (
+        VisualGenerationProfile,
+        VisualJudgeProfile,
+        load_content_profile,
+    )
+    from ytb_pipeline.pkg.models import Segment, Voiceover
+    from ytb_pipeline.render.asset_registry import AssetRegistry
+    from ytb_pipeline.render.scene_plan import build_story_scene_plan
+    from ytb_pipeline.render.story import render_prepared_story_video
+    from ytb_pipeline.render.visual_assets import VisualAssetResolver, prepare_visual_assets
+    from ytb_pipeline.render.visual_candidates import VisualCandidateStore
+    from ytb_pipeline.render.visual_judge import CandidateEvaluation, JudgeResult
+
+    profiles = tmp_path / "profiles"
+    _profile(profiles)
+    monkeypatch.setattr(settings, "content_profiles_dir", profiles, raising=False)
+    monkeypatch.setattr(settings, "projects_dir", tmp_path / "projects", raising=False)
+    monkeypatch.setattr(settings, "asset_registry_path", tmp_path / "asset_registry.json", raising=False)
+    monkeypatch.setattr(settings, "orientation", "portrait", raising=False)
+
+    loaded_profile = load_content_profile("ban-so-6")
+    profile = replace(
+        loaded_profile,
+        visual_generation=VisualGenerationProfile(
+            enabled=True,
+            style_prompt="cinematic",
+            negative_prompt="artifact",
+            steps=10,
+            cfg=5.0,
+            solo_weight=1.0,
+            duo_weight=1.0,
+            duo_denoise=0.5,
+            characters={},
+            duo_reference_image="",
+            candidate_count=3,
+            selection_policy="vlm_ranked",
+            visual_judge=VisualJudgeProfile(
+                enabled=True,
+                provider="fake-vision",
+                model="fake-v1",
+                policy_version="phase10-test",
+                minimum_score=0.5,
+                hard_fail_on_judge_error=True,
+            ),
+        ),
+    )
+    audio_path = tmp_path / "narration.wav"
+    _tone(audio_path, duration=0.8)
+    voiceover = Voiceover(
+        topic="t",
+        title="Phase 10 acceptance",
+        description="d",
+        video_type="short",
+        content_profile_id=profile.profile_id,
+        content_profile_version=profile.version,
+        segments=(
+            Segment(
+                "Minh nhìn qua cửa sổ",
+                "Minh nhìn qua cửa sổ.",
+                speaker_id="narrator",
+                audio_path=audio_path,
+                duration_sec=0.8,
+            ),
+        ),
+        audio_path=audio_path,
+        duration_sec=0.8,
+    )
+
+    class _CandidateProvider:
+        def __init__(self):
+            self.calls = 0
+
+        def generate_scene(self, _profile, **kwargs):
+            self.calls += 1
+            kwargs["output_path"].parent.mkdir(parents=True, exist_ok=True)
+            Image.new("RGB", (64, 96), (self.calls * 40, 20, 20)).save(kwargs["output_path"])
+
+    class _RankedJudge:
+        def __init__(self):
+            self.calls = 0
+
+        def evaluate(self, request, candidates, context):
+            self.calls += 1
+            scores = (0.65, 0.92, 0.99)
+            evaluations = tuple(
+                CandidateEvaluation(
+                    asset_id=candidate.asset_id,
+                    semantic_score=scores[candidate.candidate_index],
+                    character_score=scores[candidate.candidate_index],
+                    composition_score=scores[candidate.candidate_index],
+                    continuity_score=scores[candidate.candidate_index],
+                    hard_failures=("wrong_main_character",)
+                    if candidate.candidate_index == 2 else (),
+                )
+                for candidate in candidates
+            )
+            return JudgeResult(evaluations, "fake-vision", "fake-v1")
+
+    project_dir = tmp_path / "project"
+    registry = AssetRegistry(tmp_path / "asset_registry.json")
+    provider = _CandidateProvider()
+    judge = _RankedJudge()
+    scene_plan = build_story_scene_plan(voiceover, profile)
+    _, manifest, prepared = prepare_visual_assets(
+        voiceover,
+        profile,
+        project_dir=project_dir,
+        dimensions=(1080, 1920),
+        scene_plan=scene_plan,
+        registry=registry,
+        cache_dir=tmp_path / "cache",
+        provider=provider,
+        judge=judge,
+    )
+    shot_id = scene_plan.scenes[0].shots[0].shot_id
+    candidate_set = VisualCandidateStore(project_dir / "visual_candidates.json").get(shot_id)
+    assert candidate_set is not None
+    assert manifest.shots[shot_id].asset_id == candidate_set.slot(1).asset_id
+    assert provider.calls == 3
+    assert judge.calls == 1
+
+    output_dir = tmp_path / "output"
+    first_render = render_prepared_story_video(
+        voiceover,
+        output_dir,
+        profile=profile,
+        scene_plan=scene_plan,
+        prepared_assets=prepared,
+    )
+    first_render.video_path.unlink()
+
+    def forbidden_resolution(*_args, **_kwargs):
+        raise AssertionError("Prepared renderer không được generate hoặc judge.")
+
+    monkeypatch.setattr(VisualAssetResolver, "resolve", forbidden_resolution)
+    rebuilt = render_prepared_story_video(
+        voiceover,
+        output_dir,
+        profile=profile,
+        scene_plan=scene_plan,
+        prepared_assets=prepared,
+    )
+
+    assert rebuilt.video_path.is_file()
+    assert provider.calls == 3
+    assert judge.calls == 1
+    assert len(registry.assets()) == 3
+
+
 def _stream_duration(path: Path, stream: str) -> float:
     return float(subprocess.run([
         "ffprobe", "-v", "error", "-select_streams", stream,
