@@ -205,6 +205,11 @@ def _shot_id(scene_id: str, shot_index: int) -> str:
     return f"{scene_id}-shot-{shot_index:02d}"
 
 
+def _directed_shot_id(scene_id: str, item, occurrence: int) -> str:
+    semantic = "\x1f".join((scene_id, item.visual_intent.strip(), ",".join(item.characters), str(occurrence)))
+    return f"{scene_id}-shot-{hashlib.sha256(semantic.encode()).hexdigest()[:12]}"
+
+
 def normalize_directed_shots(scene_id: str, duration_sec: float, directed_shots, *, min_shot_sec: float) -> tuple[Shot, ...]:
     """Map semantic weights to exact scene coverage without LLM timing."""
     if not directed_shots or duration_sec < len(directed_shots) * min_shot_sec:
@@ -212,9 +217,13 @@ def normalize_directed_shots(scene_id: str, duration_sec: float, directed_shots,
     weights = sum(item.duration_weight for item in directed_shots)
     cursor = 0.0
     shots = []
+    occurrences: dict[tuple[str, tuple[str, ...]], int] = {}
     for index, item in enumerate(directed_shots):
         duration = duration_sec - cursor if index == len(directed_shots) - 1 else max(min_shot_sec, duration_sec * item.duration_weight / weights)
-        shots.append(Shot(_shot_id(scene_id, index), cursor, duration, "generated", item.visual_intent, "", item.characters))
+        key = (item.visual_intent.strip(), item.characters)
+        occurrence = occurrences.get(key, 0)
+        occurrences[key] = occurrence + 1
+        shots.append(Shot(_directed_shot_id(scene_id, item, occurrence), cursor, duration, "generated", item.visual_intent, "", item.characters))
         cursor += duration
     if abs(cursor - duration_sec) > 1e-6:
         raise ScenePlanError("Director timing không phủ đúng scene window.")
