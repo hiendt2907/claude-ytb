@@ -504,6 +504,107 @@ pre-Phase-3 test, and any future caller that doesn't care about
 provenance) gets zero registry I/O and the exact prior behaviour — only
 `render_story_video()`'s own call site passes them.
 
+## Multi-candidate visual generation and selection (Phase 9)
+
+`src/ytb_pipeline/render/visual_candidates.py` adds an opt-in, per-profile
+durable contract for generating **N candidate images per shot** and
+selecting one deterministically, instead of always generating exactly
+one. It sits entirely inside `visual_assets` preparation — Phase 8 parent
+reuse, and `VisualAssetResolver`'s `profile_local` path, both still
+resolve before candidate generation is ever considered:
+
+```
+VisualRequest
+    -> Phase 8 parent reuse?            (unchanged, still first)
+        YES -> selected AssetRecord      (no candidate machinery touched)
+        NO  -> profile_local?
+            YES -> direct resolve        (no candidate machinery touched)
+            NO  -> CandidateSet (candidate_count > 1 only)
+                    -> candidate AssetRecords (Phase 3.x identity, unchanged)
+                    -> deterministic Selector (`selection_policy`)
+                    -> selected AssetRecord
+    -> VisualManifest (Shot -> selected asset_id, unchanged shape)
+```
+
+**Default behaviour is unchanged.** `visual_generation.candidate_count`
+defaults to `1`; `VisualAssetResolver.resolve()` takes the exact pre-
+Phase-9 code path in that case — same `f"{generation_key}.png"` cache
+filename, same `int(key[:16], 16) % (2**32)` seed formula, same single
+`provider.generate_scene()` call shape, no `visual_candidates.json` ever
+written. The multi-candidate branch (`_resolve_candidates`) only runs when
+a profile explicitly sets `candidate_count > 1` (hard maximum `4` —
+`content_profiles.MAX_CANDIDATE_COUNT` — because ComfyUI runs on one
+constrained-unified-memory Mac and candidate slots always generate
+**sequentially**, never in parallel; cost multiplies linearly with count).
+
+Identity, kept independent of `AssetRegistry`'s own locked concepts
+(`asset_id`/`content_sha256`/`generation_key`/`local_path` — unchanged by
+Phase 9):
+
+```
+candidate_slot_id   f"{shot_id}::candidate-{index:02d}" — a LOCATOR into
+                     one project's candidate set, not a media identity
+candidate_index     0-based ordinal slot position
+candidate_seed      stable hash of (generation_key, candidate_index) —
+                     deterministic, never random/timestamp/PID/hash()
+```
+
+`candidate_seed(key, 0) == int(key[:16], 16) % (2**32)` **exactly** — slot
+0 is defined to reuse the historical single-candidate seed formula, so a
+profile turning candidate generation on for the first time finds its
+existing single-candidate cache file and `AssetRecord` already occupying
+slot 0 (via the Phase 3.2 exact-observation cache-hit match) rather than
+regenerating it. `candidate_cache_path()` mirrors this: slot 0 keeps the
+legacy `f"{generation_key}.png"` filename; slots 1+ get a
+`.candidate-NN.png` suffix, so additional slots can never overwrite slot 0
+or each other.
+
+Every candidate — selected or not — gets its own permanent `AssetRecord`
+via the unchanged `AssetRegistry.record_generated()` (one `generation_key`
+now legitimately shared by several records, exactly the capability Phase
+3 built and Phase 9 is the first caller to actually use intentionally).
+Provenance is never mutated to mark a candidate "bad"; an unselected but
+technically valid candidate remains a legitimate registered asset.
+
+Per-shot candidate progress is **project-specific** state, deliberately
+separate from all three existing artifacts:
+
+```
+AssetRegistry            global concrete media/provenance (unchanged)
+VisualManifest            final Shot -> selected asset_id (unchanged shape)
+VisualCandidateSet/Store   per-project candidate generation + selection
+                           progress — assets/projects/<slug>/
+                           visual_candidates.json
+generation cache           physical reusable output files (unchanged)
+```
+
+This is a real checkpoint: if candidates 0 and 1 succeed and candidate 2's
+ComfyUI call fails, the process can exit and a later run generates *only*
+slot 2 — slots 0/1 are re-validated (`candidate_is_valid`: registry record
+exists, file exists, SHA-256 and seed still match, technical validation
+still passes) and reused, never regenerated. A **technical-only**
+validation gate (`validate_candidate_image`: decodable, non-zero
+dimensions — no aesthetic, semantic, or person scoring) guards every slot
+before it can be selected.
+
+Selection is `selection_policy="first_valid"` — the only Phase 9 policy,
+deliberately simple: the lowest-index technically-valid candidate wins.
+Real semantic/VLM judging is explicitly deferred to Phase 10; Phase 9
+only builds the durable selection boundary the future judge will plug
+into. `minimum_valid_candidates` is effectively `1` — one valid candidate
+is enough for the shot to resolve; zero valid candidates fails
+`visual_assets` closed, exactly as the pre-Phase-9 single-candidate path
+already did on a ComfyUI failure.
+
+A changed `VisualRequest.request_fingerprint` invalidates a shot's
+candidate state (a genuinely different semantic request). A changed
+`candidate_policy_version` or `target_candidate_count` alone does **not**
+discard existing valid candidates — raising `candidate_count` from 1 to 3
+reuses slot 0 (via the same cache-hit exact-observation match already
+described) and only generates the two new slots; lowering it back to 1
+never deletes the now-unused slot 1/2 `AssetRecord`s (garbage collection
+is explicitly out of scope for Phase 9).
+
 ## Extension Points
 
 - **New AI provider for an existing capability**: implement the relevant
