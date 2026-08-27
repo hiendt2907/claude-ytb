@@ -296,6 +296,25 @@ always-rebuildable debug/postmortem artifact, never read back by any stage
 as a source of truth; a legacy project missing `scene_plan.json` is
 unaffected, since every render rebuilds it fresh.
 
+## Visual Assets — prepared story boundary (Phase 4)
+
+For `character_story`, `visual_assets` runs between audio quality and render.
+It builds the deterministic ScenePlan and provider-neutral `VisualRequest`s,
+then `VisualAssetResolver` is the sole owner of local-asset lookup, generation
+cache, ComfyUI calls, and AssetRegistry registration. Per-project
+`visual_manifest.json` checkpoints each shot (`pending`/`running`/`done`/
+`failed`) against its request fingerprint and registered asset ID.
+
+`render_prepared_story_video()` accepts only verified prepared paths; it does
+not import or call a visual provider. A render retry therefore succeeds after
+ComfyUI is unavailable as long as the manifest, registry record, file, and
+observed content hash remain valid. The direct `render_story_video()` wrapper
+is retained only for legacy callers and performs preparation before entering
+the prepared core.
+
+AssetRegistry remains protected by its existing process-safe file lock. ComfyUI
+is a server-side prompt queue, so Phase 4 adds no second distributed queue.
+
 ## Asset Registry — character_story visuals (Phase 3.2, added 2026-08-27)
 
 `src/ytb_pipeline/render/asset_registry.py` adds a durable provenance/
