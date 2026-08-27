@@ -1,0 +1,24 @@
+{
+  "passed": false,
+  "blocking_findings": [
+    "Các mục 'Góc nhìn thứ nhất/thứ hai/...' ở phần evidence liệt kê như dàn bài giảng, không còn giọng người bạn nói sau ly cà phê.",
+    "Điểm biên tập 8/10 dưới ngưỡng 9/10 của profile.",
+    "Các tiêu chí dưới ngưỡng 9/10: spoken_naturalness."
+  ],
+  "section_refs": [
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "repair_brief": "Bỏ cách mở đầu bằng 'Góc nhìn thứ...' và gộp các quan sát thành lời kể liền mạch, dùng chuyển tiếp tự nhiên kiểu 'Còn một cách nhìn khác...' hoặc kể một tình huống thay vì đánh số; giữ nguyên các bước thử có điều kiện ở cuối.",
+  "overall_score": 8,
+  "dimension_scores": {
+    "human_truth": 9,
+    "spoken_naturalness": 7,
+    "causal_coherence": 9,
+    "role_fidelity": 9,
+    "useful_restraint": 9
+  }
+}

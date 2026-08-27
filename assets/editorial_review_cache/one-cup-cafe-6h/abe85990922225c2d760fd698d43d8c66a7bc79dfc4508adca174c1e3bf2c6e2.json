@@ -1,0 +1,25 @@
+{
+  "passed": false,
+  "blocking_findings": [
+    "Dùng các mốc 'Góc nhìn thứ nhất/thứ hai/thứ ba' và 'thứ nhất, thứ hai, thứ ba' khiến lời kể thành bài giảng, không phải bạn nói chuyện.",
+    "Chèn triệu chứng 'cơn siết ngực' và hướng dẫn tìm chuyên môn mà mạch chuyện trước đó không dẫn tới, gần như cảnh báo y tế.",
+    "Điểm biên tập 6/10 dưới ngưỡng 9/10 của profile.",
+    "Các tiêu chí dưới ngưỡng 9/10: causal_coherence, human_truth, role_fidelity, spoken_naturalness, useful_restraint."
+  ],
+  "section_refs": [
+    5,
+    6,
+    7,
+    10,
+    11
+  ],
+  "repair_brief": "Viết lại toàn transcript như một lời kể liền mạch của bạn sau cà phê: bỏ nhãn 'góc nhìn thứ...' và 'thứ nhất/thứ hai/thứ ba', gộp các góc nhìn vào câu chuyện thay vì liệt kê. Chỉ nhắc đến dấu hiệu cơ thể nếu đã xuất hiện từ đầu (mất ngủ, nặng ngực do thức khuya) và nói 'nhờ người tin cậy đọc cùng' thay vì chèn cảnh báo chuyên môn. Giữ kết thúc bằng một việc nhỏ cụ thể, bỏ câu tuyên ngôn 'cái quyền biết rõ mình đang đứng ở đâu'.",
+  "overall_score": 6,
+  "dimension_scores": {
+    "human_truth": 8,
+    "spoken_naturalness": 5,
+    "causal_coherence": 7,
+    "role_fidelity": 8,
+    "useful_restraint": 7
+  }
+}

@@ -2949,7 +2949,8 @@
       "source_url": "https://videos.pexels.com/video-files/8346903/8346903-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/5f21d7f09c3461c7.mp4",
       "topics": [
-        "empty meeting room office friday afternoon chairs"
+        "empty meeting room office friday afternoon chairs",
+        "speaker engaging listener with question during meeting"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -2958,6 +2959,11 @@
           "video_slug": "vi-sao-ban-nghi-ai-cung-ong-y-voi-minh_knowledge",
           "role": "payoff",
           "used_at": "2026-07-16T05:39:45.608643+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T06:59:46.242810+00:00"
         }
       ]
     },
@@ -3206,7 +3212,8 @@
       "source_url": "https://videos.pexels.com/video-files/6963477/6963477-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/bed36602c8271745.mp4",
       "topics": [
-        "two colleagues disagreement tense office conversation"
+        "two colleagues disagreement tense office conversation",
+        "golfer tense before swing in championship"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -3215,6 +3222,11 @@
           "video_slug": "vi-sao-ban-nghi-ai-cung-ong-y-voi-minh_knowledge",
           "role": "payoff",
           "used_at": "2026-07-16T05:40:38.284357+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T06:59:15.147061+00:00"
         }
       ]
     },
@@ -3483,7 +3495,8 @@
       "topics": [
         "hand writing assumption sticky note computer monitor",
         "person taking note phone walking home evening calm",
-        "hand writing decision question sticky note before payment laptop"
+        "hand writing decision question sticky note before payment laptop",
+        "anxious person avoiding computer screen holding phone"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -3502,6 +3515,11 @@
           "video_slug": "chi-phi-chim-khi-nao-nen-dung-lai_xkiro",
           "role": "payoff",
           "used_at": "2026-08-24T13:56:48.166640+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T06:58:54.968340+00:00"
         }
       ]
     },
@@ -3565,7 +3583,8 @@
         "hand writing assumption sticky note computer monitor",
         "person taking note phone walking home evening calm",
         "hand writing decision question sticky note before payment laptop",
-        "writing reflective question notebook coffee evening"
+        "writing reflective question notebook coffee evening",
+        "anxious person avoiding computer screen holding phone"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -3589,6 +3608,11 @@
           "video_slug": "chi-phi-co-hoi-cai-gia-khong-tren-hoa-don_xkiro",
           "role": "payoff",
           "used_at": "2026-08-25T03:24:49.017566+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T06:58:54.977884+00:00"
         }
       ]
     },
@@ -3895,7 +3919,8 @@
       "local_path": "assets/broll/4d3533428c9b440b.mp4",
       "topics": [
         "old research paper reading glasses handwritten notes",
-        "manager reviewing old emails and current performance report"
+        "manager reviewing old emails and current performance report",
+        "person reading notes carefully before presentation"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -3909,6 +3934,11 @@
           "video_slug": "chi-phi-chim-khi-nao-nen-dung-lai_xkiro",
           "role": "payoff",
           "used_at": "2026-08-24T13:56:14.142995+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T06:59:55.217603+00:00"
         }
       ]
     },
@@ -3947,7 +3977,8 @@
       "topics": [
         "old research paper reading glasses handwritten notes",
         "professional reviewing old plan phone and new project notes",
-        "frustrated freelancer old project notes laptop home office"
+        "frustrated freelancer old project notes laptop home office",
+        "person reading notes carefully before presentation"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -3961,6 +3992,11 @@
           "video_slug": "chi-phi-chim-khi-nao-nen-dung-lai_xkiro",
           "role": "payoff",
           "used_at": "2026-08-24T13:58:22.416780+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T06:59:55.238557+00:00"
         }
       ]
     },
@@ -3972,7 +4008,8 @@
       "local_path": "assets/broll/745d4d90be371db0.mp4",
       "topics": [
         "old research paper reading glasses handwritten notes",
-        "behavioral economics research paper desk decision making"
+        "behavioral economics research paper desk decision making",
+        "person reading notes carefully before presentation"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -3986,6 +4023,11 @@
           "video_slug": "chi-phi-chim-khi-nao-nen-dung-lai_xkiro",
           "role": "payoff",
           "used_at": "2026-08-24T13:56:21.674063+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T06:59:55.227291+00:00"
         }
       ]
     },
@@ -4028,7 +4070,8 @@
       "local_path": "assets/broll/3dad7f2fac5c6656.mp4",
       "topics": [
         "team meeting writing individual notes before discussion",
-        "business team meeting delayed delivery project timeline red"
+        "business team meeting delayed delivery project timeline red",
+        "person reading notes carefully before presentation"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -4042,6 +4085,11 @@
           "video_slug": "chi-phi-chim-khi-nao-nen-dung-lai_xkiro",
           "role": "payoff",
           "used_at": "2026-08-24T13:56:06.534971+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T06:59:55.206924+00:00"
         }
       ]
     },
@@ -4303,7 +4351,8 @@
         "open notebook sending message phone desk warm light",
         "person typing honest text message phone evening home",
         "person composing difficult message phone home",
-        "typing deleting text computer"
+        "typing deleting text computer",
+        "anxious person avoiding computer screen holding phone"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -4327,6 +4376,11 @@
           "video_slug": "ban-nhap-xau-dau-tien_xkiro",
           "role": "payoff",
           "used_at": "2026-08-25T10:39:24.154802+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T06:58:54.997795+00:00"
         }
       ]
     },
@@ -7699,10 +7753,11 @@
       "local_path": "assets/broll/2e43452bb32720ad.mp4",
       "topics": [
         "stressed employee reading email late deadline office",
-        "business presentation editing laptop email chart deadline"
+        "business presentation editing laptop email chart deadline",
+        "person staring at laptop presentation late night"
       ],
       "orientation": "landscape",
-      "duration_sec": 6.0,
+      "duration_sec": 2.5,
       "uses": [
         {
           "video_slug": "ban-a-oi-viec-nhung-mot-phan-tam-tri-van-o-lai_knowledge",
@@ -7713,6 +7768,11 @@
           "video_slug": "planning-fallacy-du-lieu-qua-khu_xkiro",
           "role": "payoff",
           "used_at": "2026-08-25T01:56:48.023024+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "hook",
+          "used_at": "2026-08-26T06:58:39.259789+00:00"
         }
       ]
     },
@@ -7724,7 +7784,8 @@
       "local_path": "assets/broll/44831ee0a80b4906.mp4",
       "topics": [
         "stressed employee reading email late deadline office",
-        "stressed employee meeting boss"
+        "stressed employee meeting boss",
+        "man rehearsing speech in front of mirror stressed"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -7738,6 +7799,11 @@
           "video_slug": "ban-nhap-xau-dau-tien_xkiro",
           "role": "payoff",
           "used_at": "2026-08-25T10:39:45.396481+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T06:59:26.749118+00:00"
         }
       ]
     },
@@ -7749,7 +7815,8 @@
       "local_path": "assets/broll/73257e30b33f7274.mp4",
       "topics": [
         "stressed employee reading email late deadline office",
-        "stressed employee meeting boss"
+        "stressed employee meeting boss",
+        "man rehearsing speech in front of mirror stressed"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -7763,6 +7830,11 @@
           "video_slug": "ban-nhap-xau-dau-tien_xkiro",
           "role": "payoff",
           "used_at": "2026-08-25T10:39:45.405816+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T06:59:26.758310+00:00"
         }
       ]
     },
@@ -7773,7 +7845,8 @@
       "source_url": "https://videos.pexels.com/video-files/9080631/9080631-hd_2048_1080_25fps.mp4",
       "local_path": "assets/broll/dad2ffdf04d78faf.mp4",
       "topics": [
-        "stressed employee reading email late deadline office"
+        "stressed employee reading email late deadline office",
+        "man rehearsing speech in front of mirror stressed"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -7782,6 +7855,11 @@
           "video_slug": "ban-a-oi-viec-nhung-mot-phan-tam-tri-van-o-lai_knowledge",
           "role": "payoff",
           "used_at": "2026-07-16T10:00:40.981705+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T06:59:26.730033+00:00"
         }
       ]
     },
@@ -8007,7 +8085,8 @@
       "source_url": "https://videos.pexels.com/video-files/7668957/7668957-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/56dc8ae9b18ff8da.mp4",
       "topics": [
-        "cluttered desk papers workspace overhead view"
+        "cluttered desk papers workspace overhead view",
+        "person speaking aloud first sentence at desk relaxed"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -8016,6 +8095,11 @@
           "video_slug": "ban-a-oi-viec-nhung-mot-phan-tam-tri-van-o-lai_knowledge",
           "role": "payoff",
           "used_at": "2026-07-16T10:02:02.599378+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T06:59:36.885050+00:00"
         }
       ]
     },
@@ -9403,7 +9487,8 @@
         "small business owner reviewing costs pausing ads planning new channel",
         "time budget checklist calendar planning desk",
         "project planning checklist presentation editing desk",
-        "weekly calendar habits phone scrolling budget planning"
+        "weekly calendar habits phone scrolling budget planning",
+        "hands editing presentation slide title on laptop"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -9427,6 +9512,11 @@
           "video_slug": "chi-phi-co-hoi-cai-gia-khong-tren-hoa-don_xkiro",
           "role": "payoff",
           "used_at": "2026-08-25T03:24:53.964246+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T06:58:43.753084+00:00"
         }
       ]
     },
@@ -9866,7 +9956,8 @@
         "person writing one line note closing laptop new task",
         "person closing old planner opening new plan calm reflection",
         "closing old project opening new plan notebook",
-        "busy calendar scheduling conflict laptop planner"
+        "busy calendar scheduling conflict laptop planner",
+        "opening laptop first slide at night calm"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -9885,6 +9976,11 @@
           "video_slug": "planning-fallacy-du-lieu-qua-khu_xkiro",
           "role": "payoff",
           "used_at": "2026-08-25T01:57:51.326809+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T07:00:05.625038+00:00"
         }
       ]
     },
@@ -9898,7 +9994,8 @@
         "person writing one line note closing laptop new task",
         "person closing old planner opening new plan calm reflection",
         "closing old project opening new plan notebook",
-        "busy calendar scheduling conflict laptop planner"
+        "busy calendar scheduling conflict laptop planner",
+        "opening laptop first slide at night calm"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -9917,6 +10014,11 @@
           "video_slug": "planning-fallacy-du-lieu-qua-khu_xkiro",
           "role": "payoff",
           "used_at": "2026-08-25T01:57:51.320256+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T07:00:05.615716+00:00"
         }
       ]
     },
@@ -9930,7 +10032,8 @@
         "person writing one line note closing laptop new task",
         "person closing old planner opening new plan calm reflection",
         "closing old project opening new plan notebook",
-        "busy calendar scheduling conflict laptop planner"
+        "busy calendar scheduling conflict laptop planner",
+        "opening laptop first slide at night calm"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -9949,6 +10052,11 @@
           "video_slug": "planning-fallacy-du-lieu-qua-khu_xkiro",
           "role": "payoff",
           "used_at": "2026-08-25T01:57:51.313068+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T07:00:05.606558+00:00"
         }
       ]
     },
@@ -9984,7 +10092,8 @@
       "source_url": "https://videos.pexels.com/video-files/30718607/13141995_1620_1080_30fps.mp4",
       "local_path": "assets/broll/b038229ab34523ae.mp4",
       "topics": [
-        "smartphone notification screen desk evening light"
+        "smartphone notification screen desk evening light",
+        "overwhelmed man standing in front of projector screen"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -9993,6 +10102,11 @@
           "video_slug": "ban-a-oi-viec-nhung-mot-phan-tam-tri-van-o-lai_knowledge",
           "role": "payoff",
           "used_at": "2026-07-16T10:07:21.882338+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T06:59:05.128616+00:00"
         }
       ]
     },
@@ -13667,7 +13781,8 @@
       "source_url": "https://videos.pexels.com/video-files/8156465/8156465-hd_1080_1920_25fps.mp4",
       "local_path": "assets/broll/212848be55f2c100.mp4",
       "topics": [
-        "professional writing meeting notes hallway before next meeting"
+        "professional writing meeting notes hallway before next meeting",
+        "person writing notes next to laptop"
       ],
       "orientation": "portrait",
       "duration_sec": 6.0,
@@ -13676,6 +13791,11 @@
           "video_slug": "hop-xong-cuoc-nay-au-van-o-cuoc-truoc_knowledge",
           "role": "payoff",
           "used_at": "2026-07-16T12:35:29.958976+00:00"
+        },
+        {
+          "video_slug": "cang-sua-cau-mo-dau-cang-kho-bam-f5_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T07:02:21.471536+00:00"
         }
       ]
     },
@@ -13768,15 +13888,21 @@
       "source_url": "https://videos.pexels.com/video-files/7953570/7953570-hd_1080_1920_30fps.mp4",
       "local_path": "assets/broll/d6d655a08f66b313.mp4",
       "topics": [
-        "professional writing meeting notes hallway before next meeting"
+        "professional writing meeting notes hallway before next meeting",
+        "person writing notes next to laptop"
       ],
       "orientation": "portrait",
-      "duration_sec": 2.0,
+      "duration_sec": 6.0,
       "uses": [
         {
           "video_slug": "hop-xong-cuoc-nay-au-van-o-cuoc-truoc_knowledge_pexels-pexels-pillow-portrait",
           "role": "hook",
           "used_at": "2026-07-16T12:35:48.369352+00:00"
+        },
+        {
+          "video_slug": "cang-sua-cau-mo-dau-cang-kho-bam-f5_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T07:02:21.461953+00:00"
         }
       ]
     },
@@ -17603,15 +17729,21 @@
       "source_url": "https://videos.pexels.com/video-files/17770571/17770571-hd_1080_1920_24fps.mp4",
       "local_path": "assets/broll/2aaa47be0cef2873.mp4",
       "topics": [
-        "person editing text message on smartphone"
+        "person editing text message on smartphone",
+        "editing presentation title text on laptop"
       ],
       "orientation": "portrait",
-      "duration_sec": 2.5,
+      "duration_sec": 6.0,
       "uses": [
         {
           "video_slug": "sua-tin-nhan-nhieu-lan-vi-sao-ban-nghi-ai-cung-nhan-ra_knowledge",
           "role": "hook",
           "used_at": "2026-07-17T05:30:13.014423+00:00"
+        },
+        {
+          "video_slug": "cang-sua-cau-mo-dau-cang-kho-bam-f5_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T07:02:19.116895+00:00"
         }
       ]
     },
@@ -18447,15 +18579,21 @@
       "source_url": "https://videos.pexels.com/video-files/9198841/9198841-hd_1080_1920_25fps.mp4",
       "local_path": "assets/broll/8aa49d62fc22f326.mp4",
       "topics": [
-        "person nervous speaking video meeting laptop"
+        "person nervous speaking video meeting laptop",
+        "youtube video thumbnail presentation nervous speaker"
       ],
       "orientation": "portrait",
-      "duration_sec": 2.5,
+      "duration_sec": 6.0,
       "uses": [
         {
           "video_slug": "ban-noi-vap-mot-cau-vi-sao-cu-nghi-nguoi-khac-nho-mai_knowledge",
           "role": "hook",
           "used_at": "2026-07-17T06:58:02.145647+00:00"
+        },
+        {
+          "video_slug": "cang-sua-cau-mo-dau-cang-kho-bam-f5_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T07:02:25.089520+00:00"
         }
       ]
     },
@@ -18466,15 +18604,21 @@
       "source_url": "https://videos.pexels.com/video-files/5981185/5981185-hd_1080_2048_25fps.mp4",
       "local_path": "assets/broll/13af12cc3a8ede48.mp4",
       "topics": [
-        "person nervous speaking video meeting laptop"
+        "person nervous speaking video meeting laptop",
+        "youtube video thumbnail presentation nervous speaker"
       ],
       "orientation": "portrait",
-      "duration_sec": 2.5,
+      "duration_sec": 6.0,
       "uses": [
         {
           "video_slug": "ban-noi-vap-mot-cau-vi-sao-cu-nghi-nguoi-khac-nho-mai_knowledge",
           "role": "hook",
           "used_at": "2026-07-17T06:58:02.150159+00:00"
+        },
+        {
+          "video_slug": "cang-sua-cau-mo-dau-cang-kho-bam-f5_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T07:02:25.080341+00:00"
         }
       ]
     },
@@ -18485,15 +18629,21 @@
       "source_url": "https://videos.pexels.com/video-files/4872888/4872888-hd_1080_1920_25fps.mp4",
       "local_path": "assets/broll/908b24951fb06712.mp4",
       "topics": [
-        "person nervous speaking video meeting laptop"
+        "person nervous speaking video meeting laptop",
+        "youtube video thumbnail presentation nervous speaker"
       ],
       "orientation": "portrait",
-      "duration_sec": 2.5,
+      "duration_sec": 6.0,
       "uses": [
         {
           "video_slug": "ban-noi-vap-mot-cau-vi-sao-cu-nghi-nguoi-khac-nho-mai_knowledge",
           "role": "hook",
           "used_at": "2026-07-17T06:58:02.154631+00:00"
+        },
+        {
+          "video_slug": "cang-sua-cau-mo-dau-cang-kho-bam-f5_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T07:02:25.099757+00:00"
         }
       ]
     },
@@ -19039,7 +19189,8 @@
       "local_path": "assets/broll/1f895f738a96d336.mp4",
       "topics": [
         "person hesitating before posting on laptop meeting",
-        "person holding drink journaling self reflection realistic"
+        "person holding drink journaling self reflection realistic",
+        "golfer tense before swing in championship"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -19053,6 +19204,11 @@
           "video_slug": "khi-ly-do-bao-ve-hinh-anh-ban-than-bat-hoa-nhan-thuc_knowledge",
           "role": "payoff",
           "used_at": "2026-07-22T04:21:13.185444+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T06:59:15.176435+00:00"
         }
       ]
     },
@@ -19358,7 +19514,8 @@
       "source_url": "https://videos.pexels.com/video-files/6944068/6944068-hd_2048_1080_25fps.mp4",
       "local_path": "assets/broll/275efafb98fae334.mp4",
       "topics": [
-        "person overthinking at desk night"
+        "person overthinking at desk night",
+        "person speaking aloud first sentence at desk relaxed"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -19367,6 +19524,11 @@
           "video_slug": "hieu-ung-en-san-khau-vi-sao-mot-loi-nho-khien-ban-tuong-ai-cung-ang-chu-y_knowledge",
           "role": "payoff",
           "used_at": "2026-07-17T13:58:08.401678+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T06:59:36.853342+00:00"
         }
       ]
     },
@@ -19459,7 +19621,8 @@
       "source_url": "https://videos.pexels.com/video-files/34187594/14491448_1920_1080_60fps.mp4",
       "local_path": "assets/broll/d20a8a912b16a610.mp4",
       "topics": [
-        "content creator reviewing draft before publishing"
+        "content creator reviewing draft before publishing",
+        "golfer tense before swing in championship"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -19468,6 +19631,11 @@
           "video_slug": "hieu-ung-en-san-khau-vi-sao-mot-loi-nho-khien-ban-tuong-ai-cung-ang-chu-y_knowledge",
           "role": "payoff",
           "used_at": "2026-07-17T13:58:44.406459+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T06:59:15.157578+00:00"
         }
       ]
     },
@@ -19585,7 +19753,8 @@
       "source_url": "https://videos.pexels.com/video-files/6889422/6889422-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/4867f664c51e14cd.mp4",
       "topics": [
-        "person avoiding speaking in meeting laptop draft"
+        "person avoiding speaking in meeting laptop draft",
+        "person speaking aloud first sentence at desk relaxed"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -19594,6 +19763,11 @@
           "video_slug": "hieu-ung-en-san-khau-vi-sao-mot-loi-nho-khien-ban-tuong-ai-cung-ang-chu-y_knowledge",
           "role": "payoff",
           "used_at": "2026-07-17T13:59:13.000732+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T06:59:36.864266+00:00"
         }
       ]
     },
@@ -19751,7 +19925,8 @@
       "local_path": "assets/broll/37aeb727319da23f.mp4",
       "topics": [
         "writer editing social media post laptop",
-        "business presentation editing laptop email chart deadline"
+        "business presentation editing laptop email chart deadline",
+        "hands editing presentation slide title on laptop"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -19765,6 +19940,11 @@
           "video_slug": "planning-fallacy-du-lieu-qua-khu_xkiro",
           "role": "payoff",
           "used_at": "2026-08-25T01:56:48.045574+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T06:58:43.742570+00:00"
         }
       ]
     },
@@ -19776,7 +19956,8 @@
       "local_path": "assets/broll/318088b82f66d287.mp4",
       "topics": [
         "writer editing social media post laptop",
-        "business presentation editing laptop email chart deadline"
+        "business presentation editing laptop email chart deadline",
+        "hands editing presentation slide title on laptop"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -19790,6 +19971,11 @@
           "video_slug": "planning-fallacy-du-lieu-qua-khu_xkiro",
           "role": "payoff",
           "used_at": "2026-08-25T01:56:48.031543+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T06:58:43.721342+00:00"
         }
       ]
     },
@@ -19820,7 +20006,8 @@
       "local_path": "assets/broll/34e2991ff3fe987d.mp4",
       "topics": [
         "writer editing social media post laptop",
-        "business presentation editing laptop email chart deadline"
+        "business presentation editing laptop email chart deadline",
+        "hands editing presentation slide title on laptop"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -19834,6 +20021,11 @@
           "video_slug": "planning-fallacy-du-lieu-qua-khu_xkiro",
           "role": "payoff",
           "used_at": "2026-08-25T01:56:48.038564+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T06:58:43.733064+00:00"
         }
       ]
     },
@@ -19936,7 +20128,8 @@
         "person reviewing drafts versus audience scrolling phone",
         "friends cafe happy versus tired solo cafe evening split scene",
         "split screen project progress data versus old receipts",
-        "tired worker scrolling phone couch late night clock"
+        "tired worker scrolling phone couch late night clock",
+        "anxious person avoiding computer screen holding phone"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -19960,6 +20153,11 @@
           "video_slug": "chi-phi-co-hoi-cai-gia-khong-tren-hoa-don_xkiro",
           "role": "payoff",
           "used_at": "2026-08-25T03:23:53.712069+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T06:58:54.988217+00:00"
         }
       ]
     },
@@ -20795,7 +20993,8 @@
       "source_url": "https://videos.pexels.com/video-files/8460901/8460901-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/4f7c7e8d423e0c20.mp4",
       "topics": [
-        "person speaking despite nervousness meeting"
+        "person speaking despite nervousness meeting",
+        "person speaking aloud first sentence at desk relaxed"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -20804,6 +21003,11 @@
           "video_slug": "hieu-ung-en-san-khau-vi-sao-mot-loi-nho-khien-ban-tuong-ai-cung-ang-chu-y_knowledge",
           "role": "payoff",
           "used_at": "2026-07-17T14:05:25.320997+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T06:59:36.873976+00:00"
         }
       ]
     },
@@ -21473,7 +21677,8 @@
       "local_path": "assets/broll/933babb4fe2e8fce.mp4",
       "topics": [
         "employee asking question in team meeting",
-        "stressed employee meeting boss"
+        "stressed employee meeting boss",
+        "speaker engaging listener with question during meeting"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -21487,6 +21692,11 @@
           "video_slug": "ban-nhap-xau-dau-tien_xkiro",
           "role": "payoff",
           "used_at": "2026-08-25T10:39:45.414467+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T06:59:46.222651+00:00"
         }
       ]
     },
@@ -22704,7 +22914,8 @@
       "local_path": "assets/broll/00fece5b5571db4e.mp4",
       "topics": [
         "person hesitating before posting on laptop meeting",
-        "person journaling food habit reflection at cafe"
+        "person journaling food habit reflection at cafe",
+        "golfer tense before swing in championship"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -22718,6 +22929,11 @@
           "video_slug": "khi-ly-do-bao-ve-hinh-anh-ban-than-bat-hoa-nhan-thuc_knowledge",
           "role": "payoff",
           "used_at": "2026-07-22T04:19:30.973956+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T06:59:15.167187+00:00"
         }
       ]
     },
@@ -23167,7 +23383,8 @@
       "source_url": "https://videos.pexels.com/video-files/8529095/8529095-hd_2048_1080_25fps.mp4",
       "local_path": "assets/broll/1a82e40b500b6651.mp4",
       "topics": [
-        "supportive workplace mentor answering question"
+        "supportive workplace mentor answering question",
+        "speaker engaging listener with question during meeting"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -23176,6 +23393,11 @@
           "video_slug": "loi-nguyen-tri-thuc-vi-sao-biet-roi-lai-kho-giai-thich-cho-nguoi-khac_knowledge",
           "role": "payoff",
           "used_at": "2026-07-17T14:18:20.844980+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T06:59:46.233402+00:00"
         }
       ]
     },
@@ -23766,7 +23988,8 @@
       "source_url": "https://videos.pexels.com/video-files/6930836/6930836-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/858b64ec5adc2db3.mp4",
       "topics": [
-        "professional pausing during conversation office"
+        "professional pausing during conversation office",
+        "speaker engaging listener with question during meeting"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -23775,6 +23998,11 @@
           "video_slug": "loi-nguyen-tri-thuc-vi-sao-biet-roi-lai-kho-giai-thich-cho-nguoi-khac_knowledge",
           "role": "payoff",
           "used_at": "2026-07-17T14:25:01.402819+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T06:59:46.252202+00:00"
         }
       ]
     },
@@ -29672,15 +29900,21 @@
       "source_url": "https://videos.pexels.com/video-files/7687764/7687764-hd_1920_1080_30fps.mp4",
       "local_path": "assets/broll/5452415a626e68e8.mp4",
       "topics": [
-        "preparing presentation data laptop"
+        "preparing presentation data laptop",
+        "person staring at laptop presentation late night"
       ],
       "orientation": "landscape",
-      "duration_sec": 6.0,
+      "duration_sec": 2.5,
       "uses": [
         {
           "video_slug": "danh-sach-cang-dai-ban-cang-kho-bat-au-vi-mot-co-che-trong-nao_knowledge",
           "role": "payoff",
           "used_at": "2026-07-20T12:29:52.487409+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "hook",
+          "used_at": "2026-08-26T06:58:39.278931+00:00"
         }
       ]
     },
@@ -29710,15 +29944,21 @@
       "source_url": "https://videos.pexels.com/video-files/8348904/8348904-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/c9cb19c2cd935437.mp4",
       "topics": [
-        "preparing presentation data laptop"
+        "preparing presentation data laptop",
+        "person staring at laptop presentation late night"
       ],
       "orientation": "landscape",
-      "duration_sec": 6.0,
+      "duration_sec": 2.5,
       "uses": [
         {
           "video_slug": "danh-sach-cang-dai-ban-cang-kho-bat-au-vi-mot-co-che-trong-nao_knowledge",
           "role": "payoff",
           "used_at": "2026-07-20T12:29:52.499547+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "hook",
+          "used_at": "2026-08-26T06:58:39.289009+00:00"
         }
       ]
     },
@@ -29989,10 +30229,11 @@
         "focused person working laptop desk",
         "working parent commuting evening tired realistic lifestyle",
         "person working laptop planner clock office daylight evening",
-        "tired person phone late night bedside clock"
+        "tired person phone late night bedside clock",
+        "person staring at laptop presentation late night"
       ],
       "orientation": "landscape",
-      "duration_sec": 6.0,
+      "duration_sec": 2.5,
       "uses": [
         {
           "video_slug": "danh-sach-cang-dai-ban-cang-kho-bat-au-vi-mot-co-che-trong-nao_knowledge_pexels-pexels-pillow-landscape",
@@ -30013,6 +30254,11 @@
           "video_slug": "chi-phi-co-hoi-cai-gia-khong-tren-hoa-don_xkiro",
           "role": "payoff",
           "used_at": "2026-08-25T03:24:27.988775+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "hook",
+          "used_at": "2026-08-26T06:58:39.269348+00:00"
         }
       ]
     },
@@ -30427,7 +30673,8 @@
       "source_url": "https://videos.pexels.com/video-files/6700644/6700644-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/a12e8131fe94be36.mp4",
       "topics": [
-        "person opening report document laptop evening"
+        "person opening report document laptop evening",
+        "opening laptop first slide at night calm"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -30436,6 +30683,11 @@
           "video_slug": "ban-muon-lam-nhung-mot-quyet-inh-mo-ho-khien-ban-khong-bat-au_knowledge",
           "role": "payoff",
           "used_at": "2026-07-20T14:10:28.429313+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T07:00:05.634857+00:00"
         }
       ]
     },
@@ -30478,7 +30730,8 @@
       "local_path": "assets/broll/39d0b02f3e805f0c.mp4",
       "topics": [
         "person putting documents beside front door",
-        "hands picking up socks putting in basket"
+        "hands picking up socks putting in basket",
+        "man rehearsing speech in front of mirror stressed"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -30492,6 +30745,11 @@
           "video_slug": "tai-sao-ban-biet-phai-lam-nhung-van-ung-yen-giai-ma-co-che-ne-tranh-su-mo-ho_knowledge",
           "role": "payoff",
           "used_at": "2026-07-27T13:59:06.158204+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T06:59:26.739628+00:00"
         }
       ]
     },
@@ -30502,7 +30760,8 @@
       "source_url": "https://videos.pexels.com/video-files/8293303/8293303-hd_1920_1080_30fps.mp4",
       "local_path": "assets/broll/86960a799420e830.mp4",
       "topics": [
-        "person putting documents beside front door"
+        "person putting documents beside front door",
+        "overwhelmed man standing in front of projector screen"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -30511,6 +30770,11 @@
           "video_slug": "ban-muon-lam-nhung-mot-quyet-inh-mo-ho-khien-ban-khong-bat-au_knowledge",
           "role": "payoff",
           "used_at": "2026-07-20T14:11:14.426860+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T06:59:05.108493+00:00"
         }
       ]
     },
@@ -30521,7 +30785,8 @@
       "source_url": "https://videos.pexels.com/video-files/6994525/6994525-hd_1920_1080_30fps.mp4",
       "local_path": "assets/broll/98cd4aaea5fa9e9d.mp4",
       "topics": [
-        "person putting documents beside front door"
+        "person putting documents beside front door",
+        "overwhelmed man standing in front of projector screen"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -30530,6 +30795,11 @@
           "video_slug": "ban-muon-lam-nhung-mot-quyet-inh-mo-ho-khien-ban-khong-bat-au_knowledge",
           "role": "payoff",
           "used_at": "2026-07-20T14:11:14.436230+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T06:59:05.119163+00:00"
         }
       ]
     },
@@ -30540,7 +30810,8 @@
       "source_url": "https://videos.pexels.com/video-files/6406093/6406093-hd_1920_1080_25fps.mp4",
       "local_path": "assets/broll/65f5baa283dea950.mp4",
       "topics": [
-        "person putting documents beside front door"
+        "person putting documents beside front door",
+        "overwhelmed man standing in front of projector screen"
       ],
       "orientation": "landscape",
       "duration_sec": 6.0,
@@ -30549,6 +30820,11 @@
           "video_slug": "ban-muon-lam-nhung-mot-quyet-inh-mo-ho-khien-ban-khong-bat-au_knowledge",
           "role": "payoff",
           "used_at": "2026-07-20T14:11:14.443582+00:00"
+        },
+        {
+          "video_slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau_xkiro",
+          "role": "payoff",
+          "used_at": "2026-08-26T06:59:05.097660+00:00"
         }
       ]
     },
@@ -32640,15 +32916,21 @@
       "source_url": "https://videos.pexels.com/video-files/6406028/6406028-hd_1080_1920_25fps.mp4",
       "local_path": "assets/broll/0f6128d937b0e778.mp4",
       "topics": [
-        "hand selecting one task on notebook beside laptop"
+        "hand selecting one task on notebook beside laptop",
+        "hand hovering over laptop F5 key presentation slide"
       ],
       "orientation": "portrait",
-      "duration_sec": 6.0,
+      "duration_sec": 2.5,
       "uses": [
         {
           "video_slug": "vi-sao-nhieu-viec-cung-ang-lam-khien-ban-tri-hoan_knowledge",
           "role": "payoff",
           "used_at": "2026-07-20T15:59:47.133626+00:00"
+        },
+        {
+          "video_slug": "cang-sua-cau-mo-dau-cang-kho-bam-f5_xkiro",
+          "role": "hook",
+          "used_at": "2026-08-26T07:02:17.615534+00:00"
         }
       ]
     },
@@ -32659,15 +32941,21 @@
       "source_url": "https://videos.pexels.com/video-files/7128677/7128677-hd_1080_2048_25fps.mp4",
       "local_path": "assets/broll/131ad7ccc4506985.mp4",
       "topics": [
-        "hand selecting one task on notebook beside laptop"
+        "hand selecting one task on notebook beside laptop",
+        "hand hovering over laptop F5 key presentation slide"
       ],
       "orientation": "portrait",
-      "duration_sec": 6.0,
+      "duration_sec": 2.5,
       "uses": [
         {
           "video_slug": "vi-sao-nhieu-viec-cung-ang-lam-khien-ban-tri-hoan_knowledge",
           "role": "payoff",
           "used_at": "2026-07-20T15:59:47.142905+00:00"
+        },
+        {
+          "video_slug": "cang-sua-cau-mo-dau-cang-kho-bam-f5_xkiro",
+          "role": "hook",
+          "used_at": "2026-08-26T07:02:17.625470+00:00"
         }
       ]
     },
