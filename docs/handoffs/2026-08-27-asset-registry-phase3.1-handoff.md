@@ -1,3 +1,11 @@
+> **SUPERSEDED 2026-08-27 bởi Phase 3.2** (`docs/handoffs/2026-08-27-asset-
+> registry-phase3.2-handoff.md`). Phase 3.1 sửa đúng defect `asset_id`
+> nhưng lại dùng `content_sha256` MỘT MÌNH làm khoá upsert toàn cục — cùng
+> lớp lỗi một tầng thấp hơn ("cùng bytes" bị coi là "cùng định danh
+> record"). Giữ file này nguyên vẹn làm lịch sử; đọc Phase 3.2 handoff để
+> biết trạng thái ĐÚNG hiện tại (matching theo "exact observation":
+> path + content_sha256 + asset_class tương thích + generation_key/seed).
+
 # Handoff — Asset Registry Phase 3.1 (corrective: identity & provenance fix)
 
 Ngày: 2026-08-27
