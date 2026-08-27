@@ -659,6 +659,66 @@ def test_candidate_count_gt_one_with_first_valid_makes_zero_judge_calls(tmp_path
     resolver.resolve(_story_request(), _story_segment(), None, video_slug="vid")  # would raise if judge were consulted and None
 
 
+def test_candidate_count_one_with_first_valid_makes_zero_judge_calls(tmp_path):
+    class _NoJudgeCall:
+        def evaluate(self, *args, **kwargs):
+            raise AssertionError("candidate_count=1 + first_valid không được gọi judge")
+
+    profile = _NS(
+        profile_id="p", version="1",
+        visual_generation=_story_visual_generation(
+            candidate_count=1, selection_policy="first_valid",
+        ),
+    )
+    resolver = VisualAssetResolver(
+        profile,
+        registry=AssetRegistry(tmp_path / "registry.json"),
+        cache_dir=tmp_path / "cache",
+        provider=_CountingProvider(),
+        judge=_NoJudgeCall(),
+    )
+    resolver.resolve(_story_request(), _story_segment(), None, video_slug="vid")
+
+
+def test_valid_candidate_media_survives_judge_failure_and_resume_does_not_regenerate(tmp_path):
+    """Judge is downstream of candidate generation: an infrastructure
+    failure must leave all valid slots checkpointed for a judge-only retry."""
+    profile = _NS(
+        profile_id="p", version="1",
+        visual_generation=_vlm_visual_generation(
+            judge_cfg=_judge_cfg(hard_fail_on_judge_error=True),
+        ),
+    )
+    registry = AssetRegistry(tmp_path / "registry.json")
+    provider = _CountingProvider()
+    project_dir = tmp_path / "project"
+    store_path = project_dir / "visual_candidates.json"
+    request = _story_request()
+
+    failing_resolver = VisualAssetResolver(
+        profile, registry=registry, cache_dir=tmp_path / "cache", provider=provider,
+        candidate_store=VisualCandidateStore(store_path),
+        evaluation_store=VisualEvaluationStore(project_dir / "visual_evaluations.json"),
+        judge=_FakeVisualJudge(fail=True),
+    )
+    with pytest.raises(ValueError, match="hard_fail_on_judge_error"):
+        failing_resolver.resolve(request, _story_segment(), None, video_slug="vid")
+    assert provider.calls == 3
+
+    resumed_judge = _FakeVisualJudge(scores={})
+    resumed_resolver = VisualAssetResolver(
+        profile, registry=registry, cache_dir=tmp_path / "cache", provider=provider,
+        candidate_store=VisualCandidateStore(store_path),
+        evaluation_store=VisualEvaluationStore(project_dir / "visual_evaluations.json"),
+        judge=resumed_judge,
+    )
+    resumed_resolver.resolve(request, _story_segment(), None, video_slug="vid")
+
+    assert provider.calls == 3
+    assert resumed_judge.calls == 1
+    assert len(registry.assets()) == 3
+
+
 def test_profile_local_makes_zero_judge_calls(tmp_path):
     assets_dir = tmp_path / "profile_assets"
     assets_dir.mkdir()

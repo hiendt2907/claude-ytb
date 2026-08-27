@@ -153,6 +153,56 @@ def _generation_mode(characters: tuple[str, ...]) -> str:
     return {0: "establishing", 1: "solo", 2: "duo"}.get(len(characters), "duo")
 
 
+def _selector_fingerprint(visual: Any) -> str:
+    """Identity of selection semantics, deliberately excluding generation.
+
+    Changing this fingerprint makes only the selected resolution stale. The
+    candidate slots and their AssetRecords remain reusable.
+    """
+    policy = getattr(visual, "selection_policy", "first_valid")
+    payload: dict[str, Any] = {
+        "contract_version": "phase10-selector-v1",
+        "selection_policy": policy,
+        "candidate_count": getattr(visual, "candidate_count", 1),
+    }
+    if policy == "vlm_ranked":
+        judge = getattr(visual, "visual_judge", None)
+        payload["visual_judge"] = {
+            "provider": getattr(judge, "provider", ""),
+            "model": getattr(judge, "model", ""),
+            "policy_version": getattr(judge, "policy_version", ""),
+            "minimum_score": getattr(judge, "minimum_score", None),
+            "hard_fail_on_judge_error": getattr(judge, "hard_fail_on_judge_error", None),
+            "contract_version": _JUDGE_CONTRACT_VERSION,
+        }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(encoded.encode()).hexdigest()
+
+
+def _selection_checkpoint_is_reusable(
+    request: VisualRequest,
+    profile: "ContentProfile",
+    candidate_store: VisualCandidateStore,
+    *,
+    has_reuse_source: bool,
+) -> bool:
+    """Whether a reusable manifest also has a current selection decision."""
+    if has_reuse_source or request.resolution_kind != "generated_image":
+        return True
+    visual = getattr(profile, "visual_generation", None)
+    if visual is None or getattr(visual, "candidate_count", 1) <= 1:
+        return True
+    candidate_set = candidate_store.get(request.shot_id)
+    if candidate_set is None:
+        return False
+    return (
+        candidate_set.request_fingerprint == request.request_fingerprint
+        and candidate_set.selection_status == "selected"
+        and candidate_set.selection_mode != "fallback_first_valid"
+        and candidate_set.selector_fingerprint == _selector_fingerprint(visual)
+    )
+
+
 class VisualAssetResolver:
     """The single local/cache/ComfyUI/registry decision owner."""
 
@@ -237,12 +287,10 @@ class VisualAssetResolver:
             except Exception as exc:
                 slot.status, slot.last_error = "failed", str(exc)
             store.write()
-        # Selection is ALWAYS recomputed here — never cached/skipped based
-        # on a prior `selected_asset_id` — so a changed `selection_policy`
-        # or judge policy reselects on the very next call with no explicit
-        # invalidation step (see `VisualCandidateSet.selection_policy`
-        # docstring / Phase 10 handoff §16). Only candidate GENERATION
-        # above is checkpointed/skipped.
+        # Once resolution reaches this boundary selection is recomputed from
+        # the already-checkpointed slots. `prepare_visual_assets` skips this
+        # boundary only when the persisted selector fingerprint is current;
+        # generation progress above remains independent in either case.
         if policy_name == "vlm_ranked":
             selected_asset_id = self._select_vlm_ranked(request, candidate_set, video_slug=video_slug)
         elif policy_name == "first_valid":
@@ -251,6 +299,7 @@ class VisualAssetResolver:
         else:
             raise ValueError(f"selection_policy không hợp lệ: {policy_name!r}")
         candidate_set.selection_policy = policy_name
+        candidate_set.selector_fingerprint = _selector_fingerprint(visual)
         if selected_asset_id is None:
             candidate_set.selection_status = "failed"
             store.write()
@@ -258,6 +307,10 @@ class VisualAssetResolver:
         candidate_set.selected_asset_id = selected_asset_id
         candidate_set.selection_status = "selected"
         store.write()
+        _candidate_logger.info(
+            "visual_candidates.selected shot_id=%s asset_id=%s policy=%s mode=%s",
+            request.shot_id, selected_asset_id, policy_name, candidate_set.selection_mode,
+        )
         record = self.registry.find_by_asset_id(selected_asset_id)
         assert record is not None
         return record
@@ -393,7 +446,21 @@ def prepare_visual_assets(voiceover: "Voiceover", profile: "ContentProfile", *, 
         existing = manifest.shots.get(request.shot_id)
         if existing and existing.asset_id:
             record = registry.find_by_asset_id(existing.asset_id)
-            if record and manifest.is_reusable(request.shot_id, request_fingerprint=request.request_fingerprint, asset_path=Path(record["local_path"]), content_sha256=record["content_sha256"]):
+            if (
+                record
+                and manifest.is_reusable(
+                    request.shot_id,
+                    request_fingerprint=request.request_fingerprint,
+                    asset_path=Path(record["local_path"]),
+                    content_sha256=record["content_sha256"],
+                )
+                and _selection_checkpoint_is_reusable(
+                    request,
+                    profile,
+                    candidate_store,
+                    has_reuse_source=existing.reuse_source is not None,
+                )
+            ):
                 prepared[request.shot_id] = Path(record["local_path"])
                 continue
         scene, shot = shots[request.shot_id]

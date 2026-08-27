@@ -132,15 +132,14 @@ class VisualCandidateSet:
     candidates: dict[str, CandidateSlot] = field(default_factory=dict)
     selected_asset_id: str | None = None
     selection_status: str = "pending"  # pending | selected | failed
-    # Phase 10 — diagnostic only. Selection itself is ALWAYS recomputed on
-    # every `resolve()` call (never cached/skipped), so a changed
-    # `selection_policy` or judge policy reselects on its own without any
-    # explicit invalidation step — these two fields just record what
-    # produced the current `selected_asset_id` for inspection/resume
-    # diagnostics. See `docs/handoffs/2026-08-27-visual-judge-phase10-
-    # handoff.md` §16.
+    # Phase 10 selection checkpoint. `selector_fingerprint` is intentionally
+    # independent from candidate generation identity: a policy/model/
+    # threshold change invalidates the selected resolution while preserving
+    # all valid slots and AssetRecords. `selection_mode` records an explicit
+    # infrastructure fallback; fallback selections are retried on resume.
     selection_policy: str = ""
     selection_mode: str = "policy"  # policy | fallback_first_valid
+    selector_fingerprint: str = ""
 
     def slot(self, candidate_index: int) -> CandidateSlot:
         slot_id = f"{self.shot_id}::candidate-{candidate_index:02d}"
@@ -164,6 +163,7 @@ class VisualCandidateSet:
             "selection_status": self.selection_status,
             "selection_policy": self.selection_policy,
             "selection_mode": self.selection_mode,
+            "selector_fingerprint": self.selector_fingerprint,
         }
 
     @classmethod
@@ -174,6 +174,7 @@ class VisualCandidateSet:
             {key: CandidateSlot(**value) for key, value in data.get("candidates", {}).items()},
             data.get("selected_asset_id"), data.get("selection_status", "pending"),
             data.get("selection_policy", ""), data.get("selection_mode", "policy"),
+            data.get("selector_fingerprint", ""),
         )
 
 
@@ -214,6 +215,10 @@ class VisualCandidateStore:
         )
         self._sets[shot_id] = created
         return created
+
+    def get(self, shot_id: str) -> VisualCandidateSet | None:
+        """Return persisted candidate state without creating or mutating it."""
+        return self._sets.get(shot_id)
 
     def write(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
