@@ -315,6 +315,21 @@ the prepared core.
 AssetRegistry remains protected by its existing process-safe file lock. ComfyUI
 is a server-side prompt queue, so Phase 4 adds no second distributed queue.
 
+## Subtitle and audio timeline layers (Phase 5)
+
+Phase 5 keeps Narration as the measured timing authority. The story Timeline
+now represents separate optional `music_clips` and `sfx_clips` through the
+validated `AudioLayerClip` contract; neither changes `expected_duration_sec`
+or duplicates narration. No shipped content profile enables optional music/SFX
+yet, so no mix path or loudness pass was added. Narration continues to be
+normalized once by the existing TTS concatenation path.
+
+`render/subtitle.py` derives one Vietnamese subtitle cue per narration segment
+from `Timeline.narration_clips`, then emits sibling `<slug>.srt` and
+`<slug>.vtt` files during story rendering. These accessibility artifacts are
+distinct from the existing burned caption cards and do not provide translation
+or word-level alignment.
+
 ## Asset Registry — character_story visuals (Phase 3.2, added 2026-08-27)
 
 `src/ytb_pipeline/render/asset_registry.py` adds a durable provenance/
