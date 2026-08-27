@@ -247,6 +247,15 @@ def test_adapter_rejects_changed_oversized_and_unsupported_candidate_media(tmp_p
             _request(), (_candidate(large, 0),), _context()
         )
 
+    too_many_pixels = tmp_path / "too-many-pixels.png"
+    _png(too_many_pixels)
+    with pytest.raises(JudgeInfrastructureError, match="vượt giới hạn"):
+        XkiroVisualJudge(
+            "qwen/qwen3.8-max:free",
+            transport=transport,
+            max_image_pixels=32 * 24 - 1,
+        ).evaluate(_request(), (_candidate(too_many_pixels, 0),), _context())
+
 
 def test_registry_advertises_only_real_vision_judge_capability():
     from ytb_pipeline.providers.vision import available_visual_judges, get_visual_judge
