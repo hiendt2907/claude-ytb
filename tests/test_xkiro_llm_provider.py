@@ -288,10 +288,26 @@ async def test_request_timeout_scales_with_the_requested_output_size(monkeypatch
     from ytb_pipeline.providers.llm import xkiro_provider
 
     short_budget = xkiro_provider.request_timeout_for(max_tokens=4096)
-    long_budget = xkiro_provider.request_timeout_for(max_tokens=14000)
+    long_budget = xkiro_provider.request_timeout_for(max_tokens=60_000)
 
     assert short_budget >= xkiro_provider._REQUEST_TIMEOUT_S
     assert long_budget > short_budget * 2
+
+
+async def test_request_timeout_floor_covers_a_small_output_call_with_a_large_input(monkeypatch):
+    """A small max_tokens ask (e.g. editorial_review's 1024-token verdict) can
+    still take a long time to *start* responding when the INPUT is large (a
+    full Long script + rubric) — the formula only scales with requested
+    OUTPUT size, so the floor alone must be generous enough to cover that
+    prefill latency.
+
+    Production 2026-08-27: `run_editorial_review()` (max_tokens=1024) timed
+    out twice in a row against real xKiro at the previous 60s floor, both
+    times on a full Long script payload.
+    """
+    from ytb_pipeline.providers.llm import xkiro_provider
+
+    assert xkiro_provider.request_timeout_for(max_tokens=1024) >= 600.0
 
 
 @pytest.mark.unit

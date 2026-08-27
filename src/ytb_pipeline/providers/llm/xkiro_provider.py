@@ -17,7 +17,13 @@ from urllib import request as urllib_request
 from ...config.settings import settings
 from ..errors import ProviderUnavailableError
 
-_REQUEST_TIMEOUT_S = 60.0
+# Production 2026-08-27: `run_editorial_review()` asks for only 1024 output
+# tokens (small) but sends a full script + rubric as INPUT — xKiro can take
+# a long time to finish reading that context before producing any output,
+# and the formula below only scales with requested OUTPUT size. A flat 60s
+# floor is too tight for that prefill latency; 600s covers it while still
+# scaling further up for genuinely large output requests below.
+_REQUEST_TIMEOUT_S = 600.0
 # Slowest sustained generation rate we are willing to wait through.  A flat
 # 60s budget was sized for Short-scale requests; a Long asks for ~14k tokens.
 _MIN_OUTPUT_TOKENS_PER_SEC = 40.0
