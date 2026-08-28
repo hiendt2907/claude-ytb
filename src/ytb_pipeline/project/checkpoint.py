@@ -11,7 +11,7 @@ from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .models import NodeStatus, Project, WorkflowNode
+from .models import NodeStatus, Project, ProjectStatus, WorkflowNode
 
 
 def _now_iso() -> str:
@@ -90,6 +90,28 @@ class CheckpointManager:
             retry_count=retry_count,
         )
         return project.with_node(node)
+
+    def mark_halted(
+        self,
+        project: Project,
+        node_id: str,
+        *,
+        node_status: NodeStatus,
+        project_status: ProjectStatus,
+        error: str,
+    ) -> Project:
+        """Persist an intentional domain halt separately from FAILED."""
+        if node_status not in {NodeStatus.REVIEW_REQUIRED, NodeStatus.ABANDONED}:
+            raise ValueError(f"Node halt status không hợp lệ: {node_status.value}.")
+        existing = project.nodes.get(node_id)
+        stage = existing.stage if existing else node_id
+        node = replace(
+            existing if existing else WorkflowNode(node_id=node_id, stage=stage),
+            status=node_status,
+            error=error,
+            completed_at=_now_iso(),
+        )
+        return replace(project.with_node(node), status=project_status)
 
     def is_done(self, project: Project, node_id: str) -> bool:
         """True nếu node tồn tại và status=DONE."""

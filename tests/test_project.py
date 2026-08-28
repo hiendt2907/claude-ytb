@@ -271,8 +271,10 @@ def test_workflow_persists_explicit_operator_halt_state(
     tmp_path, node_status, project_status
 ):
     class _OperatorHalt(RuntimeError):
-        workflow_node_status = node_status.value
-        project_status = project_status.value
+        pass
+
+    _OperatorHalt.workflow_node_status = node_status.value
+    _OperatorHalt.project_status = project_status.value
 
     async def halt(_project):
         raise _OperatorHalt("operator boundary")

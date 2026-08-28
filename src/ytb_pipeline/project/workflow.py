@@ -11,7 +11,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any, Awaitable, Callable
 
 from .checkpoint import CheckpointManager
-from .models import Project, ProjectStatus
+from .models import NodeStatus, Project, ProjectStatus
 
 
 @dataclass(frozen=True)
@@ -98,7 +98,21 @@ class WorkflowGraph:
             try:
                 output = await node.fn(current)
             except Exception as exc:  # noqa: BLE001
-                current = self.checkpoint.mark_failed(current, node_id, str(exc))
+                node_status_value = getattr(exc, "workflow_node_status", "")
+                project_status_value = getattr(exc, "project_status", "")
+                if node_status_value and project_status_value:
+                    try:
+                        current = self.checkpoint.mark_halted(
+                            current,
+                            node_id,
+                            node_status=NodeStatus(node_status_value),
+                            project_status=ProjectStatus(project_status_value),
+                            error=str(exc),
+                        )
+                    except ValueError:
+                        current = self.checkpoint.mark_failed(current, node_id, str(exc))
+                else:
+                    current = self.checkpoint.mark_failed(current, node_id, str(exc))
                 self.checkpoint.save(current)
                 raise WorkflowError(node_id, str(exc)) from exc
 

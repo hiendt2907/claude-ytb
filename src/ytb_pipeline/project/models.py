@@ -27,6 +27,8 @@ class ProjectStatus(str, Enum):
     PUBLISHED = "published"
     ARCHIVED = "archived"
     FAILED = "failed"
+    REVIEW_REQUIRED = "review_required"
+    ABANDONED = "abandoned"
 
 
 class NodeStatus(str, Enum):
@@ -35,6 +37,8 @@ class NodeStatus(str, Enum):
     DONE = "done"
     FAILED = "failed"
     SKIPPED = "skipped"
+    REVIEW_REQUIRED = "review_required"
+    ABANDONED = "abandoned"
 
 
 @dataclass(frozen=True)
