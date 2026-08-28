@@ -299,6 +299,52 @@ def hook_repair_prompt(
     )
 
 
+def narrator_reflection_repair_prompt(
+    payload: dict, detail: str, *, content_profile: "ContentProfile | None" = None,
+) -> str:
+    """Ask for one bounded rewrite of only the final narrator reflection."""
+    sections = payload.get("sections") or []
+    narrator_id = (
+        content_profile.editorial_contract.narration_speaker_id
+        if content_profile is not None
+        else "narrator"
+    )
+    final_text = str((sections[-1] if sections else {}).get("voiceover") or "").casefold()
+    requires_bridge = (
+        content_profile.content_rules.require_next_episode_bridge
+        if content_profile is not None
+        else any(marker in final_text for marker in ("tập sau", "lần tới", "hẹn gặp lại"))
+    )
+    bridge_instruction = (
+        "Preserve a natural bridge beginning with 'Tập sau', 'Lần tới', or "
+        "'Hẹn gặp lại ở tập sau'; cast names are allowed only inside that bridge."
+        if requires_bridge
+        else "Do not invent a next-episode bridge when the profile does not require one."
+    )
+    context = {
+        key: payload.get(key)
+        for key in ("slug", "topic", "title", "video_type", "continuity")
+    }
+    context["final_section"] = sections[-1] if sections else None
+    return (
+        "Rewrite ONLY the final narrator reflection of this Vietnamese YouTube "
+        "script to fix a QA narrator_reflection rejection.\n"
+        f"QA detail: {detail}\n"
+        f'The existing final speaker remains "{narrator_id}". Write exactly 2-3 '
+        "natural spoken sentences addressed directly to the viewer (include "
+        "'bạn'), rooted in the exact choice and consequence already present. "
+        "Keep the reflection modest and conditional; do not issue a command, "
+        "diagnose the viewer, invent a new event, or state a universal moral. "
+        "Do not name a cast member in the reflection before any next-episode bridge. "
+        f"{bridge_instruction}\n"
+        'Return ONLY one JSON object shaped {"voiceover": <new Vietnamese final '
+        "text>}. Do not return the full script, markdown, or any other field. "
+        "Do not change title, topic, section count, purpose, speaker, continuity, "
+        "or any earlier section.\n\n"
+        f"Script context:\n{json.dumps(context, ensure_ascii=False, indent=2)}"
+    )
+
+
 STRATEGY_V1_CONTRACT = f"""Every newly generated Short MUST include a strategy object. strategy contains format_id, core_mechanism, audience_problem, angle, long_form_slug, playlist, cta_target, and hook. hook contains situation, core_answer, open_loop, answer_by_sec. Use format_id="core_answer_first_v1" unless explicit analytics feedback says another tested format won. The Short must show the situation in the first segment, put the exact core_answer in a section whose purpose is "core_answer", and set answer_by_sec to 5 or less. Every section must include purpose, one of exactly: {SECTION_PURPOSES_LIST}. Do not delay the core answer with a greeting, a generic question, or an abstract definition. The core_answer should be a careful explanation, not an absolute diagnosis or a dopamine cliché."""
 
 PERSONAL_FINANCE_PSYCHOLOGY_PROFILE = "personal_finance_psychology"

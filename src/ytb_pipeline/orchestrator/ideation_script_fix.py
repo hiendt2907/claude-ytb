@@ -34,6 +34,7 @@ from .ideation_prompts import (
     SHORT_MIN_CHARS,
     SHORT_TARGET_CHARS,
     hook_repair_prompt,
+    narrator_reflection_repair_prompt,
     editorial_rewrite_prompt,
     ledger_topics,
     long_extension_prompt,
@@ -625,6 +626,24 @@ def apply_hook_repair(payload: dict, delta: dict) -> dict:
     return enriched
 
 
+def apply_narrator_reflection_repair(payload: dict, delta: dict) -> dict:
+    """Replace only the final section's spoken text, preserving the payload."""
+    new_voiceover = str(delta.get("voiceover") or "").strip()
+    if not new_voiceover:
+        raise ValueError("Narrator reflection repair phải trả về voiceover không rỗng.")
+    sections = payload.get("sections")
+    if not isinstance(sections, list) or not sections:
+        raise ValueError("Script không có sections để sửa narrator reflection.")
+    if not isinstance(sections[-1], dict):
+        raise ValueError("Section cuối phải là object.")
+    enriched = deepcopy(payload)
+    final_section = enriched["sections"][-1]
+    final_section["voiceover"] = new_voiceover
+    if "narration" in final_section:
+        final_section["narration"] = new_voiceover
+    return enriched
+
+
 def apply_editorial_rewrite(payload: dict, delta: dict) -> dict:
     """Replace ONLY the voiceover of the sections an editorial review cited.
 
@@ -698,6 +717,7 @@ async def validate_or_repair_script(
     short_expansion_attempts = 0
     identity_repair_attempted = False
     hook_repair_attempted = False
+    narrator_reflection_repair_attempted = False
     editorial_rewrites = 0
     report_path = script_path.parent.parent / "assets" / "quality_reports" / "ideation_errors.jsonl"
     initial_review_profile = _explicit_profile(current)
@@ -992,6 +1012,8 @@ async def validate_or_repair_script(
                             }
                             if 1 in rewritten_indices:
                                 hook_repair_attempted = False
+                            if len(current.get("sections") or ()) in rewritten_indices:
+                                narrator_reflection_repair_attempted = False
                         except (ValueError, json.JSONDecodeError) as exc:
                             last_validation_error = f"Editorial rewrite không dùng được: {exc}"
                             if log_path:
@@ -1118,6 +1140,71 @@ async def validate_or_repair_script(
                         last_validation_error = f"Hook repair không dùng được: {exc}"
                         if log_path:
                             append_local_start_log(log_path, "HOOK_REPAIR_FAILED", last_validation_error)
+
+                if (
+                    is_deterministic_attempt
+                    and not narrator_reflection_repair_attempted
+                    and "narrator_reflection" in violation_rules
+                ):
+                    narrator_reflection_repair_attempted = True
+                    repaired_anything = True
+                    reflection_violation = next(
+                        (
+                            violation
+                            for violation in (last_qa_output or {}).get("violations", [])
+                            if str(violation.get("rule")) == "narrator_reflection"
+                        ),
+                        {},
+                    )
+                    reflection_request = narrator_reflection_repair_prompt(
+                        current,
+                        str(reflection_violation.get("detail") or ""),
+                        content_profile=_explicit_profile(current),
+                    )
+                    if console_prefix:
+                        print(
+                            f"{console_prefix} repair: final narrator reflection only",
+                            flush=True,
+                        )
+                    if log_path:
+                        append_local_start_log(
+                            log_path,
+                            "NARRATOR_REFLECTION_REPAIR_PROMPT",
+                            reflection_request,
+                        )
+                    reflection_text = await provider.complete(
+                        reflection_request,
+                        system=repair_system_prompt(current),
+                        max_tokens=1024,
+                        temperature=0.3,
+                        json_output=True,
+                        response_schema={
+                            "type": "object",
+                            "properties": {"voiceover": {"type": "string"}},
+                            "required": ["voiceover"],
+                            "additionalProperties": False,
+                        },
+                    )
+                    if log_path:
+                        append_local_start_log(
+                            log_path,
+                            "NARRATOR_REFLECTION_REPAIR_RESPONSE",
+                            reflection_text,
+                        )
+                    try:
+                        current = apply_narrator_reflection_repair(
+                            current, json_from_llm(reflection_text)
+                        )
+                    except (ValueError, json.JSONDecodeError) as exc:
+                        last_validation_error = (
+                            f"Narrator reflection repair không dùng được: {exc}"
+                        )
+                        if log_path:
+                            append_local_start_log(
+                                log_path,
+                                "NARRATOR_REFLECTION_REPAIR_FAILED",
+                                last_validation_error,
+                            )
 
                 if repaired_anything:
                     continue
