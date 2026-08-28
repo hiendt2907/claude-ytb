@@ -147,6 +147,32 @@ def test_round_one_slot_seed_and_cache_identity_is_deterministic_and_distinct(tm
     }
 
 
+def test_round_one_seed_collision_is_resolved_without_changing_round_zero(monkeypatch):
+    from ytb_pipeline.render import visual_candidates
+
+    class _ConstantDigest:
+        def hexdigest(self):
+            return "0000000000000001" + "0" * 48
+
+    monkeypatch.setattr(
+        visual_candidates.hashlib,
+        "sha256",
+        lambda _payload: _ConstantDigest(),
+    )
+    key = "abcdef0123456789abcdef0123456789"
+    round_zero = {
+        candidate_seed(key, index, generation_round=0)
+        for index in range(4)
+    }
+    round_one = [
+        candidate_seed(key, index, generation_round=1)
+        for index in range(4)
+    ]
+
+    assert len(set(round_one)) == 4
+    assert set(round_one).isdisjoint(round_zero)
+
+
 def test_legacy_candidate_json_loads_as_round_zero_without_migration(tmp_path):
     path = tmp_path / "visual_candidates.json"
     path.write_text(json.dumps({
