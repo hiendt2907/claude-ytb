@@ -556,3 +556,203 @@ class VisualReviewStore:
             request_fingerprint=request_fingerprint,
             update=update,
         )
+
+    def initialize_manual_attempt(
+        self,
+        review_id: str,
+        *,
+        request_fingerprint: str,
+        candidate_count: int,
+        generation_key: str,
+    ) -> VisualReviewEntry:
+        if not 1 <= candidate_count <= 4:
+            raise VisualReviewError("Manual candidate_count phải nằm trong [1, 4].")
+
+        def update(entry: VisualReviewEntry) -> VisualReviewEntry:
+            override = entry.manual_override
+            if override is None or entry.disposition != ReviewDisposition.MANUAL_REGENERATE:
+                raise VisualReviewError("Review không có manual regeneration disposition.")
+            if override.base_request_fingerprint != entry.request_fingerprint:
+                raise VisualReviewError("Manual override stale: base request đã thay đổi.")
+            if override.candidates:
+                if (
+                    override.candidate_count != candidate_count
+                    or override.generation_key != generation_key
+                ):
+                    raise VisualReviewError("Manual attempt identity không còn khớp.")
+                return entry
+            slots = tuple(
+                ManualCandidateSlot(
+                    candidate_slot_id=(
+                        f"{entry.shot_id}::manual::{override.override_id}::"
+                        f"candidate-{index:02d}"
+                    ),
+                    candidate_index=index,
+                    seed=manual_candidate_seed(generation_key, index),
+                )
+                for index in range(candidate_count)
+            )
+            return replace(
+                entry,
+                manual_override=replace(
+                    override,
+                    status="running",
+                    candidate_count=candidate_count,
+                    generation_key=generation_key,
+                    candidates=slots,
+                ),
+            )
+
+        return self.update_pending(
+            review_id,
+            request_fingerprint=request_fingerprint,
+            update=update,
+        )
+
+    def update_manual_slot(
+        self,
+        review_id: str,
+        *,
+        request_fingerprint: str,
+        candidate_index: int,
+        status: str,
+        asset_id: str | None = None,
+        last_error: str | None = None,
+        increment_attempt: bool = False,
+    ) -> VisualReviewEntry:
+        if status not in {"pending", "running", "done", "failed"}:
+            raise VisualReviewError(f"Manual slot status không hợp lệ: {status!r}.")
+
+        def update(entry: VisualReviewEntry) -> VisualReviewEntry:
+            override = entry.manual_override
+            if override is None:
+                raise VisualReviewError("Review thiếu manual override.")
+            slots = list(override.candidates)
+            try:
+                slot_index = next(
+                    index
+                    for index, slot in enumerate(slots)
+                    if slot.candidate_index == candidate_index
+                )
+            except StopIteration as exc:
+                raise VisualReviewError(
+                    f"Manual candidate slot không tồn tại: {candidate_index}."
+                ) from exc
+            slot = slots[slot_index]
+            slots[slot_index] = replace(
+                slot,
+                status=status,
+                asset_id=asset_id,
+                attempt_count=slot.attempt_count + (1 if increment_attempt else 0),
+                last_error=last_error,
+            )
+            return replace(
+                entry,
+                manual_override=replace(override, candidates=tuple(slots)),
+            )
+
+        return self.update_pending(
+            review_id,
+            request_fingerprint=request_fingerprint,
+            update=update,
+        )
+
+    def resolve_manual_attempt(
+        self,
+        review_id: str,
+        *,
+        request_fingerprint: str,
+        selected_asset_id: str,
+        selection_mode: str,
+        evaluation_fingerprint: str,
+    ) -> VisualReviewEntry:
+        def update(entry: VisualReviewEntry) -> VisualReviewEntry:
+            override = entry.manual_override
+            if override is None:
+                raise VisualReviewError("Review thiếu manual override.")
+            manual_ids = tuple(
+                slot.asset_id for slot in override.candidates if slot.asset_id
+            )
+            if selected_asset_id not in manual_ids:
+                raise VisualReviewError("Manual winner không thuộc manual candidate set.")
+            return replace(
+                entry,
+                status=ReviewStatus.RESOLVED,
+                candidate_asset_ids=tuple(
+                    dict.fromkeys((*entry.candidate_asset_ids, *manual_ids))
+                ),
+                evaluation_fingerprint=evaluation_fingerprint,
+                selected_asset_id=selected_asset_id,
+                selection_mode=selection_mode,
+                manual_override=replace(
+                    override,
+                    status="resolved",
+                    selected_asset_id=selected_asset_id,
+                ),
+                last_error=None,
+            )
+
+        return self.update_pending(
+            review_id,
+            request_fingerprint=request_fingerprint,
+            update=update,
+        )
+
+    def mark_manual_rejected(
+        self,
+        review_id: str,
+        *,
+        request_fingerprint: str,
+        evaluation_fingerprint: str,
+    ) -> VisualReviewEntry:
+        def update(entry: VisualReviewEntry) -> VisualReviewEntry:
+            override = entry.manual_override
+            if override is None:
+                raise VisualReviewError("Review thiếu manual override.")
+            manual_ids = tuple(
+                slot.asset_id for slot in override.candidates if slot.asset_id
+            )
+            return replace(
+                entry,
+                review_reason=ReviewReason.MANUAL_SEMANTIC_REJECTION,
+                candidate_asset_ids=tuple(
+                    dict.fromkeys((*entry.candidate_asset_ids, *manual_ids))
+                ),
+                evaluation_fingerprint=evaluation_fingerprint,
+                recovery_status="manual_rejected",
+                manual_override=replace(override, status="rejected"),
+                last_error=None,
+            )
+
+        return self.update_pending(
+            review_id,
+            request_fingerprint=request_fingerprint,
+            update=update,
+        )
+
+    def reopen_invalid_selection(
+        self,
+        review_id: str,
+        *,
+        request_fingerprint: str,
+        error: str,
+    ) -> VisualReviewEntry:
+        with locked_json_update(self.path) as data:
+            reviews = data.setdefault("reviews", {})
+            payload = reviews.get(review_id)
+            if payload is None:
+                raise VisualReviewError(f"Không tìm thấy review {review_id!r}.")
+            entry = VisualReviewEntry.from_dict(payload)
+            if entry.request_fingerprint != request_fingerprint:
+                raise VisualReviewError("Review stale: request fingerprint không còn khớp.")
+            if entry.status != ReviewStatus.RESOLVED:
+                raise VisualReviewError("Chỉ resolved review mới có thể reopen.")
+            updated = replace(
+                entry,
+                status=ReviewStatus.PENDING,
+                review_reason=ReviewReason.ACCEPTED_ASSET_INVALID,
+                last_error=error,
+                updated_at=_now_iso(),
+            )
+            reviews[review_id] = updated.to_dict()
+            return updated

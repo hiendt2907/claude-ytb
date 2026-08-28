@@ -16,6 +16,7 @@ from ..config.settings import settings
 from ..providers.image.comfyui_story_provider import SAMPLER, SCHEDULER
 from .asset_registry import AssetRegistry, content_sha256 as observed_content_sha256
 from .visual_candidates import (
+    CandidateSlot,
     MAX_GENERATION_ROUND,
     VisualCandidateSet,
     VisualCandidateStore,
@@ -33,6 +34,19 @@ from .visual_judge import (
     JudgeResult,
     logger as _judge_logger,
     select_vlm_ranked,
+)
+from .visual_review import (
+    ReviewDisposition,
+    ReviewReason,
+    ReviewRequiredError,
+    ReviewStatus,
+    VisualAbandonedError,
+    VisualPreparationState,
+    VisualReviewEntry,
+    VisualReviewStore,
+    derive_manual_visual_request,
+    manual_candidate_cache_path,
+    manual_generation_key,
 )
 
 if TYPE_CHECKING:
@@ -117,6 +131,13 @@ class VisualManifest:
 
     def mark_failed(self, shot_id: str, *, request_id: str, request_fingerprint: str, error: str) -> None:
         self.shots[shot_id] = VisualManifestEntry(request_id, request_fingerprint, "failed", None, self._attempts(shot_id), error)
+
+    def mark_pending(self, shot_id: str, *, request_id: str, request_fingerprint: str, reason: str) -> None:
+        """Record that no final resolution exists without duplicating review state."""
+        attempts = self.shots.get(shot_id, VisualManifestEntry("", "")).attempt_count
+        self.shots[shot_id] = VisualManifestEntry(
+            request_id, request_fingerprint, "pending", None, attempts, reason
+        )
 
     def is_reusable(self, shot_id: str, *, request_fingerprint: str, asset_path: Path, content_sha256: str) -> bool:
         entry = self.shots.get(shot_id)
@@ -240,7 +261,7 @@ def _selection_checkpoint_is_reusable(
 class VisualAssetResolver:
     """The single local/cache/ComfyUI/registry decision owner."""
 
-    def __init__(self, profile: "ContentProfile", *, registry: AssetRegistry | None = None, cache_dir: Path | None = None, provider: Any = None, candidate_store: VisualCandidateStore | None = None, judge: Any = None, evaluation_store: VisualEvaluationStore | None = None) -> None:
+    def __init__(self, profile: "ContentProfile", *, registry: AssetRegistry | None = None, cache_dir: Path | None = None, provider: Any = None, candidate_store: VisualCandidateStore | None = None, judge: Any = None, evaluation_store: VisualEvaluationStore | None = None, review_store: VisualReviewStore | None = None) -> None:
         self.profile, self.registry, self.cache_dir, self.provider = profile, registry or AssetRegistry(), cache_dir, provider
         self.candidate_store = candidate_store
         # Only consulted when a profile opts into
@@ -251,6 +272,7 @@ class VisualAssetResolver:
         # instantiate a Judge adapter.
         self.judge = judge
         self.evaluation_store = evaluation_store
+        self.review_store = review_store
 
     def resolve(self, request: VisualRequest, segment: "Segment", shot: "Shot", *, video_slug: str) -> dict[str, Any]:
         if request.resolution_kind == "profile_local":
@@ -407,6 +429,289 @@ class VisualAssetResolver:
             candidate_set.recovery_policy,
         )
 
+    def _raise_semantic_review(
+        self,
+        request: VisualRequest,
+        candidate_set: VisualCandidateSet,
+        *,
+        reason: ReviewReason,
+        evaluation_fingerprint: str,
+    ) -> None:
+        """Persist the human boundary when a project-local store is available.
+
+        Direct resolver callers without a project context retain the Phase-12
+        ValueError behavior; production ``prepare_visual_assets`` always
+        injects the durable review store.
+        """
+        if self.review_store is None:
+            if reason == ReviewReason.SEMANTIC_RECOVERY_EXHAUSTED:
+                raise ValueError(
+                    f"Semantic recovery exhausted cho shot {request.shot_id}; "
+                    "không tạo round 2."
+                )
+            raise ValueError(
+                f"Không có candidate hợp lệ nào cho shot {request.shot_id} "
+                f"(target_count={candidate_set.target_candidate_count})."
+            )
+        candidate_ids = tuple(
+            slot.asset_id
+            for generation_round in candidate_set.existing_rounds()
+            for slot in candidate_set.existing_slots_for_round(generation_round)
+            if slot.asset_id and candidate_is_valid(slot, self.registry)
+        )
+        entry = self.review_store.ensure_pending(
+            request,
+            reason=reason,
+            candidate_asset_ids=candidate_ids,
+            evaluation_fingerprint=evaluation_fingerprint,
+            recovery_status=candidate_set.recovery_status,
+        )
+        _candidate_logger.info(
+            "visual_review.created shot_id=%s review_id=%s reason=%s status=%s",
+            request.shot_id,
+            entry.review_id,
+            entry.review_reason.value,
+            entry.status.value,
+        )
+        raise ReviewRequiredError(entry)
+
+    @staticmethod
+    def _manual_candidate_slot(slot: Any) -> CandidateSlot:
+        return CandidateSlot(
+            candidate_slot_id=slot.candidate_slot_id,
+            candidate_index=slot.candidate_index,
+            seed=slot.seed,
+            status=slot.status,
+            asset_id=slot.asset_id,
+            attempt_count=slot.attempt_count,
+            last_error=slot.last_error,
+            generation_round=0,
+        )
+
+    def resolve_manual_review(
+        self,
+        request: VisualRequest,
+        segment: "Segment",
+        entry: VisualReviewEntry,
+        *,
+        video_slug: str,
+    ) -> dict[str, Any]:
+        """Resume one human-authored candidate set; never create round 2."""
+        if self.review_store is None or entry.manual_override is None:
+            raise ValueError("Manual review execution thiếu durable review state.")
+        override = entry.manual_override
+        if override.status == "rejected":
+            raise ReviewRequiredError(entry)
+        if override.base_request_fingerprint != request.request_fingerprint:
+            self.review_store.mark_stale_for_changed_request(
+                request.shot_id, request.request_fingerprint
+            )
+            raise ReviewRequiredError(entry)
+
+        visual = self.profile.visual_generation
+        derived = derive_manual_visual_request(request, override)
+        automated_key = _generation_key(segment, self.profile, request.dimensions)
+        generation_key = manual_generation_key(automated_key, override)
+        cache_dir = self.cache_dir or (
+            settings.assets_dir / "generated_visuals" / self.profile.profile_id
+        )
+        generated_dimensions = _SDXL_GENERATION_DIMS[request.dimensions]
+        characters = tuple(dict.fromkeys(segment.scene_characters))
+        entry = self.review_store.initialize_manual_attempt(
+            entry.review_id,
+            request_fingerprint=request.request_fingerprint,
+            candidate_count=visual.candidate_count,
+            generation_key=generation_key,
+        )
+        override = entry.manual_override
+        assert override is not None
+        _candidate_logger.info(
+            "visual_review.manual_attempt_started shot_id=%s override_id=%s candidates=%s",
+            request.shot_id,
+            override.override_id,
+            override.candidate_count,
+        )
+
+        for persisted_slot in override.candidates:
+            candidate_slot = self._manual_candidate_slot(persisted_slot)
+            if candidate_is_valid(candidate_slot, self.registry):
+                continue
+            entry = self.review_store.update_manual_slot(
+                entry.review_id,
+                request_fingerprint=request.request_fingerprint,
+                candidate_index=persisted_slot.candidate_index,
+                status="running",
+                asset_id=None,
+                last_error=None,
+                increment_attempt=True,
+            )
+            override = entry.manual_override
+            assert override is not None
+            slot = next(
+                item
+                for item in override.candidates
+                if item.candidate_index == persisted_slot.candidate_index
+            )
+            asset_path = manual_candidate_cache_path(
+                cache_dir, generation_key, slot.candidate_index
+            )
+            fresh = not asset_path.is_file()
+            try:
+                if fresh:
+                    provider = self.provider
+                    if provider is None:
+                        from ..providers.registry import get_story_image_provider
+
+                        provider = get_story_image_provider()
+                    provider.generate_scene(
+                        self.profile,
+                        characters_present=tuple(segment.scene_characters),
+                        prompt=derived.visual_intent,
+                        width=generated_dimensions[0],
+                        height=generated_dimensions[1],
+                        seed=slot.seed,
+                        output_path=asset_path,
+                    )
+                if not validate_candidate_image(asset_path):
+                    raise ValueError(
+                        "Manual candidate technical validation thất bại: "
+                        f"{asset_path}"
+                    )
+                asset_id = self.registry.record_generated(
+                    generation_key=generation_key,
+                    local_path=asset_path,
+                    is_fresh_generation=fresh,
+                    profile_id=self.profile.profile_id,
+                    profile_version=self.profile.version,
+                    seed=slot.seed,
+                    prompt=derived.visual_intent,
+                    style_prompt=visual.style_prompt,
+                    negative_prompt=visual.negative_prompt,
+                    steps=visual.steps,
+                    cfg=visual.cfg,
+                    width=generated_dimensions[0],
+                    height=generated_dimensions[1],
+                    characters=characters,
+                    generation_mode=_generation_mode(characters),
+                    checkpoint=settings.comfyui_sdxl_checkpoint,
+                    clip_vision_model=settings.comfyui_clip_vision_model,
+                    ipadapter_model=settings.comfyui_ipadapter_model,
+                    solo_weight=visual.solo_weight,
+                    duo_weight=visual.duo_weight,
+                    duo_denoise=visual.duo_denoise,
+                    sampler=SAMPLER,
+                    scheduler=SCHEDULER,
+                    scene_id=request.scene_id,
+                    shot_id=request.shot_id,
+                    video_slug=video_slug,
+                )
+                entry = self.review_store.update_manual_slot(
+                    entry.review_id,
+                    request_fingerprint=request.request_fingerprint,
+                    candidate_index=slot.candidate_index,
+                    status="done",
+                    asset_id=asset_id,
+                    last_error=None,
+                )
+            except Exception as exc:
+                entry = self.review_store.update_manual_slot(
+                    entry.review_id,
+                    request_fingerprint=request.request_fingerprint,
+                    candidate_index=slot.candidate_index,
+                    status="failed",
+                    asset_id=None,
+                    last_error=str(exc),
+                )
+
+        override = entry.manual_override
+        assert override is not None
+        candidate_slots = tuple(
+            self._manual_candidate_slot(slot) for slot in override.candidates
+        )
+        invalid = tuple(
+            slot.candidate_index
+            for slot in candidate_slots
+            if not candidate_is_valid(slot, self.registry)
+        )
+        if invalid:
+            raise ValueError(
+                f"Manual generation chưa hoàn tất cho shot {request.shot_id}; "
+                f"failed_slots={list(invalid)}."
+            )
+
+        manual_set = VisualCandidateSet(
+            shot_id=request.shot_id,
+            request_id=derived.request_id,
+            request_fingerprint=derived.request_fingerprint,
+            generation_key=generation_key,
+            candidate_policy_version=visual.candidate_policy_version,
+            target_candidate_count=override.candidate_count,
+            candidates={slot.candidate_slot_id: slot for slot in candidate_slots},
+            selection_policy=visual.selection_policy,
+        )
+        if visual.selection_policy == "first_valid":
+            selected_asset_id = resolve_selection_policy("first_valid")(
+                manual_set, self.registry
+            )
+            semantic_rejection = False
+            evaluation_fingerprint = ""
+            selection_mode = "operator_manual_first_valid"
+        else:
+            outcome = self._select_vlm_ranked(
+                derived,
+                manual_set,
+                video_slug=video_slug,
+                evaluation_store_key=override.evaluation_store_key,
+            )
+            selected_asset_id = outcome.selected_asset_id
+            semantic_rejection = outcome.semantic_rejection
+            evaluation_fingerprint = outcome.evaluation_fingerprint
+            selection_mode = (
+                "operator_manual_fallback_first_valid"
+                if manual_set.selection_mode == "fallback_first_valid"
+                else "operator_manual_judged"
+            )
+        if selected_asset_id is None:
+            if semantic_rejection:
+                entry = self.review_store.mark_manual_rejected(
+                    entry.review_id,
+                    request_fingerprint=request.request_fingerprint,
+                    evaluation_fingerprint=evaluation_fingerprint,
+                )
+                _candidate_logger.info(
+                    "visual_review.manual_attempt_rejected shot_id=%s override_id=%s",
+                    request.shot_id,
+                    override.override_id,
+                )
+                raise ReviewRequiredError(entry)
+            raise ValueError(
+                f"Manual candidate set không có media hợp lệ cho shot {request.shot_id}."
+            )
+
+        entry = self.review_store.resolve_manual_attempt(
+            entry.review_id,
+            request_fingerprint=request.request_fingerprint,
+            selected_asset_id=selected_asset_id,
+            selection_mode=selection_mode,
+            evaluation_fingerprint=evaluation_fingerprint,
+        )
+        if self.candidate_store is not None:
+            automated = self.candidate_store.get(request.shot_id)
+            if automated is not None:
+                automated.selected_asset_id = selected_asset_id
+                automated.selection_status = "selected"
+                automated.selection_mode = selection_mode
+                self.candidate_store.write()
+        _candidate_logger.info(
+            "visual_review.manual_attempt_completed shot_id=%s override_id=%s asset_id=%s",
+            request.shot_id,
+            override.override_id,
+            selected_asset_id,
+        )
+        record = self.registry.find_by_asset_id(selected_asset_id)
+        assert record is not None
+        return record
+
     def _resolve_candidates(self, request: VisualRequest, segment: "Segment", visual: Any, generation_key: str, cache_dir: Path, generated_dimensions: tuple[int, int], characters: tuple[str, ...], video_slug: str) -> dict[str, Any]:
         """Resolve Phase-9 candidates plus Phase-12 bounded recovery."""
         target_count = visual.candidate_count
@@ -452,6 +757,8 @@ class VisualAssetResolver:
 
         selected_asset_id: str | None = None
         exhausted = False
+        semantic_rejection_for_review = False
+        rejected_evaluation_fingerprint = ""
         if policy_name == "first_valid":
             selected_asset_id = resolve_selection_policy(policy_name)(candidate_set, self.registry)
             candidate_set.selection_mode = "policy"
@@ -500,6 +807,8 @@ class VisualAssetResolver:
                         "resolved" if has_round_one else "not_needed"
                     )
             elif outcome.semantic_rejection:
+                semantic_rejection_for_review = True
+                rejected_evaluation_fingerprint = outcome.evaluation_fingerprint
                 rejected_round = 1 if has_round_one else 0
                 self._record_semantic_rejection(
                     candidate_set,
@@ -551,6 +860,7 @@ class VisualAssetResolver:
                         if candidate_set.selection_mode == "policy":
                             candidate_set.recovery_status = "resolved"
                     elif second.semantic_rejection:
+                        rejected_evaluation_fingerprint = second.evaluation_fingerprint
                         self._record_semantic_rejection(
                             candidate_set,
                             store,
@@ -576,9 +886,18 @@ class VisualAssetResolver:
                     request.shot_id,
                     target_count * 2,
                 )
-                raise ValueError(
-                    f"Semantic recovery exhausted cho shot {request.shot_id}; "
-                    "không tạo round 2."
+                self._raise_semantic_review(
+                    request,
+                    candidate_set,
+                    reason=ReviewReason.SEMANTIC_RECOVERY_EXHAUSTED,
+                    evaluation_fingerprint=rejected_evaluation_fingerprint,
+                )
+            if semantic_rejection_for_review:
+                self._raise_semantic_review(
+                    request,
+                    candidate_set,
+                    reason=ReviewReason.SEMANTIC_FAIL_CLOSED,
+                    evaluation_fingerprint=rejected_evaluation_fingerprint,
                 )
             raise ValueError(
                 f"Không có candidate hợp lệ nào cho shot {request.shot_id} "
@@ -605,6 +924,7 @@ class VisualAssetResolver:
         candidate_set: VisualCandidateSet,
         *,
         video_slug: str,
+        evaluation_store_key: str | None = None,
     ) -> RankedSelectionOutcome:
         """Phase-10 selection with an explicit semantic-rejection outcome.
 
@@ -647,7 +967,8 @@ class VisualAssetResolver:
         )
 
         store = self.evaluation_store or VisualEvaluationStore(Path(self.cache_dir or ".") / "visual_evaluations.json")
-        existing = store.get(request.shot_id)
+        store_key = evaluation_store_key or request.shot_id
+        existing = store.get(store_key)
         can_reuse = (
             existing is not None and not existing.fallback_used
             and existing.matches_context(
@@ -676,7 +997,7 @@ class VisualAssetResolver:
                 if not judge_cfg.hard_fail_on_judge_error:
                     _judge_logger.info("visual_judge.fallback shot_id=%s error=%s", request.shot_id, exc)
                     store.save(ShotEvaluationSet(
-                        shot_id=request.shot_id, request_fingerprint=request.request_fingerprint,
+                        shot_id=store_key, request_fingerprint=request.request_fingerprint,
                         judge_provider=judge_cfg.provider, judge_model=judge_cfg.model,
                         judge_policy_version=judge_cfg.policy_version, judge_contract_version=_JUDGE_CONTRACT_VERSION,
                         candidate_identity=candidate_identity, evaluations={}, fallback_used=True, judge_error=str(exc),
@@ -691,7 +1012,7 @@ class VisualAssetResolver:
                     f"{request.shot_id}: {exc}"
                 ) from exc
             store.save(ShotEvaluationSet(
-                shot_id=request.shot_id, request_fingerprint=request.request_fingerprint,
+                shot_id=store_key, request_fingerprint=request.request_fingerprint,
                 judge_provider=result.judge_provider, judge_model=result.judge_model,
                 judge_policy_version=judge_cfg.policy_version, judge_contract_version=result.judge_contract_version,
                 candidate_identity=candidate_identity,
@@ -738,6 +1059,41 @@ def _parent_reuse(request: VisualRequest, lineage, registry: AssetRegistry, *, v
     return None
 
 
+def _resolved_review_record(
+    entry: VisualReviewEntry,
+    candidate_store: VisualCandidateStore,
+    registry: AssetRegistry,
+) -> dict[str, Any] | None:
+    """Revalidate a human-selected asset without consulting Judge/generation."""
+    asset_id = entry.selected_asset_id
+    if not asset_id or asset_id not in entry.candidate_asset_ids:
+        return None
+    candidate_set = candidate_store.get(entry.shot_id)
+    automated_ids = {
+        slot.asset_id
+        for slot in (candidate_set.candidates.values() if candidate_set else ())
+        if slot.asset_id
+    }
+    manual_ids = {
+        slot.asset_id
+        for slot in (entry.manual_override.candidates if entry.manual_override else ())
+        if slot.asset_id
+    }
+    if asset_id not in automated_ids | manual_ids:
+        return None
+    record = registry.find_by_asset_id(asset_id)
+    if record is None:
+        return None
+    path = Path(record.get("local_path", ""))
+    if (
+        not path.is_file()
+        or observed_content_sha256(path) != record.get("content_sha256")
+        or not validate_candidate_image(path)
+    ):
+        return None
+    return record
+
+
 def prepare_visual_assets(voiceover: "Voiceover", profile: "ContentProfile", *, project_dir: Path, dimensions: tuple[int, int], scene_plan: "ScenePlan | None" = None, registry: AssetRegistry | None = None, cache_dir: Path | None = None, provider: Any = None, lineage=None, judge: Any = None) -> tuple["ScenePlan", VisualManifest, dict[str, Path]]:
     """Checkpoint each resolved shot; failures preserve earlier completed shots.
 
@@ -754,10 +1110,54 @@ def prepare_visual_assets(voiceover: "Voiceover", profile: "ContentProfile", *, 
     registry = registry or AssetRegistry()
     candidate_store = VisualCandidateStore(project_dir / "visual_candidates.json")
     evaluation_store = VisualEvaluationStore(project_dir / "visual_evaluations.json")
-    resolver = VisualAssetResolver(profile, registry=registry, cache_dir=cache_dir, provider=provider, candidate_store=candidate_store, judge=judge, evaluation_store=evaluation_store)
+    review_store = VisualReviewStore(project_dir / "visual_review.json")
+    resolver = VisualAssetResolver(profile, registry=registry, cache_dir=cache_dir, provider=provider, candidate_store=candidate_store, judge=judge, evaluation_store=evaluation_store, review_store=review_store)
     shots = {shot.shot_id: (scene, shot) for scene in plan.scenes for shot in scene.shots}
     prepared: dict[str, Path] = {}
     for request in requests:
+        stale_entries = review_store.mark_stale_for_changed_request(
+            request.shot_id, request.request_fingerprint
+        )
+        for stale in stale_entries:
+            _candidate_logger.info(
+                "visual_review.stale project=%s shot_id=%s review_id=%s",
+                voiceover.project_id or project_dir.name,
+                request.shot_id,
+                stale.review_id,
+            )
+        review = review_store.current_for_shot(request.shot_id)
+        if review is not None and review.request_fingerprint == request.request_fingerprint:
+            if review.status == ReviewStatus.ABANDONED:
+                raise VisualAbandonedError(review)
+            if review.status == ReviewStatus.RESOLVED:
+                record = _resolved_review_record(review, candidate_store, registry)
+                if record is None:
+                    review = review_store.reopen_invalid_selection(
+                        review.review_id,
+                        request_fingerprint=request.request_fingerprint,
+                        error="Accepted/manual selected asset missing, stale, or invalid.",
+                    )
+                    raise ReviewRequiredError(review)
+                candidate_set = candidate_store.get(request.shot_id)
+                if candidate_set is not None:
+                    candidate_set.selected_asset_id = record["asset_id"]
+                    candidate_set.selection_status = "selected"
+                    candidate_set.selection_mode = review.selection_mode
+                    candidate_store.write()
+                manifest.mark_done(
+                    request.shot_id,
+                    request_id=request.request_id,
+                    request_fingerprint=request.request_fingerprint,
+                    asset_id=record["asset_id"],
+                )
+                manifest.write_json(manifest_path)
+                prepared[request.shot_id] = Path(record["local_path"])
+                continue
+            if (
+                review.status == ReviewStatus.PENDING
+                and review.disposition != ReviewDisposition.MANUAL_REGENERATE
+            ):
+                raise ReviewRequiredError(review)
         existing = manifest.shots.get(request.shot_id)
         if existing and existing.asset_id:
             record = registry.find_by_asset_id(existing.asset_id)
@@ -782,11 +1182,33 @@ def prepare_visual_assets(voiceover: "Voiceover", profile: "ContentProfile", *, 
         manifest.mark_running(request.shot_id, request_id=request.request_id, request_fingerprint=request.request_fingerprint)
         manifest.write_json(manifest_path)
         try:
-            reused = _parent_reuse(request, lineage, registry, video_slug=voiceover.project_id or project_dir.name)
-            record, reuse_source = reused if reused is not None else (resolver.resolve(request, voiceover.segments[scene.source_segment_index], shot, video_slug=voiceover.project_id or project_dir.name), None)
+            if (
+                review is not None
+                and review.status == ReviewStatus.PENDING
+                and review.disposition == ReviewDisposition.MANUAL_REGENERATE
+            ):
+                record = resolver.resolve_manual_review(
+                    request,
+                    voiceover.segments[scene.source_segment_index],
+                    review,
+                    video_slug=voiceover.project_id or project_dir.name,
+                )
+                reuse_source = None
+            else:
+                reused = _parent_reuse(request, lineage, registry, video_slug=voiceover.project_id or project_dir.name)
+                record, reuse_source = reused if reused is not None else (resolver.resolve(request, voiceover.segments[scene.source_segment_index], shot, video_slug=voiceover.project_id or project_dir.name), None)
             manifest.mark_done(request.shot_id, request_id=request.request_id, request_fingerprint=request.request_fingerprint, asset_id=record["asset_id"], reuse_source=reuse_source)
             manifest.write_json(manifest_path)
             prepared[request.shot_id] = Path(record["local_path"])
+        except ReviewRequiredError:
+            manifest.mark_pending(
+                request.shot_id,
+                request_id=request.request_id,
+                request_fingerprint=request.request_fingerprint,
+                reason=VisualPreparationState.REVIEW_REQUIRED.value,
+            )
+            manifest.write_json(manifest_path)
+            raise
         except Exception as exc:
             manifest.mark_failed(request.shot_id, request_id=request.request_id, request_fingerprint=request.request_fingerprint, error=str(exc))
             manifest.write_json(manifest_path)
