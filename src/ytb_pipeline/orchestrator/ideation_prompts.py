@@ -1299,6 +1299,23 @@ def editorial_rewrite_prompt(payload: dict, review: object) -> str:
         f"target bar: every dimension and overall score must reach {minimum_score}/10"
         if minimum_score else "target bar: satisfy the active profile editorial contract"
     )
+    strategy = payload.get("strategy")
+    cold_open_guard = ""
+    if (
+        payload.get("video_type") == "short"
+        and isinstance(strategy, dict)
+        and strategy.get("format_id") == "core_answer_first_v1"
+    ):
+        hook = strategy.get("hook") if isinstance(strategy.get("hook"), dict) else {}
+        situation = str(hook.get("situation") or "").strip()
+        core_answer = str(hook.get("core_answer") or "").strip()
+        cold_open_guard = (
+            "\n\nMANDATORY SHORT COLD-OPEN CONTRACT (overrides any conflicting repair wording): "
+            "section 1 must remain a brief tension setup under 120 characters with an explicit "
+            f"tension marker, consistent with {situation!r}; you must start section 2 voiceover exactly "
+            f"with {core_answer!r}. Do not remove, delay, or paraphrase that prefix. Improve the cited "
+            "human scene around these structural invariants."
+        )
     return (
         "An editorial review found this Vietnamese YouTube script below the profile's quality bar. "
         "The full current script is given below as READ CONTEXT ONLY, so you understand the scene, "
@@ -1316,7 +1333,7 @@ def editorial_rewrite_prompt(payload: dict, review: object) -> str:
         f"- dimension scores: {json.dumps(dimension_scores, ensure_ascii=False, sort_keys=True)}\n"
         f"- sections: {section_refs}\n"
         f"- findings: {json.dumps(findings, ensure_ascii=False)}\n"
-        f"- repair brief: {repair_brief}\n\n"
+        f"- repair brief: {repair_brief}{cold_open_guard}\n\n"
         "Treat the review packet as the diagnosis: repair the cited weak dimensions and cited sections, "
         "do not invent a different problem or answer with generic motivational language. Do not touch any "
         "section index not listed above, even if you think it could also be improved.\n\n"

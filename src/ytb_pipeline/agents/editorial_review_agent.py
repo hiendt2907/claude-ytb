@@ -194,6 +194,23 @@ async def run_editorial_review(
             profile, _to_result(json.loads(cache_path.read_text(encoding="utf-8"))),
         )
     rubric = profile.editorial_review_rubric_text()
+    strategy = review_payload.get("strategy")
+    cold_open_contract = ""
+    if (
+        review_payload.get("video_type") == "short"
+        and isinstance(strategy, dict)
+        and strategy.get("format_id") == "core_answer_first_v1"
+    ):
+        hook = strategy.get("hook") if isinstance(strategy.get("hook"), dict) else {}
+        core_answer = str(hook.get("core_answer") or "").strip()
+        cold_open_contract = (
+            "\n\nThis Short has a mandatory cold-open contract: section 1 is a very brief "
+            "tension setup and section 2 must immediately begin with the configured core answer "
+            f"{core_answer!r}. You must not recommend removing, delaying, or paraphrasing that "
+            "required prefix merely because it states the answer early. Judge whether the later "
+            "human scene earns and grounds it; findings may improve execution around the invariant "
+            "but must remain compatible with it."
+        )
     prompt = (
         "Review this Vietnamese YouTube script JSON against the rubric below. "
         "Return ONLY one JSON object with keys: passed (boolean), overall_score "
@@ -204,7 +221,7 @@ async def run_editorial_review(
         "the findings, empty string when passed is true). A score below the profile "
         f"bar ({review_profile.minimum_score}/10) MUST set passed=false. Do not award "
         "a high score merely because the JSON schema or an abstract structure is correct.\n\n"
-        f"Rubric:\n{rubric}\n\n"
+        f"Rubric:\n{rubric}{cold_open_contract}\n\n"
         f"Script JSON:\n{json.dumps(review_payload, ensure_ascii=False, indent=2)}"
     )
     text = await provider.complete(

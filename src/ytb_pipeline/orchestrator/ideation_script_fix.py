@@ -683,6 +683,16 @@ def apply_editorial_rewrite(payload: dict, delta: dict) -> dict:
         target["voiceover"] = new_voiceover
         if "narration" in target:
             target["narration"] = new_voiceover
+    strategy = enriched.get("strategy")
+    if (
+        enriched.get("video_type") == "short"
+        and isinstance(strategy, dict)
+        and strategy.get("format_id") == "core_answer_first_v1"
+    ):
+        try:
+            validate_short_strategy_v1(enriched)
+        except ValueError as exc:
+            raise ValueError(f"Editorial rewrite phá {exc}") from exc
     return enriched
 
 

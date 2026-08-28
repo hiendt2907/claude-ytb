@@ -150,6 +150,41 @@ def test_profile_with_review_enabled_calls_the_llm_and_parses_the_verdict(tmp_pa
     assert "Narrator must narrate" in provider.last_prompt
 
 
+def test_short_strategy_editorial_review_treats_cold_open_contract_as_invariant(tmp_path):
+    from ytb_pipeline.agents.editorial_review_agent import run_editorial_review
+    import asyncio
+
+    _write_profile(
+        tmp_path, "short-strategy-review-fixture",
+        editorial_review={"enabled": True, "rubric_prompt_name": "review_rubric"},
+    )
+    profile = load_content_profile("short-strategy-review-fixture", profiles_dir=tmp_path)
+    payload = _script_payload(profile)
+    payload.update({
+        "video_type": "short",
+        "strategy": {
+            "format_id": "core_answer_first_v1",
+            "hook": {
+                "situation": "Còn 48 phút, nhưng Minh vẫn chưa biết nên im hay nói.",
+                "core_answer": "Im lặng sẽ làm mất chỗ để người khác xác nhận lại.",
+                "open_loop": "Minh sẽ chọn gì?",
+                "answer_by_sec": 4,
+            },
+        },
+    })
+    provider = _FakeProvider(json.dumps({
+        "passed": True, "blocking_findings": [], "section_refs": [], "repair_brief": "",
+    }))
+
+    asyncio.run(run_editorial_review(
+        profile, payload, provider=provider, cache_dir=tmp_path / "cache",
+    ))
+
+    assert "mandatory cold-open contract" in provider.last_prompt
+    assert "must not recommend removing" in provider.last_prompt
+    assert payload["strategy"]["hook"]["core_answer"] in provider.last_prompt
+
+
 def test_review_rejects_a_self_approved_score_below_the_profile_bar(tmp_path):
     """A model cannot approve its own weak draft by setting passed=true.
 
@@ -795,3 +830,63 @@ def test_editorial_rewrite_prompt_is_bounded_to_the_cited_sections_only():
     assert '"section_index"' in prompt
     assert "Section 3 bị liệt kê như dàn bài." in prompt  # full context still supplied
     assert "Section 1 giữ nguyên." in prompt  # untouched sections still visible as context
+
+
+def _short_strategy_rewrite_payload() -> dict:
+    return {
+        "profile_id": "ban-so-6",
+        "profile_version": "2.1.0",
+        "video_type": "short",
+        "strategy": {
+            "format_id": "core_answer_first_v1",
+            "core_mechanism": "Giữ chỗ để người khác kiểm tra.",
+            "audience_problem": "Sợ nói khi chưa chắc.",
+            "angle": "Một lựa chọn trong cuộc họp.",
+            "long_form_slug": "long-a",
+            "playlist": "Bàn số 6",
+            "cta_target": "long-a",
+            "hook": {
+                "situation": "Còn 48 phút, nhưng Minh vẫn chưa biết nên im hay nói.",
+                "core_answer": "Im lặng sẽ làm mất chỗ để người khác xác nhận lại.",
+                "open_loop": "Minh sẽ chọn gì?",
+                "answer_by_sec": 4,
+            },
+        },
+        "sections": [
+            {"purpose": "situation", "voiceover": "Còn 48 phút, nhưng Minh vẫn chưa biết nên im hay nói."},
+            {"purpose": "core_answer", "voiceover": "Im lặng sẽ làm mất chỗ để người khác xác nhận lại. Đây là chỗ cần kiểm tra."},
+            {"purpose": "application", "voiceover": "Minh nói ra điều chưa chắc."},
+            {"purpose": "payoff", "voiceover": "Câu trả lời vẫn chưa về."},
+        ],
+    }
+
+
+def test_short_strategy_editorial_rewrite_prompt_preserves_required_cold_open():
+    from types import SimpleNamespace
+    from ytb_pipeline.orchestrator.ideation_prompts import editorial_rewrite_prompt
+
+    review = SimpleNamespace(
+        overall_score=7,
+        dimension_scores={},
+        section_refs=(1, 2, 3),
+        blocking_findings=("Cảnh chưa đủ cụ thể.",),
+        repair_brief="Làm cảnh tự nhiên hơn.",
+    )
+    payload = _short_strategy_rewrite_payload()
+
+    prompt = editorial_rewrite_prompt(payload, review)
+
+    assert "MANDATORY SHORT COLD-OPEN CONTRACT" in prompt
+    assert payload["strategy"]["hook"]["core_answer"] in prompt
+    assert "must start section 2 voiceover exactly" in prompt
+
+
+def test_short_strategy_editorial_delta_cannot_break_required_core_answer_prefix():
+    from ytb_pipeline.orchestrator.ideation_script_fix import apply_editorial_rewrite
+
+    payload = _short_strategy_rewrite_payload()
+
+    with pytest.raises(ValueError, match="Short strategy-v1"):
+        apply_editorial_rewrite(payload, {
+            "sections": [{"section_index": 2, "voiceover": "Trang bốn vẫn bôi vàng."}],
+        })
