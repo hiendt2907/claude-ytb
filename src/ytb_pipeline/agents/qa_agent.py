@@ -899,6 +899,8 @@ def _check_dedup(
                 "detail": f"Chủ đề/title '{candidate}' (slug={slug}) đã có trong done_topics.",
             }]
         for done_topic in done_topics:
+            if series_mod.slugify(str(done_topic)) in exempt:
+                continue
             similarity = _topic_similarity(candidate, str(done_topic))
             if similarity >= 0.55:
                 return [_repair(

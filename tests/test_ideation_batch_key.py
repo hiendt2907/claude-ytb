@@ -191,6 +191,26 @@ def test_long_source_context_selects_traceable_sections(tmp_path):
     assert context["candidates"][0]["excerpt"] == "Đây là phần giải thích có giá trị."
 
 
+def test_short_source_dedup_exemptions_include_only_verified_source_identity():
+    from ytb_pipeline.orchestrator.ideation_cmd import short_source_dedup_exemptions
+
+    exemptions = short_source_dedup_exemptions(
+        replacement_slug="short-slot",
+        source_long_context={
+            "slug": "long-a",
+            "title": "Long A: Im Lặng Hay Nói?",
+            "topic": "Một lựa chọn trong cuộc họp",
+        },
+    )
+
+    assert exemptions == (
+        "short-slot",
+        "long-a",
+        "Long A: Im Lặng Hay Nói?",
+        "Một lựa chọn trong cuộc họp",
+    )
+
+
 def test_available_long_source_context_excludes_sections_used_by_other_shorts():
     from ytb_pipeline.orchestrator.ideation_cmd import available_short_source_context
 

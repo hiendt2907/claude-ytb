@@ -45,3 +45,13 @@ def test_exempting_one_slug_does_not_exempt_another():
     )
 
     assert [v["rule"] for v in violations] == ["series_dedup"]
+
+
+def test_derivative_short_skips_semantic_comparison_with_its_exact_source_long():
+    violations = qa_agent._check_dedup(
+        _script("Im lặng hay nói thật trước con số sai trong cuộc họp"),
+        ["Chậm Hơn Trong Cuộc Họp: Im Lặng Hay Nói Thật?"],
+        exempt_slugs=("Chậm Hơn Trong Cuộc Họp: Im Lặng Hay Nói Thật?",),
+    )
+
+    assert violations == []

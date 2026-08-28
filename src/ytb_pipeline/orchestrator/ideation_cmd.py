@@ -104,9 +104,29 @@ def load_short_source_long_context(script_path: Path, long_slug: str) -> dict:
     return {
         "slug": long_slug,
         "title": str(payload.get("title", "")).strip(),
+        "topic": str(payload.get("topic", "")).strip(),
         "candidates": selected,
         "evidence_register": evidence_register if isinstance(evidence_register, list) else [],
     }
+
+
+def short_source_dedup_exemptions(
+    *, replacement_slug: str = "", source_long_context: dict | None = None,
+) -> tuple[str, ...]:
+    """Exclude only the verified derivative source from self-dedup.
+
+    A Short is intentionally semantically close to its Long source.  The
+    source context is loaded from that concrete Long script before generation,
+    so its slug/title/topic are safe exemptions; unrelated ledger entries keep
+    the normal exact and semantic duplicate checks.
+    """
+    values = [replacement_slug]
+    if source_long_context is not None:
+        values.extend(
+            str(source_long_context.get(field) or "").strip()
+            for field in ("slug", "title", "topic")
+        )
+    return tuple(dict.fromkeys(value for value in values if value))
 
 
 def resolve_short_source_long_path(
@@ -530,14 +550,17 @@ async def _cmd_start_local(args: argparse.Namespace) -> None:
                 log_path=log_path,
                 console_prefix=prefix,
                 strict=strict_qa,
-            semantic_history=generated_summaries,
-            expected_video_type=args.type_of_vid,
-            requires_financial_evidence=is_personal_finance_psychology_request(
-                args.type_of_rules
-            ),
-            source_long_context=available_source_long_context,
-            exempt_slugs=tuple(s for s in (replacement_slug,) if s),
-        )
+                semantic_history=generated_summaries,
+                expected_video_type=args.type_of_vid,
+                requires_financial_evidence=is_personal_finance_psychology_request(
+                    args.type_of_rules
+                ),
+                source_long_context=available_source_long_context,
+                exempt_slugs=short_source_dedup_exemptions(
+                    replacement_slug=replacement_slug,
+                    source_long_context=available_source_long_context,
+                ),
+            )
         except IdeationQualityFailure as exc:
             rejected_candidates += 1
             archive_dir = cli.ROOT / "assets" / "script_revisions" / "failed_ideation"
