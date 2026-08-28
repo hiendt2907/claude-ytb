@@ -14,6 +14,7 @@ from ytb_pipeline.orchestrator import batch_cli as cli
 @pytest.fixture(autouse=True)
 def _bypass_preflight_for_worker_scheduling_tests(monkeypatch):
     monkeypatch.setattr(cli, "preflight_script", lambda _path: SimpleNamespace(passed=True, failures=()))
+    monkeypatch.setattr(cli, "notify_progress", lambda _message: None)
 
 
 def test_select_pending_batch_returns_distinct_items_up_to_worker_limit():
