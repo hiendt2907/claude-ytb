@@ -23,6 +23,7 @@ Các lệnh:
   doctor   Kiểm tra môi trường trước khi chạy batch (config, token, script)
   auth     Đăng nhập lại OAuth (mở browser) cho YouTube + Drive
   benchmark-local  Benchmark local AI stack và ghi JSON report
+  review   List/show/resolve visual Shots đã chạm giới hạn tự động
 
 Quy trình thường dùng:
   ytb batch start -n 5 --type-of-vid long   # xKiro/DeepSeek V4 Pro viết kịch bản
@@ -455,5 +456,47 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
         help="Đường dẫn JSON report benchmark (mặc định assets/benchmarks/local_benchmark.json)",
     )
     p_benchmark.set_defaults(func=cmd_funcs["benchmark-local"])
+
+    p_review = _sub(
+        sub,
+        "review",
+        help="Quản lý visual Shot cần operator disposition",
+        description=(
+            "Đọc visual_review.json và áp dụng đúng một quyết định human: "
+            "accept existing, manual regenerate, hoặc abandon. Administrative "
+            "CLI chỉ ghi state; không gọi ComfyUI hoặc VisualJudge."
+        ),
+        epilog=(
+            "Ví dụ:\n"
+            "  ytb batch review list my-project\n"
+            "  ytb batch review show my-project shot-001\n"
+            "  ytb batch review accept my-project shot-001 --asset-id ast_...\n"
+            "  ytb batch review regenerate my-project shot-001 --instruction \"Bỏ đám đông\"\n"
+            "  ytb batch review abandon my-project shot-001\n"
+        ),
+    )
+    review_func = cmd_funcs.get("review", lambda _args: None)
+    review_sub = p_review.add_subparsers(dest="review_action", required=True)
+    review_list = review_sub.add_parser("list", help="Liệt kê review hiện hành")
+    review_list.add_argument("project", help="Project slug dưới assets/projects/")
+    review_list.set_defaults(func=review_func)
+    review_show = review_sub.add_parser("show", help="Hiện request/candidate/Judge context")
+    review_show.add_argument("project")
+    review_show.add_argument("shot_id")
+    review_show.set_defaults(func=review_func)
+    review_accept = review_sub.add_parser("accept", help="Chọn một managed candidate hiện có")
+    review_accept.add_argument("project")
+    review_accept.add_argument("shot_id")
+    review_accept.add_argument("--asset-id", required=True)
+    review_accept.set_defaults(func=review_func)
+    review_regenerate = review_sub.add_parser("regenerate", help="Ghi một human-authored manual override")
+    review_regenerate.add_argument("project")
+    review_regenerate.add_argument("shot_id")
+    review_regenerate.add_argument("--instruction", required=True)
+    review_regenerate.set_defaults(func=review_func)
+    review_abandon = review_sub.add_parser("abandon", help="Dừng Shot theo quyết định operator")
+    review_abandon.add_argument("project")
+    review_abandon.add_argument("shot_id")
+    review_abandon.set_defaults(func=review_func)
 
     return parser

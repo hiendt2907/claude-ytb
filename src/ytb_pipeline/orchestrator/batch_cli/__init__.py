@@ -105,6 +105,7 @@ from ..queue_manager import (
 )
 from ..preflight import format_preflight_result, preflight_script
 from ..state_io import locked_json_update
+from ..visual_review_cli import cmd_review
 
 from .commands import (
     cmd_analytics,
@@ -203,6 +204,7 @@ def main(argv: list[str] | None = None) -> None:
         "auth": cmd_auth,
         "benchmark-local": cmd_benchmark_local,
         "preflight": cmd_preflight,
+        "review": cmd_review,
     }
     parser = build_parser(doc=__doc__, cmd_funcs=cmd_funcs)
 
