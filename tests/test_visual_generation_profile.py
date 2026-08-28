@@ -349,3 +349,46 @@ def test_first_valid_selection_policy_does_not_require_visual_judge(tmp_path):
     profile = load_content_profile("ban-so-6", profiles_dir=tmp_path)
 
     assert profile.visual_generation.visual_judge is None
+
+
+# --- Phase 12: bounded semantic-rejection recovery -------------------------
+
+def test_semantic_rejection_recovery_defaults_to_fail_closed(tmp_path):
+    from ytb_pipeline.content_profiles import load_content_profile
+
+    _write_profile(tmp_path, "ban-so-6", visual_generation=_vg_with_judge())
+
+    profile = load_content_profile("ban-so-6", profiles_dir=tmp_path)
+
+    assert profile.visual_generation.semantic_rejection_recovery == "fail_closed"
+
+
+def test_semantic_rejection_regenerate_once_is_explicit_opt_in(tmp_path):
+    from ytb_pipeline.content_profiles import load_content_profile
+
+    visual_generation = _vg_with_judge()
+    visual_generation["semantic_rejection_recovery"] = "regenerate_once"
+    _write_profile(
+        tmp_path,
+        "ban-so-6",
+        visual_generation=visual_generation,
+    )
+
+    profile = load_content_profile("ban-so-6", profiles_dir=tmp_path)
+
+    assert profile.visual_generation.semantic_rejection_recovery == "regenerate_once"
+
+
+def test_unknown_semantic_rejection_recovery_policy_is_rejected(tmp_path):
+    from ytb_pipeline.content_profiles import ContentProfileError, load_content_profile
+
+    visual_generation = _vg_with_judge()
+    visual_generation["semantic_rejection_recovery"] = "retry_forever"
+    _write_profile(
+        tmp_path,
+        "ban-so-6",
+        visual_generation=visual_generation,
+    )
+
+    with pytest.raises(ContentProfileError, match="semantic_rejection_recovery"):
+        load_content_profile("ban-so-6", profiles_dir=tmp_path)

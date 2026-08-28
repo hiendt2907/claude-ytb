@@ -8,6 +8,7 @@ generation/selection flow through `VisualAssetResolver` is covered in
 """
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from ytb_pipeline.render.asset_registry import AssetRegistry
@@ -102,6 +103,134 @@ def test_candidate_slots_never_collide_with_slot_zero_or_each_other(tmp_path):
     slot1 = candidate_cache_path(tmp_path, "the-key", 1)
     slot2 = candidate_cache_path(tmp_path, "the-key", 2)
     assert slot0 != slot1 != slot2 != slot0
+
+
+# --- Phase 12: generation-round identity -----------------------------------
+
+def test_round_zero_identity_remains_phase9_compatible(tmp_path):
+    key = "abcdef0123456789abcdef0123456789"
+    candidate_set = VisualCandidateSet("shot-1", "req", "fp", key, "phase9-v1", 2)
+
+    assert candidate_set.slot(0, generation_round=0).candidate_slot_id == "shot-1::candidate-00"
+    assert candidate_set.slot(0, generation_round=0).seed == int(key[:16], 16) % (2**32)
+    assert candidate_cache_path(tmp_path, key, 0, generation_round=0) == tmp_path / f"{key}.png"
+
+
+def test_round_one_slot_seed_and_cache_identity_is_deterministic_and_distinct(tmp_path):
+    key = "abcdef0123456789abcdef0123456789"
+    first = VisualCandidateSet("shot-1", "req", "fp", key, "phase9-v1", 3)
+    second = VisualCandidateSet("shot-1", "req", "fp", key, "phase9-v1", 3)
+
+    round_one_ids = []
+    round_one_seeds = []
+    round_one_paths = []
+    for index in range(3):
+        slot = first.slot(index, generation_round=1)
+        matching = second.slot(index, generation_round=1)
+        round_one_ids.append(slot.candidate_slot_id)
+        round_one_seeds.append(slot.seed)
+        round_one_paths.append(candidate_cache_path(tmp_path, key, index, generation_round=1))
+        assert slot.candidate_slot_id == matching.candidate_slot_id
+        assert slot.seed == matching.seed
+        assert slot.seed != candidate_seed(key, index, generation_round=0)
+
+    assert round_one_ids == [
+        "shot-1::round-01::candidate-00",
+        "shot-1::round-01::candidate-01",
+        "shot-1::round-01::candidate-02",
+    ]
+    assert len(set(round_one_seeds)) == 3
+    assert len(set(round_one_paths)) == 3
+    assert not set(round_one_paths) & {
+        candidate_cache_path(tmp_path, key, index, generation_round=0)
+        for index in range(3)
+    }
+
+
+def test_legacy_candidate_json_loads_as_round_zero_without_migration(tmp_path):
+    path = tmp_path / "visual_candidates.json"
+    path.write_text(json.dumps({
+        "shots": {
+            "shot-1": {
+                "shot_id": "shot-1",
+                "request_id": "req",
+                "request_fingerprint": "fp",
+                "generation_key": "abcdef0123456789abcdef0123456789",
+                "candidate_policy_version": "phase9-v1",
+                "target_candidate_count": 1,
+                "candidates": {
+                    "shot-1::candidate-00": {
+                        "candidate_slot_id": "shot-1::candidate-00",
+                        "candidate_index": 0,
+                        "seed": 123,
+                        "status": "done",
+                        "asset_id": "ast_legacy",
+                        "attempt_count": 1,
+                        "last_error": None,
+                    }
+                },
+            }
+        }
+    }), encoding="utf-8")
+
+    restored = VisualCandidateStore(path).get("shot-1")
+
+    assert restored is not None
+    assert restored.slot(0).candidate_slot_id == "shot-1::candidate-00"
+    assert restored.slot(0).generation_round == 0
+    assert restored.active_generation_round == 0
+    assert restored.recovery_status == "not_needed"
+
+
+def test_recovery_state_and_both_rounds_persist_across_reload(tmp_path):
+    path = tmp_path / "visual_candidates.json"
+    store = VisualCandidateStore(path)
+    candidate_set = store.get_or_create(
+        shot_id="shot-1", request_id="req", request_fingerprint="fp",
+        generation_key="abcdef0123456789abcdef0123456789",
+        candidate_policy_version="phase9-v1", target_candidate_count=2,
+    )
+    candidate_set.recovery_policy = "regenerate_once"
+    candidate_set.recovery_status = "running"
+    candidate_set.active_generation_round = 1
+    candidate_set.semantic_rejection_rounds = [0]
+    candidate_set.rejected_evaluation_fingerprint = "eval-round-0"
+    candidate_set.slot(0, generation_round=1).status = "done"
+    store.write()
+
+    restored = VisualCandidateStore(path).get("shot-1")
+
+    assert restored is not None
+    assert restored.recovery_policy == "regenerate_once"
+    assert restored.recovery_status == "running"
+    assert restored.active_generation_round == 1
+    assert restored.semantic_rejection_rounds == [0]
+    assert restored.rejected_evaluation_fingerprint == "eval-round-0"
+    assert restored.slot(0, generation_round=1).status == "done"
+
+
+def test_changed_request_resets_recovery_chain_to_fresh_round_zero(tmp_path):
+    store = VisualCandidateStore(tmp_path / "visual_candidates.json")
+    previous = store.get_or_create(
+        shot_id="shot-1", request_id="req-1", request_fingerprint="fp-1",
+        generation_key="aaa1230123456789abcdef0123456789",
+        candidate_policy_version="phase9-v1", target_candidate_count=2,
+    )
+    previous.recovery_status = "exhausted"
+    previous.semantic_rejection_rounds = [0, 1]
+    previous.slot(0, generation_round=1).status = "done"
+
+    current = store.get_or_create(
+        shot_id="shot-1", request_id="req-2", request_fingerprint="fp-2",
+        generation_key="bbb1230123456789abcdef0123456789",
+        candidate_policy_version="phase9-v1", target_candidate_count=2,
+    )
+
+    assert current is not previous
+    assert current.recovery_status == "not_needed"
+    assert current.semantic_rejection_rounds == []
+    assert current.slot(0).generation_round == 0
+    assert all(slot.generation_round == 0 for slot in current.candidates.values())
 
 
 # --- Technical validation (§18) --------------------------------------------
