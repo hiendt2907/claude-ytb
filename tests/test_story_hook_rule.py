@@ -188,6 +188,19 @@ def test_story_allows_a_character_to_quote_the_exact_words_they_will_say():
     assert qa_agent._check_character_voiceover_is_direct(script) == []
 
 
+def test_story_allows_a_colon_to_introduce_a_list_inside_direct_dialogue():
+    """A mid-sentence enumeration is dialogue, not a staged action prefix."""
+    script = _story_script([
+        (
+            "application",
+            "an",
+            "Một câu có đủ ba chỗ: hệ thống, tháng thứ ba, và chỗ chưa ai thử.",
+        ),
+    ])
+
+    assert qa_agent._check_character_voiceover_is_direct(script) == []
+
+
 def test_narration_naming_a_character_normally_is_not_a_prefix_leak():
     script = _story_script([
         ("situation", "narrator", "Bảy giờ, Minh mở hộp thư lần thứ tư. Vẫn phải chờ."),

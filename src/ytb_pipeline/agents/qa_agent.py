@@ -550,6 +550,21 @@ def _check_character_voiceover_is_direct(script: Any) -> list[dict[str, str]]:
             # action before the quote ("An đặt cốc xuống: ...").
             if re.search(r"\b(?:tôi|mình|em|tớ|ta|chúng tôi)\b", prelude):
                 continue
+            # A colon in ordinary direct dialogue may introduce a list or an
+            # explanation ("ba chỗ: hệ thống, thời hạn, dữ liệu").  Reject
+            # only an observable third-person staging prefix, rather than
+            # treating every colon as narration.  The routed speaker's own
+            # name is the strongest signal; explicit third-person pronouns
+            # remain guarded when paired with a staging action.
+            speaker_prefix = re.match(rf"^\s*{re.escape(speaker)}\b", prelude)
+            third_person_staging = re.match(
+                r"^\s*(?:anh ấy|chị ấy|cô ấy|cậu ấy|hắn|nó)\b.*\b"
+                r"(?:đặt|cầm|nhìn|ngồi|đứng|quay|cúi|gật|lắc|nhấc|kéo|đẩy|"
+                r"mở|đóng|thở|cười|bước|xoay|chạm|nói|hỏi|đáp)\b",
+                prelude,
+            )
+            if speaker_prefix is None and third_person_staging is None:
+                continue
             violations.append(_repair(
                 "character_voiceover_direct",
                 f"Section {index} có phần dẫn/hành động trước dấu ':' trong voiceover của {speaker}.",
