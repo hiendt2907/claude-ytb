@@ -233,6 +233,33 @@ def test_changed_request_resets_recovery_chain_to_fresh_round_zero(tmp_path):
     assert all(slot.generation_round == 0 for slot in current.candidates.values())
 
 
+def test_candidate_count_change_preserves_historical_round_slots(tmp_path):
+    store = VisualCandidateStore(tmp_path / "visual_candidates.json")
+    original = store.get_or_create(
+        shot_id="shot-1", request_id="req", request_fingerprint="fp",
+        generation_key="aaa1230123456789abcdef0123456789",
+        candidate_policy_version="phase9-v1", target_candidate_count=3,
+    )
+    for generation_round in (0, 1):
+        for index in range(3):
+            original.slot(index, generation_round=generation_round).status = "done"
+    original.recovery_status = "exhausted"
+    original.semantic_rejection_rounds = [0, 1]
+
+    resized = store.get_or_create(
+        shot_id="shot-1", request_id="req", request_fingerprint="fp",
+        generation_key="aaa1230123456789abcdef0123456789",
+        candidate_policy_version="phase9-v1", target_candidate_count=2,
+    )
+
+    assert resized is original
+    assert resized.target_candidate_count == 2
+    assert len(resized.candidates) == 6
+    assert resized.recovery_status == "exhausted"
+    assert resized.slot(2, generation_round=0).status == "done"
+    assert resized.slot(2, generation_round=1).status == "done"
+
+
 # --- Technical validation (§18) --------------------------------------------
 
 def test_a_real_decodable_image_passes_technical_validation(tmp_path):

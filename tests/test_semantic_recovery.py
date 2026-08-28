@@ -308,6 +308,14 @@ def test_recovery_success_generates_six_assets_judges_twice_and_prepared_rerende
         registry.assets()[0]["generation_key"]
     }
     assert len({record["seed"] for record in registry.assets()}) == 6
+    assert all(
+        not ({"rejected", "recovery_round_winner", "quality", "bad"} & set(record))
+        for record in registry.assets()
+    )
+    registry_snapshot = {
+        record["asset_id"]: dict(record)
+        for record in registry.assets()
+    }
 
     _, manifest_again, prepared_again = prepare_visual_assets(
         voiceover,
@@ -322,6 +330,10 @@ def test_recovery_success_generates_six_assets_judges_twice_and_prepared_rerende
     )
     assert manifest_again.shots["scene-000-shot-00"].asset_id == selected
     assert prepared_again == prepared
+    assert {
+        record["asset_id"]: dict(record)
+        for record in registry.assets()
+    } == registry_snapshot
 
 
 def test_new_whole_set_evaluation_may_select_a_round_zero_asset(tmp_path):
@@ -488,6 +500,36 @@ def test_judge_model_change_rejudges_existing_exhausted_media_without_regenerati
     assert len(changed_judge.batches[0]) == 6
     assert len(registry.assets()) == 6
     assert _candidate_set(tmp_path).recovery_status == "resolved"
+
+
+def test_regenerate_once_to_fail_closed_preserves_both_rounds_and_budget(tmp_path):
+    registry = AssetRegistry(tmp_path / "registry.json")
+    first = _resolver(
+        tmp_path,
+        profile=_profile(recovery="regenerate_once"),
+        registry=registry,
+        provider=_CountingProvider(),
+        judge=_SequenceJudge("reject", "reject"),
+    )
+    with pytest.raises(ValueError, match="recovery exhausted"):
+        first.resolve(_request(), _segment(), None, video_slug="video")
+    before = {record["asset_id"]: dict(record) for record in registry.assets()}
+
+    changed_policy = _resolver(
+        tmp_path,
+        profile=_profile(recovery="fail_closed"),
+        registry=registry,
+        provider=_NoCalls(),
+        judge=_NoCalls(),
+    )
+    with pytest.raises(ValueError, match="recovery exhausted"):
+        changed_policy.resolve(_request(), _segment(), None, video_slug="video")
+
+    persisted = _candidate_set(tmp_path)
+    assert persisted.recovery_policy == "fail_closed"
+    assert persisted.recovery_status == "exhausted"
+    assert persisted.semantic_rejection_rounds == [0, 1]
+    assert {record["asset_id"]: dict(record) for record in registry.assets()} == before
 
 
 def test_round_zero_generation_failure_is_not_semantic_rejection(tmp_path):
