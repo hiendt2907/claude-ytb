@@ -185,10 +185,18 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
 
     p_preflight = _sub(
         sub, "preflight",
-        help="Kiểm tra offline script trước khi chạy batch",
-        description="Không gọi cloud, không render, không upload. Kiểm tra contract, duration, TTS, B-roll local, thumbnail và disk.",
+        help="Kiểm tra effective config trước khi chạy batch",
+        description="Mặc định offline. Kiểm tra contract, provider config, story assets, audio, tool, thư mục và disk; --live-providers chỉ health-check, không sinh media.",
     )
     p_preflight.add_argument("slugs", nargs="*", help="Slug cần kiểm tra; bỏ trống để kiểm tra toàn bộ queue.")
+    p_preflight.add_argument(
+        "--live-providers", action="store_true",
+        help="Kiểm tra live ComfyUI inventory, xKiro Vision capability và OAuth (nếu --publish).",
+    )
+    p_preflight.add_argument(
+        "--publish", action="store_true",
+        help="Yêu cầu kiểm tra YouTube/Drive credential cho lượt publish thật.",
+    )
     p_preflight.set_defaults(func=cmd_funcs.get("preflight", lambda _args: None))
 
     p_run = _sub(

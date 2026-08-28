@@ -173,11 +173,18 @@ _recovery_code_streak: dict[str, int] = {}
 
 
 def cmd_preflight(args) -> None:
-    """Check scripts offline before queue admission or a batch run."""
+    """Check scripts before queue admission or a supervised production run."""
     paths = [ROOT / "scripts" / f"{slug}.json" for slug in getattr(args, "slugs", [])]
     if not paths:
         paths = [ROOT / "scripts" / f"{item.slug}.json" for item in load_queue()]
-    results = [preflight_script(path) for path in paths]
+    results = [
+        preflight_script(
+            path,
+            live_providers=bool(getattr(args, "live_providers", False)),
+            publish=bool(getattr(args, "publish", False)),
+        )
+        for path in paths
+    ]
     for result in results:
         print(format_preflight_result(result))
     if any(not result.passed for result in results):
