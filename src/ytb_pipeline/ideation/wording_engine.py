@@ -116,6 +116,15 @@ def process_and_sanitize(raw_llm_output: str) -> dict:
             "notes": "Compliance tối thiểu được bổ sung deterministic; QA vẫn kiểm tra claim.",
         },
     )
+    compliance = result.get("compliance")
+    if isinstance(compliance, dict) and "passed" not in compliance:
+        required_signals = ("community", "copyright", "accuracy", "advertiser", "coppa")
+        # Qwen occasionally emits every required gate as the JSON boolean
+        # `true` but omits only their redundant aggregate. Deriving the
+        # aggregate is safe only for that exact, explicit representation:
+        # descriptive strings or any false/missing signal remain fail-closed.
+        if all(compliance.get(signal) is True for signal in required_signals):
+            compliance["passed"] = True
     flags: list[str] = []
     encoding_valid = True
 

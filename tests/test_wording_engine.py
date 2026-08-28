@@ -53,6 +53,44 @@ def test_process_and_sanitize_handles_pipeline_sections_and_removes_all_stage_cu
     assert "[camera zoom]" not in result["sections"][0]["voiceover"]
 
 
+def test_process_and_sanitize_derives_compliance_passed_from_all_explicit_pass_signals():
+    from ytb_pipeline.ideation.wording_engine import process_and_sanitize
+
+    result = process_and_sanitize(json.dumps({
+        "slug": "co-che-moi",
+        "sections": [{"voiceover": "Một câu tiếng Việt có dấu."}],
+        "compliance": {
+            "community": True,
+            "copyright": True,
+            "accuracy": True,
+            "advertiser": True,
+            "coppa": True,
+            "notes": "Đã kiểm tra.",
+        },
+    }, ensure_ascii=False))
+
+    assert result["compliance"]["passed"] is True
+
+
+def test_process_and_sanitize_never_derives_compliance_passed_when_any_signal_fails():
+    from ytb_pipeline.ideation.wording_engine import process_and_sanitize
+
+    result = process_and_sanitize(json.dumps({
+        "slug": "co-che-moi",
+        "sections": [{"voiceover": "Một câu tiếng Việt có dấu."}],
+        "compliance": {
+            "community": True,
+            "copyright": False,
+            "accuracy": True,
+            "advertiser": True,
+            "coppa": True,
+            "notes": "Bản quyền chưa đạt.",
+        },
+    }, ensure_ascii=False))
+
+    assert "passed" not in result["compliance"]
+
+
 def test_process_and_sanitize_flags_ascii_only_vietnamese_narration():
     from ytb_pipeline.ideation.wording_engine import process_and_sanitize
 
