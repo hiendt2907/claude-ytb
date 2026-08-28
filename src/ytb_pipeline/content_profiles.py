@@ -428,6 +428,12 @@ MAX_CANDIDATE_COUNT = 4
 # (see `VisualGenerationProfile.__post_init__`). "first_valid" stays the
 # default, zero-judge-call policy.
 _KNOWN_SELECTION_POLICIES = {"first_valid", "vlm_ranked"}
+# Phase 12 is intentionally a two-value contract rather than a generic retry
+# count: zero extra rounds by default, or exactly one bounded resample round.
+_KNOWN_SEMANTIC_REJECTION_RECOVERY_POLICIES = {
+    "fail_closed",
+    "regenerate_once",
+}
 
 
 @dataclass(frozen=True)
@@ -488,6 +494,10 @@ class VisualGenerationProfile:
     # Phase 10 — opt-in semantic judging, only consulted when
     # selection_policy == "vlm_ranked" (enforced below).
     visual_judge: "VisualJudgeProfile | None" = None
+    # Phase 12 — successful semantic rejection may optionally authorize one
+    # additional deterministic candidate round. The default preserves the
+    # exact Phase-11 fail-closed behaviour and cost.
+    semantic_rejection_recovery: str = "fail_closed"
 
     def __post_init__(self) -> None:
         if self.steps < 1:
@@ -514,6 +524,11 @@ class VisualGenerationProfile:
             raise ContentProfileError(
                 "visual_generation.selection_policy='vlm_ranked' yêu cầu "
                 "visual_judge.enabled=true."
+            )
+        if self.semantic_rejection_recovery not in _KNOWN_SEMANTIC_REJECTION_RECOVERY_POLICIES:
+            raise ContentProfileError(
+                "visual_generation.semantic_rejection_recovery không hợp lệ: "
+                f"{self.semantic_rejection_recovery!r}."
             )
 
 
@@ -821,6 +836,9 @@ def _visual_generation_profile(raw: Any, profile_id: str) -> "VisualGenerationPr
         selection_policy=str(mapping.get("selection_policy") or "first_valid").strip(),
         candidate_policy_version=str(mapping.get("candidate_policy_version") or "phase9-v1").strip(),
         visual_judge=_visual_judge_profile(mapping.get("visual_judge")),
+        semantic_rejection_recovery=str(
+            mapping.get("semantic_rejection_recovery") or "fail_closed"
+        ).strip(),
     )
 
 

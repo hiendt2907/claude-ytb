@@ -72,24 +72,51 @@ from .asset_registry import AssetRegistry, content_sha256 as observed_content_sh
 
 logger = logging.getLogger(__name__)
 
+RECOVERY_POLICY_VERSION = "phase12-v1"
+MAX_GENERATION_ROUND = 1
 
-def candidate_seed(generation_key: str, candidate_index: int) -> int:
+
+def candidate_seed(
+    generation_key: str,
+    candidate_index: int,
+    generation_round: int = 0,
+) -> int:
     """Stable per-slot seed. Index 0 == the pre-Phase-9 single-candidate
     formula exactly, so existing cache/AssetRecords stay valid as slot 0."""
-    if candidate_index == 0:
+    if generation_round not in {0, 1}:
+        raise ValueError("generation_round phải là 0 hoặc 1.")
+    if generation_round == 0 and candidate_index == 0:
         return int(generation_key[:16], 16) % (2**32)
-    digest = hashlib.sha256(f"{generation_key}\x1fcandidate\x1f{candidate_index}".encode()).hexdigest()
+    if generation_round == 0:
+        payload = f"{generation_key}\x1fcandidate\x1f{candidate_index}"
+    else:
+        payload = (
+            f"{generation_key}\x1fgeneration-round\x1f{generation_round}"
+            f"\x1fcandidate\x1f{candidate_index}"
+        )
+    digest = hashlib.sha256(payload.encode()).hexdigest()
     return int(digest[:16], 16) % (2**32)
 
 
-def candidate_cache_path(cache_dir: Path, generation_key: str, candidate_index: int) -> Path:
+def candidate_cache_path(
+    cache_dir: Path,
+    generation_key: str,
+    candidate_index: int,
+    generation_round: int = 0,
+) -> Path:
     """Slot 0 keeps the historical `{generation_key}.png` filename so an
     existing single-candidate project's cache is found unchanged. Later
     slots get a distinct suffix so they can never overwrite one another
     or slot 0."""
-    if candidate_index == 0:
+    if generation_round not in {0, 1}:
+        raise ValueError("generation_round phải là 0 hoặc 1.")
+    if generation_round == 0 and candidate_index == 0:
         return Path(cache_dir) / f"{generation_key}.png"
-    return Path(cache_dir) / f"{generation_key}.candidate-{candidate_index:02d}.png"
+    if generation_round == 0:
+        return Path(cache_dir) / f"{generation_key}.candidate-{candidate_index:02d}.png"
+    return Path(cache_dir) / (
+        f"{generation_key}.round-{generation_round:02d}.candidate-{candidate_index:02d}.png"
+    )
 
 
 def validate_candidate_image(path: Path) -> bool:
@@ -119,6 +146,9 @@ class CandidateSlot:
     asset_id: str | None = None
     attempt_count: int = 0
     last_error: str | None = None
+    # Missing in Phase-9/10/11 JSON means round 0. Appended at the end so
+    # existing positional construction remains compatible.
+    generation_round: int = 0
 
 
 @dataclass
@@ -140,15 +170,52 @@ class VisualCandidateSet:
     selection_policy: str = ""
     selection_mode: str = "policy"  # policy | fallback_first_valid
     selector_fingerprint: str = ""
+    # Phase 12 recovery checkpoint. Full scores remain solely in
+    # visual_evaluations.json; this state records only bounded control-flow
+    # facts and the exact rejected evaluation identity.
+    recovery_policy: str = "fail_closed"
+    recovery_policy_version: str = RECOVERY_POLICY_VERSION
+    recovery_status: str = "not_needed"  # not_needed | eligible | running | resolved | exhausted
+    active_generation_round: int = 0
+    semantic_rejection_rounds: list[int] = field(default_factory=list)
+    rejected_evaluation_fingerprint: str = ""
 
-    def slot(self, candidate_index: int) -> CandidateSlot:
-        slot_id = f"{self.shot_id}::candidate-{candidate_index:02d}"
+    def slot(self, candidate_index: int, generation_round: int = 0) -> CandidateSlot:
+        if generation_round not in {0, 1}:
+            raise ValueError("generation_round phải là 0 hoặc 1.")
+        slot_id = (
+            f"{self.shot_id}::candidate-{candidate_index:02d}"
+            if generation_round == 0
+            else f"{self.shot_id}::round-{generation_round:02d}::candidate-{candidate_index:02d}"
+        )
         existing = self.candidates.get(slot_id)
         if existing is not None:
             return existing
-        created = CandidateSlot(slot_id, candidate_index, candidate_seed(self.generation_key, candidate_index))
+        created = CandidateSlot(
+            slot_id,
+            candidate_index,
+            candidate_seed(self.generation_key, candidate_index, generation_round),
+            generation_round=generation_round,
+        )
         self.candidates[slot_id] = created
         return created
+
+    def existing_rounds(self) -> tuple[int, ...]:
+        rounds = {slot.generation_round for slot in self.candidates.values()}
+        return tuple(sorted(rounds or {0}))
+
+    def existing_slots_for_round(self, generation_round: int) -> tuple[CandidateSlot, ...]:
+        return tuple(
+            sorted(
+                (
+                    slot
+                    for slot in self.candidates.values()
+                    if slot.generation_round == generation_round
+                    and slot.candidate_index < self.target_candidate_count
+                ),
+                key=lambda slot: slot.candidate_index,
+            )
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -164,6 +231,12 @@ class VisualCandidateSet:
             "selection_policy": self.selection_policy,
             "selection_mode": self.selection_mode,
             "selector_fingerprint": self.selector_fingerprint,
+            "recovery_policy": self.recovery_policy,
+            "recovery_policy_version": self.recovery_policy_version,
+            "recovery_status": self.recovery_status,
+            "active_generation_round": self.active_generation_round,
+            "semantic_rejection_rounds": list(self.semantic_rejection_rounds),
+            "rejected_evaluation_fingerprint": self.rejected_evaluation_fingerprint,
         }
 
     @classmethod
@@ -175,6 +248,12 @@ class VisualCandidateSet:
             data.get("selected_asset_id"), data.get("selection_status", "pending"),
             data.get("selection_policy", ""), data.get("selection_mode", "policy"),
             data.get("selector_fingerprint", ""),
+            data.get("recovery_policy", "fail_closed"),
+            data.get("recovery_policy_version", RECOVERY_POLICY_VERSION),
+            data.get("recovery_status", "not_needed"),
+            data.get("active_generation_round", 0),
+            list(data.get("semantic_rejection_rounds", [])),
+            data.get("rejected_evaluation_fingerprint", ""),
         )
 
 

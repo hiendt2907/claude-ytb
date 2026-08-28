@@ -16,6 +16,8 @@ from ..config.settings import settings
 from ..providers.image.comfyui_story_provider import SAMPLER, SCHEDULER
 from .asset_registry import AssetRegistry, content_sha256 as observed_content_sha256
 from .visual_candidates import (
+    MAX_GENERATION_ROUND,
+    VisualCandidateSet,
     VisualCandidateStore,
     candidate_cache_path,
     candidate_is_valid,
@@ -51,6 +53,16 @@ class VisualRequest:
     dimensions: tuple[int, int]
     resolution_kind: str
     semantic_constraints: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class RankedSelectionOutcome:
+    """Internal selection result that keeps semantic rejection distinct
+    from technical emptiness and Judge infrastructure fallback."""
+
+    selected_asset_id: str | None
+    semantic_rejection: bool = False
+    evaluation_fingerprint: str = ""
 
 
 def _fingerprint(*parts: str) -> str:
@@ -179,6 +191,28 @@ def _selector_fingerprint(visual: Any) -> str:
     return hashlib.sha256(encoded.encode()).hexdigest()
 
 
+def _evaluation_fingerprint(
+    request: VisualRequest,
+    judge_cfg: Any,
+    candidate_identity: dict[str, str],
+) -> str:
+    """Exact identity of a successful whole-set semantic observation.
+
+    Full evaluations stay in ``visual_evaluations.json``. The candidate
+    checkpoint stores only this compact identity when a round is rejected.
+    """
+    payload = {
+        "request_fingerprint": request.request_fingerprint,
+        "judge_provider": judge_cfg.provider,
+        "judge_model": judge_cfg.model,
+        "judge_policy_version": judge_cfg.policy_version,
+        "judge_contract_version": _JUDGE_CONTRACT_VERSION,
+        "candidate_identity": candidate_identity,
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(encoded.encode()).hexdigest()
+
+
 def _selection_checkpoint_is_reusable(
     request: VisualRequest,
     profile: "ContentProfile",
@@ -251,26 +285,44 @@ class VisualAssetResolver:
             return record
         return self._resolve_candidates(request, segment, visual, key, cache_dir, generated_dimensions, characters, video_slug)
 
-    def _resolve_candidates(self, request: VisualRequest, segment: "Segment", visual: Any, generation_key: str, cache_dir: Path, generated_dimensions: tuple[int, int], characters: tuple[str, ...], video_slug: str) -> dict[str, Any]:
-        """Opt-in Phase 9 multi-candidate path (`candidate_count > 1`)."""
-        target_count = visual.candidate_count
-        policy_version = getattr(visual, "candidate_policy_version", "phase9-v1")
-        policy_name = getattr(visual, "selection_policy", "first_valid")
-        store = self.candidate_store or VisualCandidateStore(Path(cache_dir) / "visual_candidates.json")
-        candidate_set = store.get_or_create(
-            shot_id=request.shot_id, request_id=request.request_id, request_fingerprint=request.request_fingerprint,
-            generation_key=generation_key, candidate_policy_version=policy_version, target_candidate_count=target_count,
-        )
+    def _generate_candidate_round(
+        self,
+        request: VisualRequest,
+        segment: "Segment",
+        visual: Any,
+        candidate_set: VisualCandidateSet,
+        store: VisualCandidateStore,
+        *,
+        generation_round: int,
+        generation_key: str,
+        cache_dir: Path,
+        generated_dimensions: tuple[int, int],
+        characters: tuple[str, ...],
+        video_slug: str,
+    ) -> tuple[int, ...]:
+        """Generate/resume one round sequentially and return invalid slots.
+
+        Every slot is checkpointed immediately. Round 0 preserves all Phase-9
+        identities; round 1 uses deterministic distinct seeds and paths.
+        """
         _candidate_logger.info(
-            "visual_candidates.prepare shot_id=%s target_count=%s policy=%s policy_version=%s",
-            request.shot_id, target_count, policy_name, policy_version,
+            "visual_candidates.round shot_id=%s recovery_policy=%s generation_round=%s target_count=%s",
+            request.shot_id,
+            candidate_set.recovery_policy,
+            generation_round,
+            candidate_set.target_candidate_count,
         )
-        for index in range(target_count):
-            slot = candidate_set.slot(index)
+        for index in range(candidate_set.target_candidate_count):
+            slot = candidate_set.slot(index, generation_round=generation_round)
             if candidate_is_valid(slot, self.registry):
                 continue
             slot.attempt_count += 1
-            asset_path = candidate_cache_path(cache_dir, generation_key, index)
+            asset_path = candidate_cache_path(
+                cache_dir,
+                generation_key,
+                index,
+                generation_round=generation_round,
+            )
             seed = slot.seed
             fresh = not asset_path.is_file()
             try:
@@ -278,49 +330,287 @@ class VisualAssetResolver:
                     provider = self.provider
                     if provider is None:
                         from ..providers.registry import get_story_image_provider
+
                         provider = get_story_image_provider()
-                    provider.generate_scene(self.profile, characters_present=tuple(segment.scene_characters), prompt=segment.visual_intent.strip(), width=generated_dimensions[0], height=generated_dimensions[1], seed=seed, output_path=asset_path)
+                    provider.generate_scene(
+                        self.profile,
+                        characters_present=tuple(segment.scene_characters),
+                        prompt=segment.visual_intent.strip(),
+                        width=generated_dimensions[0],
+                        height=generated_dimensions[1],
+                        seed=seed,
+                        output_path=asset_path,
+                    )
                 if not validate_candidate_image(asset_path):
-                    raise ValueError(f"Candidate ảnh không hợp lệ (technical validation thất bại): {asset_path}")
-                asset_id = self.registry.record_generated(generation_key=generation_key, local_path=asset_path, is_fresh_generation=fresh, profile_id=self.profile.profile_id, profile_version=self.profile.version, seed=seed, prompt=segment.visual_intent.strip(), style_prompt=visual.style_prompt, negative_prompt=visual.negative_prompt, steps=visual.steps, cfg=visual.cfg, width=generated_dimensions[0], height=generated_dimensions[1], characters=characters, generation_mode=_generation_mode(characters), checkpoint=settings.comfyui_sdxl_checkpoint, clip_vision_model=settings.comfyui_clip_vision_model, ipadapter_model=settings.comfyui_ipadapter_model, solo_weight=visual.solo_weight, duo_weight=visual.duo_weight, duo_denoise=visual.duo_denoise, sampler=SAMPLER, scheduler=SCHEDULER, scene_id=request.scene_id, shot_id=request.shot_id, video_slug=video_slug)
+                    raise ValueError(
+                        "Candidate ảnh không hợp lệ (technical validation thất bại): "
+                        f"{asset_path}"
+                    )
+                asset_id = self.registry.record_generated(
+                    generation_key=generation_key,
+                    local_path=asset_path,
+                    is_fresh_generation=fresh,
+                    profile_id=self.profile.profile_id,
+                    profile_version=self.profile.version,
+                    seed=seed,
+                    prompt=segment.visual_intent.strip(),
+                    style_prompt=visual.style_prompt,
+                    negative_prompt=visual.negative_prompt,
+                    steps=visual.steps,
+                    cfg=visual.cfg,
+                    width=generated_dimensions[0],
+                    height=generated_dimensions[1],
+                    characters=characters,
+                    generation_mode=_generation_mode(characters),
+                    checkpoint=settings.comfyui_sdxl_checkpoint,
+                    clip_vision_model=settings.comfyui_clip_vision_model,
+                    ipadapter_model=settings.comfyui_ipadapter_model,
+                    solo_weight=visual.solo_weight,
+                    duo_weight=visual.duo_weight,
+                    duo_denoise=visual.duo_denoise,
+                    sampler=SAMPLER,
+                    scheduler=SCHEDULER,
+                    scene_id=request.scene_id,
+                    shot_id=request.shot_id,
+                    video_slug=video_slug,
+                )
                 slot.status, slot.asset_id, slot.last_error = "done", asset_id, None
             except Exception as exc:
                 slot.status, slot.last_error = "failed", str(exc)
             store.write()
-        # Once resolution reaches this boundary selection is recomputed from
-        # the already-checkpointed slots. `prepare_visual_assets` skips this
-        # boundary only when the persisted selector fingerprint is current;
-        # generation progress above remains independent in either case.
-        if policy_name == "vlm_ranked":
-            selected_asset_id = self._select_vlm_ranked(request, candidate_set, video_slug=video_slug)
-        elif policy_name == "first_valid":
+        return tuple(
+            index
+            for index in range(candidate_set.target_candidate_count)
+            if not candidate_is_valid(
+                candidate_set.slot(index, generation_round=generation_round),
+                self.registry,
+            )
+        )
+
+    @staticmethod
+    def _record_semantic_rejection(
+        candidate_set: VisualCandidateSet,
+        store: VisualCandidateStore,
+        *,
+        generation_round: int,
+        evaluation_fingerprint: str,
+    ) -> None:
+        if generation_round not in candidate_set.semantic_rejection_rounds:
+            candidate_set.semantic_rejection_rounds.append(generation_round)
+            candidate_set.semantic_rejection_rounds.sort()
+        candidate_set.rejected_evaluation_fingerprint = evaluation_fingerprint
+        store.write()
+        _candidate_logger.info(
+            "visual_candidates.semantic_rejection shot_id=%s generation_round=%s recovery_policy=%s",
+            candidate_set.shot_id,
+            generation_round,
+            candidate_set.recovery_policy,
+        )
+
+    def _resolve_candidates(self, request: VisualRequest, segment: "Segment", visual: Any, generation_key: str, cache_dir: Path, generated_dimensions: tuple[int, int], characters: tuple[str, ...], video_slug: str) -> dict[str, Any]:
+        """Resolve Phase-9 candidates plus Phase-12 bounded recovery."""
+        target_count = visual.candidate_count
+        policy_version = getattr(visual, "candidate_policy_version", "phase9-v1")
+        policy_name = getattr(visual, "selection_policy", "first_valid")
+        recovery_policy = getattr(
+            visual,
+            "semantic_rejection_recovery",
+            "fail_closed",
+        )
+        store = self.candidate_store or VisualCandidateStore(Path(cache_dir) / "visual_candidates.json")
+        candidate_set = store.get_or_create(
+            shot_id=request.shot_id,
+            request_id=request.request_id,
+            request_fingerprint=request.request_fingerprint,
+            generation_key=generation_key,
+            candidate_policy_version=policy_version,
+            target_candidate_count=target_count,
+        )
+        candidate_set.recovery_policy = recovery_policy
+        _candidate_logger.info(
+            "visual_candidates.prepare shot_id=%s target_count=%s policy=%s policy_version=%s recovery_policy=%s",
+            request.shot_id,
+            target_count,
+            policy_name,
+            policy_version,
+            recovery_policy,
+        )
+
+        self._generate_candidate_round(
+            request,
+            segment,
+            visual,
+            candidate_set,
+            store,
+            generation_round=0,
+            generation_key=generation_key,
+            cache_dir=cache_dir,
+            generated_dimensions=generated_dimensions,
+            characters=characters,
+            video_slug=video_slug,
+        )
+
+        selected_asset_id: str | None = None
+        exhausted = False
+        if policy_name == "first_valid":
             selected_asset_id = resolve_selection_policy(policy_name)(candidate_set, self.registry)
             candidate_set.selection_mode = "policy"
+            candidate_set.recovery_status = (
+                "resolved"
+                if candidate_set.semantic_rejection_rounds and selected_asset_id
+                else "not_needed"
+            )
+        elif policy_name == "vlm_ranked":
+            has_round_one = 1 in candidate_set.existing_rounds()
+            if (
+                has_round_one
+                and candidate_set.recovery_status == "running"
+                and recovery_policy == "regenerate_once"
+            ):
+                invalid = self._generate_candidate_round(
+                    request,
+                    segment,
+                    visual,
+                    candidate_set,
+                    store,
+                    generation_round=1,
+                    generation_key=generation_key,
+                    cache_dir=cache_dir,
+                    generated_dimensions=generated_dimensions,
+                    characters=characters,
+                    video_slug=video_slug,
+                )
+                if invalid:
+                    candidate_set.selection_status = "failed"
+                    store.write()
+                    raise ValueError(
+                        f"round 1 generation chưa hoàn tất cho shot {request.shot_id}; "
+                        f"failed_slots={list(invalid)}."
+                    )
+
+            outcome = self._select_vlm_ranked(
+                request,
+                candidate_set,
+                video_slug=video_slug,
+            )
+            selected_asset_id = outcome.selected_asset_id
+            if selected_asset_id is not None:
+                if candidate_set.selection_mode == "policy":
+                    candidate_set.recovery_status = (
+                        "resolved" if has_round_one else "not_needed"
+                    )
+            elif outcome.semantic_rejection:
+                rejected_round = 1 if has_round_one else 0
+                self._record_semantic_rejection(
+                    candidate_set,
+                    store,
+                    generation_round=rejected_round,
+                    evaluation_fingerprint=outcome.evaluation_fingerprint,
+                )
+                if has_round_one:
+                    if candidate_set.recovery_status == "exhausted" or recovery_policy == "regenerate_once":
+                        candidate_set.recovery_status = "exhausted"
+                        exhausted = True
+                    else:
+                        candidate_set.recovery_status = "eligible"
+                elif recovery_policy == "regenerate_once":
+                    candidate_set.recovery_status = "running"
+                    candidate_set.active_generation_round = MAX_GENERATION_ROUND
+                    store.write()
+                    _candidate_logger.info(
+                        "visual_candidates.recovery_started shot_id=%s generation_round=1",
+                        request.shot_id,
+                    )
+                    invalid = self._generate_candidate_round(
+                        request,
+                        segment,
+                        visual,
+                        candidate_set,
+                        store,
+                        generation_round=1,
+                        generation_key=generation_key,
+                        cache_dir=cache_dir,
+                        generated_dimensions=generated_dimensions,
+                        characters=characters,
+                        video_slug=video_slug,
+                    )
+                    if invalid:
+                        candidate_set.selection_status = "failed"
+                        store.write()
+                        raise ValueError(
+                            f"round 1 generation chưa hoàn tất cho shot {request.shot_id}; "
+                            f"failed_slots={list(invalid)}."
+                        )
+                    second = self._select_vlm_ranked(
+                        request,
+                        candidate_set,
+                        video_slug=video_slug,
+                    )
+                    selected_asset_id = second.selected_asset_id
+                    if selected_asset_id is not None:
+                        if candidate_set.selection_mode == "policy":
+                            candidate_set.recovery_status = "resolved"
+                    elif second.semantic_rejection:
+                        self._record_semantic_rejection(
+                            candidate_set,
+                            store,
+                            generation_round=1,
+                            evaluation_fingerprint=second.evaluation_fingerprint,
+                        )
+                        candidate_set.recovery_status = "exhausted"
+                        exhausted = True
+                else:
+                    candidate_set.recovery_status = "eligible"
         else:
             raise ValueError(f"selection_policy không hợp lệ: {policy_name!r}")
+
         candidate_set.selection_policy = policy_name
         candidate_set.selector_fingerprint = _selector_fingerprint(visual)
         if selected_asset_id is None:
+            candidate_set.selected_asset_id = None
             candidate_set.selection_status = "failed"
             store.write()
-            raise ValueError(f"Không có candidate hợp lệ nào cho shot {request.shot_id} (target_count={target_count}).")
+            if exhausted:
+                _candidate_logger.info(
+                    "visual_candidates.recovery_exhausted shot_id=%s generation_calls_bound=%s judge_calls_bound=2",
+                    request.shot_id,
+                    target_count * 2,
+                )
+                raise ValueError(
+                    f"Semantic recovery exhausted cho shot {request.shot_id}; "
+                    "không tạo round 2."
+                )
+            raise ValueError(
+                f"Không có candidate hợp lệ nào cho shot {request.shot_id} "
+                f"(target_count={target_count})."
+            )
         candidate_set.selected_asset_id = selected_asset_id
         candidate_set.selection_status = "selected"
         store.write()
         _candidate_logger.info(
-            "visual_candidates.selected shot_id=%s asset_id=%s policy=%s mode=%s",
-            request.shot_id, selected_asset_id, policy_name, candidate_set.selection_mode,
+            "visual_candidates.selected shot_id=%s asset_id=%s policy=%s mode=%s recovery_status=%s",
+            request.shot_id,
+            selected_asset_id,
+            policy_name,
+            candidate_set.selection_mode,
+            candidate_set.recovery_status,
         )
         record = self.registry.find_by_asset_id(selected_asset_id)
         assert record is not None
         return record
 
-    def _select_vlm_ranked(self, request: VisualRequest, candidate_set, *, video_slug: str) -> str | None:
-        """Phase 10 opt-in ranked selection. Returns `None` only when there
-        is truly nothing eligible to select (zero technically-valid
-        candidates, or a successfully-judged set with zero eligible
-        candidates) — the caller fails closed in both cases, exactly like
-        `first_valid`'s own zero-valid-candidates behaviour."""
+    def _select_vlm_ranked(
+        self,
+        request: VisualRequest,
+        candidate_set: VisualCandidateSet,
+        *,
+        video_slug: str,
+    ) -> RankedSelectionOutcome:
+        """Phase-10 selection with an explicit semantic-rejection outcome.
+
+        Infrastructure fallback and zero technically-valid media are never
+        labeled semantic rejection, so neither can authorize Phase-12 media.
+        """
         visual = self.profile.visual_generation
         judge_cfg = getattr(visual, "visual_judge", None)
         if judge_cfg is None:
@@ -329,21 +619,32 @@ class VisualAssetResolver:
                 "yêu cầu visual_judge được cấu hình."
             )
         valid_slots = [
-            candidate_set.slot(index) for index in range(candidate_set.target_candidate_count)
-            if candidate_is_valid(candidate_set.slot(index), self.registry)
+            slot
+            for generation_round in candidate_set.existing_rounds()
+            for slot in candidate_set.existing_slots_for_round(generation_round)
+            if candidate_is_valid(slot, self.registry)
         ]
         if not valid_slots:
-            return None
+            return RankedSelectionOutcome(None)
         candidates: list[JudgeCandidate] = []
         for slot in valid_slots:
             record = self.registry.find_by_asset_id(slot.asset_id)
             assert record is not None
             candidates.append(JudgeCandidate(
                 asset_id=slot.asset_id, local_path=record["local_path"],
-                content_sha256=record["content_sha256"], candidate_index=slot.candidate_index,
+                content_sha256=record["content_sha256"],
+                candidate_index=(
+                    slot.generation_round * candidate_set.target_candidate_count
+                    + slot.candidate_index
+                ),
             ))
         candidate_identity = {candidate.asset_id: candidate.content_sha256 for candidate in candidates}
         candidate_index_by_asset = {candidate.asset_id: candidate.candidate_index for candidate in candidates}
+        evaluation_fingerprint = _evaluation_fingerprint(
+            request,
+            judge_cfg,
+            candidate_identity,
+        )
 
         store = self.evaluation_store or VisualEvaluationStore(Path(self.cache_dir or ".") / "visual_evaluations.json")
         existing = store.get(request.shot_id)
@@ -382,7 +683,9 @@ class VisualAssetResolver:
                     ))
                     store.write()
                     candidate_set.selection_mode = "fallback_first_valid"
-                    return resolve_selection_policy("first_valid")(candidate_set, self.registry)
+                    return RankedSelectionOutcome(
+                        resolve_selection_policy("first_valid")(candidate_set, self.registry)
+                    )
                 raise ValueError(
                     f"VisualJudge lỗi hạ tầng và hard_fail_on_judge_error=true cho shot "
                     f"{request.shot_id}: {exc}"
@@ -405,7 +708,16 @@ class VisualAssetResolver:
         # `None` here means every candidate was hard-failed or below
         # threshold — NEVER falls back to first_valid (semantic rejection,
         # not infrastructure failure; see module docstring).
-        return select_vlm_ranked(result, candidate_index_by_asset, minimum_score=judge_cfg.minimum_score)
+        selected_asset_id = select_vlm_ranked(
+            result,
+            candidate_index_by_asset,
+            minimum_score=judge_cfg.minimum_score,
+        )
+        return RankedSelectionOutcome(
+            selected_asset_id,
+            semantic_rejection=selected_asset_id is None,
+            evaluation_fingerprint=evaluation_fingerprint,
+        )
 
 
 def _parent_reuse(request: VisualRequest, lineage, registry: AssetRegistry, *, video_slug: str) -> tuple[dict[str, Any], dict[str, str]] | None:
