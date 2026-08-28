@@ -74,6 +74,7 @@ logger = logging.getLogger(__name__)
 
 RECOVERY_POLICY_VERSION = "phase12-v1"
 MAX_GENERATION_ROUND = 1
+MAX_CANDIDATE_SLOTS_PER_ROUND = 4
 
 
 def candidate_seed(
@@ -95,7 +96,25 @@ def candidate_seed(
             f"\x1fcandidate\x1f{candidate_index}"
         )
     digest = hashlib.sha256(payload.encode()).hexdigest()
-    return int(digest[:16], 16) % (2**32)
+    seed = int(digest[:16], 16) % (2**32)
+    if generation_round == 0:
+        return seed
+
+    # A 32-bit digest collision is unlikely but the Phase-12 identity
+    # contract is categorical. Deterministic linear probing guarantees that
+    # every round-1 slot differs from all four allowed round-0 slots and all
+    # earlier round-1 slots, without changing a single Phase-9 seed.
+    used = {
+        candidate_seed(generation_key, index, generation_round=0)
+        for index in range(MAX_CANDIDATE_SLOTS_PER_ROUND)
+    }
+    used.update(
+        candidate_seed(generation_key, index, generation_round=1)
+        for index in range(candidate_index)
+    )
+    while seed in used:
+        seed = (seed + 1) % (2**32)
+    return seed
 
 
 def candidate_cache_path(
