@@ -650,8 +650,13 @@ class VisualAssetResolver:
             selection_policy=visual.selection_policy,
         )
         if visual.selection_policy == "first_valid":
-            selected_asset_id = resolve_selection_policy("first_valid")(
-                manual_set, self.registry
+            selected_asset_id = next(
+                (
+                    slot.asset_id
+                    for slot in candidate_slots
+                    if candidate_is_valid(slot, self.registry)
+                ),
+                None,
             )
             semantic_rejection = False
             evaluation_fingerprint = ""

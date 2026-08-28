@@ -19,6 +19,7 @@ from ytb_pipeline.render.visual_review import (
     ReviewStatus,
     VisualAbandonedError,
     VisualReviewStore,
+    VisualReviewError,
 )
 from ytb_pipeline.render.visual_review_ops import (
     abandon_visual_review,
@@ -225,7 +226,9 @@ def test_human_accept_existing_updates_manifest_and_reruns_without_ai(tmp_path):
             provider=_Provider(),
             judge=_Judge("reject", "reject"),
         )
-    candidate_set = VisualCandidateStore(tmp_path / "project" / "visual_candidates.json").get("shot-001")
+    candidate_set = VisualCandidateStore(
+        tmp_path / "project" / "visual_candidates.json"
+    ).get("shot-001")
     accepted_asset_id = candidate_set.slot(1, generation_round=0).asset_id
 
     accepted = accept_existing_candidate(
@@ -351,3 +354,156 @@ def test_abandoned_review_stops_future_provider_work(tmp_path):
             provider=_NoCalls(),
             judge=_NoCalls(),
         )
+
+
+def test_manual_partial_generation_resumes_only_failed_candidate(tmp_path):
+    registry = AssetRegistry(tmp_path / "registry.json")
+    with pytest.raises(ReviewRequiredError):
+        _prepare(
+            tmp_path,
+            profile=_profile(),
+            registry=registry,
+            provider=_Provider(),
+            judge=_Judge("reject", "reject"),
+        )
+    request_manual_regeneration(
+        tmp_path / "project", "shot-001", "Bỏ đám đông phía sau"
+    )
+    provider = _Provider(fail_once=".manual-candidate-02.png")
+
+    with pytest.raises(ValueError, match="Manual generation chưa hoàn tất"):
+        _prepare(
+            tmp_path,
+            profile=_profile(),
+            registry=registry,
+            provider=provider,
+            judge=_NoCalls(),
+        )
+    after_failure = _review(tmp_path)
+    completed_ids = {
+        slot.asset_id
+        for slot in after_failure.manual_override.candidates[:2]
+    }
+    assert provider.calls == 3
+    assert after_failure.manual_override.candidates[2].status == "failed"
+
+    _prepare(
+        tmp_path,
+        profile=_profile(),
+        registry=registry,
+        provider=provider,
+        judge=_Judge("select_first"),
+    )
+    resolved = _review(tmp_path)
+    assert provider.calls == 4
+    assert {
+        slot.asset_id for slot in resolved.manual_override.candidates[:2]
+    } == completed_ids
+    assert resolved.status == ReviewStatus.RESOLVED
+
+
+@pytest.mark.parametrize("damage", ["missing", "sha"])
+def test_accepted_asset_damage_returns_to_review_without_auto_selection(tmp_path, damage):
+    registry = AssetRegistry(tmp_path / "registry.json")
+    with pytest.raises(ReviewRequiredError):
+        _prepare(
+            tmp_path,
+            profile=_profile(recovery="fail_closed"),
+            registry=registry,
+            provider=_Provider(),
+            judge=_Judge("reject"),
+        )
+    candidate_set = VisualCandidateStore(tmp_path / "project" / "visual_candidates.json").get("shot-001")
+    asset_id = candidate_set.slot(0).asset_id
+    record = registry.find_by_asset_id(asset_id)
+    accept_existing_candidate(
+        tmp_path / "project", "shot-001", asset_id, registry=registry
+    )
+    path = Path(record["local_path"])
+    if damage == "missing":
+        path.unlink()
+    else:
+        Image.new("RGB", (8, 8), (250, 0, 0)).save(path)
+
+    with pytest.raises(ReviewRequiredError):
+        _prepare(
+            tmp_path,
+            profile=_profile(recovery="fail_closed"),
+            registry=registry,
+            provider=_NoCalls(),
+            judge=_NoCalls(),
+        )
+
+    entry = _review(tmp_path)
+    assert entry.status == ReviewStatus.PENDING
+    assert entry.review_reason == ReviewReason.ACCEPTED_ASSET_INVALID
+    assert entry.selected_asset_id == asset_id
+
+
+def test_accept_rejects_arbitrary_asset_from_another_shot(tmp_path):
+    registry = AssetRegistry(tmp_path / "registry.json")
+    with pytest.raises(ReviewRequiredError):
+        _prepare(
+            tmp_path,
+            profile=_profile(recovery="fail_closed"),
+            registry=registry,
+            provider=_Provider(),
+            judge=_Judge("reject"),
+        )
+    foreign = tmp_path / "foreign.png"
+    Image.new("RGB", (8, 8), (1, 2, 3)).save(foreign)
+    foreign_id = registry.record_generated(
+        generation_key="f" * 64,
+        local_path=foreign,
+        is_fresh_generation=True,
+        profile_id="story",
+        profile_version="1",
+        seed=1,
+        scene_id="foreign-scene",
+        shot_id="foreign-shot",
+        video_slug="other-project",
+    )
+
+    with pytest.raises(VisualReviewError, match="không thuộc candidate history"):
+        accept_existing_candidate(
+            tmp_path / "project", "shot-001", foreign_id, registry=registry
+        )
+
+
+@pytest.mark.parametrize("disposition", ["abandon", "manual"])
+def test_changed_request_stales_human_disposition_and_runs_fresh_automation(
+    tmp_path, disposition
+):
+    registry = AssetRegistry(tmp_path / "registry.json")
+    with pytest.raises(ReviewRequiredError):
+        _prepare(
+            tmp_path,
+            profile=_profile(),
+            registry=registry,
+            provider=_Provider(),
+            judge=_Judge("reject", "reject"),
+        )
+    old = _review(tmp_path)
+    if disposition == "abandon":
+        abandon_visual_review(tmp_path / "project", "shot-001")
+    else:
+        request_manual_regeneration(
+            tmp_path / "project", "shot-001", "Bỏ đám đông phía sau"
+        )
+    provider = _Provider()
+    judge = _Judge("select_first")
+
+    _prepare(
+        tmp_path,
+        profile=_profile(),
+        registry=registry,
+        provider=provider,
+        judge=judge,
+        plan=_plan("Minh đứng một mình bên cửa sổ"),
+    )
+
+    assert provider.calls == 3
+    assert judge.calls == 1
+    store = VisualReviewStore(tmp_path / "project" / "visual_review.json")
+    assert store.get(old.review_id).status == ReviewStatus.STALE
+    assert store.current_for_shot("shot-001") is None
