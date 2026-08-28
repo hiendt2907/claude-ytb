@@ -803,6 +803,87 @@ called. `VisualManifest` still contains only Shot -> selected `AssetRecord`.
 Timeline and prepared renderer import no recovery policy and remain LLM,
 Judge, and ComfyUI-free after visual preparation.
 
+## Operator disposition and the v1 autonomy boundary (Phase 13)
+
+Phase 13 closes the automated visual loop at an explicit, durable human
+boundary. A successful path remains review-free; a review is created only
+after a valid semantic evaluation rejects every eligible candidate under
+`fail_closed`, or after the single Phase-12 autonomous recovery round is
+exhausted:
+
+```
+Script -> Narration -> ScenePlan / Director -> VisualRequest
+    -> reuse / candidate generation -> VisualJudge
+    -> bounded autonomous recovery
+    -> autonomous boundary ends
+       -> operator review (only when required)
+          -> accept_existing
+          -> manual_regenerate (one human-authored attempt)
+          -> abandon
+    -> VisualManifest -> Timeline -> prepared Renderer
+```
+
+AI autonomy is bounded. Judge output never automatically rewrites generation
+instructions. In particular, Phase 12 still permits no autonomous round 2.
+The only post-boundary generation is a deliberate operator disposition with a
+bounded instruction; it derives a new immutable `VisualRequest` identity from
+the original request plus the instruction, and receives a separate manual
+generation key, deterministic seeds, cache names and evaluation-store key.
+The original request, automated candidates, evaluations and registry records
+remain immutable history. One review permits at most one such manual attempt.
+
+Review state is project-local at
+`assets/projects/<slug>/visual_review.json`. `VisualReviewEntry` snapshots the
+bounded provider-neutral request context, exact candidate asset IDs,
+evaluation fingerprint, recovery state, reason, status, disposition, selected
+asset and optional `ManualVisualOverride`. Writes use the same sidecar file
+lock plus atomic replace as other durable project state. Repeating the same
+semantic halt reuses the same deterministic review ID. A changed request
+fingerprint marks the old review—including accept, manual or abandon—as
+`stale`; it cannot govern the new request.
+
+The lifecycle is `pending -> resolved`, `pending -> abandoned`, or any current
+decision `-> stale` after request change. Accepting an existing asset may
+deliberately override the VLM, but only for a candidate in that Shot's managed
+history whose `AssetRecord`, physical file, SHA-256 and technical media probe
+still validate. The decision is recorded as `operator_override` and the
+minimal final resolution is written to `VisualManifest`. If the accepted
+bytes later disappear or change, the review reopens as `pending` with
+`accepted_asset_invalid`; the engine never silently selects another asset.
+
+Manual regeneration is stateful and resumable per candidate slot. Completed
+manual candidates survive a process exit and only a missing/failed slot is
+retried. The existing Phase-10 Judge and infrastructure-fallback contract is
+reused once for the completed manual set. A second semantic rejection leaves
+the review pending with `manual_semantic_rejection`; it never triggers more
+generation. `abandon` is an intentional terminal operator outcome, not an
+infrastructure failure, and subsequent runs make zero provider calls until a
+material request change makes that disposition stale.
+
+Operators use the state-only interface:
+
+```bash
+ytb batch review list <project>
+ytb batch review show <project> <shot>
+ytb batch review accept <project> <shot> --asset-id <ast_id>
+ytb batch review regenerate <project> <shot> --instruction "..."
+ytb batch review abandon <project> <shot>
+```
+
+These commands do not call ComfyUI or the Judge. The next normal pipeline run
+executes a recorded manual attempt. Workflow checkpoints and the top-level CLI
+distinguish `SUCCESS`, `REVIEW_REQUIRED`, `ABANDONED`, and
+`INFRASTRUCTURE_FAILED`; review and abandon therefore are not reported as a
+generic failed node. `AssetRegistry` provenance and contextual evaluation
+history stay unchanged, `VisualManifest` retains only the selected resolution,
+and prepared render remains LLM/Judge/ComfyUI-free.
+
+**Engine feature freeze:** after Phase 13, AI Content Factory engine feature
+development is frozen for v1. Bug fixes remain allowed, but no new agents,
+models, autonomous recovery loops or AI workflows should be added until the
+Production Readiness workstream proves a concrete need through a real
+end-to-end run.
+
 ## Extension Points
 
 - **New AI provider for an existing capability**: implement the relevant

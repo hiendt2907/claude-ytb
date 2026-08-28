@@ -196,6 +196,24 @@ scores để sửa prompt và không gọi lại Director. Với `candidate_coun
 tối đa có 8 concrete candidate slots cho mỗi Shot (2 round × 4); generation
 vẫn tuần tự và slot lỗi hạ tầng được resume theo checkpoint hiện hữu.
 
+Phase 13 không thêm field profile. Khi `fail_closed` từ chối toàn bộ candidate
+hoặc `regenerate_once` đã dùng hết round tự động, pipeline ghi review bền vững
+tại `assets/projects/<slug>/visual_review.json` và dừng với
+`REVIEW_REQUIRED`. Operator phải chọn đúng một trong ba disposition:
+
+```bash
+ytb batch review show <slug> <shot-id>
+ytb batch review accept <slug> <shot-id> --asset-id <ast_id>
+ytb batch review regenerate <slug> <shot-id> --instruction "..."
+ytb batch review abandon <slug> <shot-id>
+```
+
+`accept` chỉ nhận asset thuộc history của Shot và còn đúng SHA/kỹ thuật.
+`regenerate` cho đúng một manual attempt có identity riêng; nó không phải
+autonomous round 2 và chỉ chạy khi pipeline được resume. `abandon` là trạng
+thái sản phẩm có chủ đích. Request fingerprint thay đổi làm disposition cũ
+stale. Các lệnh review chỉ ghi state, không gọi ComfyUI/Judge.
+
 ## Quy ước version snapshot
 
 Mỗi lần bump `version` trong `profile.json`, copy nguyên trạng thái cũ (kể cả
