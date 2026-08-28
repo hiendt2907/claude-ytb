@@ -469,6 +469,7 @@ def test_loader_resolves_a_real_archived_profile_version_without_rewriting_scrip
         ("ban-so-6", "1.4.0"),
         ("ban-so-6", "1.5.0"),
         ("ban-so-6", "1.6.0"),
+        ("ban-so-6", "2.0.0"),
     ),
 )
 def test_every_profile_version_referenced_by_tracked_work_is_resolvable(profile_id, version):
@@ -479,6 +480,26 @@ def test_every_profile_version_referenced_by_tracked_work_is_resolvable(profile_
 
     assert profile.profile_id == profile_id
     assert profile.version == version
+
+
+def test_ban_so_6_production_profile_enables_derivative_short_and_real_vision_qc():
+    from ytb_pipeline.content_profiles import load_content_profile
+
+    profile = load_content_profile("ban-so-6")
+    visual = profile.visual_generation
+
+    assert profile.version == "2.1.0"
+    assert profile.content_rules.allow_short_generation is True
+    assert profile.content_rules.require_short_source_trace is True
+    assert visual is not None
+    assert visual.candidate_count == 2
+    assert visual.selection_policy == "vlm_ranked"
+    assert visual.semantic_rejection_recovery == "regenerate_once"
+    assert visual.visual_judge is not None
+    assert visual.visual_judge.enabled is True
+    assert visual.visual_judge.provider == "xkiro"
+    assert visual.visual_judge.model == "qwen/qwen3.8-max:free"
+    assert visual.visual_judge.hard_fail_on_judge_error is True
 
 
 def test_profile_loader_rejects_string_booleans_nonfinite_numbers_and_dialogue_overlap(
