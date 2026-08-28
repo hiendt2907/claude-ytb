@@ -770,6 +770,113 @@ def test_hook_repair_can_run_again_after_an_editorial_rewrite_touches_the_openin
     assert result["sections"][0]["voiceover"] == "Opening fixed, lần 2."
 
 
+def test_narrator_reflection_repair_can_run_after_reserved_editorial_rewrite(
+    tmp_path, monkeypatch,
+):
+    """An editorial rewrite of the payoff may regress a repaired reflection.
+
+    Production Gate 1 exhausted its ordinary QA attempts repairing the final
+    narrator reflection, then used the profile-reserved editorial rewrite.
+    That rewrite touched the final section and reintroduced the same QA
+    violation.  The reserved validation attempt must be allowed one bounded
+    reflection repair plus one final validation; otherwise a correct earlier
+    repair is impossible to preserve through the independent review stage.
+    """
+    import asyncio
+
+    from ytb_pipeline.agents.base import AgentResult, AgentStatus
+    from ytb_pipeline.config.settings import settings
+    from ytb_pipeline.orchestrator.ideation_script_fix import validate_or_repair_script
+    import ytb_pipeline.orchestrator.ideation_script_fix as fix_module
+
+    _write_profile(
+        tmp_path, "reflection-after-editorial-fixture",
+        editorial_review={
+            "enabled": True, "rubric_prompt_name": "review_rubric",
+            "minimum_score": 9, "max_rewrites": 1,
+        },
+    )
+    monkeypatch.setattr(settings, "content_profiles_dir", tmp_path, raising=False)
+    monkeypatch.setattr(settings, "assets_dir", tmp_path / "assets_root", raising=False)
+    profile = load_content_profile("reflection-after-editorial-fixture", profiles_dir=tmp_path)
+    original = _valid_review_gate_payload(profile)
+
+    qa_calls = 0
+
+    async def _qa_sequence(self, _context):
+        nonlocal qa_calls
+        qa_calls += 1
+        if qa_calls in (1, 3):
+            return AgentResult(
+                agent_name="qa", status=AgentStatus.SUCCESS,
+                output={
+                    "passed": False,
+                    "violations": [{
+                        "rule": "narrator_reflection", "detail": "closing is not direct",
+                    }],
+                },
+            )
+        return AgentResult(agent_name="qa", status=AgentStatus.SUCCESS, output={"passed": True})
+
+    monkeypatch.setattr(fix_module.QAAgent, "run", _qa_sequence)
+
+    review_calls = 0
+
+    class Provider:
+        def __init__(self):
+            self.reflection_repair_calls = 0
+
+        async def complete(self, prompt, **_kwargs):
+            nonlocal review_calls
+            if prompt.startswith("Rewrite ONLY the final narrator reflection"):
+                self.reflection_repair_calls += 1
+                return json.dumps({
+                    "voiceover": (
+                        "Nếu bạn từng giữ một cảnh báo vì sợ bị hỏi ngược, có lẽ "
+                        f"sự im lặng ấy cũng có một cái giá, lần {self.reflection_repair_calls}."
+                    ),
+                })
+            if prompt.startswith("Review this Vietnamese YouTube script JSON"):
+                review_calls += 1
+                if review_calls == 1:
+                    return json.dumps({
+                        "passed": False, "overall_score": 8,
+                        "dimension_scores": {
+                            "human_truth": 9, "spoken_naturalness": 8,
+                            "causal_coherence": 9, "role_fidelity": 9,
+                            "useful_restraint": 9,
+                        },
+                        "blocking_findings": ["Payoff còn giống lời giải thích."],
+                        "section_refs": [4],
+                        "repair_brief": "Viết lại payoff tự nhiên hơn.",
+                    })
+                return json.dumps({
+                    "passed": True, "overall_score": 9,
+                    "dimension_scores": {
+                        "human_truth": 9, "spoken_naturalness": 9,
+                        "causal_coherence": 9, "role_fidelity": 9,
+                        "useful_restraint": 9,
+                    },
+                    "blocking_findings": [], "section_refs": [], "repair_brief": "",
+                })
+            assert "Editorial review findings" in prompt
+            return json.dumps({
+                "sections": [{
+                    "section_index": 4,
+                    "voiceover": "Câu chuyện kết thúc ở đây, nhưng chưa nói trực tiếp với bạn.",
+                }],
+            })
+
+    provider = Provider()
+    result = asyncio.run(validate_or_repair_script(
+        provider, original, tmp_path / "s.json", "", max_attempts=1,
+    ))
+
+    assert provider.reflection_repair_calls == 2
+    assert qa_calls == 4
+    assert "lần 2" in result["sections"][-1]["voiceover"]
+
+
 def _editorial_rewrite_payload():
     return {
         "slug": "fixture", "topic": "Một tình huống công việc", "profile_id": "one-cup-cafe-6h",
