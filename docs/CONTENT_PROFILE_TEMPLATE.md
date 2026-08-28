@@ -179,6 +179,23 @@ VISUAL_JUDGE_MODEL='qwen/qwen3.8-max:free' \
 .venv/bin/python -m ytb_pipeline.tools.smoke_visual_judge --generate-probe
 ```
 
+Phase 12 — phục hồi semantic rejection có giới hạn: field
+`semantic_rejection_recovery` nằm trực tiếp trong `visual_generation`, nhận
+đúng hai giá trị:
+
+- `"fail_closed"` (mặc định): giữ nguyên Phase 11, không sinh thêm ảnh.
+- `"regenerate_once"`: chỉ khi Judge trả response hợp lệ nhưng toàn bộ
+  candidate bị hard-fail/dưới ngưỡng, sinh đúng một round candidate mới với
+  cùng `VisualRequest` và seed deterministic khác, rồi Judge lại whole-set
+  round 0 + round 1. Lần từ chối thứ hai là `exhausted` và fail closed.
+
+Policy này chỉ có hiệu lực với multi-candidate `vlm_ranked`. Lỗi hạ tầng
+Judge, lỗi generation/technical validation, `first_valid`, `profile_local`,
+parent reuse và prepared render không kích hoạt recovery. Không dùng reasons/
+scores để sửa prompt và không gọi lại Director. Với `candidate_count <= 4`,
+tối đa có 8 concrete candidate slots cho mỗi Shot (2 round × 4); generation
+vẫn tuần tự và slot lỗi hạ tầng được resume theo checkpoint hiện hữu.
+
 ## Quy ước version snapshot
 
 Mỗi lần bump `version` trong `profile.json`, copy nguyên trạng thái cũ (kể cả

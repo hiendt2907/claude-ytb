@@ -27,11 +27,11 @@ semantic rejection are DELIBERATELY different: infra failure may fall
 back to `first_valid` when a profile opts in
 (`visual_judge.hard_fail_on_judge_error=False`); a successfully evaluated
 candidate set where every candidate is hard-failed or below
-`minimum_score` NEVER falls back — `visual_assets` fails closed for that
-Shot, or semantic QC would mean nothing (see `render/visual_assets.py`'s
-`_select_vlm_ranked`).
+`minimum_score` NEVER falls back. Phase 12 may authorize exactly one new
+deterministic candidate round for that successful semantic-rejection state;
+the second rejection remains fail-closed (see `render/visual_assets.py`).
 
-Explicitly OUT of scope, matching Phase 10's directive: no
+Explicitly OUT of scope: no
 beauty/attractiveness/body/age/gender/race desirability scoring of any
 kind. The allowed dimensions are request-fidelity/technical-composition
 only (`KNOWN_HARD_FAILURE_CODES`, `_SCORE_FIELDS`).

@@ -711,6 +711,98 @@ strict `JudgeResult`, verifies the observed facts, cleans the temp directory,
 and exits non-zero on any capability/transport/schema/observation failure. It
 is intentionally not part of `make test` because it uses a live provider.
 
+## Bounded semantic-rejection recovery (Phase 12)
+
+Phase 12 changes only what may happen after a **successful** whole-set Judge
+evaluation has zero eligible candidates. The default remains the exact
+Phase-11 fail-closed path. An explicitly opted-in story profile may authorize
+one deterministic resampling round:
+
+```
+VisualRequest
+    -> round 0 CandidateSet
+    -> technical validation
+    -> VisualJudge
+    -> Selector
+        -> selected -------------------------------> VisualManifest
+        -> semantic rejection
+            -> semantic_rejection_recovery
+                -> fail_closed --------------------> fail
+                -> regenerate_once
+                    -> round 1 CandidateSet
+                    -> technical validation
+                    -> whole-set Judge (round 0 + 1)
+                    -> selected OR durable exhausted failure
+```
+
+The profile field is `visual_generation.semantic_rejection_recovery`, with
+only `fail_closed` (default) and `regenerate_once`. There is no arbitrary
+retry count and no round 2. `regenerate_once` is ignored by `first_valid` and
+the unchanged `candidate_count=1` direct path; parent reuse and
+`profile_local` still return before candidate machinery.
+
+The recovery gate is deliberately narrow: candidate generation must leave at
+least one technically valid asset, the Judge must return a valid structured
+result, and deterministic ranked selection must find zero eligible assets.
+Timeout, authentication, rate-limit, provider/transport failure, and malformed
+Judge output after its existing one repair remain infrastructure failures and
+follow `hard_fail_on_judge_error`; they never authorize regeneration.
+Generation/technical-validation failure is likewise not semantic rejection.
+
+Round identity extends the existing `VisualCandidateSet`, not a second store:
+
+```
+round 0 slot     <shot_id>::candidate-NN                 (unchanged)
+round 1 slot     <shot_id>::round-01::candidate-NN
+round 0 cache    existing generation_key paths           (unchanged)
+round 1 cache    <generation_key>.round-01.candidate-NN.png
+```
+
+Round-0 seeds are byte-for-byte Phase-9 compatible. Round-1 seeds derive from
+`generation_key + generation_round + candidate_index`, use no timestamp/PID/
+Python `hash()`, and apply deterministic collision resolution against all
+allowed round-0 and earlier round-1 slots. Both rounds intentionally retain
+the same semantic `generation_key`; each concrete path/seed/bytes observation
+still gets its own immutable `AssetRecord`.
+
+`visual_candidates.json` adds recovery policy/version, status
+(`not_needed|eligible|running|resolved|exhausted`), active round, rejected
+round list, and the most recent rejected whole-set evaluation fingerprint.
+It does not duplicate scores/reasons: `visual_evaluations.json` remains the
+evaluation source. Missing Phase-12 fields and missing
+`CandidateSlot.generation_round` in legacy JSON default to Phase-11
+`fail_closed` and round
+0, so no migration or rewrite is required.
+
+Round 1 generates sequentially. Every slot write is atomic and immediate; a
+restart validates and reuses completed slots and retries only missing/failed
+ones. A complete round 1 changes the whole candidate identity, so the existing
+Phase-10 set-level cache naturally causes one new comparative Judge call over
+all technically-valid assets from both rounds. Round-0 media may win that new
+evaluation. A second semantic rejection persists `exhausted`; unchanged
+reruns reuse media and evaluation, make zero new generation/Judge calls, and
+fail closed without creating round 2.
+
+Changing request fingerprint starts the existing fresh-request candidate
+semantics. Changing Judge provider/model/policy/threshold rejudges existing
+media without regeneration. Changing `fail_closed -> regenerate_once` after a
+persisted round-0 rejection reuses round 0 and begins only round 1; changing
+back deletes nothing and cannot replenish an exhausted budget. A candidate
+count change preserves historical slots under the existing Phase-9 rules.
+
+Cost is structurally bounded to two candidate rounds. With
+`MAX_CANDIDATE_COUNT=4`, at most eight concrete candidate slots/media records
+can exist per Shot; failed infrastructure attempts may be retried only for the
+same checkpointed slots. One recovery event has at most one successful
+round-0 Judge evaluation plus one whole-set post-round-1 evaluation (each
+retaining the existing single structured-output repair bound).
+
+Round 1 uses the same `VisualRequest`, prompt, ScenePlan and Director output;
+Judge scores/reasons never rewrite the generation prompt, and Director is not
+called. `VisualManifest` still contains only Shot -> selected `AssetRecord`.
+Timeline and prepared renderer import no recovery policy and remain LLM,
+Judge, and ComfyUI-free after visual preparation.
+
 ## Extension Points
 
 - **New AI provider for an existing capability**: implement the relevant

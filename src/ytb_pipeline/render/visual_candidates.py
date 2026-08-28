@@ -16,6 +16,11 @@
         v
     selected AssetRecord
 
+Phase 12 evolves the same store backward-compatibly with one optional
+semantic-rejection recovery round. Round 0 keeps every Phase-9 identity;
+round 1 uses ``round-01`` slot/path identities and collision-resolved stable
+seeds. No round greater than 1 can be created.
+
 ``candidate_count == 1`` (the default) never touches this module: the
 single-candidate path in `VisualAssetResolver.resolve` is the unchanged
 Phase 8 code, byte-for-byte, including the historical `f"{key}.png"` cache
@@ -29,9 +34,9 @@ Identity model, kept independent of `AssetRegistry`'s own locked concepts
 (`asset_id` / `content_sha256` / `generation_key` / `local_path` — see
 `asset_registry.py`, unchanged by this module):
 
-    candidate_slot_id   `f"{shot_id}::candidate-{index:02d}"` — a LOCATOR
-                         into one project's candidate set, not a media
-                         identity.
+    candidate_slot_id   round 0: `f"{shot_id}::candidate-{index:02d}"`;
+                         round 1 adds `::round-01::`. It is a LOCATOR into
+                         one project's candidate set, not a media identity.
     candidate_index     0-based ordinal slot position within one
                          VisualCandidateSet. Never used as a substitute for
                          `asset_id`.
@@ -50,9 +55,8 @@ deliberately separate from:
     generation cache   physical reusable generation output files.
 
 Technical validation here is strictly non-semantic: decodable image,
-non-zero dimensions. No aesthetic/person/quality scoring — real semantic
-judging is explicitly deferred to Phase 10 (see `docs/handoffs/2026-08-27-
-visual-candidates-phase9-handoff.md`).
+non-zero dimensions. No aesthetic/person/quality scoring — semantic judging
+remains in the Phase-10 `VisualJudge` boundary.
 
 Selection (`selection_policy="first_valid"`, the only Phase 9 policy) is
 deterministic: the lowest-index technically-valid candidate wins. It never
