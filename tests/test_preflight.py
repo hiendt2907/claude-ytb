@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import urllib.request
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -369,3 +370,112 @@ def test_preflight_accepts_scene_characters_instead_of_visual_asset_when_auto_ge
     result = preflight_script(path)
 
     assert "asset.profile_missing" not in {failure.code for failure in result.failures}
+
+
+def test_production_preflight_requires_xkiro_configuration_without_network(
+    tmp_path, monkeypatch,
+):
+    """The cheap configuration gate runs before any live health request."""
+    from ytb_pipeline.config.settings import settings
+    from ytb_pipeline.orchestrator.preflight import preflight_script
+
+    payload = json.loads(
+        Path("profiles/ban-so-6/fixtures/episode-01-short.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    path = tmp_path / "story.json"
+    path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setattr(settings, "xkiro_api_key", "")
+
+    def forbidden(*_args, **_kwargs):
+        raise AssertionError("offline preflight must not call network")
+
+    monkeypatch.setattr(urllib.request, "urlopen", forbidden)
+
+    result = preflight_script(path)
+
+    assert "xkiro.config" in {failure.code for failure in result.failures}
+
+
+def test_live_production_preflight_checks_story_and_vision_capabilities(
+    tmp_path, monkeypatch,
+):
+    """Live mode verifies capability endpoints but never generates media."""
+    from ytb_pipeline.content_profiles import VisualJudgeProfile, load_content_profile
+    from ytb_pipeline.orchestrator import preflight
+    from ytb_pipeline.render.visual_judge import JudgeInfrastructureError
+
+    payload = json.loads(
+        Path("profiles/ban-so-6/fixtures/episode-01-short.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    path = tmp_path / "story.json"
+    path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    current = load_content_profile("ban-so-6")
+    assert current.visual_generation is not None
+    production = replace(
+        current,
+        visual_generation=replace(
+            current.visual_generation,
+            candidate_count=2,
+            selection_policy="vlm_ranked",
+            visual_judge=VisualJudgeProfile(
+                enabled=True,
+                provider="xkiro",
+                model="vision-model",
+                policy_version="gate1-v1",
+            ),
+        ),
+    )
+    monkeypatch.setattr(preflight, "_resolve_profile", lambda *_args: production)
+
+    class StoryProvider:
+        def availability_status(self):
+            return False, "missing SDXL checkpoint"
+
+    class VisionTransport:
+        def verify_vision_model(self, model):
+            assert model == "vision-model"
+            raise JudgeInfrastructureError("vision=false")
+
+    monkeypatch.setattr(
+        preflight, "get_story_image_provider", lambda _name: StoryProvider()
+    )
+    monkeypatch.setattr(
+        preflight,
+        "get_visual_judge",
+        lambda _provider, _model: SimpleNamespace(transport=VisionTransport()),
+    )
+
+    result = preflight.preflight_script(path, live_providers=True)
+    codes = {failure.code for failure in result.failures}
+
+    assert "story_generation.live" in codes
+    assert "visual_judge.live" in codes
+
+
+def test_publish_preflight_requires_local_oauth_material(tmp_path, monkeypatch):
+    """A requested publish fails before TTS when credential files are absent."""
+    from ytb_pipeline.config.settings import settings
+    from ytb_pipeline.orchestrator.preflight import preflight_script
+
+    payload = json.loads(
+        Path("profiles/ban-so-6/fixtures/episode-01-short.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    path = tmp_path / "story.json"
+    path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setattr(settings, "youtube_client_secrets", str(tmp_path / "client.json"))
+    monkeypatch.setattr(settings, "youtube_token_file", str(tmp_path / "youtube.json"))
+    monkeypatch.setattr(settings, "drive_token_file", str(tmp_path / "drive.json"))
+    monkeypatch.setattr(settings, "drive_backup", True)
+
+    result = preflight_script(path, publish=True)
+    codes = {failure.code for failure in result.failures}
+
+    assert "youtube.client_secrets" in codes
+    assert "youtube.oauth_token" in codes
+    assert "drive.oauth_token" in codes
