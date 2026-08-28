@@ -320,6 +320,35 @@ def test_render_uses_renderer_declared_by_script_content_profile(monkeypatch, tm
 
     monkeypatch.setattr(pipeline, "load_script", lambda _path: script)
     monkeypatch.setattr(pipeline, "QAAgent", PassingQAAgent)
+
+    # This test owns renderer routing, not ComfyUI/Vision behavior.  The
+    # production profile intentionally enables both, so keep this unit test
+    # offline by persisting the smallest prepared boundary and stubbing its
+    # validation result.  Dedicated visual-assets tests exercise the real
+    # manifest/registry contract.
+    from ytb_pipeline.render import visual_assets
+
+    def prepare_without_providers(
+        _voiceover,
+        _profile,
+        *,
+        project_dir,
+        dimensions,
+        scene_plan,
+        lineage,
+    ):
+        del dimensions, lineage
+        manifest = visual_assets.VisualManifest(scene_plan.source_fingerprint)
+        manifest.write_json(project_dir / "visual_manifest.json")
+        return scene_plan, manifest, {}
+
+    monkeypatch.setattr(visual_assets, "prepare_visual_assets", prepare_without_providers)
+    monkeypatch.setattr(visual_assets, "build_visual_requests", lambda *_args, **_kwargs: ())
+    monkeypatch.setattr(
+        visual_assets,
+        "validate_prepared_manifest",
+        lambda _manifest, _requests, _registry: {},
+    )
     monkeypatch.setattr(
         pipeline,
         "get_render_provider",

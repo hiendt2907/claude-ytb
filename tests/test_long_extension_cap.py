@@ -112,8 +112,7 @@ def test_long_only_story_profile_rejects_new_short_generation_but_reads_archives
         ).read_text(encoding="utf-8")
     )
     from ytb_pipeline.content_profiles import load_content_profile
-    payload["profile_version"] = load_content_profile("ban-so-6").version
-    payload["strategy"] = {"format_id": "core_answer_first_v1"}  # no `hook`
+    payload["profile_version"] = "2.0.0"
     path = tmp_path / "story.json"
     path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
 
@@ -123,4 +122,11 @@ def test_long_only_story_profile_rejects_new_short_generation_but_reads_archives
 
     assert load_script(path).video_type == "short"
     with pytest.raises(ContentProfileError, match="không cho sinh short"):
-        local_script_prompt(1, 1, "short", "auto", "", content_profile=load_content_profile("ban-so-6"))
+        local_script_prompt(
+            1,
+            1,
+            "short",
+            "auto",
+            "",
+            content_profile=load_content_profile("ban-so-6", version="2.0.0"),
+        )
