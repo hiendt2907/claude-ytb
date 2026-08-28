@@ -38,7 +38,10 @@ def profile(tmp_path, monkeypatch):
     # `settings.asset_registry_path` — without this, these unit tests would
     # write into the real repository's `assets/asset_registry.json`.
     monkeypatch.setattr(settings, "asset_registry_path", tmp_path / "asset_registry.json", raising=False)
-    return load_content_profile("ban-so-6")
+    # These tests exercise the original one-candidate write-through cache.
+    # The active production profile enables Phase-10/12 ranking and recovery,
+    # which have their own focused suites and would change this unit boundary.
+    return load_content_profile("ban-so-6", version="2.0.0")
 
 
 def _segment(**overrides):
