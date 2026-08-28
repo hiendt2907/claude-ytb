@@ -479,3 +479,25 @@ def test_publish_preflight_requires_local_oauth_material(tmp_path, monkeypatch):
     assert "youtube.client_secrets" in codes
     assert "youtube.oauth_token" in codes
     assert "drive.oauth_token" in codes
+
+
+def test_production_preflight_rejects_unknown_profile_llm_provider(
+    tmp_path, monkeypatch,
+):
+    from ytb_pipeline.content_profiles import load_content_profile
+    from ytb_pipeline.orchestrator import preflight
+
+    payload = json.loads(
+        Path("profiles/ban-so-6/fixtures/episode-01-short.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    path = tmp_path / "story.json"
+    path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    profile = load_content_profile("ban-so-6")
+    broken = replace(profile, providers=replace(profile.providers, llm="missing-llm"))
+    monkeypatch.setattr(preflight, "_resolve_profile", lambda *_args: broken)
+
+    result = preflight.preflight_script(path)
+
+    assert "llm.available" in {failure.code for failure in result.failures}
