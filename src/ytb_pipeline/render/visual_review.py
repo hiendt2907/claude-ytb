@@ -143,8 +143,11 @@ class VisualReviewEntry:
     shot_id: str
     request_id: str
     request_fingerprint: str
+    scene_id: str
     visual_intent: str
     characters: tuple[str, ...]
+    dimensions: tuple[int, int]
+    resolution_kind: str
     semantic_constraints: tuple[str, ...]
     status: ReviewStatus
     review_reason: ReviewReason
@@ -165,6 +168,7 @@ class VisualReviewEntry:
         data["review_reason"] = self.review_reason.value
         data["disposition"] = self.disposition.value if self.disposition else None
         data["characters"] = list(self.characters)
+        data["dimensions"] = list(self.dimensions)
         data["semantic_constraints"] = list(self.semantic_constraints)
         data["candidate_asset_ids"] = list(self.candidate_asset_ids)
         data["manual_override"] = (
@@ -180,6 +184,7 @@ class VisualReviewEntry:
         disposition = payload.get("disposition")
         payload["disposition"] = ReviewDisposition(disposition) if disposition else None
         payload["characters"] = tuple(payload.get("characters", ()))
+        payload["dimensions"] = tuple(payload.get("dimensions", ()))
         payload["semantic_constraints"] = tuple(
             payload.get("semantic_constraints", ())
         )
@@ -256,6 +261,23 @@ def derive_manual_visual_request(
         dimensions=request.dimensions,
         resolution_kind=request.resolution_kind,
         semantic_constraints=request.semantic_constraints,
+    )
+
+
+def request_from_review_entry(entry: VisualReviewEntry) -> "VisualRequest":
+    """Rehydrate the bounded base request snapshot used by operator CLI."""
+    from .visual_assets import VisualRequest
+
+    return VisualRequest(
+        request_id=entry.request_id,
+        request_fingerprint=entry.request_fingerprint,
+        scene_id=entry.scene_id,
+        shot_id=entry.shot_id,
+        visual_intent=entry.visual_intent,
+        characters=entry.characters,
+        dimensions=entry.dimensions,
+        resolution_kind=entry.resolution_kind,
+        semantic_constraints=entry.semantic_constraints,
     )
 
 
@@ -386,8 +408,11 @@ class VisualReviewStore:
                 shot_id=request.shot_id,
                 request_id=request.request_id,
                 request_fingerprint=request.request_fingerprint,
+                scene_id=request.scene_id,
                 visual_intent=request.visual_intent,
                 characters=request.characters,
+                dimensions=request.dimensions,
+                resolution_kind=request.resolution_kind,
                 semantic_constraints=request.semantic_constraints,
                 status=ReviewStatus.PENDING,
                 review_reason=reason,
