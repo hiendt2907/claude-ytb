@@ -145,6 +145,25 @@ def test_narrator_lesson_ending_passes_when_profile_opts_in(tmp_path, monkeypatc
     assert violations == []
 
 
+def test_character_story_funnel_requires_spoken_long_bridge():
+    """A narrator reflection must not bypass an opted-in Short funnel CTA."""
+    profile = load_content_profile("ban-so-6")
+    script = _script(
+        NARRATOR_LESSON_ENDING,
+        profile_id=profile.profile_id,
+        version=profile.version,
+    )
+    script.strategy = SimpleNamespace(
+        long_form_slug="long-topic",
+        cta_target="long-topic",
+        source_long_slug="long-topic",
+    )
+
+    violations = qa_agent._check_immediate_action(script)
+
+    assert [violation["rule"] for violation in violations] == ["funnel_bridge"]
+
+
 def test_narrator_lesson_rejects_an_imperative_even_if_legacy_action_hint_matches(
     tmp_path, monkeypatch,
 ):
