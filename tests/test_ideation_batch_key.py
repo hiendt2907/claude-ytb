@@ -225,6 +225,31 @@ def test_available_long_source_context_excludes_sections_used_by_other_shorts():
     assert [item["section_index"] for item in context["candidates"]] == [2]
 
 
+def test_replacing_short_releases_its_own_source_section():
+    from ytb_pipeline.orchestrator.ideation_cmd import used_short_source_section_indexes
+
+    batch = {
+        "short_videos": [
+            {
+                "slug": "short-a",
+                "long_form_slug": "long-a",
+                "source_section_index": 3,
+            },
+            {
+                "slug": "short-b",
+                "long_form_slug": "long-a",
+                "source_section_index": 4,
+            },
+        ],
+    }
+
+    assert used_short_source_section_indexes(
+        batch,
+        long_slug="long-a",
+        replacement_slugs={"short-a"},
+    ) == {4}
+
+
 def test_short_batch_item_requires_a_complete_long_form_funnel(tmp_path, monkeypatch):
     """A Short must not be persisted until its funnel contract is complete."""
     from ytb_pipeline.orchestrator import ideation_state
