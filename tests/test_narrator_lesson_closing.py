@@ -180,6 +180,23 @@ def test_character_story_funnel_accepts_reflection_with_spoken_long_bridge():
     assert qa_agent._check_immediate_action(script) == []
 
 
+def test_funnel_slug_cast_name_is_outside_narrator_reflection():
+    profile = load_content_profile("ban-so-6")
+    target = "minh-neu-rui-ro-trong-cuoc-hop"
+    script = _script(
+        f"{NARRATOR_LESSON_ENDING} Xem video dài {target}.",
+        profile_id=profile.profile_id,
+        version=profile.version,
+    )
+    script.strategy = SimpleNamespace(
+        long_form_slug=target,
+        cta_target=target,
+        source_long_slug=target,
+    )
+
+    assert qa_agent._check_immediate_action(script) == []
+
+
 def test_narrator_lesson_rejects_an_imperative_even_if_legacy_action_hint_matches(
     tmp_path, monkeypatch,
 ):
