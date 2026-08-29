@@ -35,6 +35,7 @@ from .ideation_prompts import (
     SHORT_TARGET_CHARS,
     hook_repair_prompt,
     narrator_reflection_repair_prompt,
+    short_funnel_bridge_target,
     editorial_rewrite_prompt,
     ledger_topics,
     long_extension_prompt,
@@ -631,6 +632,13 @@ def apply_narrator_reflection_repair(payload: dict, delta: dict) -> dict:
     new_voiceover = str(delta.get("voiceover") or "").strip()
     if not new_voiceover:
         raise ValueError("Narrator reflection repair phải trả về voiceover không rỗng.")
+    funnel_target = short_funnel_bridge_target(payload)
+    normalized_voiceover = new_voiceover.casefold()
+    if funnel_target and (
+        funnel_target.casefold() not in normalized_voiceover
+        or not any(marker in normalized_voiceover for marker in ("video dài", "xem video", "xem tiếp"))
+    ):
+        raise ValueError("Narrator reflection repair làm mất mandatory Short funnel bridge.")
     sections = payload.get("sections")
     if not isinstance(sections, list) or not sections:
         raise ValueError("Script không có sections để sửa narrator reflection.")

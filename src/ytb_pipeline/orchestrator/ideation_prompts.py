@@ -299,6 +299,20 @@ def hook_repair_prompt(
     )
 
 
+def short_funnel_bridge_target(payload: dict) -> str:
+    """Return the exact Long target when a Short carries a valid funnel trace."""
+    if str(payload.get("video_type") or "").strip().lower() != "short":
+        return ""
+    strategy = payload.get("strategy")
+    if not isinstance(strategy, dict):
+        return ""
+    targets = [
+        str(strategy.get(field) or "").strip()
+        for field in ("long_form_slug", "cta_target", "source_long_slug")
+    ]
+    return targets[0] if targets[0] and len(set(targets)) == 1 else ""
+
+
 def narrator_reflection_repair_prompt(
     payload: dict, detail: str, *, content_profile: "ContentProfile | None" = None,
 ) -> str:
@@ -321,6 +335,14 @@ def narrator_reflection_repair_prompt(
         if requires_bridge
         else "Do not invent a next-episode bridge when the profile does not require one."
     )
+    funnel_target = short_funnel_bridge_target(payload)
+    funnel_instruction = (
+        " MANDATORY SHORT FUNNEL BRIDGE: preserve a spoken voiceover bridge "
+        f"containing both the phrase 'video dài' and the exact target '{funnel_target}'. "
+        "This bridge must remain inside the same 2-3 total spoken sentences."
+        if funnel_target
+        else ""
+    )
     context = {
         key: payload.get(key)
         for key in ("slug", "topic", "title", "video_type", "continuity")
@@ -336,7 +358,7 @@ def narrator_reflection_repair_prompt(
         "Keep the reflection modest and conditional; do not issue a command, "
         "diagnose the viewer, invent a new event, or state a universal moral. "
         "Do not name a cast member in the reflection before any next-episode bridge. "
-        f"{bridge_instruction}\n"
+        f"{bridge_instruction}{funnel_instruction}\n"
         'Return ONLY one JSON object shaped {"voiceover": <new Vietnamese final '
         "text>}. Do not return the full script, markdown, or any other field. "
         "Do not change title, topic, section count, purpose, speaker, continuity, "
