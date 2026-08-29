@@ -728,6 +728,7 @@ async def validate_or_repair_script(
     identity_repair_attempted = False
     hook_repair_attempted = False
     narrator_reflection_repair_attempted = False
+    post_editorial_repairable_rules: set[str] = set()
     editorial_rewrites = 0
     report_path = script_path.parent.parent / "assets" / "quality_reports" / "ideation_errors.jsonl"
     initial_review_profile = _explicit_profile(current)
@@ -736,14 +737,20 @@ async def validate_or_repair_script(
         if initial_review_profile is not None and initial_review_profile.editorial_review is not None
         else 0
     )
-    # Formatting/QA repairs and whole-transcript editorial rewrites solve
-    # different failures.  A Long that first needs a length or hook repair
-    # must not consume the profile's explicitly approved editorial budget.
-    total_attempts = max_attempts + editorial_retry_budget
+    # Formatting/QA repairs and bounded editorial rewrites solve different
+    # failures. Each permitted editorial rewrite reserves enough room for:
+    # the rewrite validation, one narrow repair if the rewrite regresses the
+    # opening/final contract, and a final validation. This is still bounded by
+    # the profile's max_rewrites; no general contract-repair budget is opened.
+    post_editorial_attempt_budget = (
+        2 * editorial_retry_budget + 1 if editorial_retry_budget else 0
+    )
+    total_attempts = max_attempts + post_editorial_attempt_budget
 
     for attempt in range(1, total_attempts + 1):
-        # Editorial-reserved retries may validate and re-review the rewritten
-        # transcript, but never borrow more contract-repair LLM calls.
+        # Editorial-reserved retries validate and re-review the rewritten
+        # transcript. They may repair only a previously repaired opening/final
+        # contract that this editorial delta materially changed.
         is_deterministic_attempt = attempt <= max_attempts
         current, long_note = normalize_long_overflow(current, expected_video_type)
         current, normalized_note = normalize_short_narration(
@@ -945,6 +952,10 @@ async def validate_or_repair_script(
                         json.dumps(result.output, ensure_ascii=False, indent=2),
                     )
                 if result.output and result.output.get("passed"):
+                    # The most recent editorial delta did not regress any
+                    # guarded contract. Do not carry its one-shot repair
+                    # permission into a later, unrelated review cycle.
+                    post_editorial_repairable_rules.clear()
                     review_profile = _explicit_profile(current)
                     review = (
                         await run_editorial_review(
@@ -1008,6 +1019,25 @@ async def validate_or_repair_script(
                             append_local_start_log(log_path, "EDITORIAL_REWRITE_RESPONSE", rewrite_text)
                         try:
                             rewrite_delta = json_from_llm(rewrite_text)
+                            rewrite_items = [
+                                item
+                                for item in (rewrite_delta.get("sections") or [])
+                                if isinstance(item, dict)
+                            ]
+                            current_sections = current.get("sections") or []
+                            changed_indices = {
+                                item.get("section_index")
+                                for item in rewrite_items
+                                if isinstance(item.get("section_index"), int)
+                                and not isinstance(item.get("section_index"), bool)
+                                and 1 <= item["section_index"] <= len(current_sections)
+                                and str(item.get("voiceover") or "").strip()
+                                != str(
+                                    current_sections[item["section_index"] - 1].get("voiceover")
+                                    or current_sections[item["section_index"] - 1].get("narration")
+                                    or ""
+                                ).strip()
+                            }
                             current = apply_editorial_rewrite(current, rewrite_delta)
                             # An editorial rewrite legitimately touching the
                             # opening section can reintroduce a hook
@@ -1015,15 +1045,15 @@ async def validate_or_repair_script(
                             # flag from an EARLIER, unrelated hook fix must
                             # not block fixing THIS one. Bounded: editorial
                             # rewrites are themselves capped by max_rewrites.
-                            rewritten_indices = {
-                                item.get("section_index")
-                                for item in (rewrite_delta.get("sections") or [])
-                                if isinstance(item, dict)
-                            }
-                            if 1 in rewritten_indices:
+                            if 1 in changed_indices and hook_repair_attempted:
                                 hook_repair_attempted = False
-                            if len(current.get("sections") or ()) in rewritten_indices:
+                                post_editorial_repairable_rules.add("hook")
+                            if (
+                                len(current.get("sections") or ()) in changed_indices
+                                and narrator_reflection_repair_attempted
+                            ):
                                 narrator_reflection_repair_attempted = False
+                                post_editorial_repairable_rules.add("narrator_reflection")
                         except (ValueError, json.JSONDecodeError) as exc:
                             last_validation_error = f"Editorial rewrite không dùng được: {exc}"
                             if log_path:
@@ -1107,11 +1137,15 @@ async def validate_or_repair_script(
                 # generation and free-standing repair prompts already state,
                 # never the whole script.
                 if (
-                    is_deterministic_attempt
+                    (
+                        is_deterministic_attempt
+                        or "hook" in post_editorial_repairable_rules
+                    )
                     and not hook_repair_attempted
                     and "hook" in violation_rules
                 ):
                     hook_repair_attempted = True
+                    post_editorial_repairable_rules.discard("hook")
                     repaired_anything = True
                     hook_violation = next(
                         (
@@ -1152,11 +1186,15 @@ async def validate_or_repair_script(
                             append_local_start_log(log_path, "HOOK_REPAIR_FAILED", last_validation_error)
 
                 if (
-                    is_deterministic_attempt
+                    (
+                        is_deterministic_attempt
+                        or "narrator_reflection" in post_editorial_repairable_rules
+                    )
                     and not narrator_reflection_repair_attempted
                     and "narrator_reflection" in violation_rules
                 ):
                     narrator_reflection_repair_attempted = True
+                    post_editorial_repairable_rules.discard("narrator_reflection")
                     repaired_anything = True
                     reflection_violation = next(
                         (
@@ -1248,8 +1286,9 @@ async def validate_or_repair_script(
     atomic_write_json(script_path, current)
     raise IdeationQualityFailure(
         "✗ LLM tạo script không qua QA sau "
-        f"{total_attempts} lượt (gồm {max_attempts} lượt contract và "
-        f"{editorial_retry_budget} lượt editorial). validation={last_validation_error!r} "
+        f"{total_attempts} lượt (gồm {max_attempts} lượt contract, tối đa "
+        f"{editorial_retry_budget} rewrite editorial và hậu kiểm có giới hạn). "
+        f"validation={last_validation_error!r} "
         f"qa={last_qa_output!r}",
         current,
     )
