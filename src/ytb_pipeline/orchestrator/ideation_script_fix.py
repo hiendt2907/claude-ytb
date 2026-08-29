@@ -455,10 +455,37 @@ def normalize_short_narration(
                 final_section["narration"] = final_voiceover
                 total = short_narration_chars(candidate)
                 if total > short_max_chars:
-                    # Failing closed preserves the original CTA and lets the
-                    # bounded repair loop handle length; normalization must
-                    # never silently trade a required funnel bridge for size.
-                    return payload, None
+                    excess = total - short_max_chars
+                    # Reclaim only from middle beats: the situation, exact
+                    # core-answer prefix, and required final bridge are locked.
+                    middle_sections = sorted(
+                        sections[2:-1],
+                        key=lambda item: len(
+                            str(item.get("voiceover") or item.get("narration") or "")
+                        ),
+                        reverse=True,
+                    )
+                    for middle in middle_sections:
+                        if excess <= 0:
+                            break
+                        narration = str(
+                            middle.get("voiceover") or middle.get("narration") or ""
+                        )
+                        if len(narration) <= 40:
+                            continue
+                        trimmed = trim_to_sentence(narration, max(40, len(narration) - excess))
+                        removed = len(narration) - len(trimmed)
+                        if removed <= 0:
+                            continue
+                        middle["voiceover"] = trimmed
+                        middle["narration"] = trimmed
+                        excess -= removed
+                    total = short_narration_chars(candidate)
+                    if total > short_max_chars:
+                        # Failing closed preserves the original CTA and lets
+                        # bounded repair handle length; normalization never
+                        # silently trades a required bridge for size.
+                        return payload, None
     # A boundary trim must be atomic: a sentence boundary can cut more than the
     # numeric budget.  Never replace a merely-overlong script with an undersized
     # one; let the editorial repair see the intact source instead.
