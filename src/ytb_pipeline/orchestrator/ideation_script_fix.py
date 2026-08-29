@@ -251,10 +251,20 @@ def trim_to_sentence(text: str, limit: int) -> str:
     boundary = max(cut.rfind("."), cut.rfind("!"), cut.rfind("?"))
     if boundary >= max(60, int(limit * 0.55)):
         return cut[: boundary + 1].strip()
-    boundary = cut.rfind(" ")
-    if boundary >= max(60, int(limit * 0.65)):
-        cut = cut[:boundary].rstrip()
-    return cut.rstrip(" ,;:") + "."
+    following = [
+        index
+        for mark in (".", "!", "?")
+        if (index := text.find(mark, limit)) >= 0
+    ]
+    if following:
+        boundary = min(following)
+        allowance = min(limit + 24, int(limit * 1.2))
+        if boundary < len(text) - 1 and boundary <= allowance:
+            return text[: boundary + 1].strip()
+    # A word boundary is not a spoken boundary.  Cutting there and appending a
+    # period manufactured fragments such as "cùng Minh xác." in production.
+    # Keep the atomic sentence intact and let the bounded LLM repair shorten it.
+    return text
 
 
 def required_short_funnel_bridge(payload: dict) -> str:
@@ -489,6 +499,8 @@ def normalize_short_narration(
     # A boundary trim must be atomic: a sentence boundary can cut more than the
     # numeric budget.  Never replace a merely-overlong script with an undersized
     # one; let the editorial repair see the intact source instead.
+    if total > short_max_chars:
+        return payload, None
     if total < short_min_chars:
         return payload, None
     # Script thiếu độ dài phải đi qua vòng repair LLM bên dưới caller. Không được

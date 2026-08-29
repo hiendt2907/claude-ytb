@@ -66,3 +66,37 @@ def test_overlong_short_is_actually_trimmed(monkeypatch):
     candidate, note = fix.normalize_short_narration(payload, "short")
     assert note is not None, "an overlong Short must not be reported as normalized untouched"
     assert fix.short_narration_chars(candidate) <= prompts.SHORT_MAX_CHARS
+
+
+def test_sentence_trim_never_manufactures_a_spoken_fragment():
+    from ytb_pipeline.orchestrator.ideation_script_fix import trim_to_sentence
+
+    narration = (
+        "Người phụ trách dừng slide, gọi người giữ dữ liệu cùng Minh "
+        "xác nhận lại trước khi dùng con số."
+    )
+
+    assert trim_to_sentence(narration, 70) == narration
+
+
+def test_short_normalizer_fails_closed_when_atomic_sentences_cannot_fit(monkeypatch):
+    fix = importlib.reload(importlib.import_module("ytb_pipeline.orchestrator.ideation_script_fix"))
+    sentence = (
+        "Người phụ trách dừng slide và gọi người giữ dữ liệu cùng Minh xác nhận lại "
+        "trước khi dùng con số trong cuộc họp, vì phần đối chiếu vẫn chưa hoàn tất."
+    )
+    payload = {
+        "video_type": "short",
+        "sections": [
+            {"purpose": "situation", "voiceover": sentence},
+            {"purpose": "core_answer", "voiceover": sentence},
+            {"purpose": "evidence", "voiceover": sentence},
+            {"purpose": "payoff", "voiceover": sentence},
+        ],
+    }
+    monkeypatch.setattr(fix, "_repair_character_bounds", lambda *_args: (100, 300, 260))
+
+    candidate, note = fix.normalize_short_narration(payload, "short")
+
+    assert note is None
+    assert candidate == payload
