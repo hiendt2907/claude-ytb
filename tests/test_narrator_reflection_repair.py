@@ -180,3 +180,62 @@ def test_narrator_reflection_repair_rejects_dropped_short_funnel_bridge():
             _short_funnel_payload(),
             {"voiceover": "Có lẽ nếu bạn nói ra, người khác sẽ có chỗ kiểm tra lại."},
         )
+
+
+def test_short_normalization_does_not_trim_away_required_funnel_bridge():
+    payload = _short_funnel_payload()
+    payload["profile_id"] = "ban-so-6"
+    payload["profile_version"] = "2.1.0"
+    payload["strategy"]["hook"] = {
+        "core_answer": "Im lặng sẽ làm mất chỗ để người khác xác nhận lại."
+    }
+    payload["sections"] = [
+        {
+            "purpose": "situation",
+            "voiceover": "Còn 48 phút, nhưng Minh vẫn chưa biết nên im hay nói.",
+        },
+        {
+            "purpose": "core_answer",
+            "voiceover": (
+                "Im lặng sẽ làm mất chỗ để người khác xác nhận lại. "
+                "Khi điều mình thấy chưa được kiểm tra, nó chỉ là một dòng trống."
+            ),
+        },
+        {"purpose": "evidence", "voiceover": "Dòng trống này cậu chừa ra để làm gì?"},
+        {
+            "purpose": "application",
+            "voiceover": (
+                "Số mới này không phải của em, em chưa được quyền sửa. "
+                "Em sợ họ hỏi vì sao tối qua em chưa đối chiếu."
+            ),
+        },
+        {
+            "purpose": "evidence",
+            "voiceover": (
+                "Trong cuộc họp, dữ liệu em đang chiếu cũ hơn hai ngày, "
+                "và em chưa đối chiếu xong."
+            ),
+        },
+        {
+            "purpose": "application",
+            "voiceover": (
+                "Người phụ trách giao việc đối chiếu trước cuối ngày. "
+                "Minh gật đầu. Không ai nói cậu đúng."
+            ),
+        },
+        {
+            "purpose": "payoff",
+            "voiceover": (
+                "Có lẽ bạn cũng từng im lặng để tránh một câu hỏi, rồi giữ lại một "
+                "con số mình biết chưa chắc đúng. Nói ra chưa chắc được xác nhận "
+                "ngay, nhưng im lặng cũng để lại một việc phải làm đến cuối ngày. "
+                "Lần tới, hẹn gặp lại bạn ở video dài "
+                "minh-neu-rui-ro-trong-cuoc-hop."
+            ),
+        },
+    ]
+
+    normalized, note = script_fix.normalize_short_narration(payload, "short")
+
+    assert note is not None
+    assert "video dài minh-neu-rui-ro-trong-cuoc-hop" in normalized["sections"][-1]["voiceover"]
