@@ -159,6 +159,21 @@ def available_short_source_context(source_long_context: dict, used_section_index
     return {**source_long_context, "candidates": candidates}
 
 
+def used_short_source_section_indexes(
+    batch: dict, *, long_slug: str, replacement_slugs: set[str] | None = None,
+) -> set[int]:
+    """Reserve sources used by other Shorts, not the slot being replaced."""
+    replaced = replacement_slugs or set()
+    return {
+        item["source_section_index"]
+        for item in batch.get("short_videos", [])
+        if isinstance(item, dict)
+        and item.get("slug") not in replaced
+        and item.get("long_form_slug") == long_slug
+        and isinstance(item.get("source_section_index"), int)
+    }
+
+
 def preassign_short_source_context(source_long_context: dict) -> dict:
     """Limit one generation to one auditable Long excerpt.
 
@@ -399,6 +414,7 @@ async def _cmd_start_local(args: argparse.Namespace) -> None:
         "playlist": str(getattr(args, "playlist", "") or "").strip(),
         "cta_target": str(getattr(args, "cta_target", "") or "").strip(),
     }
+    replacement_slugs = [str(slug).strip() for slug in getattr(args, "replace_slug", []) or []]
     source_long_context = None
     used_source_section_indexes: set[int] = set()
     if args.type_of_vid == "short" and content_profile.content_rules.require_short_source_trace:
@@ -411,15 +427,12 @@ async def _cmd_start_local(args: argparse.Namespace) -> None:
         )
         state = json.loads(cli.AUTO_STATE_PATH.read_text(encoding="utf-8"))
         batch = state.get(str(getattr(args, "batch_key", "")), {})
-        used_source_section_indexes = {
-            item["source_section_index"]
-            for item in batch.get("short_videos", [])
-            if isinstance(item, dict)
-            and item.get("long_form_slug") == funnel["long_form_slug"]
-            and isinstance(item.get("source_section_index"), int)
-        }
+        used_source_section_indexes = used_short_source_section_indexes(
+            batch,
+            long_slug=funnel["long_form_slug"],
+            replacement_slugs=set(replacement_slugs),
+        )
 
-    replacement_slugs = [str(slug).strip() for slug in getattr(args, "replace_slug", []) or []]
     if replacement_slugs and (len(replacement_slugs) != args.num_of_vid or not getattr(args, "batch_key", "")):
         raise SystemExit("✗ --replace-slug cần đúng một slug cho mỗi video và bắt buộc có --batch-key.")
     requested_count = args.num_of_vid
