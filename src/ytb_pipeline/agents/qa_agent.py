@@ -576,6 +576,8 @@ def _check_character_voiceover_is_direct(script: Any) -> list[dict[str, str]]:
 _NEXT_EPISODE_MARKERS = (
     "tập sau", "hẹn gặp lại", "lần tới", "phần sau",
 )
+_FUNNEL_BRIDGE_MARKERS = ("video dài", "xem tiếp", "xem video", "long")
+_SPOKEN_BRIDGE_MARKERS = _NEXT_EPISODE_MARKERS + _FUNNEL_BRIDGE_MARKERS
 
 
 def _check_story_series_arc(script: Any) -> list[dict[str, str]]:
@@ -691,12 +693,12 @@ def _is_narrator_lesson_closing(profile: Any, final_segment: Any, final_text: st
     if speaker != narrator_id:
         return False
     # The lesson is addressed to the viewer. A separate, explicitly marked
-    # next-episode bridge may naturally refer back to a character, so only
-    # evaluate the lesson portion for a cast-name leak.
+    # next-episode or Long funnel bridge may naturally carry a character name
+    # in its target slug, so only evaluate the lesson portion for a cast leak.
     normalized_final = final_text.casefold()
     bridge_positions = [
         normalized_final.find(marker)
-        for marker in _NEXT_EPISODE_MARKERS
+        for marker in _SPOKEN_BRIDGE_MARKERS
         if normalized_final.find(marker) >= 0
     ]
     lesson_text = final_text[:min(bridge_positions)] if bridge_positions else final_text
@@ -766,11 +768,10 @@ def _check_funnel_bridge(script: Any, final_text: str) -> list[dict[str, str]]:
     long_slug = str(_get(strategy, "long_form_slug", "") or "").strip()
     cta_target = str(_get(strategy, "cta_target", "") or "").strip()
     source_long_slug = str(_get(strategy, "source_long_slug", "") or "").strip()
-    bridge_markers = ("video dài", "xem tiếp", "xem video", "long")
     if (
         long_slug
         and long_slug == cta_target == source_long_slug
-        and any(marker in final_text for marker in bridge_markers)
+        and any(marker in final_text for marker in _FUNNEL_BRIDGE_MARKERS)
     ):
         return []
     return [_repair(
