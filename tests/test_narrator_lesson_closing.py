@@ -164,6 +164,22 @@ def test_character_story_funnel_requires_spoken_long_bridge():
     assert [violation["rule"] for violation in violations] == ["funnel_bridge"]
 
 
+def test_character_story_funnel_accepts_reflection_with_spoken_long_bridge():
+    profile = load_content_profile("ban-so-6")
+    script = _script(
+        f"{NARRATOR_LESSON_ENDING} Xem video dài để theo dõi trọn câu chuyện.",
+        profile_id=profile.profile_id,
+        version=profile.version,
+    )
+    script.strategy = SimpleNamespace(
+        long_form_slug="long-topic",
+        cta_target="long-topic",
+        source_long_slug="long-topic",
+    )
+
+    assert qa_agent._check_immediate_action(script) == []
+
+
 def test_narrator_lesson_rejects_an_imperative_even_if_legacy_action_hint_matches(
     tmp_path, monkeypatch,
 ):

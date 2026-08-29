@@ -731,6 +731,8 @@ def _check_immediate_action(script: Any) -> list[dict[str, str]]:
                 "Nói với người xem bằng một nhận xét có điều kiện, bám đúng lựa chọn/hệ quả vừa xảy ra.",
             )]
         if segments and _is_narrator_lesson_closing(profile, segments[-1], final_text):
+            if _requires_funnel_bridge(script, profile):
+                return _check_funnel_bridge(script, final_text)
             return []
         return [_repair(
             "narrator_reflection",
@@ -739,25 +741,9 @@ def _check_immediate_action(script: Any) -> list[dict[str, str]]:
         )]
     if (
         profile is not None
-        and _script_video_type(script) == "short"
-        and profile.content_rules.short_ending_mode == "funnel_bridge"
+        and _requires_funnel_bridge(script, profile)
     ):
-        strategy = _get(script, "strategy", None)
-        long_slug = str(_get(strategy, "long_form_slug", "") or "").strip()
-        cta_target = str(_get(strategy, "cta_target", "") or "").strip()
-        source_long_slug = str(_get(strategy, "source_long_slug", "") or "").strip()
-        bridge_markers = ("video dài", "xem tiếp", "xem video", "long")
-        if (
-            long_slug
-            and long_slug == cta_target == source_long_slug
-            and any(marker in final_text for marker in bridge_markers)
-        ):
-            return []
-        return [_repair(
-            "funnel_bridge",
-            "Short phễu phải kết bằng cầu nối tự nhiên tới đúng video Long đã khai báo.",
-            "Nêu phần Long sẽ giải thích tiếp và giữ long_form_slug, cta_target, source_long_slug trùng nhau.",
-        )]
+        return _check_funnel_bridge(script, final_text)
     if any(hint in final_text for hint in _IMMEDIATE_ACTION_HINTS):
         return []
     if (
@@ -773,6 +759,37 @@ def _check_immediate_action(script: Any) -> list[dict[str, str]]:
         "Phần chốt chưa có một hành động có thể làm ngay sau khi xem.",
         "Kết bằng một mệnh lệnh nhỏ, cụ thể và làm được ngay, ví dụ 'Hãy đặt điện thoại ngoài bàn trong 10 phút tới'.",
     )]
+
+
+def _check_funnel_bridge(script: Any, final_text: str) -> list[dict[str, str]]:
+    strategy = _get(script, "strategy", None)
+    long_slug = str(_get(strategy, "long_form_slug", "") or "").strip()
+    cta_target = str(_get(strategy, "cta_target", "") or "").strip()
+    source_long_slug = str(_get(strategy, "source_long_slug", "") or "").strip()
+    bridge_markers = ("video dài", "xem tiếp", "xem video", "long")
+    if (
+        long_slug
+        and long_slug == cta_target == source_long_slug
+        and any(marker in final_text for marker in bridge_markers)
+    ):
+        return []
+    return [_repair(
+        "funnel_bridge",
+        "Short phễu phải kết bằng cầu nối tự nhiên tới đúng video Long đã khai báo.",
+        "Nêu phần Long sẽ giải thích tiếp và giữ long_form_slug, cta_target, source_long_slug trùng nhau.",
+    )]
+
+
+def _requires_funnel_bridge(script: Any, profile: Any) -> bool:
+    if _script_video_type(script) != "short":
+        return False
+    if profile.content_rules.short_ending_mode == "funnel_bridge":
+        return True
+    strategy = _get(script, "strategy", None)
+    return any(
+        str(_get(strategy, field, "") or "").strip()
+        for field in ("long_form_slug", "cta_target", "source_long_slug")
+    )
 
 
 def _check_final_payoff(script: Any) -> list[dict[str, str]]:

@@ -1301,6 +1301,7 @@ def editorial_rewrite_prompt(payload: dict, review: object) -> str:
     )
     strategy = payload.get("strategy")
     cold_open_guard = ""
+    funnel_bridge_guard = ""
     if (
         payload.get("video_type") == "short"
         and isinstance(strategy, dict)
@@ -1316,6 +1317,16 @@ def editorial_rewrite_prompt(payload: dict, review: object) -> str:
             f"with {core_answer!r}. Do not remove, delay, or paraphrase that prefix. Improve the cited "
             "human scene around these structural invariants."
         )
+    if payload.get("video_type") == "short" and isinstance(strategy, dict):
+        long_slug = str(strategy.get("long_form_slug") or "").strip()
+        cta_target = str(strategy.get("cta_target") or "").strip()
+        if long_slug or cta_target:
+            funnel_bridge_guard = (
+                "\n\nMANDATORY SHORT FUNNEL BRIDGE (overrides any conflicting repair wording): "
+                "the final spoken section must retain a natural spoken bridge to the declared Long "
+                f"{(cta_target or long_slug)!r}. Do not replace the funnel CTA with a generic next-episode "
+                "tease or reflection-only ending."
+            )
     return (
         "An editorial review found this Vietnamese YouTube script below the profile's quality bar. "
         "The full current script is given below as READ CONTEXT ONLY, so you understand the scene, "
@@ -1333,7 +1344,7 @@ def editorial_rewrite_prompt(payload: dict, review: object) -> str:
         f"- dimension scores: {json.dumps(dimension_scores, ensure_ascii=False, sort_keys=True)}\n"
         f"- sections: {section_refs}\n"
         f"- findings: {json.dumps(findings, ensure_ascii=False)}\n"
-        f"- repair brief: {repair_brief}{cold_open_guard}\n\n"
+        f"- repair brief: {repair_brief}{cold_open_guard}{funnel_bridge_guard}\n\n"
         "Treat the review packet as the diagnosis: repair the cited weak dimensions and cited sections, "
         "do not invent a different problem or answer with generic motivational language. Do not touch any "
         "section index not listed above, even if you think it could also be improved.\n\n"

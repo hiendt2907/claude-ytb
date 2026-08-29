@@ -988,6 +988,25 @@ def test_short_strategy_editorial_rewrite_prompt_preserves_required_cold_open():
     assert "must start section 2 voiceover exactly" in prompt
 
 
+def test_short_strategy_editorial_rewrite_prompt_preserves_spoken_funnel_bridge():
+    from types import SimpleNamespace
+    from ytb_pipeline.orchestrator.ideation_prompts import editorial_rewrite_prompt
+
+    review = SimpleNamespace(
+        overall_score=7,
+        dimension_scores={},
+        section_refs=(4,),
+        blocking_findings=("Payoff needs a more grounded consequence.",),
+        repair_brief="Rewrite only the payoff.",
+    )
+
+    prompt = editorial_rewrite_prompt(_short_strategy_rewrite_payload(), review)
+
+    assert "MANDATORY SHORT FUNNEL BRIDGE" in prompt
+    assert "long-a" in prompt
+    assert "final spoken section" in prompt
+
+
 def test_short_strategy_editorial_delta_cannot_break_required_core_answer_prefix():
     from ytb_pipeline.orchestrator.ideation_script_fix import apply_editorial_rewrite
 
