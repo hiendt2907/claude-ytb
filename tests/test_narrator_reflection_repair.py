@@ -202,6 +202,7 @@ def test_short_normalization_does_not_trim_away_required_funnel_bridge():
             ),
         },
         {"purpose": "evidence", "voiceover": "Dòng trống này cậu chừa ra để làm gì?"},
+        {"purpose": "evidence", "voiceover": "Còn số cũ? Cậu vẫn chưa nói nó cũ bao lâu."},
         {
             "purpose": "application",
             "voiceover": (
@@ -216,11 +217,13 @@ def test_short_normalization_does_not_trim_away_required_funnel_bridge():
                 "và em chưa đối chiếu xong."
             ),
         },
+        {"purpose": "evidence", "voiceover": "Minh gật. Việc được ghi vào sổ."},
         {
             "purpose": "application",
             "voiceover": (
                 "Người phụ trách giao việc đối chiếu trước cuối ngày. "
-                "Minh gật đầu. Không ai nói cậu đúng."
+                "Minh gật đầu. Không ai nói cậu đúng. "
+                "Người phụ trách dừng giữa bảng rồi ghi việc vào sổ."
             ),
         },
         {
@@ -229,8 +232,8 @@ def test_short_normalization_does_not_trim_away_required_funnel_bridge():
                 "Có lẽ bạn cũng từng im lặng để tránh một câu hỏi, rồi giữ lại một "
                 "con số mình biết chưa chắc đúng. Nói ra chưa chắc được xác nhận "
                 "ngay, nhưng im lặng cũng để lại một việc phải làm đến cuối ngày. "
-                "Lần tới, hẹn gặp lại bạn ở video dài "
-                "minh-neu-rui-ro-trong-cuoc-hop."
+                "Tập sau, video dài minh-neu-rui-ro-trong-cuoc-hop sẽ cho thấy "
+                "việc đối chiếu đó dẫn câu chuyện đi tiếp thế nào."
             ),
         },
     ]
