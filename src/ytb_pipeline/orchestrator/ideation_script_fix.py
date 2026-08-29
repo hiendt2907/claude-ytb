@@ -257,6 +257,24 @@ def trim_to_sentence(text: str, limit: int) -> str:
     return cut.rstrip(" ,;:") + "."
 
 
+def required_short_funnel_bridge(payload: dict) -> str:
+    """Extract the spoken CTA sentence that Short normalization must preserve."""
+    target = short_funnel_bridge_target(payload)
+    sections = payload.get("sections") or []
+    if not target or not sections or not isinstance(sections[-1], dict):
+        return ""
+    final_text = str(
+        sections[-1].get("voiceover") or sections[-1].get("narration") or ""
+    ).strip()
+    for sentence in re.split(r"(?<=[.!?])\s+", final_text):
+        normalized = sentence.casefold()
+        if target.casefold() in normalized and any(
+            marker in normalized for marker in ("video dài", "xem video", "xem tiếp")
+        ):
+            return sentence.strip()
+    return ""
+
+
 def short_narration_chars(payload: dict) -> int:
     return sum(
         len(section.get("voiceover") or section.get("narration", "") or "")
@@ -398,6 +416,8 @@ def normalize_short_narration(
     short_min_chars, short_max_chars, short_target_chars = _repair_character_bounds(
         candidate, "short"
     )
+    required_funnel_bridge = required_short_funnel_bridge(candidate)
+    funnel_target = short_funnel_bridge_target(candidate)
     total = short_narration_chars(candidate)
     if total > short_max_chars:
         ratio = short_target_chars / total
@@ -424,6 +444,21 @@ def normalize_short_narration(
             remaining -= len(section["voiceover"])
         changed = True
         total = short_narration_chars(candidate)
+        if required_funnel_bridge:
+            final_section = sections[-1]
+            final_voiceover = str(
+                final_section.get("voiceover") or final_section.get("narration") or ""
+            ).strip()
+            if funnel_target.casefold() not in final_voiceover.casefold():
+                final_voiceover = f"{final_voiceover} {required_funnel_bridge}".strip()
+                final_section["voiceover"] = final_voiceover
+                final_section["narration"] = final_voiceover
+                total = short_narration_chars(candidate)
+                if total > short_max_chars:
+                    # Failing closed preserves the original CTA and lets the
+                    # bounded repair loop handle length; normalization must
+                    # never silently trade a required funnel bridge for size.
+                    return payload, None
     # A boundary trim must be atomic: a sentence boundary can cut more than the
     # numeric budget.  Never replace a merely-overlong script with an undersized
     # one; let the editorial repair see the intact source instead.
