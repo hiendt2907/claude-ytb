@@ -28,6 +28,23 @@ REPAIRED_CLOSING = (
 )
 
 
+def _short_funnel_payload() -> dict:
+    payload = _payload()
+    payload["video_type"] = "short"
+    payload["strategy"] = {
+        "long_form_slug": "minh-neu-rui-ro-trong-cuoc-hop",
+        "cta_target": "minh-neu-rui-ro-trong-cuoc-hop",
+        "source_long_slug": "minh-neu-rui-ro-trong-cuoc-hop",
+    }
+    closing = (
+        "Có lẽ nếu bạn nói ra, người khác sẽ có chỗ kiểm tra lại. "
+        "Xem video dài minh-neu-rui-ro-trong-cuoc-hop."
+    )
+    payload["sections"][-1]["voiceover"] = closing
+    payload["sections"][-1]["narration"] = closing
+    return payload
+
+
 def _payload() -> dict:
     return {
         "slug": "gate-one-reflection-repair",
@@ -144,3 +161,22 @@ async def test_narrator_reflection_repair_is_single_shot(monkeypatch, tmp_path):
         )
 
     assert len(provider.calls) == 1
+
+
+def test_narrator_reflection_prompt_locks_existing_short_funnel_bridge():
+    prompt = script_fix.narrator_reflection_repair_prompt(
+        _short_funnel_payload(),
+        "closing is not direct",
+    )
+
+    assert "MANDATORY SHORT FUNNEL BRIDGE" in prompt
+    assert "minh-neu-rui-ro-trong-cuoc-hop" in prompt
+    assert "spoken voiceover" in prompt
+
+
+def test_narrator_reflection_repair_rejects_dropped_short_funnel_bridge():
+    with pytest.raises(ValueError, match="funnel bridge"):
+        script_fix.apply_narrator_reflection_repair(
+            _short_funnel_payload(),
+            {"voiceover": "Có lẽ nếu bạn nói ra, người khác sẽ có chỗ kiểm tra lại."},
+        )
