@@ -413,7 +413,8 @@ def test_narrator_reflection_repair_states_the_length_floor_for_a_short():
     )
 
     assert "characters" in prompt
-    assert "at least" in prompt.lower()
+    # Both ends: a floor-only instruction lets the rewrite overshoot instead.
+    assert "between" in prompt.lower()
 
 
 def _repair_sites_for_a_strategy_short():
@@ -446,16 +447,26 @@ def _repair_sites_for_a_strategy_short():
     }
 
 
-def test_every_short_repair_states_the_length_floor_it_will_be_judged_by():
-    """No bounded repair may resize a Short without being told the floor.
+def test_every_short_repair_states_BOTH_length_bounds_it_will_be_judged_by():
+    """No bounded repair may resize a Short knowing only one end of the gate.
 
-    Three separate P0s on 2026-08-30 had one shape: a repair prompt was judged
-    by a contract nobody told it about, so a correct-looking delta was discarded
-    or killed the run. This pins the whole matrix instead of one site at a time.
+    Four P0s on 2026-08-30 had one shape: a repair prompt was judged by a
+    contract nobody told it about. The fourth was self-inflicted — a fix stated
+    the floor and dropped the cap it had already computed, so an editorial
+    rewrite of all seven sections came back at 70.4s against a 45.0s ceiling.
+    The duration gate is two-sided, so every resizing repair must carry both.
     """
     for name, prompt in _repair_sites_for_a_strategy_short().items():
         lowered = prompt.lower()
-        assert "at least" in lowered or "total narration" in lowered, name
+        has_floor = "at least" in lowered or "between" in lowered or "total narration" in lowered
+        has_cap = (
+            "between" in lowered
+            or "do not overshoot" in lowered
+            or "must not exceed" in lowered
+            or "ceiling" in lowered
+        )
+        assert has_floor, f"{name} states no length floor"
+        assert has_cap, f"{name} states no length cap"
 
 
 def test_every_short_repair_that_can_touch_the_opening_names_the_markers():

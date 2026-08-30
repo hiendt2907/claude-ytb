@@ -130,14 +130,15 @@ _BOUNDED_ACTION_CLOSING = (
 )
 
 
-def _short_total_length_floor(
+def _short_total_length_bounds(
     payload: dict, *, content_profile: "ContentProfile | None" = None
-) -> int | None:
-    """Return the character floor a Short must still clear after a repair.
+) -> tuple[int, int] | None:
+    """Return BOTH character bounds a Short must hold after a repair.
 
-    Every bounded repair resizes text that the duration gate then judges, so
-    each of them needs this number. Returning None keeps non-Short repairs and
-    malformed payloads unchanged.
+    The duration gate is two-sided, so a repair told only the floor overshoots
+    the cap instead — production 2026-08-30 rewrote all seven sections into
+    70.4s against a 45.0s ceiling. Half a contract is not a contract. Returning
+    None keeps non-Short repairs and malformed payloads unchanged.
     """
     if str(payload.get("video_type") or "").strip().lower() != "short":
         return None
@@ -149,10 +150,9 @@ def _short_total_length_floor(
         or settings.tts_provider,
         video_type="short",
     )
-    floor_chars, _cap = contract_for("short", content_profile).safe_character_bounds(
+    return contract_for("short", content_profile).safe_character_bounds(
         chars_per_minute=rate, segment_count=max(1, len(sections))
     )
-    return floor_chars
 
 
 def _short_situation_marker_list() -> str:
@@ -338,19 +338,28 @@ def hook_repair_prompt(
             f"Vietnamese markers: {_short_situation_marker_list()}. An opening without one of "
             "them is rejected outright, however well anchored it is."
         )
-        # Resizing the opening moves the whole-script total that the duration
-        # gate judges, so this repair needs the floor as much as the reflection
-        # repair did.
-        floor_chars = _short_total_length_floor(payload, content_profile=content_profile)
-        if floor_chars is not None:
+        # Resizing the opening moves the whole-script total that the two-sided
+        # duration gate judges, so this repair needs both bounds.
+        bounds = _short_total_length_bounds(payload, content_profile=content_profile)
+        if bounds is not None:
+            floor_chars, cap_chars = bounds
             others = sum(
                 len(str(section.get("voiceover") or section.get("narration") or ""))
                 for section in sections[1:]
             )
+            situation_cap = contract_for("short", content_profile).situation_char_budget(
+                chars_per_minute=chars_per_min_for_provider(
+                    (content_profile.providers.tts if content_profile is not None else None)
+                    or settings.tts_provider,
+                    video_type="short",
+                )
+            )
             marker_guard += (
-                f" LENGTH FLOOR: the whole Short must stay at least {floor_chars} characters of "
-                f"spoken narration; the other sections already carry {others}, so your rewritten "
-                f"opening must be at least {max(1, floor_chars - others)} characters."
+                f" LENGTH BUDGET: the whole Short must stay between {floor_chars} and {cap_chars} "
+                f"characters of spoken narration; the other sections already carry {others}, so your "
+                f"rewritten opening must be between {max(1, floor_chars - others)} and "
+                f"{max(1, min(situation_cap, cap_chars - others))} characters. Both ends are "
+                "rejected outright."
             )
     return (
         "Rewrite ONLY the opening narration of this Vietnamese YouTube script to fix "
@@ -415,19 +424,19 @@ def narrator_reflection_repair_prompt(
     # at 28.4s against a 30.0s floor. State the floor the rewrite will be judged
     # against instead of letting it discover the cap by being killed.
     length_instruction = ""
-    floor_chars = _short_total_length_floor(payload, content_profile=content_profile)
-    if floor_chars is not None:
+    bounds = _short_total_length_bounds(payload, content_profile=content_profile)
+    if bounds is not None:
+        floor_chars, cap_chars = bounds
         others = sum(
             len(str(section.get("voiceover") or section.get("narration") or ""))
             for section in sections[:-1]
         )
-        minimum_final = max(1, floor_chars - others)
         length_instruction = (
-            f" LENGTH FLOOR: the whole Short must stay at least {floor_chars} characters of "
-            f"spoken narration; the other sections already carry {others}, so your rewritten "
-            f"final section must be at least {minimum_final} characters. A shorter one is "
-            "rejected outright, so reach the floor by saying the reflection fully rather than "
-            "by padding it."
+            f" LENGTH BUDGET: the whole Short must stay between {floor_chars} and {cap_chars} "
+            f"characters of spoken narration; the other sections already carry {others}, so your "
+            f"rewritten final section must be between {max(1, floor_chars - others)} and "
+            f"{max(1, cap_chars - others)} characters. Both ends are rejected outright, so reach "
+            "the floor by saying the reflection fully rather than by padding it."
         )
     context = {
         key: payload.get(key)
@@ -1447,19 +1456,32 @@ def editorial_rewrite_prompt(payload: dict, review: object) -> str:
     # likeliest of all the repairs to move the whole-script total past the
     # duration gate. State that budget alongside the other invariants.
     length_guard = ""
-    rewrite_floor = _short_total_length_floor(payload)
-    if rewrite_floor is not None:
-        current_total = sum(
-            len(str(section.get("voiceover") or section.get("narration") or ""))
+    rewrite_bounds = _short_total_length_bounds(payload)
+    if rewrite_bounds is not None:
+        rewrite_floor, rewrite_cap = rewrite_bounds
+        sections_now = [
+            section
             for section in (payload.get("sections") or [])
             if isinstance(section, dict)
+        ]
+        current_total = sum(
+            len(str(section.get("voiceover") or section.get("narration") or ""))
+            for section in sections_now
+        )
+        cited = {int(ref) for ref in section_refs if isinstance(ref, (int, float))}
+        untouched = sum(
+            len(str(section.get("voiceover") or section.get("narration") or ""))
+            for index, section in enumerate(sections_now, start=1)
+            if index not in cited
         )
         length_guard = (
-            "\n\nMANDATORY SHORT LENGTH FLOOR (overrides any conflicting repair wording): the "
+            "\n\nMANDATORY SHORT LENGTH BUDGET (overrides any conflicting repair wording): the "
             f"whole Short currently carries {current_total} characters of spoken narration and must "
-            f"stay at least {rewrite_floor}. Your rewritten sections must not pull the total below "
-            "that; a shorter Short is rejected outright, so rebuild the cited scenes at full length "
-            "rather than tightening them into fragments."
+            f"end up between {rewrite_floor} and {rewrite_cap}. The sections you are NOT rewriting "
+            f"already carry {untouched}, so everything you return must total between "
+            f"{max(1, rewrite_floor - untouched)} and {max(1, rewrite_cap - untouched)} characters. "
+            "Both ends are rejected outright: rebuild the cited scenes at full length, but do not "
+            "let a richer rewrite push the Short past its ceiling."
         )
     if payload.get("video_type") == "short" and isinstance(strategy, dict):
         long_slug = str(strategy.get("long_form_slug") or "").strip()
