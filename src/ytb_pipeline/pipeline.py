@@ -291,6 +291,27 @@ def editorial_receipt_covers(payload: dict[str, Any]) -> bool:
     return digest == recorded
 
 
+def editorial_output_from_receipt(
+    receipt: dict[str, Any], *, script_sha256: str
+) -> dict[str, Any]:
+    """Rebuild the release verdict from an admission receipt.
+
+    Trusting the receipt removes the second judge call, not the release
+    manifest's verdict: the publish node still requires `passed`, the scores,
+    and a `script_sha256` binding the verdict to this exact file. Omitting it
+    only moved the failure from `node=input` to `node=publish`.
+    """
+    return {
+        "passed": bool(receipt.get("passed")),
+        "overall_score": receipt.get("overall_score"),
+        "dimension_scores": dict(receipt.get("dimension_scores") or {}),
+        "blocking_findings": [],
+        "section_refs": [],
+        "repair_brief": "",
+        "script_sha256": script_sha256,
+    }
+
+
 def _script_sha256(path: Path) -> str:
     if not path.exists():
         raise FileNotFoundError(f"Không tìm thấy kịch bản: {path}")
@@ -645,16 +666,19 @@ async def run_project(project: Project, checkpoint: CheckpointManager, through: 
             profile_id,
             version=str(raw_payload.get("profile_version") or "").strip() or None,
         )
-        review = (
-            None
-            if editorial_receipt_covers(raw_payload)
-            else await run_editorial_review(
+        if editorial_receipt_covers(raw_payload):
+            review = None
+            editorial_output = editorial_output_from_receipt(
+                raw_payload["_editorial_review"],
+                script_sha256=_script_sha256(Path(script_path)),
+            )
+        else:
+            review = await run_editorial_review(
                 profile,
                 raw_payload,
                 provider=get_llm_provider(profile.providers.llm),
                 cache_dir=settings.assets_dir / "editorial_review_cache" / profile.profile_id,
             )
-        )
         if review is not None:
             editorial_output = {
                 "passed": review.passed,

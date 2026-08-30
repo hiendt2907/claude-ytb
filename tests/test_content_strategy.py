@@ -803,3 +803,33 @@ def test_admitted_content_is_not_re_judged_at_production_time():
 
     failed = dict(payload, _editorial_review=dict(receipt, passed=False))
     assert editorial_receipt_covers(failed) is False
+
+
+def test_trusted_receipt_still_produces_a_release_verdict():
+    """Skipping the re-review must not skip the release manifest verdict.
+
+    The publish node requires `input_data["editorial_review"]` with `passed`,
+    `overall_score`, `dimension_scores` and a `script_sha256` matching the file.
+    Trusting the admission receipt without populating that dict left the
+    manifest empty and moved the failure from `node=input` to `node=publish`:
+
+        INFRASTRUCTURE_FAILED node=publish
+        error=Editorial release manifest thiếu verdict cho profile đang bật review.
+
+    The receipt carries the verdict; only the file digest has to be added.
+    """
+    from ytb_pipeline.pipeline import editorial_output_from_receipt
+
+    receipt = {
+        "passed": True, "overall_score": 9,
+        "dimension_scores": {"human_truth": 9, "useful_restraint": 9},
+        "reviewed_payload_sha256": "deadbeef",
+    }
+    out = editorial_output_from_receipt(receipt, script_sha256="abc123")
+
+    assert out["passed"] is True
+    assert out["overall_score"] == 9
+    assert out["dimension_scores"] == {"human_truth": 9, "useful_restraint": 9}
+    assert out["script_sha256"] == "abc123"
+    assert out["blocking_findings"] == []
+    assert out["section_refs"] == []
