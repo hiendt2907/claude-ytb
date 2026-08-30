@@ -97,11 +97,32 @@ def _parse_review_response(text: str) -> EditorialReviewResult:
     blocking = data.get("blocking_findings") or []
     if not isinstance(blocking, list) or not all(isinstance(item, str) for item in blocking):
         raise ValueError("blocking_findings phải là mảng string.")
-    refs = data.get("section_refs") or []
-    if not isinstance(refs, list) or not all(
-        isinstance(item, int) and not isinstance(item, bool) for item in refs
-    ):
+    # `section_refs` only points the repair prompt at sections; it is a hint,
+    # not part of the gate. A judge answering ["4", "6"] used to raise here and
+    # abort the whole supervised run before the review was even logged
+    # (production 2026-08-30, ideation_20260830_111408). Accept any integral
+    # value, keep rejecting anything that is not a section number.
+    raw_refs = data.get("section_refs") or []
+    if not isinstance(raw_refs, list):
         raise ValueError("section_refs phải là mảng số nguyên.")
+    refs: list[int] = []
+    for item in raw_refs:
+        if isinstance(item, bool):
+            raise ValueError("section_refs phải là mảng số nguyên.")
+        if isinstance(item, int):
+            refs.append(item)
+            continue
+        if isinstance(item, float) and item.is_integer():
+            refs.append(int(item))
+            continue
+        if isinstance(item, str):
+            try:
+                refs.append(int(item.strip()))
+                continue
+            except ValueError as exc:
+                raise ValueError("section_refs phải là mảng số nguyên.") from exc
+        else:
+            raise ValueError("section_refs phải là mảng số nguyên.")
     score = data.get("overall_score")
     if score is not None and (isinstance(score, bool) or not isinstance(score, int) or not 0 <= score <= 10):
         raise ValueError("overall_score phải là số nguyên trong [0, 10].")
@@ -234,7 +255,15 @@ async def run_editorial_review(
         temperature=0.0,
         json_output=True,
     )
-    result = _enforce_profile_score(profile, _parse_review_response(text))
+    try:
+        result = _enforce_profile_score(profile, _parse_review_response(text))
+    except ValueError as exc:
+        # Fail closed, but never lose the evidence: the parse error alone does
+        # not say what the judge actually returned, and production 2026-08-30
+        # ended with a traceback and an empty review log.
+        raise ValueError(
+            f"Editorial review response không dùng được: {exc} | raw={text!r:.2000}"
+        ) from exc
     cache_path.write_text(
         json.dumps({
             "passed": result.passed,

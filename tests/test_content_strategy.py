@@ -630,3 +630,46 @@ def test_normalization_protects_a_bridge_the_qa_gate_would_accept():
     normalized, note = normalize_short_narration(payload, expected_video_type="short")
     assert note, "the fixture must actually be over the cap so trimming runs"
     assert "video dài" in (normalized["sections"][-1].get("voiceover") or "")
+
+
+def test_editorial_review_tolerates_numeric_section_refs_from_the_judge():
+    """A hint field must not abort a production run.
+
+    `section_refs` only tells the repair prompt which sections to rebuild; it is
+    not part of the quality gate. A judge returning ["4", "6"] or [4.0, 6.0]
+    crashed `_parse_review_response` with an uncaught ValueError, which killed
+    the whole supervised run (production 2026-08-30, ideation_20260830_111408 —
+    the log ends at QA_RESULT 1 with no review recorded at all).
+
+    Coerce integral values; keep rejecting anything that is not a section
+    number. `passed` and `overall_score` stay strict — those ARE the gate.
+    """
+    import json
+
+    from ytb_pipeline.agents.editorial_review_agent import _parse_review_response
+
+    for refs in (["4", "6"], [4.0, 6.0], [4, "6"]):
+        parsed = _parse_review_response(
+            json.dumps({"passed": False, "blocking_findings": ["x"], "section_refs": refs})
+        )
+        assert list(parsed.section_refs) == [4, 6], refs
+
+    for bad in (["four"], [None], [[4]], [True]):
+        with pytest.raises(ValueError, match="section_refs"):
+            _parse_review_response(
+                json.dumps({"passed": False, "blocking_findings": [], "section_refs": bad})
+            )
+
+
+def test_editorial_review_keeps_the_gate_fields_strict():
+    """Tolerance must not leak into the fields that decide admission."""
+    import json
+
+    from ytb_pipeline.agents.editorial_review_agent import _parse_review_response
+
+    with pytest.raises(ValueError, match="passed"):
+        _parse_review_response(json.dumps({"passed": "false", "blocking_findings": []}))
+    with pytest.raises(ValueError, match="overall_score"):
+        _parse_review_response(
+            json.dumps({"passed": False, "blocking_findings": [], "overall_score": "7"})
+        )
