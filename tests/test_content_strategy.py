@@ -673,3 +673,39 @@ def test_editorial_review_keeps_the_gate_fields_strict():
         _parse_review_response(
             json.dumps({"passed": False, "blocking_findings": [], "overall_score": "7"})
         )
+
+
+def test_auto_visual_prompt_states_what_visual_intent_is_judged_on():
+    """`visual_intent` is the image prompt AND the pass/fail spec — say so.
+
+    Nothing in the prompt stack told the writer how `visual_intent` is consumed.
+    It is sent verbatim to ComfyUI as the generation prompt AND to the Vision
+    Judge as the requirement, which then treats every clause as binding.
+
+    Production 2026-08-30 (project minh-neu-rui-ro-trong-cuoc-hop): three of
+    three shots escalated to a human for exactly this, while character,
+    composition and continuity all scored 1.000:
+
+      scene-000  "màn hình laptop mở trang tài liệu có dòng bôi vàng"
+                 -> unreadable_required_text
+      scene-001  "An ... tay cầm khay"
+                 -> missing_required_object
+      scene-002  "Minh chỉ vào dòng bôi vàng trên màn hình, tay còn lại đặt
+                  trên mép bàn"
+                 -> semantic_contradiction, missing_required_object
+
+    Prose written for a human reader became an unsatisfiable specification.
+    """
+    from ytb_pipeline.content_profiles import load_content_profile
+    from ytb_pipeline.orchestrator.ideation_prompts import local_script_prompt
+
+    prompt = local_script_prompt(
+        1, 1, "long", "auto", "", content_profile=load_content_profile("ban-so-6"),
+    )
+
+    lowered = prompt.lower()
+    assert "visual_intent" in prompt
+    # It must say the intent is generated and judged, not just "where action goes".
+    assert "judged" in lowered or "chấm" in lowered or "pass/fail" in lowered
+    # It must warn off the three things a still frame cannot carry.
+    assert "readable text" in lowered or "chữ đọc được" in lowered

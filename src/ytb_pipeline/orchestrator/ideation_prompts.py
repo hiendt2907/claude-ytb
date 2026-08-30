@@ -1121,6 +1121,24 @@ def local_script_prompt(
             visual_asset_instruction = (
                 f"scene_characters lists who is on screen, from {cast_ids}, max 2 — "
                 "never a filename, never more than the two the profile can render together.\n"
+                # `visual_intent` is not prose for a human reader. It is sent
+                # verbatim to the image generator AND to the Vision Judge, which
+                # treats every clause in it as a binding requirement. Production
+                # 2026-08-30: three of three shots escalated to a human because
+                # the intent asked for readable on-screen text, a held prop and
+                # an exact hand position, while character/composition/continuity
+                # all scored 1.000. Say what the field is judged on.
+                "IMPORTANT — how visual_intent is used: it becomes BOTH the image "
+                "generation prompt AND the requirement a vision model scores the "
+                "resulting frame against, clause by clause, pass/fail. Write only what "
+                "a single still frame can actually show and be judged on: who is "
+                "present, where they are, the light and time of day, posture and mood, "
+                "and one action readable at a glance. Do NOT require readable text or "
+                "numbers inside the frame (a screen, a page, a sign), a specific small "
+                "prop held in a hand, or an exact hand/finger placement — an image "
+                "model cannot deliver those reliably and every one of them becomes a "
+                "hard failure. Name the object if it matters to the scene, but describe "
+                "it as present in the frame, not as something being read or held.\n"
             )
         else:
             names = ", ".join(content_profile.visual_asset_names)
