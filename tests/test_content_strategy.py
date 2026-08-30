@@ -833,3 +833,42 @@ def test_trusted_receipt_still_produces_a_release_verdict():
     assert out["script_sha256"] == "abc123"
     assert out["blocking_findings"] == []
     assert out["section_refs"] == []
+
+
+def test_narration_is_pronunciation_normalised_before_tts():
+    """The pronunciation layer must actually be in the TTS path.
+
+    `voiceover/pronunciation.py` ships a pronunciation table, a learnable
+    override file and `normalize_for_speech()`. It is imported nowhere: 103
+    statements, 0% coverage, dead since it was written. `_prepare_narration` —
+    the only text preparation before synthesis — strips stage directions and
+    collapses whitespace, nothing else.
+
+    Consequence heard in the published Gate-1 videos: the voice reads the name
+    "Minh" as "mờ i nờ hờ", spelling it letter by letter, and there is no
+    supported way to correct it because the override mechanism is not connected.
+    """
+    from ytb_pipeline.voiceover import tts
+
+    prepared = tts._prepare_narration("Minh mở terminal rồi chạy backup.")
+
+    assert "tơ-mi-nồ" in prepared, "English terms are not transliterated for speech"
+    assert "bách-cấp" in prepared
+
+
+def test_pronunciation_overrides_can_fix_a_name_without_a_code_change():
+    """An operator must be able to correct a mispronounced name themselves."""
+    import json
+
+    from ytb_pipeline.voiceover import pronunciation
+
+    original = pronunciation.OVERRIDES_FILE
+    tmp = original.parent / "pronunciation_overrides.test.json"
+    tmp.parent.mkdir(parents=True, exist_ok=True)
+    tmp.write_text(json.dumps({"Minh": "Ming"}, ensure_ascii=False), encoding="utf-8")
+    pronunciation.OVERRIDES_FILE = tmp
+    try:
+        assert "Ming" in pronunciation.normalize_for_speech("Minh ngồi xuống.")
+    finally:
+        pronunciation.OVERRIDES_FILE = original
+        tmp.unlink(missing_ok=True)

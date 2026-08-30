@@ -19,6 +19,7 @@ import edge_tts
 from ..config.settings import settings
 from ..content_contract import contract_for
 from ..pkg.models import Script, Segment, Voiceover
+from .pronunciation import normalize_for_speech
 
 AUDIO_DIR = Path("assets/audio")
 VOICE_CONFIG_PATH = Path(__file__).resolve().parents[1] / "config" / "voice_profiles.json"
@@ -360,12 +361,20 @@ def _segment_profile(segment: Segment, default: VoiceProfile,
 
 
 def _prepare_narration(text: str) -> str:
-    """Remove leaked visual/stage directions before TTS reads them out loud."""
+    """Clean stage directions AND fix pronunciation before TTS reads the line.
+
+    `pronunciation.normalize_for_speech` shipped with a table, a learnable
+    override file and no caller: 103 statements at 0% coverage. Nothing stood
+    between a written word and the voice, so an English term was read as
+    English and a name the voice does not recognise was spelled out letter by
+    letter — the published Gate-1 videos say "mờ i nờ hờ" for "Minh", and no
+    supported lever existed to correct it.
+    """
     cleaned = text.strip()
     for pattern in _STAGE_DIRECTION_PATTERNS:
         cleaned = re.sub(pattern, "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
-    return cleaned
+    return normalize_for_speech(cleaned)
 
 
 # "Đọc được" = có ít nhất một chữ cái hoặc chữ số; dấu câu đơn thuần thì không.
