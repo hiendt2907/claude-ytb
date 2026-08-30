@@ -145,14 +145,51 @@ def _short_total_length_bounds(
     sections = payload.get("sections") or []
     if not sections:
         return None
-    rate = chars_per_min_for_provider(
-        (content_profile.providers.tts if content_profile is not None else None)
-        or settings.tts_provider,
-        video_type="short",
+    provider = (
+        content_profile.providers.tts if content_profile is not None else None
+    ) or settings.tts_provider
+    # A Short is measured twice, with two different rates: the ideation contract
+    # plans on chars_per_min_for_provider while the QA length rule resolves to
+    # effective_chars_per_min. Quoting one gate's window hands the writer a
+    # budget the other gate rejects — production 2026-08-30 lost a 7/10
+    # candidate at 730 characters because the quoted cap of 726 already measured
+    # 46.0s against a 45.0s ceiling. Quote the intersection instead, so anything
+    # inside it clears every gate the artifact must pass.
+    return short_safe_bounds_for_every_gate(
+        segment_count=max(1, len(sections)),
+        tts_provider=provider,
+        content_profile=content_profile,
     )
-    return contract_for("short", content_profile).safe_character_bounds(
-        chars_per_minute=rate, segment_count=max(1, len(sections))
-    )
+
+
+def short_safe_bounds_for_every_gate(
+    *,
+    segment_count: int,
+    tts_provider: str,
+    content_profile: "ContentProfile | None",
+) -> tuple[int, int]:
+    """Character window that clears BOTH duration gates a Short must pass.
+
+    The two gates disagree on the narration rate, so either window alone is
+    wrong at one end: the ideation contract's cap is measured over the ceiling
+    by the QA rule, and the QA rule's floor is measured under the floor by the
+    ideation contract. Both were observed in production on 2026-08-30 — a 730
+    character candidate rejected at 46.2s, and a 505 character one at 29.4s.
+    Intersecting the windows is the only budget that satisfies each of them.
+    """
+    contract = contract_for("short", content_profile)
+    windows = [
+        contract.safe_character_bounds(chars_per_minute=rate, segment_count=segment_count)
+        for rate in (
+            chars_per_min_for_provider(tts_provider, video_type="short"),
+            effective_chars_per_min(
+                tts_provider, video_type="short", content_profile=content_profile
+            ),
+        )
+    ]
+    floor = max(window[0] for window in windows)
+    cap = min(window[1] for window in windows)
+    return (floor, cap) if floor < cap else windows[0]
 
 
 def _short_situation_marker_list() -> str:
@@ -847,8 +884,16 @@ def local_script_prompt(
         effective_chars_per_min(tts_provider, video_type="long", content_profile=content_profile)
         if normalized_type == "long" else 0.0
     )
+    # Quote the window that clears BOTH duration gates. Quoting one gate's view
+    # told the writer 497 characters was a valid floor, which the ideation
+    # contract measures at 29.0s and rejects (production 2026-08-30, a 505
+    # character candidate failed at 29.4s).
     short_safe = (
-        short_contract.safe_character_bounds(chars_per_minute=short_rate, segment_count=short_sections)
+        short_safe_bounds_for_every_gate(
+            segment_count=short_sections,
+            tts_provider=tts_provider,
+            content_profile=content_profile,
+        )
         if short_contract is not None else (0, 0)
     )
     short_absolute_seconds = (

@@ -510,3 +510,39 @@ def test_strategy_short_prompt_offers_the_profile_section_window_not_just_the_mi
 
     assert f"Use exactly {short_format.min_sections} sections" not in prompt
     assert str(short_format.max_sections) in prompt
+
+
+def test_repair_length_budget_satisfies_every_gate_the_short_must_pass():
+    """The quoted budget must be the intersection of both duration gates.
+
+    A Short is measured twice with two different rates: the ideation contract
+    uses chars_per_min_for_provider (1030 for xkiro) and the QA length rule
+    resolves to effective_chars_per_min (947.6 for ban-so-6). Quoting only the
+    first gate's window told the writer it could spend 726 characters, which the
+    second gate measures as 46.0s against a 45.0s ceiling.
+
+    Production 2026-08-30 (ideation_20260830_102041): the best candidate of the
+    session — nine sections, 7/10 with human_truth and useful_restraint at the
+    bar — was rejected at 730 characters / 46.2s, four characters past a cap
+    that was already too generous.
+    """
+    from ytb_pipeline.content_contract import (
+        chars_per_min_for_provider,
+        contract_for,
+        effective_chars_per_min,
+    )
+    from ytb_pipeline.content_profiles import load_content_profile
+    from ytb_pipeline.orchestrator.ideation_prompts import _short_total_length_bounds
+
+    profile = load_content_profile("ban-so-6")
+    payload = _strategy_short_payload("Còn mười phút nữa họp, nhưng dòng vẫn để nguyên.")
+    floor, cap = _short_total_length_bounds(payload, content_profile=profile)
+
+    contract = contract_for("short", profile)
+    _lower, upper_sec = contract.audio_runtime_bounds_sec(segment_count=len(payload["sections"]))
+    for rate in (
+        chars_per_min_for_provider(profile.providers.tts, video_type="short"),
+        effective_chars_per_min(profile.providers.tts, video_type="short", content_profile=profile),
+    ):
+        assert cap / rate * 60 <= upper_sec, f"cap {cap} overruns {upper_sec}s at {rate} chars/min"
+    assert floor < cap
