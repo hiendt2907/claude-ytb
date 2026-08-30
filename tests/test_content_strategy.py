@@ -476,3 +476,37 @@ def test_every_short_repair_that_can_touch_the_opening_names_the_markers():
     for name in ("hook_repair", "editorial_rewrite", "generic_repair"):
         for marker in SHORT_SITUATION_TENSION_MARKERS:
             assert marker in sites[name], f"{name} missing {marker}"
+
+
+def test_strategy_short_prompt_offers_the_profile_section_window_not_just_the_minimum():
+    """A strategy-v1 Short must be told the shape its own quality gate expects.
+
+    `short_sections` is the profile MINIMUM, and the strategy-v1 branch turned it
+    into "Use exactly 4 sections" while the sibling legacy branch already offered
+    the profile's expansion window. Production 2026-08-30: every four-section
+    candidate was rejected for the same structural reasons — "An gets a question
+    but no Minh reply", "the outcome is asserted without showing the choice",
+    "the close is a generalized lesson" — all symptoms of too few beats. The one
+    artifact that ever cleared the 9/10 bar for this slug used SEVEN sections,
+    a shape the prompt forbade.
+
+    The runtime contract is unaffected: the character and duration bounds are
+    identical for every section count in the profile window.
+    """
+    from ytb_pipeline.content_profiles import load_content_profile
+    from ytb_pipeline.orchestrator.ideation_prompts import local_script_prompt
+
+    profile = load_content_profile("ban-so-6")
+    short_format = profile.format_for("short")
+    prompt = local_script_prompt(
+        1, 1, "short", "auto", "",
+        funnel={
+            "long_form_slug": "minh-neu-rui-ro-trong-cuoc-hop",
+            "playlist": "Bàn số 6 — Truyện đời thường",
+            "cta_target": "minh-neu-rui-ro-trong-cuoc-hop",
+        },
+        content_profile=profile,
+    )
+
+    assert f"Use exactly {short_format.min_sections} sections" not in prompt
+    assert str(short_format.max_sections) in prompt

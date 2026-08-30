@@ -1049,7 +1049,16 @@ def local_script_prompt(
     else:
         section_fields = "Each section also needs pexels_query. "
     short_instruction = "" if type_of_vid != "short" else (
-        f"Use exactly {short_sections} sections for this Short. Make `situation` first and "
+        # `short_sections` is the profile MINIMUM. Stating it as an exact count
+        # instructed a shape the profile's own editorial gate keeps rejecting:
+        # four beats cannot show a character's question, the reply, the meeting
+        # response, the cost and a modest close, which is what every 2026-08-30
+        # rejection asked for. The only artifact that ever cleared the 9/10 bar
+        # for this format used seven. The runtime contract is unaffected — the
+        # character and duration bounds are identical across the whole window.
+        f"Use between {short_sections} and {short_max_sections} sections for this Short; "
+        f"prefer more, shorter beats over few long ones when the story needs a reply, a "
+        f"reaction or a consequence to be shown rather than summarised. Make `situation` first and "
         f"keep it under {short_contract.situation_char_budget(chars_per_minute=short_rate)} characters with a concrete tension marker "
         f"— it must literally contain one of these exact Vietnamese markers: {_short_situation_marker_list()}; "
         "make `core_answer` the next section and begin with the exact strategy.hook.core_answer. "
