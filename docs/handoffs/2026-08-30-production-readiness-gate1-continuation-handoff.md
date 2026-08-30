@@ -1,6 +1,6 @@
 # Production Readiness Gate 1 — Continuation Handoff
 
-Snapshot time: **2026-08-30 07:37 +07:00**.
+Snapshot time: **2026-08-30 08:10 +07:00**.
 
 Previous required context:
 
@@ -32,11 +32,12 @@ Current milestone state:
 | --- | --- |
 | Gate branch | `codex/production-readiness-e2e-gate1` |
 | Phase-13 base | `97fe94190b41185f494e22e5a3eba6d6fd8489c2` |
-| Source HEAD before this handoff | `97546b8` |
+| Latest documentation HEAD before this update | `cfa7fa7` |
+| Latest source/test HEAD | `97546b8` |
 | Production profile | `ban-so-6` `2.1.0` |
 | Real Long ideation | PASS and persisted |
-| Derivative Short ideation | Not physically persisted; a replacement attempt was in flight at snapshot time |
-| Full production preflight | Must be rerun after the Short exists |
+| Derivative Short ideation | Not admitted. An interrupted attempt left an unreviewed physical candidate whose SHA does not match state provenance |
+| Full production preflight | Must be rerun after the Short is admitted and provenance matches |
 | Real TTS / visuals / Vision Judge / render | Not yet executed for this Long/Short pair |
 | Restart/resume drill | Not yet executed |
 | Private YouTube publish | Not yet attempted |
@@ -196,58 +197,49 @@ Batch key:
 shorts_funnel_batch_gate1_20260828
 ```
 
-At the snapshot:
-
-- `scripts/48-phut-mot-dong-rui-ro.json` **does not exist**;
-- `assets/auto_state.json` and `data/ledger.md` still contain an older
-  `ideation/ok` revision-1 record and SHA for this slug;
-- therefore state alone is not proof that the current Short is ready;
-- do not hand-edit those state files; the normal `--replace-slug` path must
-  persist a new accepted script and update provenance.
-
-### In-flight attempt at handoff time
-
-At `2026-08-30 07:37 +07:00`, process `PID 52057` was still running:
+At the snapshot no `ytb batch start` process is alive. The latest interrupted
+attempt left this physical file:
 
 ```text
-python -m ytb_pipeline.orchestrator.batch_cli start
-  -n 1
-  --profile ban-so-6
-  --type-of-vid short
-  --llm-provider xkiro
-  --batch-key shorts_funnel_batch_gate1_20260828
-  --replace-slug 48-phut-mot-dong-rui-ro
-  --long-form-slug minh-neu-rui-ro-trong-cuoc-hop
-  --playlist "Bàn số 6 — Truyện đời thường"
-  --cta-target minh-neu-rui-ro-trong-cuoc-hop
-  --idea <bounded scene instruction>
+scripts/48-phut-mot-dong-rui-ro.json
 ```
 
-Its log is:
+It is **not an admitted production Short**. Exact evidence:
 
-```text
-assets/batch_logs/ideation_20260830_073108.log
-```
+- file mtime: `2026-08-30 08:09:55 +07:00`;
+- physical SHA-256:
+  `d91f252d0bf43c4f4b071f224f3f046940cf23d6784fa16df6936ffb6a3a4a65`;
+- `_qa=null` and `_editorial_review=null` in the physical JSON;
+- the file has the intended profile, Long source identity and four speaker
+  turns, but these structural fields do not replace admission;
+- `assets/auto_state.json` still points to revision `1`, recorded at
+  `2026-08-29T07:57:01+07:00`, with the different SHA-256
+  `9d07f5d2b1985f17443bdc415fe189c8822299de57150828d09bf23b5d2440b3`;
+- the latest log ends after `QA_RESULT 2` passed and contains no final
+  editorial result, persistence acknowledgement, or candidate admission.
 
-At the snapshot the log had emitted only the complete initial prompt and no
-response, validation, editorial result, or rejection. **Do not start another
-attempt while that process is alive.** First inspect:
+This is an orphaned provisional candidate produced before the operator
+session was interrupted. Do not render, publish, copy, or manually approve it.
+Do not edit the JSON, state, or ledger to make the hashes agree. A subsequent
+normal `batch start --replace-slug` attempt must complete editorial admission
+and atomically update the project provenance.
 
-```bash
-ps -p 52057 -o pid=,etime=,state=,command=
-tail -n 160 assets/batch_logs/ideation_20260830_073108.log
-```
+### Attempts after the original 07:37 handoff snapshot
 
-If the process has ended, decide from the physical script plus the final log,
-not from the old state row:
+| Log | Actual outcome |
+| --- | --- |
+| `ideation_20260830_073108.log` | xKiro call ended without response, validation, rejection, or artifact. The process was no longer alive when rechecked. Classified as interrupted/provider no-response, not semantic PASS. |
+| `ideation_20260830_074030.log` | Structural QA passed, but final editorial score stayed 5. Direct character speech was embedded in narrator voiceover; An's café beat had no causal handoff to the meeting. Failed closed and archived. |
+| `ideation_20260830_074759.log` | Role-separated prompt still ended at editorial score 5. An remained paraphrased instead of receiving a live turn, and the meeting consequence was asserted rather than shown. The production normalizer emitted 608 characters without manufacturing fragments. Failed closed and archived. |
+| `ideation_20260830_075838.log` | Four-turn An/narrator/Minh/narrator structure reached QA, but the rewrite merged Minh's café reply and meeting interruption, omitted a concrete response after “Khoan”, and finished at editorial score 4. Final duration validation also measured 24.9 seconds, below the 30-second floor. Failed closed and archived. |
+| `ideation_20260830_080749.log` | The provider returned a candidate; normalization emitted 658 characters and `QA_RESULT 2` passed. The operator session was then interrupted before editorial/admission. It left the orphaned JSON documented above. This is neither a pass nor an editorial rejection. |
 
-```bash
-test -f scripts/48-phut-mot-dong-rui-ro.json
-tail -n 220 assets/batch_logs/ideation_20260830_073108.log
-jq '.shorts_funnel_batch_gate1_20260828.short_videos[] | select(.slug == "48-phut-mot-dong-rui-ro")' assets/auto_state.json
-```
+The three completed semantic failures are content-attempt failures, not new
+engine correctness defects. They demonstrate that the 9/10 profile bar and
+duration floor remain fail-closed. The interrupted 08:07 attempt must not be
+used as evidence that the Short passed.
 
-### Most recent completed failures
+### Earlier completed failures
 
 | Log | Actual outcome |
 | --- | --- |
@@ -267,30 +259,36 @@ engine bug by itself.
 
 ## 7. START HERE — exact takeover procedure
 
-1. Confirm branch, Git state, and whether the in-flight Short attempt is still
-   alive. Do not kill or duplicate it merely because xKiro is slow.
+1. Confirm branch and Git state, then verify no stale ideation process has
+   appeared. There was no live process at this snapshot.
 
    ```bash
    git branch --show-current
    git status --short
-   ps -p 52057 -o pid=,etime=,state=,command=
-   tail -n 160 assets/batch_logs/ideation_20260830_073108.log
+   pgrep -fl 'ytb batch start' || true
+   tail -n 220 assets/batch_logs/ideation_20260830_080749.log
    ```
 
-2. If the Short attempt passed, require all of the following before moving on:
+2. Do not treat the orphaned physical Short as a pass. Before moving on,
+   require a newly completed normal replacement attempt and all of the
+   following:
 
    - `scripts/48-phut-mot-dong-rui-ro.json` exists;
    - profile/version, strategy, Long source identity, CTA, QA and editorial
      status are valid;
-   - the new file SHA matches the new `auto_state` provenance;
+   - `_qa` and `_editorial_review` record the accepted result;
+   - the new file SHA matches newly updated `auto_state` provenance;
    - the file is not an archived failed candidate copied into place.
 
-3. If the attempt failed, record the exact final failure from its log. Retry
-   only through the normal `batch start --replace-slug` entrypoint. Keep the
+3. Retry only through the normal `batch start --replace-slug` entrypoint. Keep the
    story bounded, show the concrete cost and decision causally, preserve An as
    a café owner rather than a workflow coach, keep the final evidence humble,
    and preserve the exact Long source and spoken CTA. Do not edit a generated
-   JSON candidate by hand.
+   JSON candidate by hand. The best-supported four-turn structure from the
+   latest attempts is An's live hook, narrator core answer and concrete bridge,
+   Minh's meeting interruption, then narrator-observed colleague response,
+   cost, grounded reflection and spoken Long CTA. It still must pass the
+   provider/editorial path; this note is not manual approval.
 
 4. Once both scripts physically exist and validate, run the real effective
    preflight:
