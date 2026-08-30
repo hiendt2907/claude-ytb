@@ -1409,6 +1409,12 @@ def repair_prompt(
             f"markers: {_short_situation_marker_list()}; a Short without one is rejected "
             "outright.\n"
         )
+    # The module constants are computed for the default profile at import time,
+    # so they hand a ban-so-6 Short a 793-character ceiling that measures 50.2s.
+    # Prefer the script's own profile window whenever it declares one.
+    short_repair_chars = _short_total_length_bounds(
+        payload, content_profile=repair_profile
+    ) or (SHORT_MIN_CHARS, SHORT_MAX_CHARS)
     return (
         "Repair this Vietnamese YouTube script JSON for the local-first pipeline.\n"
         "Return ONLY the full corrected JSON object. Do not add markdown.\n"
@@ -1418,7 +1424,7 @@ def repair_prompt(
         "source_long_slug, source_section_index, source_excerpt, and hook; retain a situation section followed by a core_answer section whose narration STARTS with "
         "the exact hook.core_answer before hook.answer_by_sec seconds.\n"
         f"{financial_repair_contract}"
-        f"For Shorts without target_minutes, total narration MUST be {SHORT_MIN_CHARS}-{SHORT_MAX_CHARS} "
+        f"For Shorts without target_minutes, total narration MUST be {short_repair_chars[0]}-{short_repair_chars[1]} "
         f"Vietnamese characters for {SHORT_MIN_MINUTES:.2f}-{SHORT_MAX_MINUTES:.2f} minutes. Do not overshoot. Do not add greetings. "
         f"For Longs, target_minutes MUST be EXACTLY {LONG_MIN_MINUTES} and total narration MUST be "
         f"{LONG_SAFE_MIN_CHARS}-{LONG_SAFE_MAX_CHARS} Vietnamese characters ({LONG_MIN_MINUTES}-{LONG_MAX_MINUTES} minutes at "
@@ -1510,7 +1516,11 @@ def editorial_rewrite_prompt(payload: dict, review: object) -> str:
     # likeliest of all the repairs to move the whole-script total past the
     # duration gate. State that budget alongside the other invariants.
     length_guard = ""
-    rewrite_bounds = _short_total_length_bounds(payload)
+    # `review_profile` is already resolved above; without it the helper falls
+    # back to the default contract and quotes a window from another profile —
+    # production 2026-08-30 told this rewrite it could spend 784 characters,
+    # which measures 49.6s against a 45.0s ceiling.
+    rewrite_bounds = _short_total_length_bounds(payload, content_profile=review_profile)
     if rewrite_bounds is not None:
         rewrite_floor, rewrite_cap = rewrite_bounds
         sections_now = [

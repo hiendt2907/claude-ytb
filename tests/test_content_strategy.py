@@ -426,6 +426,10 @@ def _repair_sites_for_a_strategy_short():
 
     profile = load_content_profile("ban-so-6")
     payload = _strategy_short_payload("Còn mười phút nữa họp, nhưng dòng vẫn để nguyên.")
+    # A real script declares its profile; without it every site silently quotes
+    # the default contract's window instead of the one it will be judged by.
+    payload["profile_id"] = "ban-so-6"
+    payload["profile_version"] = "2.1.0"
     payload["sections"].append(
         {
             "purpose": "payoff",
@@ -546,3 +550,38 @@ def test_repair_length_budget_satisfies_every_gate_the_short_must_pass():
     ):
         assert cap / rate * 60 <= upper_sec, f"cap {cap} overruns {upper_sec}s at {rate} chars/min"
     assert floor < cap
+
+
+def test_every_repair_quotes_the_budget_of_the_scripts_own_profile():
+    """A repair must not quote another profile's window.
+
+    Three times this session a fix was shipped that was correct in one place and
+    absent or wrong in another. Here the editorial rewrite resolved its profile
+    for every other guard but passed none to the length helper, so it quoted the
+    default contract's 605-784 instead of ban-so-6's 540-668 — and 784
+    characters measures 49.6s against a 45.0s ceiling
+    (ideation_20260830_103233, rejected at 898 characters / 52.3s).
+
+    Pin the numbers themselves, not merely that some number is present.
+    """
+    import re
+
+    from ytb_pipeline.content_profiles import load_content_profile
+    from ytb_pipeline.orchestrator.ideation_prompts import _short_total_length_bounds
+
+    profile = load_content_profile("ban-so-6")
+    sites = _repair_sites_for_a_strategy_short()
+    payload = _strategy_short_payload("Còn mười phút nữa họp, nhưng dòng vẫn để nguyên.")
+    payload["sections"].append(
+        {
+            "purpose": "payoff",
+            "speaker_id": "narrator",
+            "voiceover": "Có lẽ bạn cũng vậy. Tập sau, mời bạn xem video dài buoc-dau-mo-ho.",
+        }
+    )
+    floor, cap = _short_total_length_bounds(payload, content_profile=profile)
+
+    for name, prompt in sites.items():
+        quoted = {int(value) for value in re.findall(r"\b(\d{3})\b", prompt)}
+        assert cap in quoted, f"{name} does not quote the profile cap {cap}: {sorted(quoted)}"
+        assert floor in quoted, f"{name} does not quote the profile floor {floor}"
