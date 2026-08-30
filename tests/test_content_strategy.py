@@ -738,3 +738,68 @@ def test_contract_rejection_is_not_reported_as_invalid_json():
     )
     assert "source_excerpt" in contract
     assert "JSON hợp lệ" not in contract
+
+
+def test_admission_receipt_is_persisted_to_disk():
+    """The verdict that admitted a script must survive in the artifact.
+
+    `validate_or_repair_script` writes the script during validation, THEN
+    attaches `_editorial_review` on the passing path and returns — so the
+    receipt only ever existed in memory. Production 2026-08-30: both the
+    admitted Long and Short carry `_editorial_review: null` despite passing 9/10.
+
+    Without a receipt the production input node re-reviews the same bytes, and
+    an LLM judge is not obliged to answer the same way twice: the Short admitted
+    at 9/10 was scored 7/10 at publish on a file whose SHA had not changed, and
+    was blocked.
+    """
+    import inspect
+
+    from ytb_pipeline.orchestrator import ideation_script_fix
+
+    source = inspect.getsource(ideation_script_fix.validate_or_repair_script)
+    attach = source.index('current["_editorial_review"] = review_evidence')
+    tail = source[attach:attach + 900]
+    assert "atomic_write_json" in tail or "write_text" in tail, (
+        "the receipt is attached but never written to disk"
+    )
+
+
+def test_admitted_content_is_not_re_judged_at_production_time():
+    """A receipt covering the exact bytes must be trusted, not re-litigated.
+
+    The production input node called `run_editorial_review` on an
+    already-admitted script. Its cache key is the payload digest, and the
+    payload at that stage is not byte-identical to the one reviewed at
+    admission, so it misses the cache and asks the LLM again. Production
+    2026-08-30: 9/10 at admission, 7/10 at publish, file SHA unchanged
+    (`ec617b55…`), and the Short was blocked from publishing.
+
+    Re-checking is not a stronger gate — it is the SAME gate at the SAME
+    threshold, applied twice to identical content, with a non-deterministic
+    answer. Trusting a digest-bound receipt keeps the gate and removes the
+    coin flip; anything without a matching receipt is still reviewed.
+    """
+    from ytb_pipeline.pipeline import editorial_receipt_covers
+
+    payload = {"slug": "s", "sections": [{"voiceover": "x"}]}
+    from ytb_pipeline.orchestrator.ideation_script_fix import _editorial_review_evidence
+
+    class _Review:
+        passed = True
+        overall_score = 9
+        dimension_scores = {"human_truth": 9}
+
+    receipt = _editorial_review_evidence(payload, _Review())
+    admitted = dict(payload, _editorial_review=receipt)
+
+    assert editorial_receipt_covers(admitted) is True
+
+    tampered = dict(admitted)
+    tampered["sections"] = [{"voiceover": "y"}]
+    assert editorial_receipt_covers(tampered) is False
+
+    assert editorial_receipt_covers(dict(payload)) is False
+
+    failed = dict(payload, _editorial_review=dict(receipt, passed=False))
+    assert editorial_receipt_covers(failed) is False

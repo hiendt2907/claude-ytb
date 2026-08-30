@@ -1079,6 +1079,15 @@ async def validate_or_repair_script(
                         )
                     if review.passed:
                         current["_editorial_review"] = review_evidence
+                        # The loop's last disk write happened BEFORE this
+                        # verdict existed, so the receipt used to live only in
+                        # memory and every admitted artifact carried
+                        # `_editorial_review: null`. A production stage then has
+                        # nothing to trust and re-asks the judge, which is not
+                        # obliged to answer the same way twice — production
+                        # 2026-08-30 admitted a Short at 9/10 and blocked the
+                        # same bytes at 7/10 during publish.
+                        atomic_write_json(script_path, current)
                         return current
                     last_qa_output = {
                         "passed": False,

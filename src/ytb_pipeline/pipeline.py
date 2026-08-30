@@ -262,6 +262,35 @@ def load_or_create_project(script_source: str, checkpoint: CheckpointManager) ->
     return project
 
 
+_RECEIPT_KEYS = ("_editorial_review", "_qa", "quality_status", "quality_review")
+
+
+def editorial_receipt_covers(payload: dict[str, Any]) -> bool:
+    """True when a passing editorial verdict already covers these exact bytes.
+
+    Re-reviewing an admitted script is not a stronger gate: it is the same
+    rubric at the same threshold, asked a second time of a model that is not
+    obliged to answer identically. Production 2026-08-30 admitted a Short at
+    9/10 and blocked the same file at 7/10 during publish, its SHA unchanged.
+
+    The receipt records the digest of the payload as it was reviewed, before
+    the receipt itself was attached, so verification strips the receipt keys
+    and re-hashes. Any edit to the transcript breaks the match and the script
+    is reviewed again, exactly as before.
+    """
+    receipt = payload.get("_editorial_review")
+    if not isinstance(receipt, dict) or not receipt.get("passed"):
+        return False
+    recorded = str(receipt.get("reviewed_payload_sha256") or "")
+    if not recorded:
+        return False
+    reviewed = {key: value for key, value in payload.items() if key not in _RECEIPT_KEYS}
+    digest = hashlib.sha256(
+        json.dumps(reviewed, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    ).hexdigest()
+    return digest == recorded
+
+
 def _script_sha256(path: Path) -> str:
     if not path.exists():
         raise FileNotFoundError(f"Không tìm thấy kịch bản: {path}")
@@ -616,11 +645,15 @@ async def run_project(project: Project, checkpoint: CheckpointManager, through: 
             profile_id,
             version=str(raw_payload.get("profile_version") or "").strip() or None,
         )
-        review = await run_editorial_review(
-            profile,
-            raw_payload,
-            provider=get_llm_provider(profile.providers.llm),
-            cache_dir=settings.assets_dir / "editorial_review_cache" / profile.profile_id,
+        review = (
+            None
+            if editorial_receipt_covers(raw_payload)
+            else await run_editorial_review(
+                profile,
+                raw_payload,
+                provider=get_llm_provider(profile.providers.llm),
+                cache_dir=settings.assets_dir / "editorial_review_cache" / profile.profile_id,
+            )
         )
         if review is not None:
             editorial_output = {
