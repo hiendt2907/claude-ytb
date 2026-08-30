@@ -345,3 +345,40 @@ def test_short_generation_instruction_names_the_markers_the_gate_will_check():
 
     for marker in SHORT_SITUATION_TENSION_MARKERS:
         assert marker in prompt
+
+
+def test_hook_repair_names_the_markers_for_a_strategy_short():
+    """The hook repair rewrites the very section the marker gate polices.
+
+    Production 2026-08-30 (ideation_20260830_084815 and _092129): QA rejected the
+    hook, the bounded repair returned a well-anchored opening carrying real
+    tension, but without a whitelisted token — so contract validation killed the
+    whole run. Two supervised attempts died this way at the third rewrite site.
+    """
+    from ytb_pipeline.content_profiles import load_content_profile
+    from ytb_pipeline.orchestrator.ideation_prompts import hook_repair_prompt
+    from ytb_pipeline.orchestrator.ideation_script_fix import SHORT_SITUATION_TENSION_MARKERS
+
+    # The production path is a character_story profile, whose hook directive is
+    # STORY_HOOK_CONTRACT — it never carried the marker list that the legacy
+    # Long directive happens to mention.
+    prompt = hook_repair_prompt(
+        _strategy_short_payload("Còn mười phút nữa họp, nhưng dòng vẫn để nguyên."),
+        "Cảnh mở đầu chưa neo được khoảnh khắc hoặc chưa có gì để mất.",
+        content_profile=load_content_profile("ban-so-6"),
+    )
+
+    for marker in SHORT_SITUATION_TENSION_MARKERS:
+        assert marker in prompt
+
+
+def test_hook_repair_stays_silent_about_short_markers_for_a_long():
+    """A Long opening is judged by a different contract; do not leak this one."""
+    from ytb_pipeline.orchestrator.ideation_prompts import hook_repair_prompt
+
+    prompt = hook_repair_prompt(
+        {"video_type": "long", "sections": [{"purpose": "intro", "voiceover": "Mến chào các bạn,"}]},
+        "Cảnh mở đầu chưa neo được khoảnh khắc.",
+    )
+
+    assert "exact Vietnamese markers" not in prompt

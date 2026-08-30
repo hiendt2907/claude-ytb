@@ -297,11 +297,27 @@ def hook_repair_prompt(
     sections = payload.get("sections") or []
     context["first_section"] = sections[0] if sections else None
     directive = _hook_repair_directive(content_profile)
+    # This repair rewrites the exact section the Short marker gate polices, so it
+    # must be told the whitelist too. Production 2026-08-30: a well-anchored
+    # repaired opening carrying real tension but no listed token failed contract
+    # validation outright and killed the whole run twice.
+    strategy = payload.get("strategy")
+    marker_guard = ""
+    if (
+        payload.get("video_type") == "short"
+        and isinstance(strategy, dict)
+        and strategy.get("format_id") == "core_answer_first_v1"
+    ):
+        marker_guard = (
+            "\nMANDATORY: the rewritten opening must literally contain one of these exact "
+            f"Vietnamese markers: {_short_situation_marker_list()}. An opening without one of "
+            "them is rejected outright, however well anchored it is."
+        )
     return (
         "Rewrite ONLY the opening narration of this Vietnamese YouTube script to fix "
         "a QA hook rejection.\n"
         f"QA detail: {detail}\n"
-        f"{directive}\n"
+        f"{directive}{marker_guard}\n"
         'Return ONLY one JSON object shaped {"voiceover": <new Vietnamese opening '
         "text>}. Do not return the full script, markdown, or any other field. Keep "
         "the same speaker, purpose, and scene as the existing opening; do not "
