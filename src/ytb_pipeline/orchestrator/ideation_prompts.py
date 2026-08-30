@@ -130,6 +130,31 @@ _BOUNDED_ACTION_CLOSING = (
 )
 
 
+def _short_total_length_floor(
+    payload: dict, *, content_profile: "ContentProfile | None" = None
+) -> int | None:
+    """Return the character floor a Short must still clear after a repair.
+
+    Every bounded repair resizes text that the duration gate then judges, so
+    each of them needs this number. Returning None keeps non-Short repairs and
+    malformed payloads unchanged.
+    """
+    if str(payload.get("video_type") or "").strip().lower() != "short":
+        return None
+    sections = payload.get("sections") or []
+    if not sections:
+        return None
+    rate = chars_per_min_for_provider(
+        (content_profile.providers.tts if content_profile is not None else None)
+        or settings.tts_provider,
+        video_type="short",
+    )
+    floor_chars, _cap = contract_for("short", content_profile).safe_character_bounds(
+        chars_per_minute=rate, segment_count=max(1, len(sections))
+    )
+    return floor_chars
+
+
 def _short_situation_marker_list() -> str:
     """Spell out the closed whitelist the Short `situation` gate actually checks.
 
@@ -313,6 +338,20 @@ def hook_repair_prompt(
             f"Vietnamese markers: {_short_situation_marker_list()}. An opening without one of "
             "them is rejected outright, however well anchored it is."
         )
+        # Resizing the opening moves the whole-script total that the duration
+        # gate judges, so this repair needs the floor as much as the reflection
+        # repair did.
+        floor_chars = _short_total_length_floor(payload, content_profile=content_profile)
+        if floor_chars is not None:
+            others = sum(
+                len(str(section.get("voiceover") or section.get("narration") or ""))
+                for section in sections[1:]
+            )
+            marker_guard += (
+                f" LENGTH FLOOR: the whole Short must stay at least {floor_chars} characters of "
+                f"spoken narration; the other sections already carry {others}, so your rewritten "
+                f"opening must be at least {max(1, floor_chars - others)} characters."
+            )
     return (
         "Rewrite ONLY the opening narration of this Vietnamese YouTube script to fix "
         "a QA hook rejection.\n"
@@ -376,19 +415,11 @@ def narrator_reflection_repair_prompt(
     # at 28.4s against a 30.0s floor. State the floor the rewrite will be judged
     # against instead of letting it discover the cap by being killed.
     length_instruction = ""
-    if str(payload.get("video_type") or "").strip().lower() == "short":
+    floor_chars = _short_total_length_floor(payload, content_profile=content_profile)
+    if floor_chars is not None:
         others = sum(
             len(str(section.get("voiceover") or section.get("narration") or ""))
             for section in sections[:-1]
-        )
-        short_contract = contract_for("short", content_profile)
-        rate = chars_per_min_for_provider(
-            (content_profile.providers.tts if content_profile is not None else None)
-            or settings.tts_provider,
-            video_type="short",
-        )
-        floor_chars, _cap_chars = short_contract.safe_character_bounds(
-            chars_per_minute=rate, segment_count=max(1, len(sections))
         )
         minimum_final = max(1, floor_chars - others)
         length_instruction = (
@@ -1301,6 +1332,20 @@ def repair_prompt(
         "Rewrite the first narration section whenever the QA issues include rule "
         f"'hook': {_hook_repair_directive(repair_profile)}\n"
     )
+    # This repair returns the FULL script, so it can rewrite the situation
+    # section that the Short marker gate polices. Name the whitelist here too,
+    # or a corrected script gets rejected for a rule it was never told.
+    strategy_payload = payload.get("strategy")
+    if (
+        str(payload.get("video_type") or "").strip().lower() == "short"
+        and isinstance(strategy_payload, dict)
+        and strategy_payload.get("format_id") == "core_answer_first_v1"
+    ):
+        hook_repair_rule += (
+            "The situation section must literally contain one of these exact Vietnamese "
+            f"markers: {_short_situation_marker_list()}; a Short without one is rejected "
+            "outright.\n"
+        )
     return (
         "Repair this Vietnamese YouTube script JSON for the local-first pipeline.\n"
         "Return ONLY the full corrected JSON object. Do not add markdown.\n"
@@ -1398,6 +1443,24 @@ def editorial_rewrite_prompt(payload: dict, review: object) -> str:
             f"with {core_answer!r}. Do not remove, delay, or paraphrase that prefix. Improve the cited "
             "human scene around these structural invariants."
         )
+    # An editorial rewrite may resize several sections at once, so it is the
+    # likeliest of all the repairs to move the whole-script total past the
+    # duration gate. State that budget alongside the other invariants.
+    length_guard = ""
+    rewrite_floor = _short_total_length_floor(payload)
+    if rewrite_floor is not None:
+        current_total = sum(
+            len(str(section.get("voiceover") or section.get("narration") or ""))
+            for section in (payload.get("sections") or [])
+            if isinstance(section, dict)
+        )
+        length_guard = (
+            "\n\nMANDATORY SHORT LENGTH FLOOR (overrides any conflicting repair wording): the "
+            f"whole Short currently carries {current_total} characters of spoken narration and must "
+            f"stay at least {rewrite_floor}. Your rewritten sections must not pull the total below "
+            "that; a shorter Short is rejected outright, so rebuild the cited scenes at full length "
+            "rather than tightening them into fragments."
+        )
     if payload.get("video_type") == "short" and isinstance(strategy, dict):
         long_slug = str(strategy.get("long_form_slug") or "").strip()
         cta_target = str(strategy.get("cta_target") or "").strip()
@@ -1425,7 +1488,7 @@ def editorial_rewrite_prompt(payload: dict, review: object) -> str:
         f"- dimension scores: {json.dumps(dimension_scores, ensure_ascii=False, sort_keys=True)}\n"
         f"- sections: {section_refs}\n"
         f"- findings: {json.dumps(findings, ensure_ascii=False)}\n"
-        f"- repair brief: {repair_brief}{cold_open_guard}{funnel_bridge_guard}\n\n"
+        f"- repair brief: {repair_brief}{cold_open_guard}{funnel_bridge_guard}{length_guard}\n\n"
         "Treat the review packet as the diagnosis: repair the cited weak dimensions and cited sections, "
         "do not invent a different problem or answer with generic motivational language. Do not touch any "
         "section index not listed above, even if you think it could also be improved.\n\n"

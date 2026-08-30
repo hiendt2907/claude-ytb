@@ -414,3 +414,54 @@ def test_narrator_reflection_repair_states_the_length_floor_for_a_short():
 
     assert "characters" in prompt
     assert "at least" in prompt.lower()
+
+
+def _repair_sites_for_a_strategy_short():
+    """Render every bounded repair prompt that can resize or reopen a Short."""
+    from types import SimpleNamespace
+
+    from ytb_pipeline.content_profiles import load_content_profile
+    from ytb_pipeline.orchestrator import ideation_prompts as prompts
+
+    profile = load_content_profile("ban-so-6")
+    payload = _strategy_short_payload("Còn mười phút nữa họp, nhưng dòng vẫn để nguyên.")
+    payload["sections"].append(
+        {
+            "purpose": "payoff",
+            "speaker_id": "narrator",
+            "voiceover": "Có lẽ bạn cũng vậy. Tập sau, mời bạn xem video dài buoc-dau-mo-ho.",
+        }
+    )
+    review = SimpleNamespace(
+        blocking_findings=["f"], section_refs=[1, 3], overall_score=6,
+        dimension_scores={"causal_coherence": 4}, repair_brief="b",
+    )
+    return {
+        "hook_repair": prompts.hook_repair_prompt(payload, "d", content_profile=profile),
+        "editorial_rewrite": prompts.editorial_rewrite_prompt(payload, review),
+        "generic_repair": prompts.repair_prompt(payload, {"violations": [{"rule": "hook"}]}, None),
+        "reflection_repair": prompts.narrator_reflection_repair_prompt(
+            payload, "d", content_profile=profile
+        ),
+    }
+
+
+def test_every_short_repair_states_the_length_floor_it_will_be_judged_by():
+    """No bounded repair may resize a Short without being told the floor.
+
+    Three separate P0s on 2026-08-30 had one shape: a repair prompt was judged
+    by a contract nobody told it about, so a correct-looking delta was discarded
+    or killed the run. This pins the whole matrix instead of one site at a time.
+    """
+    for name, prompt in _repair_sites_for_a_strategy_short().items():
+        lowered = prompt.lower()
+        assert "at least" in lowered or "total narration" in lowered, name
+
+
+def test_every_short_repair_that_can_touch_the_opening_names_the_markers():
+    from ytb_pipeline.orchestrator.ideation_script_fix import SHORT_SITUATION_TENSION_MARKERS
+
+    sites = _repair_sites_for_a_strategy_short()
+    for name in ("hook_repair", "editorial_rewrite", "generic_repair"):
+        for marker in SHORT_SITUATION_TENSION_MARKERS:
+            assert marker in sites[name], f"{name} missing {marker}"
