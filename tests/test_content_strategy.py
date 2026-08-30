@@ -244,3 +244,104 @@ def test_repair_prompt_preserves_strategy_v1_instead_of_downgrading_to_legacy():
     assert '"strategy"' in prompt
     assert "core_answer" in prompt
     assert "purpose" in prompt
+
+
+def _strategy_short_payload(situation: str) -> dict:
+    """A minimal strategy-v1 Short shaped exactly like the production payload."""
+    return {
+        "video_type": "short",
+        "profile_id": "",
+        "strategy": {
+            "format_id": "core_answer_first_v1",
+            "core_mechanism": "tránh né sự mơ hồ",
+            "audience_problem": "mở laptop rồi cầm điện thoại",
+            "angle": "trang trắng",
+            "long_form_slug": "buoc-dau-mo-ho",
+            "playlist": "co-che-tri-hoan",
+            "cta_target": "buoc-dau-mo-ho",
+            "hook": {
+                "situation": situation,
+                "core_answer": "Não đang né sự mơ hồ",
+                "open_loop": "Vì sao nó xảy ra?",
+                "answer_by_sec": 5,
+            },
+        },
+        "sections": [
+            {"purpose": "situation", "voiceover": situation},
+            {"purpose": "core_answer", "voiceover": "Não đang né sự mơ hồ. Rồi tay mở điện thoại."},
+        ],
+    }
+
+
+def test_short_situation_gate_accepts_only_the_markers_it_documents():
+    """The gate's accepted markers are a closed lexical whitelist, not a concept.
+
+    Production 2026-08-30: an editorially natural opening carrying explicit
+    tension but none of these exact tokens is rejected outright, so any prompt
+    that only asks for "a concrete tension marker" cannot reliably satisfy it.
+    """
+    from ytb_pipeline.orchestrator.ideation_script_fix import (
+        SHORT_SITUATION_TENSION_MARKERS,
+        validate_short_strategy_v1,
+    )
+
+    for marker in SHORT_SITUATION_TENSION_MARKERS:
+        validate_short_strategy_v1(
+            _strategy_short_payload(f"Còn mười phút nữa họp, {marker} dòng vẫn để nguyên.")
+        )
+
+    with pytest.raises(ValueError, match="tension marker"):
+        validate_short_strategy_v1(
+            _strategy_short_payload("Còn mười phút nữa họp, dòng bôi vàng vẫn để nguyên à?")
+        )
+
+
+def test_editorial_rewrite_guard_names_the_markers_the_short_gate_will_check():
+    """A cited section 1 must be rewritable into something the gate accepts.
+
+    Production 2026-08-30 (ideation_20260830_082534/083708/085402): the review
+    cited section 1, the rewrite came back editorially better but without one of
+    the whitelisted tokens, and `Editorial rewrite phá Short strategy-v1` threw
+    the whole delta away. The bounded editorial budget was then spent
+    re-reviewing byte-identical payloads — three reviews, one payload SHA, the
+    same 3/10 — so the engine's only self-repair path never applied once.
+    """
+    from types import SimpleNamespace
+
+    from ytb_pipeline.orchestrator.ideation_prompts import editorial_rewrite_prompt
+    from ytb_pipeline.orchestrator.ideation_script_fix import SHORT_SITUATION_TENSION_MARKERS
+
+    prompt = editorial_rewrite_prompt(
+        _strategy_short_payload("Còn mười phút nữa họp, nhưng dòng vẫn để nguyên."),
+        SimpleNamespace(
+            blocking_findings=["An never speaks or asks a real question."],
+            section_refs=[1],
+            overall_score=6,
+            dimension_scores={"role_fidelity": 4},
+            repair_brief="Give An one real spoken question.",
+        ),
+    )
+
+    for marker in SHORT_SITUATION_TENSION_MARKERS:
+        assert marker in prompt
+
+
+def test_short_generation_instruction_names_the_markers_the_gate_will_check():
+    """The first generation attempt must not have to guess the whitelist either.
+
+    Production 2026-08-30 (ideation_20260830_081943): a first-pass candidate was
+    rejected for exactly this before any repair budget was even reached.
+    """
+    from ytb_pipeline.orchestrator.ideation_prompts import local_script_prompt
+    from ytb_pipeline.orchestrator.ideation_script_fix import SHORT_SITUATION_TENSION_MARKERS
+
+    prompt = local_script_prompt(
+        1,
+        1,
+        "short",
+        "auto",
+        "",
+    )
+
+    for marker in SHORT_SITUATION_TENSION_MARKERS:
+        assert marker in prompt

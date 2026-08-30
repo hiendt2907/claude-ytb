@@ -20,7 +20,11 @@ from ..agents.qa_agent import QAAgent
 from ..agents.editorial_review_agent import run_editorial_review
 from ..analytics.quality_report import missing_required_purposes
 from ..config.settings import settings
-from ..content_contract import contract_for, effective_chars_per_min
+from ..content_contract import (
+    SHORT_SITUATION_TENSION_MARKERS,
+    contract_for,
+    effective_chars_per_min,
+)
 from ..ideation.generator import load_script
 from ..content_profiles import ContentProfile, load_content_profile
 from ..ideation.script_contract import validate_script_payload
@@ -388,7 +392,10 @@ def validate_short_strategy_v1(payload: dict, *, source_long_context: dict | Non
             )
             if len(situation) > 120:
                 missing.append("situation.voiceover<=120 characters")
-            if not re.search(r"\b(nhưng|thật ra|đừng|không phải|vì sao)\b", situation, re.IGNORECASE):
+            marker_pattern = "|".join(
+                re.escape(marker) for marker in SHORT_SITUATION_TENSION_MARKERS
+            )
+            if not re.search(rf"\b({marker_pattern})\b", situation, re.IGNORECASE):
                 missing.append("situation needs a concrete tension marker")
             core_answer = str(hook.get("core_answer", "")).strip()
             core_voiceover = str(

@@ -14,6 +14,7 @@ from ..analytics.quality_report import REQUIRED_PURPOSES_BY_VIDEO_TYPE
 from ..config.settings import settings
 from ..content_contract import (
     CONTRACT_VERSION,
+    SHORT_SITUATION_TENSION_MARKERS,
     chars_per_min_for_provider,
     contract_for,
     effective_chars_per_min,
@@ -127,6 +128,17 @@ _BOUNDED_ACTION_CLOSING = (
     "copy — name a real quantity such as twenty minutes, three lines, "
     "one page — shown through what a character actually does."
 )
+
+
+def _short_situation_marker_list() -> str:
+    """Spell out the closed whitelist the Short `situation` gate actually checks.
+
+    Naming the tokens is the whole point: a prompt that only asks for "a
+    concrete tension marker" describes the intent but not the test, so an
+    editorially correct line can still be rejected and, during an editorial
+    rewrite, discard the entire delta.
+    """
+    return ", ".join(repr(marker) for marker in SHORT_SITUATION_TENSION_MARKERS)
 
 
 def _character_story_closing_instruction(content_profile: "ContentProfile | None") -> str:
@@ -955,7 +967,8 @@ def local_script_prompt(
         section_fields = "Each section also needs pexels_query. "
     short_instruction = "" if type_of_vid != "short" else (
         f"Use exactly {short_sections} sections for this Short. Make `situation` first and "
-        f"keep it under {short_contract.situation_char_budget(chars_per_minute=short_rate)} characters with a concrete tension marker; "
+        f"keep it under {short_contract.situation_char_budget(chars_per_minute=short_rate)} characters with a concrete tension marker "
+        f"— it must literally contain one of these exact Vietnamese markers: {_short_situation_marker_list()}; "
         "make `core_answer` the next section and begin with the exact strategy.hook.core_answer. "
         "This immediate answer contract is mandatory.\n"
         if requires_strategy
@@ -1334,8 +1347,11 @@ def editorial_rewrite_prompt(payload: dict, review: object) -> str:
         core_answer = str(hook.get("core_answer") or "").strip()
         cold_open_guard = (
             "\n\nMANDATORY SHORT COLD-OPEN CONTRACT (overrides any conflicting repair wording): "
-            "section 1 must remain a brief tension setup under 120 characters with an explicit "
-            f"tension marker, consistent with {situation!r}; you must start section 2 voiceover exactly "
+            "section 1 must remain a brief tension setup under 120 characters and must literally "
+            f"contain one of these exact Vietnamese markers: {_short_situation_marker_list()} — a rewrite "
+            "without one of them is rejected outright and your whole delta is discarded, so keep the "
+            f"marker even while rebuilding the scene. Stay consistent with {situation!r}; "
+            "you must start section 2 voiceover exactly "
             f"with {core_answer!r}. Do not remove, delay, or paraphrase that prefix. Improve the cited "
             "human scene around these structural invariants."
         )

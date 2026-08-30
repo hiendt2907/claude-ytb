@@ -54,6 +54,21 @@ TRANSITION_OVERLAP_SEC = 0.4
 # writing window inside the narrower Long contract.
 SAFE_LOWER_RUNTIME_MARGIN_RATIO = 0.05
 SAFE_UPPER_RUNTIME_MARGIN_RATIO = 0.06
+# The Short `situation` gate is a CLOSED lexical whitelist, not a concept a
+# writer can satisfy merely by being editorially tense.  Production 2026-08-30
+# proved that stating it only as "a concrete tension marker" is unusable: an
+# editorial rewrite that fixed the cited scene but dropped these exact tokens
+# was discarded whole (`Editorial rewrite phá Short strategy-v1`), and the
+# bounded editorial budget was then spent re-reviewing byte-identical payloads.
+# It lives in the shared contract so the checker and every prompt judged by it
+# stay one source of truth instead of drifting apart.
+SHORT_SITUATION_TENSION_MARKERS: tuple[str, ...] = (
+    "nhưng",
+    "thật ra",
+    "đừng",
+    "không phải",
+    "vì sao",
+)
 
 
 @dataclass(frozen=True)
