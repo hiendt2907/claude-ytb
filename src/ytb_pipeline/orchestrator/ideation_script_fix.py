@@ -280,13 +280,24 @@ def required_short_funnel_bridge(payload: dict) -> str:
     final_text = str(
         sections[-1].get("voiceover") or sections[-1].get("narration") or ""
     ).strip()
+    # The QA gate accepts a final section carrying one of these markers; the
+    # slug only has to agree across the strategy metadata. Requiring the literal
+    # slug inside the spoken sentence made this guard STRICTER than the gate it
+    # protects, so a bridge naming the Long by its Vietnamese title was invisible
+    # here, was trimmed away as ordinary trailing text, and the script was then
+    # rejected for the bridge normalization had just deleted (production
+    # 2026-08-30, ideation_20260830_105004). Prefer a sentence carrying the slug,
+    # but never leave a marker-bearing bridge unprotected.
+    markers = ("video dài", "xem video", "xem tiếp")
+    fallback = ""
     for sentence in re.split(r"(?<=[.!?])\s+", final_text):
         normalized = sentence.casefold()
-        if target.casefold() in normalized and any(
-            marker in normalized for marker in ("video dài", "xem video", "xem tiếp")
-        ):
+        if not any(marker in normalized for marker in markers):
+            continue
+        if target.casefold() in normalized:
             return sentence.strip()
-    return ""
+        fallback = fallback or sentence.strip()
+    return fallback
 
 
 def short_narration_chars(payload: dict) -> int:
@@ -466,7 +477,10 @@ def normalize_short_narration(
             final_voiceover = str(
                 final_section.get("voiceover") or final_section.get("narration") or ""
             ).strip()
-            if funnel_target.casefold() not in final_voiceover.casefold():
+            # Restore the captured bridge itself, not "any text mentioning the
+            # slug": a title-form bridge survives trimming without ever carrying
+            # the slug, and checking for the slug would append it a second time.
+            if required_funnel_bridge.casefold() not in final_voiceover.casefold():
                 final_voiceover = f"{final_voiceover} {required_funnel_bridge}".strip()
                 final_section["voiceover"] = final_voiceover
                 final_section["narration"] = final_voiceover

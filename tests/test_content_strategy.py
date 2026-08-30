@@ -585,3 +585,48 @@ def test_every_repair_quotes_the_budget_of_the_scripts_own_profile():
         quoted = {int(value) for value in re.findall(r"\b(\d{3})\b", prompt)}
         assert cap in quoted, f"{name} does not quote the profile cap {cap}: {sorted(quoted)}"
         assert floor in quoted, f"{name} does not quote the profile floor {floor}"
+
+
+def test_normalization_protects_a_bridge_the_qa_gate_would_accept():
+    """The guard must recognise every bridge the gate accepts, or it deletes it.
+
+    `_check_funnel_bridge` accepts a final section carrying "video dài" (the slug
+    only has to match across the strategy metadata). `required_short_funnel_bridge`
+    demanded the literal slug inside the spoken sentence, so a bridge naming the
+    Long by its Vietnamese title was invisible to the protection, was trimmed away
+    as ordinary trailing text, and the script was then rejected for the missing
+    bridge the engine had just removed.
+
+    Production 2026-08-30, ideation_20260830_105004: the model wrote
+    "Xem video dài 'Minh nêu rủi ro trong cuộc họp' để hiểu lựa chọn này." at 748
+    characters; normalization cut to 650 and the sentence was gone.
+    """
+    from ytb_pipeline.orchestrator.ideation_script_fix import (
+        normalize_short_narration,
+        required_short_funnel_bridge,
+    )
+
+    slug = "minh-neu-rui-ro-trong-cuoc-hop"
+    bridge = "Xem video dài 'Minh nêu rủi ro trong cuộc họp' để hiểu lựa chọn này."
+    payload = {
+        "video_type": "short",
+        "profile_id": "ban-so-6",
+        "profile_version": "2.1.0",
+        "strategy": {
+            "format_id": "core_answer_first_v1",
+            "long_form_slug": slug, "cta_target": slug, "source_long_slug": slug,
+            "hook": {"core_answer": "CORE."},
+        },
+        "sections": [
+            {"purpose": "situation", "voiceover": "Sáu giờ bốn mươi, nhưng dòng vàng vẫn nguyên."},
+            {"purpose": "core_answer", "voiceover": "CORE. " + "Một câu kể dài. " * 30},
+            {"purpose": "evidence", "voiceover": "Một câu kể khác. " * 20},
+            {"purpose": "payoff", "voiceover": f"Có những lúc bạn nói ra điều chưa chắc. {bridge}"},
+        ],
+    }
+
+    assert required_short_funnel_bridge(payload) == bridge
+
+    normalized, note = normalize_short_narration(payload, expected_video_type="short")
+    assert note, "the fixture must actually be over the cap so trimming runs"
+    assert "video dài" in (normalized["sections"][-1].get("voiceover") or "")
