@@ -709,3 +709,32 @@ def test_auto_visual_prompt_states_what_visual_intent_is_judged_on():
     assert "judged" in lowered or "chấm" in lowered or "pass/fail" in lowered
     # It must warn off the three things a still frame cannot carry.
     assert "readable text" in lowered or "chữ đọc được" in lowered
+
+
+def test_contract_rejection_is_not_reported_as_invalid_json():
+    """A contract failure must not be labelled a JSON syntax failure.
+
+    `except (ValueError, json.JSONDecodeError)` reported both as "LLM không trả
+    JSON hợp lệ", and the fatal message dropped the detail entirely. Production
+    2026-08-30 (ideation_20260830_165835): the candidate was a perfectly valid
+    JSON document — `json.loads` parses it — rejected for
+    "Source provenance mâu thuẫn ở source_excerpt". The operator was sent
+    looking for a truncated response instead of a source mismatch.
+    """
+    from ytb_pipeline.orchestrator.ideation_cmd import describe_candidate_rejection
+
+    import json as _json
+
+    decode_error = None
+    try:
+        _json.loads("{oops")
+    except _json.JSONDecodeError as exc:
+        decode_error = exc
+
+    assert "JSON" in describe_candidate_rejection(decode_error)
+
+    contract = describe_candidate_rejection(
+        ValueError("Source provenance mâu thuẫn ở source_excerpt.")
+    )
+    assert "source_excerpt" in contract
+    assert "JSON hợp lệ" not in contract

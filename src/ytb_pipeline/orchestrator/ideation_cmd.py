@@ -69,6 +69,21 @@ from .ideation_state import (
 from .queue_manager import PIPELINE_LOG_DIR
 
 
+def describe_candidate_rejection(exc: Exception) -> str:
+    """Name the actual reason a generated candidate was rejected.
+
+    The generation path catches `ValueError` and `json.JSONDecodeError` in one
+    block, and used to report both as "LLM không trả JSON hợp lệ". Production
+    2026-08-30 (ideation_20260830_165835) rejected a candidate that `json.loads`
+    parses cleanly, because its `source_excerpt` did not match the assigned
+    source — and told the operator the response was malformed JSON, which sends
+    them looking for a truncated payload instead of a source mismatch.
+    """
+    if isinstance(exc, json.JSONDecodeError):
+        return f"LLM không trả JSON hợp lệ: {exc}"
+    return f"Candidate không đạt hợp đồng nội dung: {exc}"
+
+
 def load_short_source_long_context(script_path: Path, long_slug: str) -> dict:
     """Build a compact, traceable bank of useful open-loop segments from a Long."""
     try:
@@ -519,7 +534,7 @@ async def _cmd_start_local(args: argparse.Namespace) -> None:
             archive_dir.mkdir(parents=True, exist_ok=True)
             archive_path = archive_dir / f"candidate_{i}_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.raw.txt"
             archive_path.write_text(text, encoding="utf-8")
-            error_text = f"LLM không trả JSON hợp lệ: {exc}"
+            error_text = describe_candidate_rejection(exc)
             record_ideation_failure(
                 cli.ROOT / "assets" / "quality_reports" / "ideation_errors.jsonl",
                 script_name=f"candidate_{i}.json",
@@ -533,7 +548,8 @@ async def _cmd_start_local(args: argparse.Namespace) -> None:
             )
             if not reserve_invalid_json_regeneration(invalid_json_regenerations, i):
                 raise SystemExit(
-                    f"✗ LLM không trả JSON hợp lệ sau 1 lần sinh lại. Bản lỗi: {archive_path}"
+                    f"✗ Candidate bị từ chối sau 1 lần sinh lại: {error_text} "
+                    f"Bản lỗi: {archive_path}"
                 ) from exc
             print(f"{prefix} JSON lỗi; đã lưu bản lỗi và sinh lại đúng 1 lần.", flush=True)
             continue
