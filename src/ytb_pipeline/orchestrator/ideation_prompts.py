@@ -371,6 +371,33 @@ def narrator_reflection_repair_prompt(
         if funnel_target
         else ""
     )
+    # This repair resizes the section that decides Short admission. Production
+    # 2026-08-30: a 556-character Short lost 69 characters here and was rejected
+    # at 28.4s against a 30.0s floor. State the floor the rewrite will be judged
+    # against instead of letting it discover the cap by being killed.
+    length_instruction = ""
+    if str(payload.get("video_type") or "").strip().lower() == "short":
+        others = sum(
+            len(str(section.get("voiceover") or section.get("narration") or ""))
+            for section in sections[:-1]
+        )
+        short_contract = contract_for("short", content_profile)
+        rate = chars_per_min_for_provider(
+            (content_profile.providers.tts if content_profile is not None else None)
+            or settings.tts_provider,
+            video_type="short",
+        )
+        floor_chars, _cap_chars = short_contract.safe_character_bounds(
+            chars_per_minute=rate, segment_count=max(1, len(sections))
+        )
+        minimum_final = max(1, floor_chars - others)
+        length_instruction = (
+            f" LENGTH FLOOR: the whole Short must stay at least {floor_chars} characters of "
+            f"spoken narration; the other sections already carry {others}, so your rewritten "
+            f"final section must be at least {minimum_final} characters. A shorter one is "
+            "rejected outright, so reach the floor by saying the reflection fully rather than "
+            "by padding it."
+        )
     context = {
         key: payload.get(key)
         for key in ("slug", "topic", "title", "video_type", "continuity")
@@ -386,7 +413,7 @@ def narrator_reflection_repair_prompt(
         "Keep the reflection modest and conditional; do not issue a command, "
         "diagnose the viewer, invent a new event, or state a universal moral. "
         "Do not name a cast member in the reflection before any next-episode bridge. "
-        f"{bridge_instruction}{funnel_instruction}\n"
+        f"{bridge_instruction}{funnel_instruction}{length_instruction}\n"
         'Return ONLY one JSON object shaped {"voiceover": <new Vietnamese final '
         "text>}. Do not return the full script, markdown, or any other field. "
         "Do not change title, topic, section count, purpose, speaker, continuity, "

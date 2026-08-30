@@ -382,3 +382,35 @@ def test_hook_repair_stays_silent_about_short_markers_for_a_long():
     )
 
     assert "exact Vietnamese markers" not in prompt
+
+
+def test_narrator_reflection_repair_states_the_length_floor_for_a_short():
+    """The repair rewrites a section whose size decides Short admission.
+
+    Production 2026-08-30 (ideation_20260830_092704): at validation attempt 5 the
+    Short was a valid 556 characters. The narrator-reflection repair rewrote the
+    final section from 321 to 252 characters, leaving 487 total — 28.4s against a
+    30.0s floor — and the run was rejected outright. The prompt never stated the
+    budget its own output would be judged against. A prior session fixed the
+    mirror case (a repair overflowing the cap); this is the underflow side.
+    """
+    from ytb_pipeline.content_profiles import load_content_profile
+    from ytb_pipeline.orchestrator.ideation_prompts import narrator_reflection_repair_prompt
+
+    payload = _strategy_short_payload("Còn mười phút nữa họp, nhưng dòng vẫn để nguyên.")
+    payload["sections"].append(
+        {
+            "purpose": "payoff",
+            "speaker_id": "narrator",
+            "voiceover": "Có lẽ bạn cũng từng dừng lại như vậy. Tập sau, mời bạn xem video dài buoc-dau-mo-ho.",
+        }
+    )
+
+    prompt = narrator_reflection_repair_prompt(
+        payload,
+        "Lời chốt story cần là phản chiếu trực tiếp, khiêm tốn của narrator.",
+        content_profile=load_content_profile("ban-so-6"),
+    )
+
+    assert "characters" in prompt
+    assert "at least" in prompt.lower()
