@@ -913,3 +913,25 @@ def test_whole_script_similarity_hides_a_mispronounced_name():
     worst_index, worst = worst_segment_similarity(expected, heard)
     assert worst < T
     assert worst_index == 1
+
+
+def test_number_words_and_digits_compare_equal_in_the_transcript_gate():
+    """Whisper writes digits; the script writes words. That is not a defect.
+
+    Production 2026-08-31 flagged a correctly spoken line at 0.78:
+
+        script     "Bảy giờ kém mười lăm, ... xe rời kho bảy giờ mười"
+        transcript "7 giờ kếm 15, ... xe rời khô 7 giờ 10"
+
+    The voice was right; the transcriber simply spells numbers as digits.
+    Clock times were already canonicalised, but a standalone quantity was not,
+    so any Vietnamese narration carrying counts or durations risked being
+    blocked for a fault it does not have.
+    """
+    from ytb_pipeline.voiceover.quality import _transcript_similarity
+
+    assert _transcript_similarity("Trễ ba ngày.", "Trễ 3 ngày.") == 1.0
+    assert _transcript_similarity("Còn mười lăm phút.", "Còn 15 phút.") == 1.0
+    assert _transcript_similarity("Bốn mươi tám phần trăm.", "48 phần trăm.") == 1.0
+    # A genuinely different number must still register as different.
+    assert _transcript_similarity("Trễ ba ngày.", "Trễ 5 ngày.") < 1.0

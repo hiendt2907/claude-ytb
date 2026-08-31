@@ -706,9 +706,44 @@ def _canonical_word_tokens(text: str) -> list[str]:
             token, index = matched
             canonical.append(token)
             continue
+        # A transcriber spells quantities as digits while the script spells them
+        # as words. Clock times were already reconciled; a standalone count was
+        # not, so "mười lăm" and "15" scored as a mismatch and a correctly
+        # spoken line could be blocked (production 2026-08-31, 0.78 on a line
+        # the voice read perfectly). Fold both spellings onto one token.
+        quantity = _match_standalone_number(words, index)
+        if quantity is not None:
+            token, index = quantity
+            canonical.append(token)
+            continue
         canonical.append(words[index])
         index += 1
     return canonical
+
+
+def _match_standalone_number(words: list[str], index: int) -> tuple[str, int] | None:
+    """Fold a written-out Vietnamese quantity onto its digit form."""
+    if words[index].isdigit():
+        return f"#{int(words[index])}", index + 1
+    for span in range(4, 0, -1):
+        end = index + span
+        if end > len(words):
+            continue
+        chunk = words[index:end]
+        # `_parse_vietnamese_number` tolerates a trailing non-numeric word, which
+        # would swallow the unit ("mười lăm phút" -> 15, eating "phút"). Only
+        # accept a span that is numbers all the way through.
+        if not all(_is_number_word(word) for word in chunk):
+            continue
+        value = _parse_vietnamese_number(chunk)
+        if value is not None:
+            return f"#{value}", end
+    return None
+
+
+def _is_number_word(word: str) -> bool:
+    stripped = _strip_accents(word)
+    return stripped.isdigit() or stripped in _VIETNAMESE_NUMBERS or stripped == "muoi"
 
 
 def _match_clock_time(words: list[str], index: int) -> tuple[str, int] | None:
