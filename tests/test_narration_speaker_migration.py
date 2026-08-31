@@ -242,3 +242,30 @@ def test_qa_slug_leak_check_leaves_ordinary_hyphenated_vietnamese_alone():
 
     ordinary = _Script([_Segment("Cậu ấy pha cà-phê rồi ngồi xuống bàn số sáu.")])
     assert _check_slug_leak(ordinary) == []
+
+
+def test_funnel_prompt_states_that_the_slug_is_never_spoken():
+    """Cổng chặn slug trong lời đọc thì prompt phải nói ra luật đó.
+
+    Khối funnel đưa `long_form_slug` vào prompt rồi bảo "Make the final spoken
+    CTA point to that exact long-form topic" — đọc lên như lệnh đọc slug ra
+    tiếng, và model đã làm đúng thế hai lần liên tiếp, lần thứ hai còn bị
+    `slug_leak` chặn trong một lượt sinh thật. Luật bị ép ở một nơi và không hề
+    nói cho thành phần phải tuân theo nó.
+    """
+    from ytb_pipeline.orchestrator.ideation_prompts import local_script_prompt
+
+    prompt = local_script_prompt(
+        1, 1, "short", "auto", "",
+        funnel={
+            "long_form_slug": "minh-cham-hon-dong-nghiep-tre",
+            "playlist": "Bàn số 6",
+            "cta_target": "minh-cham-hon-dong-nghiep-tre",
+        },
+    )
+
+    assert "minh-cham-hon-dong-nghiep-tre" in prompt, "prompt vẫn phải mang slug ở phần metadata"
+    lowered = prompt.lower()
+    assert "never say" in lowered or "không đọc" in lowered or "not spoken" in lowered, (
+        "prompt phải nói rõ slug là định danh máy, không đọc thành tiếng"
+    )

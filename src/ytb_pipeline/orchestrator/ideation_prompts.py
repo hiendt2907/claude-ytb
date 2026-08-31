@@ -978,7 +978,11 @@ def local_script_prompt(
             f"long_form_slug={funnel.get('long_form_slug', '')}; "
             f"playlist={funnel.get('playlist', '')}; "
             f"cta_target={funnel.get('cta_target', '')}. "
-            "Make the final spoken CTA point to that exact long-form topic.\n"
+            "Copy these three values into the strategy fields of the same name. They are "
+            "machine identifiers: NEVER say a slug out loud — no voiceover may contain one, "
+            "because the voice reads it letter by letter as noise. The closing line names the "
+            "long form by what happens in it (\"video dài kể tiếp buổi sáng hôm đó\"), keeping "
+            "a phrase such as \"video dài\" or \"xem tiếp\".\n"
         )
     source_long_instruction = ""
     if type_of_vid == "short" and source_long_context:
