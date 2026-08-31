@@ -931,9 +931,18 @@ async def validate_or_repair_script(
         try:
             wording_meta = current.get("_wording_engine")
             if isinstance(wording_meta, dict) and not wording_meta.get("encoding_valid", True):
-                flags = ", ".join(str(flag) for flag in wording_meta.get("flags", ()))
+                raw_flags = tuple(wording_meta.get("flags", ()))
+                flags = ", ".join(str(flag) for flag in raw_flags)
+                # Hai lỗi encoding khác hẳn nhau: mất dấu tiếng Việt là model
+                # viết ASCII, còn ký tự thay thế là byte hỏng từ gateway. Báo
+                # đúng cái nào đang xảy ra, đừng gộp về một câu.
+                reason = (
+                    "text chứa ký tự thay thế U+FFFD (byte hỏng từ provider)"
+                    if "REPLACEMENT_CHARACTER" in raw_flags
+                    else "narration thiếu dấu tiếng Việt"
+                )
                 raise ValueError(
-                    "Wording Engine encoding flag: narration thiếu dấu tiếng Việt"
+                    f"Wording Engine encoding flag: {reason}"
                     + (f" ({flags})" if flags else ".")
                 )
             contract_result = validate_script_payload(current)

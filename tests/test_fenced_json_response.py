@@ -53,3 +53,49 @@ def test_prose_before_a_fence_is_tolerated():
 def test_text_that_is_not_json_at_all_still_fails():
     with pytest.raises(ValueError):
         process_and_sanitize("xin lỗi, tôi không thể làm việc này")
+
+
+def test_replacement_characters_anywhere_fail_the_encoding_gate():
+    """Byte hỏng từ gateway thành U+FFFD rồi đi tiếp như text bình thường.
+
+    `xkiro_provider` giải mã bằng `decode("utf-8", "replace")`, nên một token bị
+    cắt giữa chuỗi nhiều byte biến thành "Năm l��n" và chạy tiếp. Lớp
+    tất định trước đây chỉ bắt "mất dấu tiếng Việt" và chỉ soi
+    narration/voiceover, nên mojibake trong `caption` lọt hết — chỉ có rubric
+    LLM bắt được, mà rubric là lớp sai cho một lỗi cơ học (§38): nó không tất
+    định và có thể chấm khác ở lượt sau.
+    """
+    payload = json.dumps({
+        "slug": "nam-lan-do-chuong",
+        "title": "Năm Lần Đổ Chuông",
+        "sections": [
+            {
+                "caption": "Năm l��n đổ chuông trước giờ họp",
+                "voiceover": "Cậu gọi năm lần nhưng không ai xác nhận con số.",
+            },
+        ],
+    }, ensure_ascii=False)
+
+    result = process_and_sanitize(payload)
+
+    meta = result["_wording_engine"]
+    assert meta["encoding_valid"] is False
+    assert "REPLACEMENT_CHARACTER" in meta["flags"]
+
+
+def test_clean_vietnamese_still_passes_the_encoding_gate():
+    payload = json.dumps({
+        "slug": "nam-lan-do-chuong",
+        "title": "Năm Lần Đổ Chuông",
+        "sections": [
+            {
+                "caption": "Năm lần đổ chuông trước giờ họp",
+                "voiceover": "Cậu gọi năm lần nhưng không ai xác nhận con số.",
+            },
+        ],
+    }, ensure_ascii=False)
+
+    result = process_and_sanitize(payload)
+
+    assert result["_wording_engine"]["encoding_valid"] is True
+    assert "REPLACEMENT_CHARACTER" not in result["_wording_engine"]["flags"]

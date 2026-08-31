@@ -67,6 +67,17 @@ def _encoding_valid(text: str) -> bool:
     return not any(char.isalpha() for char in text) or bool(_VIETNAMESE_DIACRITICS.intersection(text))
 
 
+def _has_replacement_character(node: Any) -> bool:
+    """Tìm U+FFFD ở bất kỳ chuỗi nào trong payload, kể cả key không phải narration."""
+    if isinstance(node, str):
+        return "�" in node
+    if isinstance(node, dict):
+        return any(_has_replacement_character(child) for child in node.values())
+    if isinstance(node, list):
+        return any(_has_replacement_character(child) for child in node)
+    return False
+
+
 def _sanitize_narration(text: str, *, hook: bool = False, outro: bool = False) -> tuple[str, bool]:
     cleaned = _strip_stage_directions(text)
     if hook:
@@ -172,6 +183,15 @@ def process_and_sanitize(raw_llm_output: str) -> dict:
                 walk(child)
 
     walk(result)
+
+    # U+FFFD nghĩa là gateway đã gửi byte hỏng và `decode("utf-8", "replace")`
+    # đã thay bằng ký tự thay thế — "Năm l��n" đi tiếp như text thường,
+    # rồi hiện lên màn hình và được đọc lên. Quét TOÀN BỘ chuỗi, không chỉ
+    # narration: ca gặp thật nằm trong `caption`, mà `_NARRATION_KEYS` không
+    # soi tới. Chỉ đọc, không sửa: không đoán được ký tự đã mất là gì.
+    if _has_replacement_character(result):
+        encoding_valid = False
+        flags.append("REPLACEMENT_CHARACTER")
 
     result["_wording_engine"] = {
         "layer": 2,
