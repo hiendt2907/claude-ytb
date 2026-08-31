@@ -429,7 +429,7 @@ def _repair_sites_for_a_strategy_short():
     # A real script declares its profile; without it every site silently quotes
     # the default contract's window instead of the one it will be judged by.
     payload["profile_id"] = "ban-so-6"
-    payload["profile_version"] = "2.1.0"
+    payload["profile_version"] = "2.2.0"
     payload["sections"].append(
         {
             "purpose": "payoff",
@@ -582,7 +582,7 @@ def test_every_repair_quotes_the_budget_of_the_scripts_own_profile():
     floor, cap = _short_total_length_bounds(payload, content_profile=profile)
 
     for name, prompt in sites.items():
-        quoted = {int(value) for value in re.findall(r"\b(\d{3})\b", prompt)}
+        quoted = {int(value) for value in re.findall(r"\b(\d{3,4})\b", prompt)}
         assert cap in quoted, f"{name} does not quote the profile cap {cap}: {sorted(quoted)}"
         assert floor in quoted, f"{name} does not quote the profile floor {floor}"
 

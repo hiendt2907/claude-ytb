@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "profile_id": "ban-so-6",
-  "version": "2.2.0",
+  "version": "2.1.0",
   "display_name": "Bàn số 6 — Truyện đời thường",
   "topic": "Những lựa chọn nhỏ của Minh và An tại Bàn số 6",
   "narrative_mode": "character_story",
@@ -26,19 +26,8 @@
     "max_rewrites": 2
   },
   "formats": {
-    "short": {
-      "viewer_min_sec": 60,
-      "viewer_max_sec": 90,
-      "min_sections": 4,
-      "max_sections": 12
-    },
-    "long": {
-      "viewer_min_sec": 300,
-      "viewer_max_sec": 420,
-      "runtime_tolerance_sec": 3,
-      "min_sections": 10,
-      "max_sections": 24
-    }
+    "short": {"viewer_min_sec": 30, "viewer_max_sec": 45, "min_sections": 4, "max_sections": 12},
+    "long": {"viewer_min_sec": 300, "viewer_max_sec": 420, "runtime_tolerance_sec": 3, "min_sections": 10, "max_sections": 24}
   },
   "providers": {
     "llm": "xkiro",

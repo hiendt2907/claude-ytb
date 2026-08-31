@@ -431,9 +431,13 @@ def test_loader_rejects_explicit_profile_without_version_but_reads_disabled_stor
     with pytest.raises(ValueError, match="profile_version"):
         load_script(path)
 
-    from ytb_pipeline.content_profiles import load_content_profile
-
-    payload["profile_version"] = load_content_profile("ban-so-6").version
+    # Restore the version the fixture was authored against. Forcing the CURRENT
+    # version made this test depend on the live Short duration window: profile
+    # 2.2.0 widened it to 60-90s and this 43s episode stopped loading, which is
+    # a length contract, not the version handling under test here.
+    payload["profile_version"] = json.loads(
+        fixture.read_text(encoding="utf-8")
+    )["profile_version"]
     path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
     # `allow_short_generation` protects ideation only. Existing series
     # artifacts remain readable/renderable after a profile goes Long-only.
@@ -488,7 +492,9 @@ def test_ban_so_6_production_profile_enables_derivative_short_and_real_vision_qc
     profile = load_content_profile("ban-so-6")
     visual = profile.visual_generation
 
-    assert profile.version == "2.1.0"
+    # 2.2.0 widened the Short window to 60-90s so a beat can be written as a
+    # scene instead of a telegram; see the profile version snapshots.
+    assert profile.version == "2.2.0"
     assert profile.content_rules.allow_short_generation is True
     assert profile.content_rules.require_short_source_trace is True
     assert visual is not None
@@ -539,7 +545,9 @@ def test_profile_loader_uses_profile_tts_for_runtime_estimation(monkeypatch):
         return 1030.0
 
     monkeypatch.setattr(generator, "chars_per_min_for_provider", calibrated)
-    segments = tuple(Segment("", "x" * 190) for _ in range(4))
+    # profile 2.2.0 widened the Short window to 60-90s, so a valid Short now
+    # carries roughly twice the narration it used to.
+    segments = tuple(Segment("", "x" * 290) for _ in range(4))
 
     generator._validate_length(
         segments,
