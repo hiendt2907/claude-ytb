@@ -575,9 +575,14 @@ def _to_mp3(src: Path, dst: Path, *, tempo: float = 1.0,
     # provider padding can dominate short scripts and trip the audio QA gate.
     # Trim only silence at each provider file boundary; intentional pauses are
     # generated separately by `_silence_mp3` and therefore remain intact.
+    #
+    # Chỉ cắt ĐUÔI.  Cắt đầu (`start_periods`) ăn vào phụ âm đầu của cụm ngắn:
+    # đo trên xKiro, cụm "Em gọi." dài 0.672s còn 0.495s, và faster-whisper
+    # large-v3 nghe file đó ra "Hãy đăng ký kênh để ủng hộ kênh của mình nhé."
+    # Chỉ cắt đuôi thì cùng cụm ra 0.641s và nghe đúng "Em gọi.".  Im lặng đầu
+    # file do encoder chèn chỉ vài chục ms, không đủ chi phối như padding đuôi.
     filters = [
-        "silenceremove=start_periods=1:start_duration=0.05:start_threshold=-50dB:"
-        "stop_periods=1:stop_duration=0.12:stop_threshold=-50dB"
+        "silenceremove=stop_periods=1:stop_duration=0.12:stop_threshold=-50dB"
     ]
     if profile is not None and abs(profile.pitch_semitones) > 0.001:
         # Homebrew's ffmpeg often lacks rubberband.  Resample + inverse atempo

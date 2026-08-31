@@ -223,6 +223,30 @@ def test_to_mp3_applies_tempo_when_profile_needs_it(monkeypatch, tmp_path):
     assert any("atempo=" in part for part in calls[0])
 
 
+def test_to_mp3_never_trims_the_leading_edge_of_a_phrase(monkeypatch, tmp_path):
+    """Đo được trên xKiro: cắt im lặng ĐẦU file ăn mất phụ âm đầu của cụm ngắn.
+
+    Cụm "Em gọi." dài 0.672s; bật `start_periods` còn 0.495s và faster-whisper
+    nghe ra "Hãy đăng ký kênh để ủng hộ kênh của mình nhé." — audio thật đã hỏng
+    chứ không phải máy đo sai. Chỉ cắt đuôi thì vẫn nghe đúng "Em gọi.".
+    """
+    calls = []
+    src = tmp_path / "in.mp3"
+    dst = tmp_path / "out.mp3"
+    src.write_bytes(b"mp3")
+
+    class Result:
+        returncode = 0
+
+    monkeypatch.setattr(tts.subprocess, "run", lambda cmd, **kwargs: calls.append(cmd) or Result())
+
+    tts._to_mp3(src, dst)
+
+    filters = "".join(part for part in calls[0] if "silenceremove" in part)
+    assert "stop_periods" in filters, "vẫn phải cắt đuôi im lặng do encoder chèn"
+    assert "start_periods" not in filters, "cắt đầu ăn mất phụ âm đầu của cụm ngắn"
+
+
 def test_f5_tempo_stays_inside_the_stt_safe_pacing_envelope():
     for profile in tts.VOICE_PROFILES.values():
         assert 0.95 <= profile.f5_tempo <= tts.MAX_F5_TEMPO
