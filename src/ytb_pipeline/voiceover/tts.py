@@ -570,20 +570,19 @@ def _to_mp3(src: Path, dst: Path, *, tempo: float = 1.0,
     if profile is not None:
         tempo = profile.f5_tempo
     cmd = ["ffmpeg", "-y", "-i", str(src)]
-    # TTS providers commonly add encoder/trailing silence to every short
-    # phrase.  Because `_synth_segment` concatenates many phrases, that
-    # provider padding can dominate short scripts and trip the audio QA gate.
-    # Trim only silence at each provider file boundary; intentional pauses are
-    # generated separately by `_silence_mp3` and therefore remain intact.
+    # KHÔNG dùng `silenceremove`.  Bộ lọc này từng cắt im lặng ở CẢ HAI đầu để
+    # bỏ padding encoder, và cả hai nửa đều ăn vào tiếng nói thật:
     #
-    # Chỉ cắt ĐUÔI.  Cắt đầu (`start_periods`) ăn vào phụ âm đầu của cụm ngắn:
-    # đo trên xKiro, cụm "Em gọi." dài 0.672s còn 0.495s, và faster-whisper
-    # large-v3 nghe file đó ra "Hãy đăng ký kênh để ủng hộ kênh của mình nhé."
-    # Chỉ cắt đuôi thì cùng cụm ra 0.641s và nghe đúng "Em gọi.".  Im lặng đầu
-    # file do encoder chèn chỉ vài chục ms, không đủ chi phối như padding đuôi.
-    filters = [
-        "silenceremove=stop_periods=1:stop_duration=0.12:stop_threshold=-50dB"
-    ]
+    #   - cắt đầu: cụm "Em gọi." 0.672s còn 0.495s, mất phụ âm đầu, và
+    #     faster-whisper large-v3 nghe file đó ra "Hãy đăng ký kênh...";
+    #   - cắt đuôi: `stop_periods=1` cắt tại khoảng lặng NỘI BỘ đầu tiên chứ
+    #     không riêng padding cuối — cụm "gọi năm lần nhưng không ai nhấc."
+    #     2.352s còn 1.251s, mất hẳn "nhưng không ai nhấc.".
+    #
+    # Đo trên 12 cụm thật: 11 cụm chỉ mất 0-44ms (đúng là padding), 1 cụm mất
+    # 1101ms.  Lợi ~25ms mỗi cụm, hại thì không có trần.  Nhịp ngắt nghỉ vốn do
+    # `_silence_mp3` sinh riêng, nên bỏ bộ lọc này không đổi pacing đã thiết kế.
+    filters: list[str] = []
     if profile is not None and abs(profile.pitch_semitones) > 0.001:
         # Homebrew's ffmpeg often lacks rubberband.  Resample + inverse atempo
         # changes pitch while preserving duration and works with stock ffmpeg.
@@ -597,7 +596,8 @@ def _to_mp3(src: Path, dst: Path, *, tempo: float = 1.0,
         filters.append(f"volume={profile.gain_db:.3f}dB")
     if abs(tempo - 1.0) > 0.001:
         filters.append(f"atempo={tempo:.3f}")
-    cmd += ["-filter:a", ",".join(filters)]
+    if filters:
+        cmd += ["-filter:a", ",".join(filters)]
     cmd += ["-ar", "44100", "-ac", "2", "-b:a", "192k", str(dst)]
     subprocess.run(cmd, capture_output=True, check=True)
 

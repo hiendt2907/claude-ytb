@@ -223,12 +223,16 @@ def test_to_mp3_applies_tempo_when_profile_needs_it(monkeypatch, tmp_path):
     assert any("atempo=" in part for part in calls[0])
 
 
-def test_to_mp3_never_trims_the_leading_edge_of_a_phrase(monkeypatch, tmp_path):
-    """Đo được trên xKiro: cắt im lặng ĐẦU file ăn mất phụ âm đầu của cụm ngắn.
+def test_to_mp3_never_trims_silence_off_a_synthesised_phrase(monkeypatch, tmp_path):
+    """Cả hai đầu của `silenceremove` đều ăn vào tiếng nói thật.
 
-    Cụm "Em gọi." dài 0.672s; bật `start_periods` còn 0.495s và faster-whisper
-    nghe ra "Hãy đăng ký kênh để ủng hộ kênh của mình nhé." — audio thật đã hỏng
-    chứ không phải máy đo sai. Chỉ cắt đuôi thì vẫn nghe đúng "Em gọi.".
+    Đo trên xKiro, faster-whisper large-v3:
+    - cắt đầu: "Em gọi." 0.672s -> 0.495s, nghe ra "Hãy đăng ký kênh...";
+    - cắt đuôi: "gọi năm lần nhưng không ai nhấc." 2.352s -> 1.251s vì
+      `stop_periods=1` dừng ở khoảng lặng NỘI BỘ đầu tiên, mất hẳn nửa sau.
+
+    Trên 12 cụm thật, 11 cụm chỉ mất 0-44ms padding còn 1 cụm mất 1101ms — lợi
+    quá nhỏ so với hại không có trần, nên không dùng bộ lọc này nữa.
     """
     calls = []
     src = tmp_path / "in.mp3"
@@ -242,9 +246,9 @@ def test_to_mp3_never_trims_the_leading_edge_of_a_phrase(monkeypatch, tmp_path):
 
     tts._to_mp3(src, dst)
 
-    filters = "".join(part for part in calls[0] if "silenceremove" in part)
-    assert "stop_periods" in filters, "vẫn phải cắt đuôi im lặng do encoder chèn"
-    assert "start_periods" not in filters, "cắt đầu ăn mất phụ âm đầu của cụm ngắn"
+    assert not any("silenceremove" in str(part) for part in calls[0]), calls[0]
+    assert "-filter:a" not in calls[0], "không còn filter nào thì đừng truyền -filter:a rỗng"
+    assert str(dst) in calls[0]
 
 
 def test_f5_tempo_stays_inside_the_stt_safe_pacing_envelope():
@@ -276,24 +280,6 @@ def test_f5_segment_cache_key_includes_tempo(monkeypatch):
 
     assert f"f5x{tts.VOICE_KNOWLEDGE.f5_tempo:.2f}" in path.name
     assert f"s{F5_INFERENCE_SPEED:.3f}" in path.name
-
-
-def test_to_mp3_trims_provider_boundary_silence(monkeypatch, tmp_path):
-    calls = []
-    src = tmp_path / "in.wav"
-    dst = tmp_path / "out.mp3"
-    src.write_bytes(b"wav")
-
-    class Result:
-        returncode = 0
-
-    monkeypatch.setattr(tts.subprocess, "run", lambda cmd, **kwargs: calls.append(cmd) or Result())
-
-    tts._to_mp3(src, dst)
-
-    filter_args = [part for part in calls[0] if isinstance(part, str) and "silenceremove=" in part]
-    assert filter_args
-    assert "stop_periods=1" in filter_args[0]
 
 
 def test_synth_all_edge_parallel_giu_thu_tu_voi_nhieu_worker(monkeypatch, tmp_path):
