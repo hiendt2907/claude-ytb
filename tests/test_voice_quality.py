@@ -453,3 +453,42 @@ def test_repeat_gate_only_flags_a_repetition_the_script_did_not_author(monkeypat
 
     assert "TRANSCRIPT_REPEAT" not in [i.code for i in authored.issues]
     assert "TRANSCRIPT_REPEAT" in [i.code for i in invented.issues]
+
+
+def test_faster_whisper_adapter_does_not_steer_the_decoder_with_a_topic_prompt(
+    monkeypatch, tmp_path
+):
+    """`initial_prompt` lái decoder sang boilerplate YouTube trên chính audio đúng.
+
+    Đo trên 12 segment của một Long đã render, cùng file audio, chỉ đổi
+    `initial_prompt`: 2 segment nhảy 0.18 -> 0.99 và 0.13 -> 0.98 khi bỏ prompt,
+    10 segment còn lại không đổi, không segment nào kém đi. Với prompt, cả hai
+    segment hỏng đều phiên ra đúng một câu "Hãy subscribe cho kênh Ghiền Mì Gõ
+    Để không bỏ lỡ những video hấp dẫn" — audio thật đọc đúng lời, đo từng lát
+    3 giây đều khớp. Cổng chất lượng audio dùng adapter này để CHẶN publish, nên
+    một prompt làm nó báo sai là chặn nhầm bản dựng tốt.
+    """
+    options = []
+
+    class FakeModel:
+        def __init__(self, path, **kwargs):
+            pass
+
+        def transcribe(self, _audio_path, **opts):
+            options.append(opts)
+            return iter((SimpleNamespace(text="xin chào"),)), None
+
+    fake_module = ModuleType("faster_whisper")
+    fake_module.WhisperModel = FakeModel
+    monkeypatch.setitem(sys.modules, "faster_whisper", fake_module)
+    model_dir = tmp_path / "whisper-model"
+    model_dir.mkdir()
+    adapter = quality.FasterWhisperSttAdapter(
+        model_path=model_dir, module_available=lambda _name: True,
+    )
+
+    adapter.transcribe(tmp_path / "audio.mp3")
+
+    assert options, "adapter phải gọi transcribe"
+    assert not options[0].get("initial_prompt")
+    assert options[0]["language"] == "vi"

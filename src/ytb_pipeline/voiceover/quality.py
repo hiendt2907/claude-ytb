@@ -118,11 +118,17 @@ class FasterWhisperSttAdapter:
         if self.cpu_threads is not None:
             model_kwargs["cpu_threads"] = self.cpu_threads
         model = WhisperModel(str(self.model_path), **model_kwargs)
+        # KHÔNG đặt `initial_prompt`.  Prompt chủ đề lái decoder sang boilerplate
+        # YouTube: đo trên 12 segment của một Long đã render, cùng file audio,
+        # chỉ đổi prompt — 2 segment nhảy 0.18 -> 0.99 và 0.13 -> 0.98 khi bỏ
+        # prompt, 10 segment không đổi, không segment nào kém đi.  Hai segment
+        # hỏng đều phiên ra đúng một câu "Hãy subscribe cho kênh Ghiền Mì Gõ..."
+        # trong khi audio thật đọc đúng lời (cắt từng lát 3 giây đều khớp).
+        # `language="vi"` đã ghim ngôn ngữ; prompt không thêm gì ngoài rủi ro.
         options = {
             "language": "vi",
             "vad_filter": True,
             "condition_on_previous_text": False,
-            "initial_prompt": "Đây là lời thoại tiếng Việt về tâm lý học và hành vi con người.",
         }
         segments, _info = model.transcribe(str(audio_path), **options)
         text = " ".join(segment.text.strip() for segment in segments if segment.text.strip())
