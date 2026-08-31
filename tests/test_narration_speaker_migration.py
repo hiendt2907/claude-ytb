@@ -181,3 +181,64 @@ def test_qa_speaker_prefix_check_uses_declared_narration_id_for_cast_lookup(tmp_
         assert not no_violation, "the declared narration id must not be treated as a cast member"
     finally:
         qa_module._content_profile = original
+
+
+def test_qa_flags_a_machine_slug_spoken_inside_narration():
+    """Slug lọt vào lời đọc thì TTS đọc ra chuỗi vô nghĩa.
+
+    Đo trên bản Short thật: câu "Lần tới, video dài minh-cham-hon-dong-nghiep-tre
+    sẽ đi tiếp..." được xKiro đọc thành "Video giải minh cờ hờ AMH Owner the
+    owner Sơ". Section đó vẫn đạt 0.92 ở cổng audio vì 200 ký tự đúng pha loãng
+    29 ký tự slug — cùng kiểu pha loãng mà cổng per-segment đã sửa, nhưng ở
+    trong lòng một segment. Chặn ngay ở kịch bản là chỗ rẻ nhất.
+    """
+    from ytb_pipeline.agents.qa_agent import _check_slug_leak
+
+    class _Strategy:
+        long_form_slug = "minh-cham-hon-dong-nghiep-tre"
+        cta_target = "minh-cham-hon-dong-nghiep-tre"
+        source_long_slug = "minh-cham-hon-dong-nghiep-tre"
+
+    class _Segment:
+        def __init__(self, narration):
+            self.speaker_id = "narrator"
+            self.narration = narration
+            self.voiceover = narration
+
+    class _Script:
+        def __init__(self, segments):
+            self.slug = "vi-sao-toi-qua-khong-noi-som"
+            self.strategy = _Strategy()
+            self.segments = segments
+
+    leaked = _Script([
+        _Segment("Lần tới, video dài minh-cham-hon-dong-nghiep-tre sẽ đi tiếp."),
+    ])
+    violations = _check_slug_leak(leaked)
+    assert violations, "slug đọc thành tiếng phải bị chặn"
+    assert violations[0]["rule"] == "slug_leak"
+
+    clean = _Script([
+        _Segment("Lần tới, video dài sẽ đi tiếp từ chỗ chưa kịp nói đó."),
+    ])
+    assert _check_slug_leak(clean) == []
+
+
+def test_qa_slug_leak_check_leaves_ordinary_hyphenated_vietnamese_alone():
+    """Không được bắt nhầm gạch nối thường gặp trong tiếng Việt."""
+    from ytb_pipeline.agents.qa_agent import _check_slug_leak
+
+    class _Segment:
+        def __init__(self, narration):
+            self.speaker_id = "narrator"
+            self.narration = narration
+            self.voiceover = narration
+
+    class _Script:
+        slug = "mot-slug-khac"
+        strategy = None
+        def __init__(self, segments):
+            self.segments = segments
+
+    ordinary = _Script([_Segment("Cậu ấy pha cà-phê rồi ngồi xuống bàn số sáu.")])
+    assert _check_slug_leak(ordinary) == []

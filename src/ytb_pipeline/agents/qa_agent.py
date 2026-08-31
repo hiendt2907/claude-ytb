@@ -85,6 +85,7 @@ class QAAgent:
                     violations.extend(_check_release_schema(script))
                 violations.extend(_check_stage_direction_leak(script))
                 violations.extend(_check_speaker_prefix_leak(script))
+                violations.extend(_check_slug_leak(script))
                 violations.extend(_check_story_speaker_ownership(script))
                 violations.extend(_check_character_voiceover_is_direct(script))
                 violations.extend(_check_story_series_arc(script))
@@ -486,6 +487,39 @@ def _check_speaker_prefix_leak(script: Any) -> list[dict[str, str]]:
                 "speaker_prefix",
                 f"Section {index} mở đầu bằng tên người nói ('{head}:'); TTS sẽ đọc cả tên.",
                 "Bỏ tiền tố tên khỏi voiceover; giọng đã được chọn qua speaker_id.",
+            ))
+    return violations
+
+
+def _check_slug_leak(script: Any) -> list[dict[str, str]]:
+    """Slug là định danh máy; lọt vào lời đọc thì TTS đọc ra chuỗi vô nghĩa.
+
+    Đo trên một Short thật: "Lần tới, video dài minh-cham-hon-dong-nghiep-tre sẽ
+    đi tiếp..." được xKiro đọc thành "Video giải minh cờ hờ AMH Owner the owner
+    Sơ". Cổng audio vẫn cho qua ở 0.92 vì 200 ký tự đúng pha loãng 29 ký tự
+    slug — đúng kiểu pha loãng mà cổng per-segment đã sửa, nhưng nằm TRONG một
+    segment nên không cổng nào thấy.
+
+    Chỉ so với các slug script tự khai (chính nó và funnel target), không bắt
+    theo mẫu gạch nối chung: tiếng Việt có "cà-phê", và lớp phát âm còn tự sinh
+    "tơ-mi-nồ", nên một luật theo hình dạng sẽ bắt nhầm.
+    """
+    known = {str(_get(script, "slug", "") or "").strip()}
+    strategy = _get(script, "strategy", None)
+    for field in ("long_form_slug", "cta_target", "source_long_slug"):
+        known.add(str(_get(strategy, field, "") or "").strip())
+    slugs = {slug for slug in known if len(slug) >= 8 and "-" in slug}
+    if not slugs:
+        return []
+    violations: list[dict[str, str]] = []
+    for index, segment in enumerate(_segments_of(script), start=1):
+        narration = _narration_of(segment)
+        spoken = sorted(slug for slug in slugs if slug in narration)
+        if spoken:
+            violations.append(_repair(
+                "slug_leak",
+                f"Section {index} đọc thành tiếng một slug ('{spoken[0]}'); TTS sẽ phát ra chuỗi vô nghĩa.",
+                "Gọi tên video bằng tiêu đề hoặc mô tả nội dung, đừng đặt slug vào voiceover.",
             ))
     return violations
 
