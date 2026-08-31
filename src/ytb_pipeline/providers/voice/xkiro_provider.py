@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import math
 import re
 import subprocess
 import time
@@ -281,16 +282,32 @@ def _chunk_xkiro_pieces(
 
 
 def _split_long_clause(text: str, *, max_chars: int) -> list[str]:
+    """Cắt mệnh đề dài thành các mảnh CÂN BẰNG, không bỏ lại mảnh cụt.
+
+    Bản cũ nhồi tham lam tới sát `max_chars` rồi vứt phần dư ra mảnh cuối, nên
+    một câu chỉ dài hơn trần vài ký tự sinh ra một mảnh gần đầy và một mảnh cụt
+    vài ký tự. Đo trên xKiro, cả hai đều không đọc được: câu 52 ký tự "Tách cà
+    phê nguội rồi mà cậu chưa uống một ngụm nào." bị cắt thành 47 + "nào.", nửa
+    đầu nghe ra "Cảm ơn các bạn đã theo dõi và hẹn gặp lại." (0.21) và "nào."
+    nghe ra "Hãy đăng ký kênh..." (0.08); đọc nguyên câu đạt 0.98.
+
+    Chia trước cho đủ số mảnh cần thiết rồi nhắm tới độ dài trung bình, thay vì
+    nhồi đầy mảnh đầu. Trần `max_chars` vẫn là giới hạn cứng.
+    """
     if len(text) <= max_chars:
         return [text]
     words = re.findall(r"\S+\s*", text.strip())
     if not words:
         return []
+    piece_count = math.ceil(len(text) / max_chars)
+    target = len(text) / piece_count
     chunks: list[str] = []
     current: list[str] = []
     current_len = 0
     for word in words:
-        if current and current_len + len(word) > max_chars:
+        too_long = current_len + len(word) > max_chars
+        past_target = current_len >= target
+        if current and (too_long or past_target):
             chunks.append("".join(current).strip())
             current = [word]
             current_len = len(word)

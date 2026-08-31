@@ -290,3 +290,44 @@ async def test_xkiro_provider_pads_a_small_runtime_shortfall(monkeypatch, tmp_pa
 
     assert padded == [(voiceover.segments[-1].audio_path, 1.0)]
     assert voiceover.duration_sec == 60.0
+
+
+@pytest.mark.unit
+def test_split_long_clause_never_orphans_a_tail_fragment():
+    """Đo được trên xKiro: mảnh cụt do cắt tham lam làm TTS đọc ra nội dung khác.
+
+    Câu "Tách cà phê nguội rồi mà cậu chưa uống một ngụm nào." dài 52 ký tự,
+    chỉ hơn trần 48 một chút. Cắt tham lam cho ra 47 + "nào." — và CẢ HAI nửa
+    đều hỏng: nửa đầu nghe ra "Cảm ơn các bạn đã theo dõi và hẹn gặp lại."
+    (0.21), mảnh "nào." nghe ra "Hãy đăng ký kênh..." (0.08). Đọc nguyên câu
+    thì đạt 0.98. Cắt cân bằng giữ mỗi mảnh đủ dài để còn là lời nói.
+    """
+    from ytb_pipeline.providers.voice.xkiro_provider import _split_long_clause
+
+    text = "Tách cà phê nguội rồi mà cậu chưa uống một ngụm nào."
+    chunks = _split_long_clause(text, max_chars=48)
+
+    assert "".join(chunks).replace(" ", "") == text.replace(" ", "")
+    assert all(len(chunk) <= 48 for chunk in chunks), chunks
+    assert min(len(chunk) for chunk in chunks) >= 12, chunks
+
+
+@pytest.mark.unit
+def test_split_long_clause_keeps_short_text_whole():
+    from ytb_pipeline.providers.voice.xkiro_provider import _split_long_clause
+
+    assert _split_long_clause("Em gọi.", max_chars=48) == ["Em gọi."]
+
+
+@pytest.mark.unit
+def test_split_long_clause_balances_every_length_near_the_cap():
+    """Không được có mảnh cụt ở BẤT KỲ độ dài nào, không chỉ ở ca đã gặp."""
+    from ytb_pipeline.providers.voice.xkiro_provider import _split_long_clause
+
+    words = "cà phê nguội rồi mà cậu chưa uống một ngụm nào thêm lần nữa sáng nay".split()
+    for count in range(2, len(words) + 1):
+        text = " ".join(words[:count]) + "."
+        chunks = _split_long_clause(text, max_chars=48)
+        assert all(len(chunk) <= 48 for chunk in chunks), (text, chunks)
+        if len(chunks) > 1:
+            assert min(len(chunk) for chunk in chunks) >= 12, (text, chunks)
