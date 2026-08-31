@@ -872,3 +872,44 @@ def test_pronunciation_overrides_can_fix_a_name_without_a_code_change():
     finally:
         pronunciation.OVERRIDES_FILE = original
         tmp.unlink(missing_ok=True)
+
+
+def test_whole_script_similarity_hides_a_mispronounced_name():
+    """A per-segment fault must not be averaged away across the whole script.
+
+    The gate compares the joined narration against the joined transcript at a
+    0.82 threshold. A real round-trip through xKiro TTS and faster-whisper on
+    the published Long shows what that hides, measured per chunk:
+
+        "Sáu giờ mười hai phút,"    -> "6h12 phút"                    0.80
+        "An vừa lau xong dãy tách," -> "Ăn bửa lâu xong giải tách."   0.69
+        "Minh ngồi cạnh cửa kính,"  -> "Minh gọi cạnh cửa kính."      0.93
+
+    The café owner's name "An" is spoken as "Ăn" — a different word. Both bad
+    chunks sit far below the threshold, and both pass because 5,984 characters
+    of correct narration dilute them.
+    """
+    from ytb_pipeline.voiceover.quality import (
+        LOCAL_TTS_TRANSCRIPT_SIMILARITY_THRESHOLD as T,
+        _transcript_similarity,
+        worst_segment_similarity,
+    )
+
+    expected = [
+        "Sáu giờ mười hai phút,",
+        "An vừa lau xong dãy tách,",
+        "Minh ngồi cạnh cửa kính,",
+    ] + ["Câu kể bình thường trong cảnh quán." for _ in range(40)]
+    heard = [
+        "6h12 phút",
+        "Ăn bửa lâu xong giải tách.",
+        "Minh gọi cạnh cửa kính.",
+    ] + ["Câu kể bình thường trong cảnh quán." for _ in range(40)]
+
+    # Whole-script comparison: the two broken lines vanish.
+    assert _transcript_similarity(" ".join(expected), " ".join(heard)) >= T
+
+    # Per-segment comparison catches the worst one.
+    worst_index, worst = worst_segment_similarity(expected, heard)
+    assert worst < T
+    assert worst_index == 1

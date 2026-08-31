@@ -370,6 +370,10 @@ def _append_transcript_issues(
             f"Transcript local khớp script {similarity:.0%}, dưới ngưỡng {similarity_threshold:.0%}.",
             target="audio_or_segment", action="resynthesise_mismatched_segment",
         ))
+    _append_segment_transcript_issues(
+        issues, transcript_metrics, voiceover, adapter,
+        similarity_threshold=similarity_threshold,
+    )
     # Only a repetition the script never authored is a TTS artifact.  Comparing
     # against the script keeps Whisper's unreliable punctuation from deciding
     # whether "gọi là X. X là..." was a stutter or a definition.
@@ -604,6 +608,77 @@ def _issue(code: str, severity: str, message: str, *, target: str, action: str) 
 
 def _number(value: object) -> float | None:
     return float(value) if isinstance(value, (int, float)) else None
+
+
+def _append_segment_transcript_issues(
+    issues: list[QualityIssue],
+    transcript_metrics: dict[str, object],
+    voiceover: Voiceover,
+    adapter: TranscriptAdapter,
+    *,
+    similarity_threshold: float,
+) -> None:
+    """Fail on the worst-matching segment, not on the script average.
+
+    Production 2026-08-30 read the café owner's name "An" as "Ăn" (0.69) and
+    "Sáu giờ mười hai phút," as "6h12 phút" (0.80). Both are far below the
+    threshold and both passed, because a whole-script comparison averaged them
+    into thousands of correct characters. A viewer hears the line, not the mean.
+
+    Runs only where segments kept their own audio, so it costs nothing extra on
+    a voiceover that only has a merged file.
+    """
+    segments = [
+        (index, segment)
+        for index, segment in enumerate(voiceover.segments)
+        if segment.audio_path and Path(segment.audio_path).is_file()
+    ]
+    if not segments:
+        return
+    wanted, heard = [], []
+    for _index, segment in segments:
+        wanted.append(segment.narration)
+        try:
+            heard.append(adapter.transcribe(Path(segment.audio_path)))
+        except (OSError, RuntimeError, ValueError):
+            heard.append("")
+    offset, worst = worst_segment_similarity(wanted, heard)
+    if offset < 0:
+        return
+    segment_index = segments[offset][0]
+    transcript_metrics.update(
+        {"worst_segment_index": segment_index, "worst_segment_similarity": worst}
+    )
+    if worst < similarity_threshold:
+        issues.append(_issue(
+            "SEGMENT_TRANSCRIPT_MISMATCH", "error",
+            f"Đoạn {segment_index + 1} chỉ khớp {worst:.0%} (ngưỡng "
+            f"{similarity_threshold:.0%}): {wanted[offset][:60]!r} nghe thành "
+            f"{heard[offset][:60]!r}.",
+            target="audio_or_segment", action="resynthesise_mismatched_segment",
+        ))
+
+
+def worst_segment_similarity(
+    expected: list[str], heard: list[str]
+) -> tuple[int, float]:
+    """Return the worst-matching segment and its score.
+
+    Comparing the joined script against the joined transcript averages a local
+    fault away: a real round-trip on the published Long read the café owner's
+    name "An" as "Ăn" at 0.69 and "Sáu giờ mười hai phút," as "6h12 phút" at
+    0.80, and both passed because 5,984 characters of correct narration sat
+    around them. A viewer does not hear an average; they hear the line where
+    the name is wrong.
+    """
+    worst_index, worst = -1, 1.0
+    for index, (want, got) in enumerate(zip(expected, heard)):
+        if not want.strip():
+            continue
+        score = _transcript_similarity(want, got)
+        if score < worst:
+            worst_index, worst = index, score
+    return worst_index, worst
 
 
 def _transcript_similarity(expected: str, actual: str) -> float:

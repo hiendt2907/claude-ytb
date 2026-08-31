@@ -141,7 +141,11 @@ def test_gate_compares_transcript_and_detects_repeated_phrase(monkeypatch, tmp_p
     )
 
     assert result.passed is False
-    assert [issue.code for issue in result.issues] == ["TRANSCRIPT_MISMATCH", "TRANSCRIPT_REPEAT"]
+    # The gate now also scores each segment that kept its own audio, so a
+    # whole-script mismatch is reported alongside the worst single segment.
+    assert [issue.code for issue in result.issues] == [
+        "TRANSCRIPT_MISMATCH", "SEGMENT_TRANSCRIPT_MISMATCH", "TRANSCRIPT_REPEAT",
+    ]
     assert result.metrics["prosody"]["mean_volume_db"] == -19.0
     assert result.repair_payload["TRANSCRIPT_REPEAT"]["target"] == "audio_or_segment"
 
@@ -222,7 +226,9 @@ def test_gate_cache_reuses_report_without_running_stt(monkeypatch, tmp_path):
 
     assert first.cached is False
     assert second.cached is True
-    assert stt.calls == 1
+    # One pass over the merged audio plus one per segment that kept its own
+    # file: a whole-script average hid a name read as a different word.
+    assert stt.calls == 2
 
 
 def test_faster_whisper_adapter_reports_missing_dependency_without_importing_it(monkeypatch):
@@ -304,7 +310,8 @@ def test_audio_gate_cache_misses_when_policy_context_changes(monkeypatch, tmp_pa
 
     assert first.cached is False
     assert second.cached is False
-    assert stt.calls == 2
+    # Two gate runs, each transcribing the merged audio and one segment file.
+    assert stt.calls == 4
 
 
 def test_settings_exposes_an_opt_in_local_stt_model_path(tmp_path):
