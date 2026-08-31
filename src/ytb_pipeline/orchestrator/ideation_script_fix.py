@@ -418,6 +418,56 @@ def validate_short_strategy_v1(payload: dict, *, source_long_context: dict | Non
         raise ValueError("Short strategy-v1 thiếu/không hợp lệ: " + ", ".join(missing))
 
 
+def normalize_spoken_slugs(
+    payload: dict, *, source_long_title: str = "",
+) -> tuple[dict, str | None]:
+    """Đổi slug lọt vào lời đọc thành tên video, trước khi QA chặn cả candidate.
+
+    `slug_leak` là luật tất định và KHÔNG có đường vá, nên một định danh máy
+    trong một câu duy nhất huỷ nguyên một kịch bản đạt yêu cầu ở mọi mặt khác.
+    Model viết slug ra tiếng ở cả ba lượt sinh liên tiếp, kể cả sau khi khối
+    funnel nói thẳng "NEVER say a slug out loud" và dù prompt đã đưa sẵn
+    `title` của Long. Việc thay nó không cần suy luận: thay bằng tiêu đề Long
+    khi biết, cắt bỏ khi không, rồi ghi note ra log — không sửa lặng lẽ.
+    """
+    known = {str(payload.get("slug") or "").strip()}
+    strategy = payload.get("strategy")
+    if isinstance(strategy, dict):
+        for field in ("long_form_slug", "cta_target", "source_long_slug"):
+            known.add(str(strategy.get(field) or "").strip())
+    slugs = sorted(
+        (slug for slug in known if len(slug) >= 8 and "-" in slug),
+        key=len, reverse=True,
+    )
+    if not slugs:
+        return payload, None
+    replacement = source_long_title.strip()
+    candidate = deepcopy(payload)
+    touched: list[int] = []
+    for index, section in enumerate(candidate.get("sections", []) or [], start=1):
+        if not isinstance(section, dict):
+            continue
+        narration = section.get("voiceover") or section.get("narration") or ""
+        if not isinstance(narration, str) or not narration:
+            continue
+        cleaned = narration
+        for slug in slugs:
+            if slug in cleaned:
+                cleaned = cleaned.replace(slug, replacement)
+        if cleaned == narration:
+            continue
+        cleaned = re.sub(r"\s{2,}", " ", cleaned)
+        cleaned = re.sub(r"\s+([,.:;!?])", r"\1", cleaned).strip()
+        section["voiceover"] = cleaned
+        section["narration"] = cleaned
+        touched.append(index)
+    if not touched:
+        return payload, None
+    where = ", ".join(str(index) for index in touched)
+    what = f"tên Long '{replacement}'" if replacement else "chuỗi rỗng"
+    return candidate, f"replaced spoken slug with {what} in section {where}"
+
+
 def normalize_short_narration(
     payload: dict, expected_video_type: str | None = None
 ) -> tuple[dict, str | None]:
@@ -859,8 +909,13 @@ async def validate_or_repair_script(
         current, normalized_note = normalize_short_narration(
             current, expected_video_type=expected_video_type
         )
-        if long_note or normalized_note:
-            note = long_note or normalized_note
+        current, slug_note = normalize_spoken_slugs(
+            current,
+            source_long_title=str((source_long_context or {}).get("title") or ""),
+        )
+        for note in (long_note, normalized_note, slug_note):
+            if not note:
+                continue
             if console_prefix:
                 print(f"{console_prefix} normalize: {note}", flush=True)
             if log_path:

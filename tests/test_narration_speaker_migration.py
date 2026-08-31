@@ -269,3 +269,49 @@ def test_funnel_prompt_states_that_the_slug_is_never_spoken():
     assert "never say" in lowered or "không đọc" in lowered or "not spoken" in lowered, (
         "prompt phải nói rõ slug là định danh máy, không đọc thành tiếng"
     )
+
+
+def test_normalizer_replaces_a_spoken_slug_with_the_long_form_title():
+    """Model viết slug vào lời đọc 3/3 lần dù prompt đã cấm và đã có sẵn title.
+
+    `slug_leak` không có đường vá, nên một từ máy giết cả candidate tốt. Việc
+    thay nó là tất định — không cần thêm một lượt LLM — nên chuẩn hoá tại chỗ
+    giống các chuẩn hoá Short sẵn có, và ghi note ra log chứ không sửa lặng lẽ.
+    """
+    from ytb_pipeline.orchestrator.ideation_script_fix import normalize_spoken_slugs
+
+    payload = {
+        "slug": "nam-lan-do-chuong-truoc-gio-hop",
+        "video_type": "short",
+        "strategy": {
+            "long_form_slug": "minh-cham-hon-dong-nghiep-tre",
+            "cta_target": "minh-cham-hon-dong-nghiep-tre",
+            "source_long_slug": "minh-cham-hon-dong-nghiep-tre",
+        },
+        "sections": [
+            {"voiceover": "Lần tới, video dài minh-cham-hon-dong-nghiep-tre sẽ đi tiếp."},
+        ],
+    }
+
+    fixed, note = normalize_spoken_slugs(payload, source_long_title="Dòng Vàng Cuối Slide")
+
+    spoken = fixed["sections"][0]["voiceover"]
+    assert "minh-cham-hon-dong-nghiep-tre" not in spoken
+    assert "Dòng Vàng Cuối Slide" in spoken
+    assert "video dài" in spoken, "phải giữ từ khoá cầu nối cho cổng funnel_bridge"
+    assert note, "phải báo ra log là đã sửa"
+    assert payload["sections"][0]["voiceover"].count("minh-cham-hon") == 1, "không được mutate bản gốc"
+
+
+def test_normalizer_leaves_narration_without_a_slug_untouched():
+    from ytb_pipeline.orchestrator.ideation_script_fix import normalize_spoken_slugs
+
+    payload = {
+        "slug": "nam-lan-do-chuong-truoc-gio-hop",
+        "video_type": "short",
+        "strategy": {"long_form_slug": "minh-cham-hon-dong-nghiep-tre"},
+        "sections": [{"voiceover": "Lần tới, video dài sẽ đi tiếp từ chỗ chưa kịp nói."}],
+    }
+    fixed, note = normalize_spoken_slugs(payload, source_long_title="Dòng Vàng Cuối Slide")
+    assert note is None
+    assert fixed is payload
