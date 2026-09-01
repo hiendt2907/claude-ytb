@@ -115,7 +115,7 @@ def accept_existing_candidate(
 
 
 def request_manual_regeneration(
-    project_dir: Path, shot_id: str, instruction: str
+    project_dir: Path, shot_id: str, instruction: str, *, replaces_intent: bool = False
 ) -> VisualReviewEntry:
     store, entry = _current_pending(Path(project_dir), shot_id)
     history_ids, _candidate_store = _candidate_history_ids(Path(project_dir), entry)
@@ -125,6 +125,7 @@ def request_manual_regeneration(
         entry.review_id,
         request=request_from_review_entry(entry),
         instruction=instruction,
+        replaces_intent=replaces_intent,
     )
 
 

@@ -122,6 +122,11 @@ class ManualVisualOverride:
     evaluation_store_key: str = ""
     candidates: tuple[ManualCandidateSlot, ...] = ()
     selected_asset_id: str | None = None
+    # Mặc định instruction NỐI THÊM vào visual_intent, giữ ngữ cảnh cảnh. Nhưng
+    # nối thêm thì chỉ thêm được ràng buộc, không rút được cái nào — và một
+    # visual_intent đòi thứ image model không dựng nổi sẽ hard-fail vĩnh viễn dù
+    # operator nói gì. Cờ này cho operator THAY luôn mệnh đề bất khả thi.
+    replaces_intent: bool = False
 
     def to_dict(self) -> dict:
         data = asdict(self)
@@ -211,7 +216,7 @@ def _validate_instruction(instruction: str) -> str:
 
 
 def derive_manual_override(
-    request: "VisualRequest", instruction: str
+    request: "VisualRequest", instruction: str, *, replaces_intent: bool = False
 ) -> ManualVisualOverride:
     """Build a deterministic human-authored lineage without mutating request."""
     normalized = _validate_instruction(instruction)
@@ -220,6 +225,9 @@ def derive_manual_override(
         request.request_fingerprint,
         request.shot_id,
         normalized,
+        # Cùng instruction nhưng thay-thế và nối-thêm cho ra hai visual_intent
+        # khác nhau, nên phải là hai lineage khác nhau.
+        "replace" if replaces_intent else "append",
     )
     derived_fingerprint = _stable_fingerprint(
         MANUAL_OVERRIDE_CONTRACT_VERSION,
@@ -232,6 +240,7 @@ def derive_manual_override(
         shot_id=request.shot_id,
         base_request_fingerprint=request.request_fingerprint,
         instruction=normalized,
+        replaces_intent=replaces_intent,
         override_fingerprint=override_fingerprint,
         derived_request_id=f"mvr_{derived_fingerprint[:24]}",
         derived_request_fingerprint=derived_fingerprint,
@@ -253,9 +262,15 @@ def derive_manual_visual_request(
         request_fingerprint=override.derived_request_fingerprint,
         scene_id=request.scene_id,
         shot_id=request.shot_id,
+        # Nối thêm là mặc định: giữ ngữ cảnh cảnh, operator chỉ chỉnh thêm.
+        # Khi `replaces_intent`, instruction THAY hẳn — đó là cách duy nhất rút
+        # được một mệnh đề mà image model không dựng nổi. Judge chấm đúng văn
+        # bản này, nên nối thêm một câu phủ định chỉ tạo ra mâu thuẫn
+        # ("tay cầm khay gỗ" + "không cầm vật gì") và vẫn hard-fail.
         visual_intent=(
-            f"{request.visual_intent.strip()}\n"
-            f"Operator instruction: {override.instruction}"
+            override.instruction.strip()
+            if override.replaces_intent
+            else f"{request.visual_intent.strip()}\nOperator instruction: {override.instruction}"
         ),
         characters=request.characters,
         dimensions=request.dimensions,
@@ -504,8 +519,11 @@ class VisualReviewStore:
         *,
         request: "VisualRequest",
         instruction: str,
+        replaces_intent: bool = False,
     ) -> VisualReviewEntry:
-        override = derive_manual_override(request, instruction)
+        override = derive_manual_override(
+            request, instruction, replaces_intent=replaces_intent,
+        )
 
         def update(entry: VisualReviewEntry) -> VisualReviewEntry:
             if entry.shot_id != request.shot_id:

@@ -141,7 +141,8 @@ def cmd_review(args) -> None:
             return
         if action == "regenerate":
             entry = request_manual_regeneration(
-                project_dir, args.shot_id, args.instruction
+                project_dir, args.shot_id, args.instruction,
+                replaces_intent=bool(getattr(args, "replace_intent", False)),
             )
             print(
                 f"PENDING shot={entry.shot_id} manual_override="

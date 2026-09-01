@@ -214,3 +214,68 @@ def test_concurrent_operator_updates_are_atomic_and_only_one_wins(tmp_path):
     final = store.get(pending.review_id)
     assert final.status in {ReviewStatus.RESOLVED, ReviewStatus.ABANDONED}
     assert len(store.entries()) == 1
+
+
+def test_operator_instruction_can_replace_an_unrenderable_intent():
+    """Cửa thoát của operator không mở được khi visual_intent bất khả thi.
+
+    `derive_manual_visual_request` NỐI THÊM instruction vào visual_intent gốc,
+    nên operator chỉ thêm được ràng buộc, không bao giờ rút được một ràng buộc.
+
+    Đo trên hàng thật: một shot khai "An đứng gần bàn, tay cầm khay gỗ, ...".
+    Image model không dựng nổi cái khay trên tay; Judge chấm
+    semantic=0.5 character=1.0 composition=1.0 continuity=1.0 với
+    hard_failures=missing_required_object trên CẢ 8 candidate qua 2 vòng —
+    mọi mệnh đề khác đều đạt, hỏng đúng cái khay. Operator ghi override "hai
+    tay buông tự nhiên, không cầm vật gì" thì văn bản đem chấm thành mâu thuẫn
+    với chính nó ("tay cầm khay gỗ" + "không cầm vật gì") và vẫn hard-fail.
+
+    Lối duy nhất còn lại là `abandon`, tức bỏ hẳn shot. Operator phải rút được
+    một mệnh đề bất khả thi, nếu không cổng review chỉ là ngõ cụt.
+    """
+    from ytb_pipeline.render.visual_assets import VisualRequest
+    from ytb_pipeline.render.visual_review import (
+        ManualVisualOverride, derive_manual_visual_request,
+    )
+
+    request = VisualRequest(
+        request_id="vr_x", request_fingerprint="fp_base",
+        scene_id="scene-001", shot_id="scene-001-shot-00",
+        visual_intent="An đứng gần bàn, tay cầm khay gỗ, Minh ngồi cúi nhìn màn hình.",
+        characters=("an", "minh"), dimensions=(1344, 768),
+        resolution_kind="image", semantic_constraints=(),
+    )
+    common = dict(
+        override_id="mvo_x", shot_id=request.shot_id,
+        base_request_fingerprint="fp_base", override_fingerprint="fp_o",
+        derived_request_id="vr_d", derived_request_fingerprint="fp_d",
+    )
+
+    appended = derive_manual_visual_request(
+        request, ManualVisualOverride(instruction="Thêm ánh sáng sớm.", **common),
+    )
+    assert "tay cầm khay gỗ" in appended.visual_intent, "mặc định vẫn phải giữ ngữ cảnh cảnh"
+    assert "Thêm ánh sáng sớm." in appended.visual_intent
+
+    replaced = derive_manual_visual_request(
+        request,
+        ManualVisualOverride(
+            instruction="An đứng cạnh bàn, hai tay buông tự nhiên. Minh cúi nhìn laptop.",
+            replaces_intent=True, **common,
+        ),
+    )
+    assert "khay gỗ" not in replaced.visual_intent, "phải rút được mệnh đề bất khả thi"
+    assert "hai tay buông tự nhiên" in replaced.visual_intent
+
+
+def test_manual_override_json_without_the_new_field_still_loads():
+    """Override đã ghi trên đĩa từ trước không có trường mới — phải load được."""
+    from ytb_pipeline.render.visual_review import ManualVisualOverride
+
+    legacy = {
+        "override_id": "mvo_old", "shot_id": "s", "base_request_fingerprint": "b",
+        "instruction": "i", "override_fingerprint": "o",
+        "derived_request_id": "d", "derived_request_fingerprint": "df",
+    }
+    override = ManualVisualOverride.from_dict(legacy)
+    assert override.replaces_intent is False

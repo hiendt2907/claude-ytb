@@ -501,6 +501,12 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
     review_regenerate.add_argument("project")
     review_regenerate.add_argument("shot_id")
     review_regenerate.add_argument("--instruction", required=True)
+    review_regenerate.add_argument(
+        "--replace-intent", action="store_true",
+        help="Instruction THAY hẳn visual_intent thay vì nối thêm — dùng khi "
+             "intent gốc đòi thứ image model không dựng nổi, vì nối thêm chỉ "
+             "thêm được ràng buộc chứ không rút được cái nào.",
+    )
     review_regenerate.set_defaults(func=review_func)
     review_abandon = review_sub.add_parser("abandon", help="Dừng Shot theo quyết định operator")
     review_abandon.add_argument("project")
