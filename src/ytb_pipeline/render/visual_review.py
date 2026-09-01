@@ -528,7 +528,16 @@ class VisualReviewStore:
         def update(entry: VisualReviewEntry) -> VisualReviewEntry:
             if entry.shot_id != request.shot_id:
                 raise VisualReviewError("Review không thuộc Shot được yêu cầu.")
-            if entry.manual_override is not None:
+            existing = entry.manual_override
+            # Ngân sách tính theo CÔNG ĐÃ TIÊU, không theo số lần gõ lệnh. Một
+            # override còn `pending` và chưa sinh candidate nào thì chưa tốn gì,
+            # nên operator phải sửa được lệnh mình vừa gõ sai — trước đây gõ sai
+            # là khoá review vĩnh viễn, mà không có CLI reset ở mức node và
+            # `abandon` thì dừng hẳn pipeline chứ không bỏ qua shot.
+            spent = existing is not None and (
+                existing.status != "pending" or bool(existing.candidates)
+            )
+            if spent:
                 raise VisualReviewError(
                     "Manual regeneration budget đã được sử dụng cho review này."
                 )

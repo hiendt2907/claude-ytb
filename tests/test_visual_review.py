@@ -145,6 +145,13 @@ def test_manual_regenerate_disposition_persists_before_generation(tmp_path):
 
 
 def test_only_one_manual_override_is_allowed_for_one_review(tmp_path):
+    """Ngân sách tính theo CÔNG ĐÃ TIÊU, không theo số lần gõ lệnh.
+
+    Bất biến cần giữ là operator không đốt được vô hạn lượt sinh ảnh. Chặn ngay
+    từ lần gõ thứ hai thì chặt hơn mức đó: một instruction gõ sai — chưa sinh
+    ảnh nào — cũng khoá review vĩnh viễn, mà không có CLI reset ở mức node và
+    `abandon` thì dừng hẳn pipeline. Ca đó đã gặp trên hàng thật.
+    """
     store = VisualReviewStore(tmp_path / "visual_review.json")
     pending = _pending(store)
     store.submit_manual_regenerate(
@@ -152,12 +159,25 @@ def test_only_one_manual_override_is_allowed_for_one_review(tmp_path):
         request=_request(),
         instruction="Bỏ đám đông phía sau",
     )
+    # Chưa tiêu công thì sửa được lệnh.
+    store.submit_manual_regenerate(
+        pending.review_id,
+        request=_request(),
+        instruction="Đổi góc máy",
+    )
+
+    store.initialize_manual_attempt(
+        pending.review_id,
+        request_fingerprint=_request().request_fingerprint,
+        candidate_count=1,
+        generation_key="a1b2c3d4e5f60718",
+    )
 
     with pytest.raises(VisualReviewError, match="đã được sử dụng"):
         store.submit_manual_regenerate(
             pending.review_id,
             request=_request(),
-            instruction="Đổi góc máy",
+            instruction="Lần thứ ba",
         )
 
 
@@ -279,3 +299,60 @@ def test_manual_override_json_without_the_new_field_still_loads():
     }
     override = ManualVisualOverride.from_dict(legacy)
     assert override.replaces_intent is False
+
+
+def test_operator_can_correct_an_override_that_has_not_generated_anything_yet(tmp_path):
+    """Gõ sai instruction là mất luôn cửa thoát, dù chưa tốn một ảnh nào.
+
+    `submit_manual_regenerate` từ chối mọi override thứ hai, nên một instruction
+    sai — kể cả sai do chính cơ chế lúc đó chưa rút được mệnh đề — sẽ khoá review
+    vĩnh viễn. Không có CLI reset ở mức node, nên lối duy nhất còn lại là
+    `abandon`, mà `abandon` dừng hẳn pipeline chứ không bỏ qua shot.
+
+    Ngân sách vẫn phải chặn override thứ hai khi cái đầu ĐÃ tiêu công (đang chạy
+    hoặc đã sinh candidate). Chỉ cái chưa động tới mới được sửa.
+    """
+    from ytb_pipeline.render.visual_assets import VisualRequest
+    from ytb_pipeline.render.visual_review import (
+        ReviewReason, VisualReviewError, VisualReviewStore,
+    )
+
+    request = VisualRequest(
+        request_id="vr_x", request_fingerprint="fp_base",
+        scene_id="scene-001", shot_id="scene-001-shot-00",
+        visual_intent="An đứng gần bàn, tay cầm khay gỗ.",
+        characters=("an",), dimensions=(1344, 768),
+        resolution_kind="image", semantic_constraints=(),
+    )
+    store = VisualReviewStore(tmp_path / "visual_review.json")
+    entry = store.ensure_pending(
+        request, reason=ReviewReason.SEMANTIC_RECOVERY_EXHAUSTED,
+        candidate_asset_ids=("ast_a",), evaluation_fingerprint="ef",
+        recovery_status="exhausted",
+    )
+
+    store.submit_manual_regenerate(
+        entry.review_id, request=request, instruction="hướng dẫn gõ nhầm",
+    )
+    corrected = store.submit_manual_regenerate(
+        entry.review_id, request=request,
+        instruction="An đứng cạnh bàn, hai tay buông tự nhiên.", replaces_intent=True,
+    )
+    assert corrected.manual_override is not None
+    assert corrected.manual_override.replaces_intent is True
+    assert "hai tay buông" in corrected.manual_override.instruction
+
+    # Đã tiêu công rồi thì ngân sách phải chặn.
+    started = store.initialize_manual_attempt(
+        entry.review_id, request_fingerprint=request.request_fingerprint,
+        candidate_count=1, generation_key="a1b2c3d4e5f60718",
+    )
+    assert started.manual_override is not None
+    try:
+        store.submit_manual_regenerate(
+            entry.review_id, request=request, instruction="lần thứ ba",
+        )
+    except VisualReviewError as exc:
+        assert "budget" in str(exc).lower()
+    else:
+        raise AssertionError("override đã chạy thì không được thay nữa")
