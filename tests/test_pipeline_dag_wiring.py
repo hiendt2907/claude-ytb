@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from dataclasses import replace
 from pathlib import Path
 
 from ytb_pipeline import pipeline
@@ -267,3 +268,87 @@ def test_cmd_reset_removes_project_checkpoint(tmp_path, monkeypatch):
 
     assert not (projects_dir / "vid-x").exists()
     assert "reset" in ledger.read_text(encoding="utf-8")
+
+
+# ── audio gate: tổng hợp lại đúng segment hỏng ────────────────────────────────
+def _project_with_failed_audio_gate(tmp_path, *, worst_index: int, attempts: int = 0):
+    """Dựng project ở đúng trạng thái engine từng kẹt vĩnh viễn."""
+    checkpoint = CheckpointManager(tmp_path / "projects")
+    script = _script_file(tmp_path)
+    audio_dir = tmp_path / "audio"
+    audio_dir.mkdir(exist_ok=True)
+    merged = audio_dir / "merged.mp3"
+    merged.write_bytes(b"merged")
+    segments = []
+    for index in range(3):
+        path = audio_dir / f"seg{index}.mp3"
+        path.write_bytes(b"seg")
+        segments.append({"index": index, "audio_path": str(path), "duration_sec": 3.0})
+
+    project = Project(
+        project_id=script.stem, script_path=str(script),
+        metadata={"audio_resynth_attempts": attempts} if attempts else {},
+    )
+    project = checkpoint.mark_done(
+        project, "voiceover", str(merged), {"segments": segments},
+    )
+    project = checkpoint.mark_done(
+        project, "audio_quality", str(merged),
+        {
+            "passed": False,
+            "quality_status": "failed",
+            "issues": [{
+                "code": "SEGMENT_TRANSCRIPT_MISMATCH", "severity": "error",
+                "message": "Đoạn 1 chỉ khớp 24%",
+                "repair": {"target": "audio_or_segment",
+                           "action": "resynthesise_mismatched_segment"},
+            }],
+            "metrics": {"transcript": {"worst_segment_index": worst_index}},
+        },
+    )
+    return project, segments, merged
+
+
+def test_failed_audio_gate_drops_only_the_mismatched_segment_audio(tmp_path):
+    """Gate biết đoạn nào hỏng và tự gọi tên cách chữa, nhưng không ai thực thi.
+
+    xKiro TTS không tất định: cùng một câu, 5 lần gọi cho 5 file audio khác
+    nhau, và thỉnh thoảng đọc hỏng một cụm ("gọi năm lần" -> "G.I.N. Mơ Lân").
+    Trước đây `_reset_stale_nodes` chỉ chạy lại CỔNG chứ không bao giờ chạy lại
+    TTS, nên gate chấm lại đúng file hỏng cũ và project kẹt vĩnh viễn — lối
+    thoát duy nhất là `ytb batch reset`, vứt cả render lẫn ảnh đã sinh.
+    """
+    project, segments, merged = _project_with_failed_audio_gate(tmp_path, worst_index=1)
+
+    result = pipeline._reset_stale_nodes(project)
+
+    assert not Path(segments[1]["audio_path"]).exists(), "phải xoá đúng segment hỏng"
+    assert Path(segments[0]["audio_path"]).exists(), "segment tốt phải được giữ"
+    assert Path(segments[2]["audio_path"]).exists(), "segment tốt phải được giữ"
+    assert result.nodes["voiceover"].status == NodeStatus.PENDING, "phải tổng hợp lại"
+    assert result.metadata["audio_resynth_attempts"] == 1, "phải đếm lượt, có trần"
+
+
+def test_audio_gate_recovery_is_bounded_and_then_fails_closed(tmp_path):
+    """Hết lượt thì dừng — không được xoá/tổng hợp lại vô hạn."""
+    project, segments, _ = _project_with_failed_audio_gate(
+        tmp_path, worst_index=1, attempts=pipeline.MAX_AUDIO_RESYNTH_ATTEMPTS,
+    )
+
+    result = pipeline._reset_stale_nodes(project)
+
+    assert Path(segments[1]["audio_path"]).exists(), "hết lượt thì giữ nguyên bằng chứng"
+    assert result.nodes["voiceover"].status == NodeStatus.DONE
+
+
+def test_passing_audio_gate_never_touches_segment_audio(tmp_path):
+    project, segments, merged = _project_with_failed_audio_gate(tmp_path, worst_index=1)
+    node = project.nodes["audio_quality"]
+    project = project.with_node(
+        replace(node, output_data={"passed": True, "quality_status": "pass"}),
+    )
+
+    result = pipeline._reset_stale_nodes(project)
+
+    assert all(Path(s["audio_path"]).exists() for s in segments)
+    assert result.nodes["voiceover"].status == NodeStatus.DONE

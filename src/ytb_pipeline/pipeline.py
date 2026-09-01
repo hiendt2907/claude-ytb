@@ -385,6 +385,85 @@ def validate_editorial_release_approval(script_path: Path, input_data: dict[str,
             raise ValueError("Editorial release manifest có dimension_scores dưới ngưỡng profile.")
 
 
+MAX_AUDIO_RESYNTH_ATTEMPTS = 2
+
+
+def _mismatched_segment_indexes(data: dict[str, Any]) -> tuple[int, ...]:
+    """Segment nào cổng audio bảo phải đọc lại — đọc từ máy, không parse câu chữ."""
+    wants_resynth = any(
+        (issue.get("repair") or {}).get("action") == "resynthesise_mismatched_segment"
+        for issue in data.get("issues", ()) or ()
+        if isinstance(issue, dict)
+    )
+    if not wants_resynth:
+        return ()
+    transcript = ((data.get("metrics") or {}).get("transcript") or {})
+    index = transcript.get("worst_segment_index")
+    if isinstance(index, bool) or not isinstance(index, int) or index < 0:
+        return ()
+    return (index,)
+
+
+def _recover_mismatched_audio(project: Project) -> Project:
+    """Xoá đúng segment audio mà cổng đã chỉ mặt, để lần resume đọc lại nó.
+
+    xKiro TTS KHÔNG tất định: cùng một câu, 5 lần gọi cho 5 file khác nhau, và
+    thỉnh thoảng đọc hỏng một cụm — đo được "gọi năm lần nhưng không ai nhấc."
+    ra "G.I.N. Mơ Lân" ở một lượt và đúng 0.94 ở năm lượt sau.
+
+    Cổng audio phát hiện được đoạn hỏng và ISSUE của nó đã gọi tên cách chữa
+    (`action="resynthesise_mismatched_segment"`), nhưng không có ai thực thi:
+    `_reset_stale_nodes` chỉ đưa CỔNG về pending, còn `voiceover` chỉ chạy lại
+    khi file output biến mất. Nên lần resume chấm lại đúng file hỏng cũ, hỏng
+    y như cũ, và project kẹt vĩnh viễn — lối thoát duy nhất là `ytb batch reset`,
+    vứt luôn cả render và ảnh đã sinh.
+
+    Xoá đúng những segment được chỉ tên (các segment khác giữ nguyên file nên
+    không phải đọc lại), có TRẦN lượt: hết lượt thì giữ nguyên bằng chứng và
+    để cổng fail closed, không xoay vòng vô hạn.
+    """
+    node = project.nodes.get("audio_quality")
+    if node is None or node.status != NodeStatus.DONE:
+        return project
+    data = node.output_data or {}
+    if data.get("passed"):
+        return project
+    indexes = _mismatched_segment_indexes(data)
+    if not indexes:
+        return project
+    attempts = project.metadata.get("audio_resynth_attempts") or 0
+    if not isinstance(attempts, int) or attempts >= MAX_AUDIO_RESYNTH_ATTEMPTS:
+        return project
+
+    voiceover = project.nodes.get("voiceover")
+    if voiceover is None or voiceover.status != NodeStatus.DONE:
+        return project
+    removed: list[int] = []
+    for entry in (voiceover.output_data or {}).get("segments", ()) or ():
+        if not isinstance(entry, dict) or entry.get("index") not in indexes:
+            continue
+        path = Path(str(entry.get("audio_path") or ""))
+        if path.exists():
+            path.unlink()
+            removed.append(int(entry["index"]))
+    if not removed:
+        return project
+
+    # Bản ghép chứa luôn đoạn hỏng, phải dựng lại cùng lượt.
+    merged = Path(str(voiceover.output_ref or ""))
+    if merged.exists():
+        merged.unlink()
+    print(
+        "  ↻ Audio gate: đọc lại segment "
+        + ", ".join(str(index + 1) for index in sorted(removed))
+        + f" (lượt {attempts + 1}/{MAX_AUDIO_RESYNTH_ATTEMPTS})"
+    )
+    return replace(
+        project.with_node(_pending_again(voiceover)),
+        metadata={**project.metadata, "audio_resynth_attempts": attempts + 1},
+    )
+
+
 def _reset_stale_nodes(project: Project) -> Project:
     """Đưa node DONE nhưng stale về PENDING trước khi resume.
 
@@ -393,7 +472,9 @@ def _reset_stale_nodes(project: Project) -> Project:
     - `render`/`voiceover` DONE nhưng file output không còn trên đĩa (và khâu
       sau chưa DONE để rehydrate từ đó) -> phải chạy lại.
     """
-    current = project
+    # Chạy TRƯỚC vòng reset QA bên dưới: vòng đó xoá output_data của
+    # `audio_quality`, mà đó chính là chỗ ghi segment nào hỏng.
+    current = _recover_mismatched_audio(project)
 
     publish = current.nodes.get("publish")
     if publish is not None and publish.status == NodeStatus.DONE:
