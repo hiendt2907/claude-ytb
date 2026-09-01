@@ -86,6 +86,7 @@ class QAAgent:
                 violations.extend(_check_stage_direction_leak(script))
                 violations.extend(_check_speaker_prefix_leak(script))
                 violations.extend(_check_slug_leak(script))
+                violations.extend(_check_unrenderable_visual_intent(script))
                 violations.extend(_check_story_speaker_ownership(script))
                 violations.extend(_check_character_voiceover_is_direct(script))
                 violations.extend(_check_story_series_arc(script))
@@ -488,6 +489,65 @@ def _check_speaker_prefix_leak(script: Any) -> list[dict[str, str]]:
                 f"Section {index} mở đầu bằng tên người nói ('{head}:'); TTS sẽ đọc cả tên.",
                 "Bỏ tiền tố tên khỏi voiceover; giọng đã được chọn qua speaker_id.",
             ))
+    return violations
+
+
+# Đúng ba điều prompt ideation đã cấm cho `visual_intent` (xem ca6bafb): chữ/số
+# đọc được trong khung, một vật nhỏ cầm trên tay, và vị trí tay/ngón chính xác.
+# Prompt nói rõ "an image model cannot deliver those reliably and every one of
+# them becomes a hard failure" — đo trên hàng thật thì đúng vậy, không candidate
+# nào qua nổi. Mẫu bám chính xác ba điều đó, không mở rộng sang mô tả cảnh
+# thường (đứng cạnh bàn, nhìn về phía ai, phòng họp sáng đèn... đều hợp lệ).
+_UNRENDERABLE_VISUAL_INTENT: tuple[tuple[str, "re.Pattern[str]"], ...] = (
+    (
+        "vị trí tay/ngón chính xác",
+        re.compile(r"cận\s+(?:cảnh\s+)?(?:bàn\s+)?tay|ngón\s+(?:tay|trỏ|cái)", re.IGNORECASE),
+    ),
+    (
+        "vật nhỏ cầm trên tay",
+        re.compile(r"tay\s+(?:cầm|giữ|nắm)|cầm\s+(?:khay|ly|tách|bút|cuốn|tờ|điện thoại)", re.IGNORECASE),
+    ),
+    (
+        "chữ/số đọc được trong khung",
+        re.compile(
+            r"màn hình\s+(?:tối|sáng|hiện|hiển thị|có|với)|dòng chữ|dòng cảnh báo"
+            r"|chữ\s+(?:trên|hiện)|con số\s+(?:trên|hiện)",
+            re.IGNORECASE,
+        ),
+    ),
+)
+
+
+def _check_unrenderable_visual_intent(script: Any) -> list[dict[str, str]]:
+    """Chặn `visual_intent` đòi thứ image model không dựng nổi.
+
+    `visual_intent` vừa là prompt sinh ảnh vừa là thước Judge chấm TỪNG mệnh đề.
+    Một mệnh đề bất khả thi nghĩa là mọi candidate đều hard-fail mãi mãi, và
+    production dừng chờ người sau khi đã đốt 4-8 lượt sinh ảnh.
+
+    Đo trên một Long thật: 3/20 section vi phạm, hai trong số đó chặn production
+    ("tay cầm khay gỗ" 8/8 hỏng; "cận bàn tay trên bàn phím, màn hình tối" 4/4
+    hỏng). Prompt đã cấm đúng những thứ này rồi mà model vẫn viết — nêu luật
+    không đủ, phải chặn được ở kịch bản.
+    """
+    violations: list[dict[str, str]] = []
+    for index, segment in enumerate(_segments_of(script), start=1):
+        intent = str(_get(segment, "visual_intent", "") or "").strip()
+        if not intent:
+            continue
+        for label, pattern in _UNRENDERABLE_VISUAL_INTENT:
+            found = pattern.search(intent)
+            if not found:
+                continue
+            violations.append(_repair(
+                "unrenderable_visual_intent",
+                f"Section {index} yêu cầu {label} ('{found.group(0)}'); "
+                "image model không dựng nổi nên Judge sẽ hard-fail mọi candidate.",
+                "Tả cảnh ở mức trung cảnh: ai ở đâu, đang làm gì, không khí thế nào. "
+                "Đừng chỉ định góc máy cận tay, nội dung hiển thị trên màn hình, "
+                "hay một vật nhỏ phải nằm trên tay ai.",
+            ))
+            break
     return violations
 
 

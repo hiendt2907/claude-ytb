@@ -315,3 +315,58 @@ def test_normalizer_leaves_narration_without_a_slug_untouched():
     fixed, note = normalize_spoken_slugs(payload, source_long_title="Dòng Vàng Cuối Slide")
     assert note is None
     assert fixed is payload
+
+
+def test_qa_rejects_a_visual_intent_the_prompt_already_forbids():
+    """Prompt cấm rõ, model vẫn viết, và mỗi lần viết là pipeline kẹt.
+
+    `visual_intent` vừa là prompt sinh ảnh vừa là thước Judge chấm từng mệnh đề.
+    Prompt ideation đã nói thẳng (commit ca6bafb): không được đòi chữ/số đọc
+    được trong khung, một vật nhỏ cầm trên tay, hay vị trí tay/ngón chính xác —
+    "an image model cannot deliver those reliably and every one of them becomes
+    a hard failure".
+
+    Đo trên hàng thật, đúng một Long: 3/20 section vi phạm, và hai trong số đó
+    đã chặn production —
+      - "An đứng gần bàn, tay cầm khay gỗ, ..." -> 8 candidate qua 2 vòng đều
+        hard_failures=missing_required_object;
+      - "Máy quay cận bàn tay Minh trên bàn phím, phía sau là màn hình tối với
+        một vùng sáng vàng mờ, ..." -> 4 candidate đều
+        missing_required_object + semantic_contradiction.
+    Mỗi ca đốt 4-8 lượt sinh ảnh rồi mới dừng chờ người. Nêu luật trong prompt
+    là không đủ; phải chặn được ở kịch bản.
+    """
+    from ytb_pipeline.agents.qa_agent import _check_unrenderable_visual_intent
+
+    class _Segment:
+        def __init__(self, intent):
+            self.speaker_id = "narrator"
+            self.narration = "Sáu giờ mười hai phút, Minh ngồi bên cửa kính."
+            self.voiceover = self.narration
+            self.visual_intent = intent
+
+    class _Script:
+        def __init__(self, segments):
+            self.segments = segments
+
+    blocked = [
+        "An đứng gần bàn, tay cầm khay gỗ, Minh ngồi cúi nhìn màn hình.",
+        "Máy quay cận bàn tay Minh trên bàn phím, phía sau là màn hình tối.",
+        "Cận cảnh ngón trỏ Minh dừng trên phím Enter.",
+        "Màn hình hiển thị dòng chữ cảnh báo màu vàng ở cuối trang.",
+    ]
+    for intent in blocked:
+        violations = _check_unrenderable_visual_intent(_Script([_Segment(intent)]))
+        assert violations, f"phải chặn: {intent!r}"
+        assert violations[0]["rule"] == "unrenderable_visual_intent"
+
+    allowed = [
+        "Minh ngồi bên bàn gỗ cạnh cửa kính trong quán vắng lúc sáng sớm, laptop mở.",
+        "An đứng cạnh quầy, nhìn về phía Minh, quán không có khách khác.",
+        "Phòng họp sáng đèn, vài người ngồi quanh bàn dài, Minh ngồi cuối bàn.",
+        "Minh đi ra khỏi phòng họp, hành lang vắng, ánh đèn trần trắng.",
+    ]
+    for intent in allowed:
+        assert _check_unrenderable_visual_intent(_Script([_Segment(intent)])) == [], (
+            f"không được bắt nhầm: {intent!r}"
+        )
