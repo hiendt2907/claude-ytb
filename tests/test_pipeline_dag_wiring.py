@@ -352,3 +352,35 @@ def test_passing_audio_gate_never_touches_segment_audio(tmp_path):
 
     assert all(Path(s["audio_path"]).exists() for s in segments)
     assert result.nodes["voiceover"].status == NodeStatus.DONE
+
+
+def test_orientation_is_checked_before_images_are_generated(monkeypatch):
+    """Cổng khung hình nằm SAU chính stage nó phải bảo vệ.
+
+    `validate_render_orientation` tự nói trong docstring là "chặn sai khung hình
+    TRƯỚC KHI tốn chi phí dựng từng segment", nhưng nó chỉ được gọi trong
+    `render_fn`. `visual_assets_fn` chạy trước đó và sinh ảnh ComfyUI theo
+    `settings.orientation` — stage đắt nhất cả DAG.
+
+    `settings.orientation` mặc định là "portrait", còn `pipeline_runner` chỉ
+    export ORIENTATION đúng khi đi qua queue. Nên `python -m ytb_pipeline <long>`
+    chạy trực tiếp sinh trọn bộ ảnh DỌC 832x1216 cho một Long 6.7 phút, rồi mới
+    hỏng ở render. Đo được trong một lượt production thật.
+    """
+    from ytb_pipeline.pipeline import validate_render_orientation
+
+    monkeypatch.setattr(pipeline.settings, "orientation", "portrait")
+    try:
+        validate_render_orientation("long")
+    except ValueError as exc:
+        assert "landscape" in str(exc)
+    else:
+        raise AssertionError("Long + portrait phải bị chặn")
+
+    # Và nó phải được gọi ở visual_assets, không chỉ ở render.
+    source = Path(pipeline.__file__).read_text(encoding="utf-8")
+    start = source.index("async def visual_assets_fn")
+    end = source.index("async def ", start + len("async def visual_assets_fn"))
+    assert "validate_render_orientation" in source[start:end], (
+        "visual_assets_fn phải tự kiểm khung hình trước khi sinh ảnh"
+    )

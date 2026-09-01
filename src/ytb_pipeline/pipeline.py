@@ -876,6 +876,14 @@ async def run_project(project: Project, checkpoint: CheckpointManager, through: 
         from .render.scene_plan import ScenePlan
         from .render.derivative_lineage import derive_lineage
         from .render.visual_assets import prepare_visual_assets
+        # Kiểm khung hình TẠI ĐÂY, không đợi tới render_fn: node này mới là chỗ
+        # đắt nhất cả DAG (ComfyUI sinh nhiều candidate cho từng shot), và nó
+        # lấy `dimensions` thẳng từ `settings.orientation`. Mặc định của
+        # settings là "portrait", còn ORIENTATION chỉ được `pipeline_runner`
+        # export đúng khi chạy qua queue — nên `python -m ytb_pipeline <long>`
+        # chạy trực tiếp từng sinh trọn bộ ảnh DỌC 832x1216 cho một Long 6.7
+        # phút rồi mới hỏng ở render, sau khi đã đốt hết thời gian GPU.
+        validate_render_orientation(voiceover.video_type)
         dimensions = LANDSCAPE if settings.orientation == "landscape" else PORTRAIT
         plan_path = settings.projects_dir / current.project_id / "scene_plan.json"
         if not plan_path.is_file():
