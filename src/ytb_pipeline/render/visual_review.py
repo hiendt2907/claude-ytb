@@ -25,6 +25,11 @@ if TYPE_CHECKING:
 REVIEW_CONTRACT_VERSION = "phase13-review-v1"
 MANUAL_OVERRIDE_CONTRACT_VERSION = "phase13-manual-override-v1"
 MAX_MANUAL_INSTRUCTION_CHARS = 1000
+# Workflow cua chinh he thong la "Judge chi ra sai o dau, operator sua lai",
+# nen mot lan thu la qua it: do tren hang that, lan sua dau tien cua operator
+# da dat character=1.000 composition=0.900 continuity=1.000 va chi hong dung
+# mot menh de hanh dong. Van phai HUU HAN de khong dot vo han luot sinh anh.
+MAX_MANUAL_OVERRIDES_PER_REVIEW = 3
 
 
 def _now_iso() -> str:
@@ -163,6 +168,9 @@ class VisualReviewEntry:
     selected_asset_id: str | None = None
     selection_mode: str = ""
     manual_override: ManualVisualOverride | None = None
+    # Dem so override DA TIEU CONG, de bound tinh theo cong chu khong theo so
+    # lan go lenh (xem `submit_manual_regenerate`).
+    manual_override_spent: int = 0
     last_error: str | None = None
     created_at: str = ""
     updated_at: str = ""
@@ -537,14 +545,17 @@ class VisualReviewStore:
             spent = existing is not None and (
                 existing.status != "pending" or bool(existing.candidates)
             )
-            if spent:
+            spent_total = entry.manual_override_spent + (1 if spent else 0)
+            if spent_total >= MAX_MANUAL_OVERRIDES_PER_REVIEW:
                 raise VisualReviewError(
-                    "Manual regeneration budget đã được sử dụng cho review này."
+                    "Manual regeneration budget đã được sử dụng cho review này "
+                    f"({spent_total}/{MAX_MANUAL_OVERRIDES_PER_REVIEW})."
                 )
             return replace(
                 entry,
                 disposition=ReviewDisposition.MANUAL_REGENERATE,
                 manual_override=override,
+                manual_override_spent=spent_total,
                 last_error=None,
             )
 

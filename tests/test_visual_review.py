@@ -7,6 +7,7 @@ import pytest
 
 from ytb_pipeline.render.visual_assets import VisualRequest
 from ytb_pipeline.render.visual_review import (
+    MAX_MANUAL_OVERRIDES_PER_REVIEW,
     MAX_MANUAL_INSTRUCTION_CHARS,
     ReviewDisposition,
     ReviewReason,
@@ -166,18 +167,35 @@ def test_only_one_manual_override_is_allowed_for_one_review(tmp_path):
         instruction="Đổi góc máy",
     )
 
+    # Judge chi ra sai o dau roi operator sua lai — do la workflow cua chinh
+    # he thong, nen bound phai HUU HAN chu khong phai BANG MOT. Do tren hang
+    # that: lan sua dau tien cua operator cho character=1.000 composition=0.900
+    # continuity=1.000 va chi hong dung mot menh de hanh dong; khong cho sua
+    # tiep thi shot chet han du dang rat gan.
+    for attempt in range(MAX_MANUAL_OVERRIDES_PER_REVIEW - 1):
+        store.initialize_manual_attempt(
+            pending.review_id,
+            request_fingerprint=_request().request_fingerprint,
+            candidate_count=1,
+            generation_key="a1b2c3d4e5f60718",
+        )
+        store.submit_manual_regenerate(
+            pending.review_id,
+            request=_request(),
+            instruction=f"Sua lan {attempt + 2}",
+        )
+
     store.initialize_manual_attempt(
         pending.review_id,
         request_fingerprint=_request().request_fingerprint,
         candidate_count=1,
         generation_key="a1b2c3d4e5f60718",
     )
-
     with pytest.raises(VisualReviewError, match="đã được sử dụng"):
         store.submit_manual_regenerate(
             pending.review_id,
             request=_request(),
-            instruction="Lần thứ ba",
+            instruction="Vuot tran",
         )
 
 
@@ -342,17 +360,15 @@ def test_operator_can_correct_an_override_that_has_not_generated_anything_yet(tm
     assert corrected.manual_override.replaces_intent is True
     assert "hai tay buông" in corrected.manual_override.instruction
 
-    # Đã tiêu công rồi thì ngân sách phải chặn.
-    started = store.initialize_manual_attempt(
+    # Sửa khi chưa tiêu công thì KHÔNG được tính vào ngân sách.
+    assert corrected.manual_override_spent == 0
+
+    # Còn khi đã sinh ảnh rồi, lần thay tiếp theo mới bị tính.
+    store.initialize_manual_attempt(
         entry.review_id, request_fingerprint=request.request_fingerprint,
         candidate_count=1, generation_key="a1b2c3d4e5f60718",
     )
-    assert started.manual_override is not None
-    try:
-        store.submit_manual_regenerate(
-            entry.review_id, request=request, instruction="lần thứ ba",
-        )
-    except VisualReviewError as exc:
-        assert "budget" in str(exc).lower()
-    else:
-        raise AssertionError("override đã chạy thì không được thay nữa")
+    after_spend = store.submit_manual_regenerate(
+        entry.review_id, request=request, instruction="lần sửa sau khi đã sinh ảnh",
+    )
+    assert after_spend.manual_override_spent == 1
