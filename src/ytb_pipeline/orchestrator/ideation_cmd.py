@@ -28,6 +28,11 @@ from pathlib import Path
 # truncated draft followed by repair calls. Operators may lower this in tests.
 SCRIPT_LLM_MAX_TOKENS = int(os.environ.get("IDEATION_LLM_MAX_TOKENS", "14000"))
 
+# Số bản đã bị loại được nhắc lại cho lượt sinh sau. 171 bản nằm trên đĩa lúc
+# viết dòng này; nhồi hết vào prompt sẽ đẩy chính brief ra rìa ngữ cảnh, còn
+# các bản mới nhất là những bản có khả năng bị lặp lại nhất.
+MAX_RECALLED_REJECTIONS = 12
+
 from ..ideation.series import slugify
 from ..content_profiles import load_content_profile
 from ..providers.registry import get_llm_provider
@@ -67,6 +72,47 @@ from .ideation_state import (
     write_local_batch_item,
 )
 from .queue_manager import PIPELINE_LOG_DIR
+
+
+def rejected_candidate_history(archive_dir: Path, *, profile_id: str) -> list[str]:
+    """Các bản đã bị QA loại, dưới dạng dòng "do not reuse" cho lượt sinh sau.
+
+    Trong một lần chạy, mỗi bản bị loại đã được đưa vào `generated_summaries`
+    nên lượt kế tiếp không viết lại nó. Nhưng một lần chạy MỚI dựng lại lịch sử
+    từ `ledger.md`, và những bản bị loại — dù đã lưu xuống đĩa — không ai đọc.
+    Thư mục này trước giờ chỉ được ghi vào.
+
+    Điều đó biến mọi lần thử lại thành vô nghĩa, vì gateway xKiro cache request
+    giống hệt: đo 2026-09-02, cùng một prompt trả về cùng một sha256 trong
+    0.27s ở lần thứ ba. Prompt không đổi thì kịch bản không đổi, byte-for-byte
+    — ba lượt "thử lại" sau một lần loại đã hỏng y hệt nhau trong hai giây.
+
+    Kho này là gợi ý, không phải nguồn sự thật: thiếu, hỏng hay không đọc được
+    đều không được làm chết lượt sinh, chỉ mất một lớp chống lặp.
+    """
+    if not archive_dir.is_dir():
+        return []
+    entries: list[str] = []
+    # Tên file mang timestamp nên sắp theo tên là sắp theo thời gian; lấy các
+    # bản mới nhất, chúng là những bản dễ bị lặp lại nhất.
+    for path in sorted(archive_dir.glob("*.json"), reverse=True):
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError, UnicodeDecodeError):
+            continue
+        if not isinstance(payload, dict):
+            continue
+        if str(payload.get("profile_id") or "").strip() != profile_id:
+            continue
+        slug = str(payload.get("slug") or "").strip()
+        title = str(payload.get("title") or "").strip()
+        topic = str(payload.get("topic") or "").strip()
+        if not (slug or title):
+            continue
+        entries.append(f"REJECTED — do not reuse | {slug} | {title} | {topic}")
+        if len(entries) >= MAX_RECALLED_REJECTIONS:
+            break
+    return entries
 
 
 def describe_candidate_rejection(exc: Exception) -> str:
@@ -422,7 +468,12 @@ async def _cmd_start_local(args: argparse.Namespace) -> None:
     scripts_dir.mkdir(parents=True, exist_ok=True)
     log_path = _local_start_log_path()
     used_slugs = ledger_slugs(ledger_text) | existing_queue_slugs(cli.AUTO_STATE_PATH)
-    generated_summaries: list[str] = []
+    generated_summaries: list[str] = list(
+        rejected_candidate_history(
+            cli.ROOT / "assets" / "script_revisions" / "failed_ideation",
+            profile_id=str(getattr(args, "profile", "") or _cli().settings.content_profile_id),
+        )
+    )
     analytics_feedback = AnalyticsStore().feedback_summary()
     funnel = {
         "long_form_slug": str(getattr(args, "long_form_slug", "") or "").strip(),
