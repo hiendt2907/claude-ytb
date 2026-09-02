@@ -457,3 +457,41 @@ async def test_xkiro_llm_gives_up_after_bounded_retries_on_broken_bytes(monkeypa
         await XkiroLLMProvider().complete("hỏi gì đó")
 
     assert calls["n"] == MAX_CORRUPT_RESPONSE_RETRIES + 1
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_xkiro_llm_retries_an_empty_body_returned_with_http_200(monkeypatch):
+    """HTTP 200 với body toàn khoảng trắng là lỗi truyền, không phải model trả lời.
+
+    Gặp trên production ngay sau khi thêm retry cho byte hỏng: cùng gateway,
+    cùng prompt, body về đúng '       '. Một lượt sinh Long chết vì thế.
+    """
+    from ytb_pipeline.config.settings import settings
+    from ytb_pipeline.providers.llm import xkiro_provider
+    from ytb_pipeline.providers.llm.xkiro_provider import XkiroLLMProvider
+
+    monkeypatch.setattr(settings, "xkiro_api_key", "test-key", raising=False)
+    monkeypatch.setattr(settings, "xkiro_llm_url", "https://voice.example/v1/chat", raising=False)
+    calls = {"n": 0}
+
+    class _Blank:
+        def read(self):
+            return b"       "
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    def fake_urlopen(request: Request, timeout: float):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return _Blank()
+        return _fake_response({"choices": [{"message": {"content": "xin chào"}}]})
+
+    monkeypatch.setattr(xkiro_provider.urllib_request, "urlopen", fake_urlopen)
+
+    assert await XkiroLLMProvider().complete("hỏi gì đó") == "xin chào"
+    assert calls["n"] == 2, "body rỗng phải được hỏi lại"

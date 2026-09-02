@@ -206,6 +206,13 @@ class XkiroLLMProvider:
             raise _CorruptResponseError(
                 f"xKiro LLM ({model}) trả byte UTF-8 hỏng: {exc}"
             ) from exc
+        if not text.strip():
+            # HTTP 200 mà body trống là lỗi truyền, không phải câu trả lời của
+            # model — gặp thật trên production ngay sau khi thêm retry cho byte
+            # hỏng. Cùng lớp sự cố, cùng cách xử lý: hỏi lại, có trần.
+            raise _CorruptResponseError(
+                f"xKiro LLM ({model}) trả HTTP 200 với body rỗng."
+            )
         try:
             body = json.loads(text)
         except json.JSONDecodeError as exc:
