@@ -520,6 +520,35 @@ _UNRENDERABLE_VISUAL_INTENT: tuple[tuple[str, "re.Pattern[str]"], ...] = (
             re.IGNORECASE,
         ),
     ),
+    (
+        # Đo trên 4 shot liên tiếp: Judge cho character và continuity ~1.0,
+        # composition 0.5-0.9, nhưng semantic 0.0-0.2. Người và nơi chốn luôn
+        # dựng đúng; chỉ HÀNH ĐỘNG hỏng, và mọi mệnh đề hỏng đều là cử chỉ có
+        # ĐÍCH — một chi phải trỏ tới một vật xác định trong khung. Đó cùng một
+        # lý do vật lý với hai mẫu tay ở trên.
+        #
+        # Ranh giới: tư thế TĨNH luôn qua ("ngồi", "đứng cạnh bàn", "cúi nhìn
+        # màn hình"). Không chặn động từ nói chung — chặn rộng hơn sẽ giết cả
+        # cảnh dựng được, đúng cái đã xảy ra một lần với "màn hình sáng".
+        "cử chỉ có đích",
+        re.compile(r"chỉ\s+tay|chỉ\s+về\s+phía|trỏ\s+về\s+phía", re.IGNORECASE),
+    ),
+    (
+        # Cùng bộ đo: trao/xoay một vật về phía người kia đòi hai nhân vật phối
+        # hợp chính xác quanh một vật thể — hỏng y hệt cách "tay cầm" hỏng.
+        # "quay về phía cửa kính" (xoay người, không có vật) vẫn qua.
+        "trao/xoay vật về phía người khác",
+        re.compile(
+            # Tên vật dài ngắn khác nhau ("khay", "màn hình", "tách cà phê"),
+            # nên đo bằng khoảng ký tự có chặn trên thay vì đếm token — và
+            # không cho vượt qua dấu câu, để mệnh đề sau dấu phẩy không bị kéo
+            # vào thành một match giả.
+            r"chìa\s+[^,.;]{1,30}?\s+(?:cho|về)\b"
+            r"|đưa\s+[^,.;]{1,30}?\s+cho\s+\w"
+            r"|quay\s+(?!(?:về|lại|sang|đi)\b)[^,.;]{1,30}?\s+về\s+phía",
+            re.IGNORECASE,
+        ),
+    ),
 )
 
 

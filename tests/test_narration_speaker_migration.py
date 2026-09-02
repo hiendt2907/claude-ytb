@@ -354,6 +354,13 @@ def test_qa_rejects_a_visual_intent_the_prompt_already_forbids():
         "Máy quay cận bàn tay Minh trên bàn phím, phía sau là màn hình tối.",
         "Cận cảnh ngón trỏ Minh dừng trên phím Enter.",
         "Màn hình hiển thị dòng chữ cảnh báo màu vàng ở cuối trang.",
+        # Đo thêm trên 4 shot liên tiếp (ghi trong docstring của driver review):
+        # Judge cho character/continuity ~1.0 và composition 0.5-0.9, nhưng
+        # semantic 0.0-0.2. Người và nơi chốn luôn đúng; chỉ HÀNH ĐỘNG hỏng, và
+        # mọi mệnh đề hỏng đều là cử chỉ CÓ ĐÍCH hoặc phối hợp hai người.
+        "Minh chỉ tay về phía màn hình, An nhìn theo.",
+        "Minh quay màn hình về phía An để cô nhìn.",
+        "An chìa tách cà phê cho Minh.",
     ]
     for intent in blocked:
         violations = _check_unrenderable_visual_intent(_Script([_Segment(intent)]))
@@ -370,6 +377,12 @@ def test_qa_rejects_a_visual_intent_the_prompt_already_forbids():
         "An đứng cạnh quầy, nhìn về phía Minh, quán không có khách khác.",
         "Phòng họp sáng đèn, vài người ngồi quanh bàn dài, Minh ngồi cuối bàn.",
         "Minh đi ra khỏi phòng họp, hành lang vắng, ánh đèn trần trắng.",
+        # Cùng bộ đo đó ghi rõ tư thế TĨNH luôn qua. Ranh giới là cử chỉ có
+        # đích, không phải mọi động từ — chặn rộng hơn sẽ giết cả cảnh dựng
+        # được, đúng cái đã xảy ra một lần với "màn hình sáng".
+        "Minh cúi nhìn màn hình, quán vắng lúc sáu giờ.",
+        "An đứng cạnh bàn, quay về phía cửa kính.",
+        "Minh ngồi thẳng lên, nhìn ra ngoài đường.",
     ]
     for intent in allowed:
         assert _check_unrenderable_visual_intent(_Script([_Segment(intent)])) == [], (
