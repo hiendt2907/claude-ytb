@@ -167,8 +167,12 @@ def test_adapter_repairs_once_then_accepts_valid_strict_output(tmp_path):
     ],
 )
 def test_http_transport_maps_timeout_and_network_errors(monkeypatch, error):
+    from ytb_pipeline.providers.vision import xkiro_provider
     from ytb_pipeline.providers.vision.xkiro_provider import XkiroVisionTransport
 
+    # Lỗi thoáng qua giờ được hỏi lại có backoff; test này đo ánh xạ lỗi chứ
+    # không đo thời gian chờ, nên bỏ sleep thật đi.
+    monkeypatch.setattr(xkiro_provider.time, "sleep", lambda _s: None)
     monkeypatch.setattr("ytb_pipeline.providers.vision.xkiro_provider.urllib_request.urlopen", lambda *_a, **_k: (_ for _ in ()).throw(error))
     transport = XkiroVisionTransport(api_key="test-key")
 
@@ -181,7 +185,10 @@ def test_http_transport_maps_timeout_and_network_errors(monkeypatch, error):
     [(401, "authentication"), (403, "authentication"), (413, "payload too large"), (429, "rate limit"), (503, "unavailable")],
 )
 def test_http_transport_maps_provider_statuses(monkeypatch, status, message):
+    from ytb_pipeline.providers.vision import xkiro_provider
     from ytb_pipeline.providers.vision.xkiro_provider import XkiroVisionTransport
+
+    monkeypatch.setattr(xkiro_provider.time, "sleep", lambda _s: None)
 
     error = urllib_error.HTTPError("https://api.xkiro.com/v1/chat/completions", status, "error", {}, BytesIO(b"{}"))
     monkeypatch.setattr("ytb_pipeline.providers.vision.xkiro_provider.urllib_request.urlopen", lambda *_a, **_k: (_ for _ in ()).throw(error))

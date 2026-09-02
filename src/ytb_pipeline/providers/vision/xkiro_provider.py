@@ -16,6 +16,7 @@ import base64
 import hashlib
 import json
 import logging
+import time
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -51,6 +52,25 @@ _SYSTEM_PROMPT = (
     "thể, độ tuổi, giới tính hay chủng tộc. Trả DUY NHẤT một object JSON đúng "
     "schema được yêu cầu; không markdown hay prose bên ngoài JSON."
 )
+
+
+# Một Long gọi Judge khoảng 250 lần; xác suất gặp ít nhất một lỗi thoáng qua
+# gần như chắc chắn. Trước đây một lần timeout giết cả node `visual_assets`
+# sau khi ảnh đã sinh xong — mất toàn bộ công của node (đo thật 2026-09-01).
+# Ba lượt là đủ cho lỗi thoáng qua; hơn nữa chỉ kéo dài một gateway đã chết.
+MAX_TRANSPORT_ATTEMPTS = 3
+_RETRY_BACKOFF_SEC = (1.0, 3.0)
+
+# 5xx = phía provider hỏng, 429 = tạm hết lượt: cả hai đều có thể qua ở lần
+# sau. 401/403 (sai khoá) và 413 (payload quá lớn) thì hỏi lại bao nhiêu lần
+# cũng vậy — retry chỉ làm chậm và che mất nguyên nhân thật.
+_RETRYABLE_STATUSES = frozenset({429, 500, 502, 503, 504})
+
+
+def _is_retryable(exc: BaseException) -> bool:
+    if isinstance(exc, urllib_error.HTTPError):
+        return exc.code in _RETRYABLE_STATUSES
+    return isinstance(exc, (urllib_error.URLError, TimeoutError))
 
 
 def _provider_error_message(status: int) -> str:
@@ -106,13 +126,32 @@ class XkiroVisionTransport:
         }
 
     def _open(self, request: urllib_request.Request) -> bytes:
-        try:
-            with urllib_request.urlopen(request, timeout=self.timeout_sec) as response:
-                return response.read()
-        except urllib_error.HTTPError as exc:
-            raise JudgeInfrastructureError(_provider_error_message(exc.code)) from exc
-        except (urllib_error.URLError, TimeoutError) as exc:
-            raise JudgeInfrastructureError(f"xKiro vision network/timeout failure: {exc}") from exc
+        """Gửi một request, hỏi lại khi gateway lỗi thoáng qua.
+
+        Không sửa gì và không bịa gì: cùng request đó được gửi lại. Hết lượt
+        thì hỏng đúng như trước, mang đúng thông điệp cũ, nên mọi thứ đọc lỗi
+        ở tầng trên không đổi.
+        """
+        last: BaseException | None = None
+        for attempt in range(1, MAX_TRANSPORT_ATTEMPTS + 1):
+            try:
+                with urllib_request.urlopen(request, timeout=self.timeout_sec) as response:
+                    return bytes(response.read())
+            except (urllib_error.URLError, TimeoutError) as exc:
+                # HTTPError là con của URLError, nên nhánh này bắt cả hai.
+                last = exc
+                if not _is_retryable(exc) or attempt == MAX_TRANSPORT_ATTEMPTS:
+                    break
+                logger.info(
+                    "visual_judge.transport_retry provider=xkiro attempt=%d/%d reason=%s",
+                    attempt,
+                    MAX_TRANSPORT_ATTEMPTS,
+                    exc,
+                )
+                time.sleep(_RETRY_BACKOFF_SEC[min(attempt - 1, len(_RETRY_BACKOFF_SEC) - 1)])
+        if isinstance(last, urllib_error.HTTPError):
+            raise JudgeInfrastructureError(_provider_error_message(last.code)) from last
+        raise JudgeInfrastructureError(f"xKiro vision network/timeout failure: {last}") from last
 
     def verify_vision_model(self, model: str) -> None:
         """Fail fast unless the exact configured model advertises vision."""
