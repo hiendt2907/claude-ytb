@@ -230,4 +230,15 @@ class XkiroLLMProvider:
         content = choices[0].get("message", {}).get("content", "")
         if not content:
             raise RuntimeError(f"xKiro LLM ({model}) trả content rỗng.")
+        if "\ufffd" in content:
+            # Kiểm tra ở ĐÂY, không phải trên body thô: JSON mã hoá U+FFFD thành
+            # escape "\\ufffd", nên ký tự thật chỉ xuất hiện sau khi parse.
+            #
+            # Đây là ca UTF-8 HỢP LỆ mang sẵn ký tự thay thế — chữ mất TRƯỚC khi
+            # tới HTTP, trong model hoặc gateway, nên strict decode không thấy
+            # gì. Đo trên production: 'đi h\ufffd\ufffdp' thay cho 'đi họp',
+            # đúng một lời gọi, decode trót lọt.
+            raise _CorruptResponseError(
+                f"xKiro LLM ({model}) trả content chứa ký tự thay thế U+FFFD."
+            )
         return content

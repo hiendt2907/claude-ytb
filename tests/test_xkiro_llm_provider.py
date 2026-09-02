@@ -495,3 +495,35 @@ async def test_xkiro_llm_retries_an_empty_body_returned_with_http_200(monkeypatc
 
     assert await XkiroLLMProvider().complete("hỏi gì đó") == "xin chào"
     assert calls["n"] == 2, "body rỗng phải được hỏi lại"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_xkiro_llm_retries_when_the_decoded_text_carries_replacement_chars(monkeypatch):
+    """Gateway gửi UTF-8 HỢP LỆ có sẵn U+FFFD — hỏng ở phía trên HTTP.
+
+    Chẩn đoán đầu của tôi (byte bị cắt trên đường truyền) không đúng cho ca này:
+    strict decode chạy trót lọt, chỉ có MỘT lời gọi, mà text vẫn chứa
+    'đi h\\ufffd\\ufffdp' thay cho 'đi họp'. Chữ đã mất trước khi tới HTTP, nên
+    phải bắt theo NỘI DUNG đã giải mã chứ không theo lỗi decode.
+    """
+    from ytb_pipeline.config.settings import settings
+    from ytb_pipeline.providers.llm import xkiro_provider
+    from ytb_pipeline.providers.llm.xkiro_provider import XkiroLLMProvider
+
+    monkeypatch.setattr(settings, "xkiro_api_key", "test-key", raising=False)
+    monkeypatch.setattr(settings, "xkiro_llm_url", "https://voice.example/v1/chat", raising=False)
+    calls = {"n": 0}
+
+    def fake_urlopen(request: Request, timeout: float):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return _fake_response({"choices": [{"message": {"content": "cậu đi h��p"}}]})
+        return _fake_response({"choices": [{"message": {"content": "cậu đi họp"}}]})
+
+    monkeypatch.setattr(xkiro_provider.urllib_request, "urlopen", fake_urlopen)
+
+    result = await XkiroLLMProvider().complete("hỏi gì đó")
+
+    assert calls["n"] == 2, "text chứa U+FFFD phải được hỏi lại"
+    assert "�" not in result
