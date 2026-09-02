@@ -508,9 +508,14 @@ _UNRENDERABLE_VISUAL_INTENT: tuple[tuple[str, "re.Pattern[str]"], ...] = (
         re.compile(r"tay\s+(?:cầm|giữ|nắm)|cầm\s+(?:khay|ly|tách|bút|cuốn|tờ|điện thoại)", re.IGNORECASE),
     ),
     (
+        # Chỉ chặn khi đòi NỘI DUNG đọc được, không chặn trạng thái sáng/tối.
+        # Mẫu cũ bắt cả "màn hình sáng" — một màn hình đang bật thì image model
+        # vẽ dễ, và việc chặn nó đã làm hỏng một lượt sinh kịch bản mà biên tập
+        # đã đạt. Bằng chứng thật sự chỉ có cho ca đòi chữ/số hoặc một hoạ tiết
+        # cụ thể phải hiện trên màn hình.
         "chữ/số đọc được trong khung",
         re.compile(
-            r"màn hình\s+(?:tối|sáng|hiện|hiển thị|có|với)|dòng chữ|dòng cảnh báo"
+            r"màn hình\s+(?:hiện|hiển thị)|dòng chữ|dòng cảnh báo"
             r"|chữ\s+(?:trên|hiện)|con số\s+(?:trên|hiện)",
             re.IGNORECASE,
         ),

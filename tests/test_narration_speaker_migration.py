@@ -361,6 +361,11 @@ def test_qa_rejects_a_visual_intent_the_prompt_already_forbids():
         assert violations[0]["rule"] == "unrenderable_visual_intent"
 
     allowed = [
+        # Trạng thái sáng/tối của màn hình KHÔNG phải "chữ/số đọc được": image
+        # model vẽ một màn hình đang bật rất dễ. Guard từng chặn cả hai câu này
+        # và làm hỏng một lượt sinh kịch bản mà mọi mặt khác đều đạt.
+        "Minh ngồi bên bàn gỗ, màn hình sáng hắt nhẹ, quán vắng lúc sáng sớm.",
+        "Bàn số 6 lúc sáng sớm, laptop mở với màn hình tối, tách cà phê bên cạnh.",
         "Minh ngồi bên bàn gỗ cạnh cửa kính trong quán vắng lúc sáng sớm, laptop mở.",
         "An đứng cạnh quầy, nhìn về phía Minh, quán không có khách khác.",
         "Phòng họp sáng đèn, vài người ngồi quanh bàn dài, Minh ngồi cuối bàn.",
