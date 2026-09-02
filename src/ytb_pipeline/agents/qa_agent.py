@@ -290,6 +290,30 @@ def _story_words(text: str) -> list[str]:
     return re.findall(r"[^\W_]+", text.lower(), flags=re.UNICODE)
 
 
+def _mentions_cast_by_name(text: str, cast: "set[str]") -> bool:
+    """Nhân vật có được GỌI TÊN trong đoạn này không.
+
+    So token viết thường thì mọi từ tiếng Việt có âm tiết trùng tên nhân vật
+    đều thành rò rỉ. Đo thật 2026-09-02: một lời chốt hợp lệ bị loại vì
+    "cuộc gọi xác minh" — `xác minh` tách ra `minh`, trùng cast id. Tập đó nói
+    về đúng một cuộc gọi xác minh, nên cổng gần như không thể qua. `chứng
+    minh`, `thông minh`, `minh bạch`, `văn minh` đều hỏng y hệt.
+
+    Tiếng Việt viết hoa danh từ riêng và không viết hoa âm tiết trong từ ghép,
+    nên chữ hoa là thứ phân biệt được. Khớp phân biệt hoa/thường, có biên từ:
+    "Minh" là người, "minh" trong "xác minh" thì không.
+
+    Dấu thanh cũng đã tách sẵn "mình" khỏi "minh"; chữ hoa xử lý phần còn lại.
+    """
+    for name in cast:
+        if not name:
+            continue
+        pattern = re.compile(rf"(?<![^\W\d_]){re.escape(name.capitalize())}(?![^\W\d_])")
+        if pattern.search(text):
+            return True
+    return False
+
+
 def _check_story_hook(script: Any, profile: Any) -> list[dict[str, str]]:
     """Cổng mở đầu cho profile kể chuyện.
 
@@ -309,7 +333,11 @@ def _check_story_hook(script: Any, profile: Any) -> list[dict[str, str]]:
     has_clock = any(marker in word_set for marker in _STORY_MOMENT_MARKERS) and (
         bool(_STORY_NUMBER_WORDS & word_set) or any(character.isdigit() for character in first)
     )
-    has_anchor = bool(cast & word_set) or has_clock
+    # Neo nhân vật phải là GỌI TÊN thật, không phải một âm tiết trùng tên. Khớp
+    # theo token sẽ ghi công cho "cuộc gọi xác minh" là có neo nhân vật, và một
+    # cảnh mở không neo được ai vẫn qua cổng — lỗi lặng, ngược chiều với ca ở
+    # `_is_narrator_lesson_closing` nhưng cùng một gốc.
+    has_anchor = _mentions_cast_by_name(first, cast) or has_clock
     lowered = first.lower()
     has_stake = any(marker in words for marker in _STORY_STAKE_MARKERS) or any(
         marker in lowered for marker in _STORY_STAKE_MARKERS if " " in marker
@@ -834,7 +862,7 @@ def _is_narrator_lesson_closing(profile: Any, final_segment: Any, final_text: st
     if len(words) < _NARRATOR_LESSON_MIN_WORDS:
         return False
     cast = {name for name in profile.voice_cast if name != narrator_id}
-    if cast & set(words):
+    if _mentions_cast_by_name(lesson_text, cast):
         return False
     word_set = set(words)
     has_address = any(
