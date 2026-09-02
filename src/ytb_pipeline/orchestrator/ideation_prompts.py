@@ -133,17 +133,40 @@ _BOUNDED_ACTION_CLOSING = (
 def _short_total_length_bounds(
     payload: dict, *, content_profile: "ContentProfile | None" = None
 ) -> tuple[int, int] | None:
-    """Return BOTH character bounds a Short must hold after a repair.
+    """Short-only view of `_total_length_bounds`.
 
-    The duration gate is two-sided, so a repair told only the floor overshoots
-    the cap instead — production 2026-08-30 rewrote all seven sections into
-    70.4s against a 45.0s ceiling. Half a contract is not a contract. Returning
-    None keeps non-Short repairs and malformed payloads unchanged.
+    The three Short repairs (hook, expansion, strategy rewrite) each rebuild a
+    Short-shaped delta and have their own measured evidence behind them; they
+    keep asking a helper that answers for Shorts and nothing else, so widening
+    the window below cannot reach them by accident.
     """
     if str(payload.get("video_type") or "").strip().lower() != "short":
         return None
+    return _total_length_bounds(payload, content_profile=content_profile)
+
+
+def _total_length_bounds(
+    payload: dict, *, content_profile: "ContentProfile | None" = None
+) -> tuple[int, int] | None:
+    """Return BOTH character bounds a script must hold after a repair.
+
+    A Long is judged by the same two-sided duration gate a Short is, so a
+    repair that resizes several sections can miss it from either end. Measured
+    2026-09-02: an editorial rewrite whose own `repair_brief` said "cắt bớt
+    hoặc nén mục 11" landed the Long at 278.1s against a 297.0s floor and cost
+    a sixteen-minute generation. The rewrite was never told a floor existed.
+
+    Returning None keeps malformed payloads unchanged.
+    """
     sections = payload.get("sections") or []
     if not sections:
+        return None
+    video_type = str(payload.get("video_type") or "").strip().lower()
+    if video_type == "long":
+        # The Long window is a whole-script constant, not a per-segment
+        # computation: the same bounds the generation prompt already quotes.
+        return LONG_SAFE_MIN_CHARS, LONG_SAFE_MAX_CHARS
+    if video_type != "short":
         return None
     provider = (
         content_profile.providers.tts if content_profile is not None else None
@@ -505,20 +528,25 @@ def narrator_reflection_repair_prompt(
         if funnel_target
         else ""
     )
-    # This repair resizes the section that decides Short admission. Production
+    # This repair resizes the section that decides admission. Production
     # 2026-08-30: a 556-character Short lost 69 characters here and was rejected
     # at 28.4s against a 30.0s floor. State the floor the rewrite will be judged
     # against instead of letting it discover the cap by being killed.
+    #
+    # A Long is judged by the same two-sided gate through the same code, and
+    # until 2026-09-02 was told nothing: in that run this repair ran immediately
+    # before the total fell under the floor and the generation was lost.
     length_instruction = ""
-    bounds = _short_total_length_bounds(payload, content_profile=content_profile)
+    bounds = _total_length_bounds(payload, content_profile=content_profile)
     if bounds is not None:
         floor_chars, cap_chars = bounds
+        label = "Short" if payload.get("video_type") == "short" else "Long"
         others = sum(
             len(str(section.get("voiceover") or section.get("narration") or ""))
             for section in sections[:-1]
         )
         length_instruction = (
-            f" LENGTH BUDGET: the whole Short must stay between {floor_chars} and {cap_chars} "
+            f" LENGTH BUDGET: the whole {label} must stay between {floor_chars} and {cap_chars} "
             f"characters of spoken narration; the other sections already carry {others}, so your "
             f"rewritten final section must be between {max(1, floor_chars - others)} and "
             f"{max(1, cap_chars - others)} characters. Both ends are rejected outright, so reach "
@@ -1591,7 +1619,7 @@ def editorial_rewrite_prompt(payload: dict, review: object) -> str:
     # back to the default contract and quotes a window from another profile —
     # production 2026-08-30 told this rewrite it could spend 784 characters,
     # which measures 49.6s against a 45.0s ceiling.
-    rewrite_bounds = _short_total_length_bounds(payload, content_profile=review_profile)
+    rewrite_bounds = _total_length_bounds(payload, content_profile=review_profile)
     if rewrite_bounds is not None:
         rewrite_floor, rewrite_cap = rewrite_bounds
         sections_now = [
@@ -1609,14 +1637,22 @@ def editorial_rewrite_prompt(payload: dict, review: object) -> str:
             for index, section in enumerate(sections_now, start=1)
             if index not in cited
         )
+        kind = "SHORT" if payload.get("video_type") == "short" else "LONG"
+        label = "Short" if kind == "SHORT" else "Long"
+        # The floor is the half a reviewer can talk the writer out of: a
+        # `repair_brief` may legitimately say "cắt bớt", and without a stated
+        # floor the rewrite obeys it straight through the duration gate. This
+        # guard is placed after the brief and marked as overriding it for
+        # exactly that reason.
         length_guard = (
-            "\n\nMANDATORY SHORT LENGTH BUDGET (overrides any conflicting repair wording): the "
-            f"whole Short currently carries {current_total} characters of spoken narration and must "
+            f"\n\nMANDATORY {kind} LENGTH BUDGET (overrides any conflicting repair wording): the "
+            f"whole {label} currently carries {current_total} characters of spoken narration and must "
             f"end up between {rewrite_floor} and {rewrite_cap}. The sections you are NOT rewriting "
             f"already carry {untouched}, so everything you return must total between "
             f"{max(1, rewrite_floor - untouched)} and {max(1, rewrite_cap - untouched)} characters. "
             "Both ends are rejected outright: rebuild the cited scenes at full length, but do not "
-            "let a richer rewrite push the Short past its ceiling."
+            f"let a richer rewrite push the {label} past its ceiling, and do not let an instruction "
+            "to trim take it under the floor."
         )
     if payload.get("video_type") == "short" and isinstance(strategy, dict):
         long_slug = str(strategy.get("long_form_slug") or "").strip()
