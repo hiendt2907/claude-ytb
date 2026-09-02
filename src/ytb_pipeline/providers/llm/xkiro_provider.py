@@ -11,11 +11,14 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from urllib import error as urllib_error
 from urllib import request as urllib_request
 
 from ...config.settings import settings
 from ..errors import ProviderUnavailableError
+
+logger = logging.getLogger(__name__)
 
 # Production 2026-08-27: `run_editorial_review()` asks for only 1024 output
 # tokens (small) but sends a full script + rubric as INPUT — xKiro can take
@@ -87,8 +90,24 @@ class XkiroLLMProvider:
                     model, prompt, system, max_tokens, temperature, response_format
                 )
             except _CorruptResponseError as exc:
+                # Retry im lặng làm tỉ lệ hỏng của gateway không đo được: một
+                # lượt sinh hỏng 3 lần liên tiếp trông giống hệt một lượt hỏng
+                # một lần. Đo thật 2026-09-02 20:16 — chỉ thấy đúng một dòng
+                # "LLM: generating" cho ba lần gọi, nên không biết đây là xui
+                # hay gateway đang xuống cấp. Ghi lại từng lượt.
+                logger.warning(
+                    "llm.corrupt_response.retry provider=xkiro model=%s "
+                    "attempt=%d/%d max_tokens=%d reason=%s",
+                    model,
+                    attempt + 1,
+                    MAX_CORRUPT_RESPONSE_RETRIES + 1,
+                    max_tokens,
+                    exc,
+                )
                 if attempt == MAX_CORRUPT_RESPONSE_RETRIES:
-                    raise ProviderUnavailableError(str(exc)) from exc
+                    raise ProviderUnavailableError(
+                        f"{exc} (đã thử {MAX_CORRUPT_RESPONSE_RETRIES + 1} lượt)"
+                    ) from exc
                 continue
         raise AssertionError("unreachable")
 
