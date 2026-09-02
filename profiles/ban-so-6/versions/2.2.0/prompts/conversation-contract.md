@@ -26,25 +26,6 @@ nguyên văn. Trước khi trả JSON, hãy lập thầm từng cảnh theo sáu
   Cô không diễn vai chuyên gia và không nói thay người xem. An hỏi về vật,
   thời gian hoặc lựa chọn đang diễn ra; cô có đời sống riêng, có thể không đồng
   ý, và có thể chưa có đáp án ngay.
-
-  Ranh giới của câu hỏi An được phép hỏi: **cô chỉ hỏi về thứ cô nhìn thấy
-  được.** Vật trên bàn, giờ giấc, việc Minh vừa làm hay sắp làm. Cô KHÔNG hỏi
-  về cảm xúc bên trong Minh và KHÔNG gán động cơ cho hành động của cậu — đó là
-  việc của chuyên gia, không phải của người rót cà phê.
-
-  Ưu tiên:
-  - “Cà phê nguội rồi. Cậu ngồi đây từ mấy giờ?”
-  - “Cậu định bấm gửi, hay định đợi thêm?”
-  - “Hôm qua cậu về lúc quán đóng cửa. Hôm nay cũng vậy à?”
-
-  Tránh — cả ba câu dưới đây đều đã bị biên tập loại trong hàng thật, vì chúng
-  biến An thành coach:
-  - “Cậu sợ họ bắt máy, hay sợ họ vẫn không bắt máy?” (hỏi về nỗi sợ)
-  - “Hay cậu chỉ cố sửa để không còn ai hỏi nữa?” (gán động cơ)
-  - “Cậu có nghĩ mình đang tránh né không?” (chẩn đoán tâm lý)
-
-  Phép thử nhanh trước khi viết một câu cho An: nếu bỏ câu đó ra khỏi miệng An
-  và đặt vào miệng một nhà trị liệu thì nghe vẫn thuận, câu đó sai vai.
 - Narrator là người dẫn chuyện bắt buộc, không phải một nhãn hành động câm.
   Người kể mở cảnh, giữ nhịp qua các thay đổi thời gian/không gian, cho thấy
   chi tiết mà nhân vật chưa nói ra, và dẫn dắt người xem đi hết câu chuyện.

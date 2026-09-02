@@ -494,7 +494,12 @@ def test_ban_so_6_production_profile_enables_derivative_short_and_real_vision_qc
 
     # 2.2.0 widened the Short window to 60-90s so a beat can be written as a
     # scene instead of a telegram; see the profile version snapshots.
-    assert profile.version == "2.2.0"
+    # 2.3.0 gave An's questions a concrete Ưu tiên/Tránh contrast, using the
+    # exact sentences the editorial reviewer rejected twice on 2026-09-02. The
+    # abstract rule ("không diễn vai chuyên gia") was already there and the
+    # model wrote diagnostic questions anyway; the naturalness rule right below
+    # it had a contrast pair and held, so the role rule got one too.
+    assert profile.version == "2.3.0"
     assert profile.content_rules.allow_short_generation is True
     assert profile.content_rules.require_short_source_trace is True
     assert visual is not None
