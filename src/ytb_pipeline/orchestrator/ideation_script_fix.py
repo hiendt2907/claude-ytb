@@ -39,6 +39,7 @@ from .ideation_prompts import (
     SHORT_TARGET_CHARS,
     hook_repair_prompt,
     narrator_reflection_repair_prompt,
+    visual_intent_repair_prompt,
     short_funnel_bridge_target,
     editorial_rewrite_prompt,
     ledger_topics,
@@ -744,6 +745,61 @@ def apply_short_expansion(payload: dict, delta: dict) -> dict:
     return enriched
 
 
+def _section_indexes_in(detail: str) -> tuple[int, ...]:
+    """Đọc số section từ câu violation của QA gate.
+
+    Cổng viết "Section 6 yêu cầu ..."; bản sửa cần đúng con số đó để chỉ đụng
+    vào section hỏng. Không tìm thấy số nào thì trả rỗng — gọi bên trên sẽ
+    không sinh request, và luật vẫn fail-closed như trước.
+    """
+    return tuple(int(match) for match in re.findall(r"Section (\d+)", detail))
+
+
+def apply_visual_intent_repair(payload: dict, delta: dict) -> dict:
+    """Replace ONLY the `visual_intent` of the sections the delta names.
+
+    Bounded exactly like `apply_hook_repair`: the delta may touch one field of
+    the sections it lists, and everything else — narration, title, section
+    count, purposes, strategy, continuity — is copied through untouched. A shot
+    description is not spoken, so this repair cannot move the editorial score.
+
+    The rewrite is re-checked against the same gate that rejected the original
+    before it is accepted. Without that, a model that repeats the violation
+    would keep spending the repair budget on a script the gate will reject
+    anyway, which is slower than not repairing at all.
+    """
+    from ytb_pipeline.agents.qa_agent import _UNRENDERABLE_VISUAL_INTENT
+
+    entries = delta.get("sections")
+    if not isinstance(entries, list) or not entries:
+        raise ValueError("Visual intent repair phải trả về ít nhất một section.")
+    sections = payload.get("sections")
+    if not isinstance(sections, list) or not sections:
+        raise ValueError("Script không có sections để sửa visual_intent.")
+
+    enriched = deepcopy(payload)
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise ValueError("Mỗi mục sửa phải là object.")
+        try:
+            index = int(entry.get("section_index"))
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"section_index không hợp lệ: {entry.get('section_index')!r}") from exc
+        if not 1 <= index <= len(sections):
+            raise ValueError(f"section_index {index} nằm ngoài {len(sections)} section.")
+        intent = str(entry.get("visual_intent") or "").strip()
+        if not intent:
+            raise ValueError(f"Section {index}: visual_intent rỗng.")
+        for label, pattern in _UNRENDERABLE_VISUAL_INTENT:
+            found = pattern.search(intent)
+            if found is not None:
+                raise ValueError(
+                    f"Section {index}: bản sửa vẫn vi phạm {label} ('{found.group(0)}')."
+                )
+        enriched["sections"][index - 1]["visual_intent"] = intent
+    return enriched
+
+
 def apply_hook_repair(payload: dict, delta: dict) -> dict:
     """Replace ONLY the opening section's spoken text — nothing else.
 
@@ -881,6 +937,7 @@ async def validate_or_repair_script(
     identity_repair_attempted = False
     hook_repair_attempted = False
     narrator_reflection_repair_attempted = False
+    visual_intent_repair_attempted = False
     post_editorial_repairable_rules: set[str] = set()
     editorial_rewrites = 0
     report_path = script_path.parent.parent / "assets" / "quality_reports" / "ideation_errors.jsonl"
@@ -1306,6 +1363,75 @@ async def validate_or_repair_script(
                         value = identity.get(key)
                         if isinstance(value, str) and value.strip():
                             current[key] = value.strip()
+
+                # An unrenderable shot is a bounded repair as well, and the
+                # cheapest one of the set: `visual_intent` is never spoken, so
+                # rewriting it cannot move narration or the editorial score.
+                # Without this the rule had no repair path at all and one bad
+                # clause in one section discarded a multi-minute generation —
+                # three of five real rejections on 2026-09-01..02.
+                if (
+                    is_deterministic_attempt
+                    and not visual_intent_repair_attempted
+                    and "unrenderable_visual_intent" in violation_rules
+                ):
+                    visual_intent_repair_attempted = True
+                    repaired_anything = True
+                    flagged_indexes = tuple(
+                        sorted(
+                            index
+                            for v in (last_qa_output or {}).get("violations", [])
+                            if str(v.get("rule")) == "unrenderable_visual_intent"
+                            for index in _section_indexes_in(str(v.get("detail") or ""))
+                        )
+                    )
+                    visual_request = visual_intent_repair_prompt(
+                        current, section_indexes=flagged_indexes
+                    )
+                    if console_prefix:
+                        print(
+                            f"{console_prefix} repair: visual_intent only, sections "
+                            f"{list(flagged_indexes)}",
+                            flush=True,
+                        )
+                    if log_path:
+                        append_local_start_log(log_path, "VISUAL_INTENT_REPAIR_PROMPT", visual_request)
+                    visual_text = await provider.complete(
+                        visual_request,
+                        system="You are a precise JSON editor. Output valid JSON only.",
+                        max_tokens=1024,
+                        temperature=0.3,
+                        json_output=True,
+                        response_schema={
+                            "type": "object",
+                            "properties": {
+                                "sections": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "section_index": {"type": "integer"},
+                                            "visual_intent": {"type": "string"},
+                                        },
+                                        "required": ["section_index", "visual_intent"],
+                                        "additionalProperties": False,
+                                    },
+                                }
+                            },
+                            "required": ["sections"],
+                            "additionalProperties": False,
+                        },
+                    )
+                    if log_path:
+                        append_local_start_log(log_path, "VISUAL_INTENT_REPAIR_RESPONSE", visual_text)
+                    try:
+                        current = apply_visual_intent_repair(current, json_from_llm(visual_text))
+                    except (ValueError, json.JSONDecodeError) as exc:
+                        last_validation_error = f"Visual intent repair không dùng được: {exc}"
+                        if log_path:
+                            append_local_start_log(
+                                log_path, "VISUAL_INTENT_REPAIR_FAILED", last_validation_error
+                            )
 
                 # A weak opening is a bounded repair too: rewrite ONLY the
                 # first section's spoken text against the same anchor+stake

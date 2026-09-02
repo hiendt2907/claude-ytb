@@ -412,6 +412,55 @@ def hook_repair_prompt(
     )
 
 
+def visual_intent_repair_prompt(payload: dict, *, section_indexes: tuple[int, ...]) -> str:
+    """Ask for a bounded rewrite of ONLY the flagged sections' `visual_intent`.
+
+    The three unrenderable forms are already stated in the generation prompt and
+    the model still writes them — `_check_unrenderable_visual_intent` says as
+    much ("nêu luật không đủ"). What was missing is the consequence: `hook` and
+    `narrator_reflection` each get a narrow repair, this rule got none, so one
+    bad clause in one section discarded a multi-minute generation. Measured on
+    real production logs 2026-09-01..02: three of five rejections were this
+    rule alone.
+
+    `visual_intent` is not spoken. Rewriting it cannot move narration, the
+    editorial score, or anything the viewer hears, which is why a narrow repair
+    is safe here in a way a transcript rewrite would not be. The gate still runs
+    afterwards and still fails closed.
+    """
+    sections = payload.get("sections") or []
+    flagged = [
+        {
+            "section_index": index,
+            "voiceover": str(sections[index - 1].get("voiceover") or ""),
+            "visual_intent": str(sections[index - 1].get("visual_intent") or ""),
+        }
+        for index in section_indexes
+        if 1 <= index <= len(sections) and isinstance(sections[index - 1], dict)
+    ]
+    return (
+        "Rewrite ONLY the `visual_intent` of the listed sections of this Vietnamese "
+        "YouTube script. Each one currently asks for something an image model cannot "
+        "deliver, so a vision model hard-fails every candidate frame and production "
+        "stops.\n"
+        "Three forms are rejected outright, however well written:\n"
+        "  1. readable text or numbers inside the frame (a screen showing a line, a "
+        "sign, a page being read);\n"
+        "  2. a specific small prop held in a hand;\n"
+        "  3. an exact hand or finger placement, or a close-up of hands.\n"
+        "Write instead what a single still frame can show and be judged on: who is "
+        "present, where they are, the light and time of day, posture and mood, and one "
+        "action readable at a glance. The object may stay in the scene — put it on the "
+        "table, in the room — just never read from or held.\n"
+        "Keep the same characters, place and moment as the sentence being spoken over "
+        "it. Do not change the story.\n"
+        'Return ONLY one JSON object shaped {"sections": [{"section_index": <int>, '
+        '"visual_intent": <new Vietnamese scene description>}]}, one entry per listed '
+        "section, no other field and no markdown.\n\n"
+        f"Sections to fix:\n{json.dumps(flagged, ensure_ascii=False, indent=2)}"
+    )
+
+
 def short_funnel_bridge_target(payload: dict) -> str:
     """Return the exact Long target when a Short carries a valid funnel trace."""
     if str(payload.get("video_type") or "").strip().lower() != "short":
