@@ -17,6 +17,8 @@ trước khi viết, thay vì bị chấm sau khi đã viết xong.
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 
@@ -125,9 +127,95 @@ def test_long_narrator_reflection_repair_also_states_its_budget():
         _long_payload(), "Lời chốt chưa là phản chiếu trực tiếp."
     )
 
+    # Long ở fixture thiếu chữ nhiều, nên phần thiếu KHÔNG được dồn vào lời
+    # chốt — nhánh chỉ-nêu-trần là đúng ở đây. Xem test bên dưới về lý do.
     assert "LENGTH BUDGET" in prompt
     assert "Long" in prompt
-    assert "Both ends are rejected outright" in prompt
+    assert "2-3 spoken sentences" in prompt
+
+
+def test_reflection_repair_never_demands_more_than_2_3_sentences_can_hold():
+    """Ngân sách không được đánh nhau với ràng buộc cấu trúc của cùng section.
+
+    Bản sửa này viết section cuối và cùng lúc bị buộc "exactly 2-3 natural
+    spoken sentences". Khi tôi thêm ngân sách độ dài cho Long (76213e5), một
+    Long thiếu chữ đã đẩy TOÀN BỘ phần thiếu của cả kịch bản vào đúng section
+    đó:
+
+        "the other sections already carry 5013, so your rewritten final section
+         must be between 879 and 2346 characters"
+
+    879 ký tự chia cho 2-3 câu là ~300 ký tự một câu. Model chọn con số thay vì
+    cấu trúc, trả về một câu lê thê, và `narrator_reflection` loại đúng thứ đó
+    — run 2026-09-02 20:28 chết vì chính bản sửa đáng lẽ cứu nó.
+
+    Phần thiếu của cả kịch bản là việc của `extend` (thêm section), không phải
+    của lời chốt. Ở đây trần vẫn phải nêu — vượt trần là hỏng thật — nhưng sàn
+    chỉ được nêu khi nó nằm vừa trong 2-3 câu.
+    """
+    from ytb_pipeline.orchestrator.ideation_prompts import (
+        REFLECTION_MAX_CHARS,
+        narrator_reflection_repair_prompt,
+    )
+
+    prompt = narrator_reflection_repair_prompt(
+        _long_payload(), "Lời chốt chưa là phản chiếu trực tiếp."
+    )
+
+    assert "LENGTH BUDGET" in prompt
+    assert REFLECTION_MAX_CHARS <= 600, "2-3 câu tiếng Việt không thể dài hơn thế"
+    # Bất biến thật: con số ĐÒI HỎI không bao giờ vượt thứ 2-3 câu chứa nổi.
+    # Đọc thẳng hai đầu ra khỏi prompt thay vì tin vào một cụm từ.
+    demanded = re.search(r"must be between (\d+) and (\d+) characters", prompt)
+    assert demanded is not None
+    low, high = int(demanded.group(1)), int(demanded.group(2))
+    assert high <= REFLECTION_MAX_CHARS
+    assert low <= REFLECTION_MAX_CHARS
+    # Và phải nói rõ phần thiếu của cả kịch bản không phải việc của section này.
+    assert "do not make that up here" in prompt
+
+
+def test_reflection_repair_still_states_a_floor_when_it_fits():
+    """Sàn vẫn phải được nêu khi nó vừa 2-3 câu.
+
+    Đã đo: một Short mất 69 ký tự ở đây và chết ở 28.4s trên sàn 30.0s. Bản sửa
+    cho trần-mọi-lúc không được nuốt mất ca đó.
+
+    Kích thước fixture suy ra TỪ chính bounds đang hiệu lực, không ghim số:
+    ngưỡng phụ thuộc profile và TTS provider, nên một fixture ghim cứng sẽ đo
+    nhầm nhánh khi cấu hình đổi.
+    """
+    from ytb_pipeline.orchestrator.ideation_prompts import (
+        REFLECTION_MAX_CHARS,
+        _total_length_bounds,
+        narrator_reflection_repair_prompt,
+    )
+
+    probe = {
+        "profile_id": "ban-so-6",
+        "video_type": "short",
+        "sections": [{"purpose": "situation", "voiceover": "x"}] * 3,
+    }
+    floor, _cap = _total_length_bounds(probe)
+    # Chừa lại đúng một khoảng nhỏ để lời chốt lấp — vừa trong 2-3 câu.
+    wanted_others = floor - (REFLECTION_MAX_CHARS // 2)
+    filler = "Còn bốn tám phút, Minh vẫn chưa biết nên im hay nói. "
+    body = (filler * (wanted_others // len(filler) + 1))[: wanted_others // 2]
+
+    short = {
+        "profile_id": "ban-so-6",
+        "video_type": "short",
+        "sections": [
+            {"purpose": "situation", "voiceover": body},
+            {"purpose": "core_answer", "voiceover": body},
+            {"purpose": "payoff", "voiceover": "Cậu sẽ chọn gì?"},
+        ],
+    }
+
+    prompt = narrator_reflection_repair_prompt(short, "Lời chốt chưa đạt.")
+
+    assert "LENGTH BUDGET" in prompt
+    assert "must be between" in prompt
 
 
 def test_a_payload_without_sections_asks_for_no_budget():

@@ -92,6 +92,12 @@ LONG_SAFE_MIN_CHARS, LONG_SAFE_MAX_CHARS = LONG_CONTRACT.safe_character_bounds(
     chars_per_minute=LONG_PLANNING_CHARS_PER_MIN, segment_count=LONG_CONTRACT.minimum_sections
 )
 
+# Trần cấu trúc của lời chốt narrator: prompt sửa nó đòi ĐÚNG 2-3 câu nói
+# thành tiếng. Ba câu tiếng Việt đọc tự nhiên hiếm khi quá ~400 ký tự; để 420
+# cho câu dài mà vẫn chặn được kiểu viết lê thê. Đây là ràng buộc cấu trúc,
+# không phải ràng buộc thời lượng — ngân sách độ dài không được vượt qua nó.
+REFLECTION_MAX_CHARS = 420
+
 CHANNEL_EDITORIAL_BRIEF = """Kênh là "1 Cốc Café 6h", theo ngách "phát triển bản thân THẬT, không self-help": giải thích một cơ chế tâm lý, hành vi hoặc mental model trong mỗi tập bằng tình huống đời thường cụ thể. Khán giả phải hiểu vì sao hành vi xảy ra, giới hạn của cơ chế và một bước áp dụng ít rào cản; không dùng khẩu hiệu, mẹo chữa nhanh hoặc lời hứa tuyệt đối. Short là phễu cho long-form cùng cơ chế, không phải clip độc lập chỉ để lấy view."""
 
 SECTION_PURPOSES_LIST = ", ".join(SECTION_PURPOSES)
@@ -536,6 +542,15 @@ def narrator_reflection_repair_prompt(
     # A Long is judged by the same two-sided gate through the same code, and
     # until 2026-09-02 was told nothing: in that run this repair ran immediately
     # before the total fell under the floor and the generation was lost.
+    #
+    # But the floor may not fight this section's OWN structural limit. The same
+    # prompt demands exactly 2-3 spoken sentences, and on 2026-09-02 a
+    # short Long pushed its whole deficit here — "must be between 879 and 2346
+    # characters" — which is ~300 characters per sentence. The model obeyed the
+    # number, returned one run-on sentence, and `narrator_reflection` rejected
+    # it. A whole-script shortfall is `extend`'s job (it adds sections); a
+    # closing reflection cannot absorb it. The cap is always stated, because
+    # overshooting the ceiling is a real failure; the floor only when it fits.
     length_instruction = ""
     bounds = _total_length_bounds(payload, content_profile=content_profile)
     if bounds is not None:
@@ -545,13 +560,45 @@ def narrator_reflection_repair_prompt(
             len(str(section.get("voiceover") or section.get("narration") or ""))
             for section in sections[:-1]
         )
-        length_instruction = (
-            f" LENGTH BUDGET: the whole {label} must stay between {floor_chars} and {cap_chars} "
-            f"characters of spoken narration; the other sections already carry {others}, so your "
-            f"rewritten final section must be between {max(1, floor_chars - others)} and "
-            f"{max(1, cap_chars - others)} characters. Both ends are rejected outright, so reach "
-            "the floor by saying the reflection fully rather than by padding it."
-        )
+        section_floor = max(1, floor_chars - others)
+        section_cap = min(REFLECTION_MAX_CHARS, max(1, cap_chars - others))
+        if section_floor <= section_cap:
+            length_instruction = (
+                f" LENGTH BUDGET: the whole {label} must stay between {floor_chars} and {cap_chars} "
+                f"characters of spoken narration; the other sections already carry {others}, so your "
+                f"rewritten final section must be between {section_floor} and {section_cap} "
+                "characters. Both ends are rejected outright, so reach the floor by saying the "
+                "reflection fully rather than by padding it."
+            )
+        else:
+            # Phần thiếu của cả kịch bản lớn hơn thứ 2-3 câu chứa nổi. Ràng
+            # buộc ĐÚNG ở đây không phải "lấp cho đủ" mà là "đừng ngắn hơn bản
+            # đang thay" — đúng cái đã sai ngày 2026-08-30, khi lời chốt co từ
+            # 321 xuống 252 và kéo cả Short xuống dưới sàn. Phần thiếu còn lại
+            # là việc của `extend`, nó thêm section.
+            current_final = len(
+                str(sections[-1].get("voiceover") or sections[-1].get("narration") or "")
+            ) if sections else 0
+            keep_at_least = max(1, min(current_final, section_cap))
+            # "Đừng ngắn hơn bản đang thay" chỉ đúng khi bản đang thay còn nằm
+            # trong trần cấu trúc. Nếu nó đã dài hơn 2-3 câu thì lời đúng là
+            # rút ngắn, và nhắc con số cũ ở đó sẽ tự mâu thuẫn với chính trần
+            # vừa nêu.
+            keep_clause = (
+                f" — it may not come out shorter than the {current_final} it replaces, and it may "
+                "not exceed 2-3 spoken sentences"
+                if current_final <= section_cap
+                else f" — the {current_final} it replaces is already longer than 2-3 spoken "
+                     "sentences, so this rewrite must be tighter, not longer"
+            )
+            length_instruction = (
+                f" LENGTH BUDGET: the whole {label} must stay between {floor_chars} and {cap_chars} "
+                f"characters of spoken narration, and the other sections carry {others}. Your "
+                f"rewritten final section must be between {keep_at_least} and {section_cap} "
+                f"characters{keep_clause}. That leaves the {label} short of its floor; do not make "
+                "that up here — a closing reflection stretched to fill a whole-script shortfall "
+                "stops sounding like a person and is rejected."
+            )
     context = {
         key: payload.get(key)
         for key in ("slug", "topic", "title", "video_type", "continuity")
