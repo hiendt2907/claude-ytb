@@ -34,6 +34,17 @@ def request_timeout_for(*, max_tokens: int) -> float:
     return max(_REQUEST_TIMEOUT_S, max_tokens / _MIN_OUTPUT_TOKENS_PER_SEC)
 
 
+# Gateway thỉnh thoảng cắt một ký tự nhiều byte giữa chừng. Đo trên production:
+# hai lượt sinh Long liên tiếp hỏng vì đúng lỗi đó ("câu trả l\ufffd\ufffd\ufffdi",
+# "gi\ufffd\ufffd này"), mỗi lần mất trọn vài phút sinh. Byte đã mất không đoán lại
+# được, nên cách duy nhất đúng là hỏi lại provider — có trần, không quay vòng.
+MAX_CORRUPT_RESPONSE_RETRIES = 2
+
+
+class _CorruptResponseError(RuntimeError):
+    """Body không phải UTF-8 hợp lệ — byte hỏng trên đường truyền."""
+
+
 class _ResponseFormatUnsupportedError(RuntimeError):
     """The gateway rejected `response_format`, not the selected model."""
 
@@ -70,6 +81,20 @@ class XkiroLLMProvider:
 
         model = self.model_name()
         response_format = self._response_format(json_output, response_schema)
+        for attempt in range(MAX_CORRUPT_RESPONSE_RETRIES + 1):
+            try:
+                return await self._complete_once(
+                    model, prompt, system, max_tokens, temperature, response_format
+                )
+            except _CorruptResponseError as exc:
+                if attempt == MAX_CORRUPT_RESPONSE_RETRIES:
+                    raise ProviderUnavailableError(str(exc)) from exc
+                continue
+        raise AssertionError("unreachable")
+
+    async def _complete_once(
+        self, model, prompt, system, max_tokens, temperature, response_format
+    ) -> str:
         try:
             try:
                 return await asyncio.to_thread(
@@ -101,6 +126,11 @@ class XkiroLLMProvider:
                 )
         except _ResponseFormatUnsupportedError as exc:
             raise ProviderUnavailableError(str(exc)) from exc
+        except _CorruptResponseError:
+            # Để `complete` quyết định retry; đây là RuntimeError nên phải chặn
+            # TRƯỚC nhánh gom RuntimeError bên dưới, nếu không nó bị đổi thành
+            # ProviderUnavailableError và vòng retry không bao giờ thấy.
+            raise
         except (RuntimeError, urllib_error.URLError, TimeoutError) as exc:
             raise ProviderUnavailableError(f"xKiro LLM ({model}) lỗi: {exc}") from exc
 
@@ -168,7 +198,16 @@ class XkiroLLMProvider:
                 ) from exc
             raise RuntimeError(f"xKiro LLM ({model}) trả HTTP {exc.code}.") from exc
         try:
-            body = json.loads(raw.decode("utf-8", "replace"))
+            # Decode NGHIÊM NGẶT: "replace" biến byte hỏng thành U+FFFD rồi đi
+            # tiếp như text thường, và chỗ hỏng chỉ lộ ra ở tận cổng encoding
+            # sau khi đã tốn cả lượt sinh.
+            text = raw.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise _CorruptResponseError(
+                f"xKiro LLM ({model}) trả byte UTF-8 hỏng: {exc}"
+            ) from exc
+        try:
+            body = json.loads(text)
         except json.JSONDecodeError as exc:
             # HTTP 200 nhưng body không phải JSON hợp lệ là lỗi model/gateway.
             # Surface it as a provider error rather than leaking JSONDecodeError

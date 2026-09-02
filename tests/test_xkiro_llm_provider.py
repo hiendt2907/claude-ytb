@@ -370,3 +370,90 @@ async def test_xkiro_llm_reports_the_bad_body_when_every_model_returns_invalid_j
 
     with pytest.raises(ProviderUnavailableError, match="not-json-at-all"):
         await XkiroLLMProvider().complete("test")
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_xkiro_llm_retries_a_response_with_broken_utf8_bytes(monkeypatch):
+    """Gateway cắt ký tự nhiều byte giữa chừng; một lượt sinh không nên chết vì thế.
+
+    Đo trên production: hai lượt sinh Long liên tiếp hỏng vì đúng lỗi này, với
+    'câu trả l\\ufffd\\ufffd\\ufffdi' và 'gi\\ufffd\\ufffd này' trong voiceover —
+    tiếng Việt nhiều byte bị truncate trên đường truyền. Cổng encoding bắt đúng
+    và fail closed (giữ nguyên), nhưng mỗi lần như vậy mất trọn một lượt sinh
+    vài phút, trong khi lời gọi lại thường sạch.
+
+    Retry ngay tại ranh giới provider, có TRẦN. Không nới cổng, không vá text:
+    byte đã mất thì không đoán lại được, chỉ hỏi lại provider.
+    """
+    from ytb_pipeline.config.settings import settings
+    from ytb_pipeline.providers.llm import xkiro_provider
+    from ytb_pipeline.providers.llm.xkiro_provider import XkiroLLMProvider
+
+    monkeypatch.setattr(settings, "xkiro_api_key", "test-key", raising=False)
+    monkeypatch.setattr(settings, "xkiro_llm_url", "https://voice.example/v1/chat", raising=False)
+    calls = {"n": 0}
+
+    class _Corrupt:
+        """Body có byte UTF-8 hỏng: 'lời' bị cắt mất byte cuối."""
+
+        def read(self):
+            payload = '{"choices":[{"message":{"content":"câu trả lời"}}]}'.encode("utf-8")
+            return payload[:-14] + b"\xe1\xbb" + payload[-13:]
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    def fake_urlopen(request: Request, timeout: float):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return _Corrupt()
+        return _fake_response({"choices": [{"message": {"content": "câu trả lời"}}]})
+
+    monkeypatch.setattr(xkiro_provider.urllib_request, "urlopen", fake_urlopen)
+
+    result = await XkiroLLMProvider().complete("hỏi gì đó")
+
+    assert calls["n"] == 2, "phải hỏi lại provider khi byte hỏng"
+    assert "�" not in result
+    assert result == "câu trả lời"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_xkiro_llm_gives_up_after_bounded_retries_on_broken_bytes(monkeypatch):
+    """Hỏng mãi thì phải dừng, không quay vòng vô hạn."""
+    from ytb_pipeline.config.settings import settings
+    from ytb_pipeline.providers.llm import xkiro_provider
+    from ytb_pipeline.providers.llm.xkiro_provider import (
+        MAX_CORRUPT_RESPONSE_RETRIES, XkiroLLMProvider,
+    )
+    from ytb_pipeline.providers.errors import ProviderUnavailableError
+
+    monkeypatch.setattr(settings, "xkiro_api_key", "test-key", raising=False)
+    monkeypatch.setattr(settings, "xkiro_llm_url", "https://voice.example/v1/chat", raising=False)
+    calls = {"n": 0}
+
+    class _AlwaysCorrupt:
+        def read(self):
+            calls["n"] += 1
+            return b'{"choices":[{"message":{"content":"c\xe1\xbb'
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    monkeypatch.setattr(
+        xkiro_provider.urllib_request, "urlopen",
+        lambda request, timeout: _AlwaysCorrupt(),
+    )
+
+    with pytest.raises(ProviderUnavailableError):
+        await XkiroLLMProvider().complete("hỏi gì đó")
+
+    assert calls["n"] == MAX_CORRUPT_RESPONSE_RETRIES + 1
