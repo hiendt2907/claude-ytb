@@ -21,3 +21,7 @@ ts	stage	result	class	owner	evidence
 2026-09-02T21:40:21	ideate	RESTART	-	-	433dc85: nho candidate da loai giua cac lan chay (gateway cache request giong het)
 2026-09-02T21:47:10	ideate	FAIL	UNCLASSIFIED	unknown	compliance.passed must be true and include community/copyright/accuracy/advertiser/coppa/notes.
 2026-09-03T09:16:51	ideate	RESTART	-	-	runner: class_count chi dem trong loat nay (truoc do dem ca ledger nen dung som sau 1 luot that)
+2026-09-03T09:23:51	ideate	FAIL	UNCLASSIFIED	unknown	compliance.passed must be true and include community/copyright/accuracy/advertiser/coppa/notes.
+2026-09-03T09:23:52	ideate	FAIL	UNCLASSIFIED	unknown	compliance.passed must be true and include community/copyright/accuracy/advertiser/coppa/notes.
+2026-09-03T09:24:00	ideate	FAIL	UNCLASSIFIED	unknown	compliance.passed must be true and include community/copyright/accuracy/advertiser/coppa/notes.
+2026-09-03T09:24:02	ideate	FAIL	UNCLASSIFIED	unknown	compliance.passed must be true and include community/copyright/accuracy/advertiser/coppa/notes.
