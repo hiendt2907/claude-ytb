@@ -1,0 +1,98 @@
+{
+ "series": "ban-so-6",
+ "season": 2,
+ "current_episode": 2,
+ "immutable_facts": {
+  "minh": {
+   "age": 34,
+   "role": "người đi làm đang xây lại sự nghiệp và gánh trách nhiệm gia đình",
+   "routine": "ngồi bàn số 6 lúc 6 giờ sáng trước giờ làm"
+  },
+  "an": {
+   "role": "chủ quán Bàn số 6",
+   "relationship_to_minh": "người quen đủ lâu để nhận ra những thay đổi nhỏ, nhưng không là chuyên gia hay người cứu Minh"
+  },
+  "table_6": [
+   "cạnh cửa kính",
+   "gỗ sẫm",
+   "vết xước ở góc phải"
+  ]
+ },
+ "state_before_episode_1": {
+  "minh_believes": [
+   "mình phải tự giải quyết ổn thỏa rồi mới được nói với người khác",
+   "nếu để lộ sự chông chênh thì sẽ làm gia đình lo hơn"
+  ],
+  "an_knows": [
+   "Minh thường đến lúc 6 giờ và không nói nhiều khi đang có chuyện"
+  ]
+ },
+ "episodes": [
+  {
+   "episode": 1,
+   "slug": "minh-neu-rui-ro-trong-cuoc-hop",
+   "title": "Dòng Rủi Ro Bị Xóa Trước Cuộc Họp",
+   "published_at": "",
+   "url": "https://youtu.be/j7wZIAyH0HI",
+   "summary": "Minh chọn nêu rủi ro về tuyến giao hàng trong cuộc họp thay vì im lặng, khiến buổi chốt nhanh bị lùi lại một ngày để xác minh, nhưng cậu vẫn chưa trả lời được câu hỏi vì sao tối qua không nói sớm.",
+   "character_changes": {
+    "minh": "Đã nêu rủi ro thật trong cuộc họp và nhận phản hồi không như ý; vẫn còn lưỡng lự với cuộc gọi xác minh bên vận chuyển.",
+    "an": "Biết Minh đang xóa một dòng cảnh báo rủi ro và chờ cậu quay lại kể kết quả."
+   },
+   "threads_opened": [
+    "Minh còn phải gọi bên vận chuyển để xác minh tuyến giao hàng trước khi kế hoạch được chốt lại.",
+    "Câu hỏi của Duy ngoài hành lang, 'sao tối qua không nói luôn', vẫn chưa được Minh trả lời."
+   ],
+   "threads_closed": [
+    "Việc Minh tiếp tục im lặng trong cuộc họp này đã kết thúc: cậu đã nêu rủi ro thật."
+   ]
+  },
+  {
+   "episode": 2,
+   "slug": "48-phut-mot-dong-rui-ro",
+   "title": "Còn Hai Tiếng, Một Dòng Rủi Ro",
+   "published_at": "",
+   "url": "https://youtu.be/p_C-GjVbgxg",
+   "summary": "Minh chọn giữ dòng cảnh báo trễ tuyến trước cuộc họp và nhận câu hỏi vì sao tối qua không nói sớm, khiến rủi ro lộ thêm phần chậm trễ.",
+   "character_changes": {
+    "minh": "Đã nêu rủi ro thật trong cuộc họp và đối diện câu hỏi về sự chậm trễ; vẫn chưa trả lời được vì sao không nói sớm.",
+    "an": "Biết Minh chần chừ với dòng cảnh báo và chờ kết quả cuộc họp."
+   },
+   "threads_opened": [
+    "Minh còn phải gọi bên vận chuyển xác minh tuyến giao hàng trước khi kế hoạch chốt lại.",
+    "Câu hỏi vì sao tối qua không nói sớm vẫn chưa được Minh trả lời."
+   ],
+   "threads_closed": [
+    "Việc Minh tiếp tục xoá dòng cảnh báo đã kết thúc: cậu giữ nó và nêu trong cuộc họp."
+   ]
+  }
+ ],
+ "open_threads": [
+  "Minh còn phải gọi bên vận chuyển để xác minh tuyến giao hàng trước khi kế hoạch được chốt lại.",
+  "Câu hỏi của Duy ngoài hành lang, 'sao tối qua không nói luôn', vẫn chưa được Minh trả lời.",
+  "Minh còn phải gọi bên vận chuyển xác minh tuyến giao hàng trước khi kế hoạch chốt lại.",
+  "Câu hỏi vì sao tối qua không nói sớm vẫn chưa được Minh trả lời."
+ ],
+ "character_state": {
+  "minh": [
+   {
+    "episode": 1,
+    "change": "Đã nêu rủi ro thật trong cuộc họp và nhận phản hồi không như ý; vẫn còn lưỡng lự với cuộc gọi xác minh bên vận chuyển."
+   },
+   {
+    "episode": 2,
+    "change": "Đã nêu rủi ro thật trong cuộc họp và đối diện câu hỏi về sự chậm trễ; vẫn chưa trả lời được vì sao không nói sớm."
+   }
+  ],
+  "an": [
+   {
+    "episode": 1,
+    "change": "Biết Minh đang xóa một dòng cảnh báo rủi ro và chờ cậu quay lại kể kết quả."
+   },
+   {
+    "episode": 2,
+    "change": "Biết Minh chần chừ với dòng cảnh báo và chờ kết quả cuộc họp."
+   }
+  ]
+ }
+}
