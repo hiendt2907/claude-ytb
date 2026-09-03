@@ -64,12 +64,17 @@ _RETRY_BACKOFF_SEC = (1.0, 3.0)
 # 5xx = phía provider hỏng, 429 = tạm hết lượt: cả hai đều có thể qua ở lần
 # sau. 401/403 (sai khoá) và 413 (payload quá lớn) thì hỏi lại bao nhiêu lần
 # cũng vậy — retry chỉ làm chậm và che mất nguyên nhân thật.
-_RETRYABLE_STATUSES = frozenset({429, 500, 502, 503, 504})
+# "Lỗi server" phải có MỘT định nghĩa trong file này. `_provider_error_message`
+# coi mọi status >= 500 là "provider unavailable"; retry từng liệt kê một tập
+# con, nên một 5xx ngoài tập (520/521/529 của Cloudflare) báo unavailable mà
+# không bao giờ được hỏi lại. Đo 2026-09-04: node visual_assets chết vì đúng
+# thế, 0 dòng retry trong log, và endpoint sống lại ngay khi probe.
+_RETRYABLE_STATUSES = frozenset({429})
 
 
 def _is_retryable(exc: BaseException) -> bool:
     if isinstance(exc, urllib_error.HTTPError):
-        return exc.code in _RETRYABLE_STATUSES
+        return exc.code >= 500 or exc.code in _RETRYABLE_STATUSES
     return isinstance(exc, (urllib_error.URLError, TimeoutError))
 
 
@@ -142,7 +147,7 @@ class XkiroVisionTransport:
                 last = exc
                 if not _is_retryable(exc) or attempt == MAX_TRANSPORT_ATTEMPTS:
                     break
-                logger.info(
+                logger.warning(
                     "visual_judge.transport_retry provider=xkiro attempt=%d/%d reason=%s",
                     attempt,
                     MAX_TRANSPORT_ATTEMPTS,

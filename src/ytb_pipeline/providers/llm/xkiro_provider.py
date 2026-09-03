@@ -56,7 +56,8 @@ class _CorruptResponseError(RuntimeError):
 # che mất nguyên nhân thật. Cùng ranh giới đã dùng cho Vision provider
 # (d639bd6); đây là lỗ tương ứng còn hở ở LLM, đo được 2026-09-03: một HTTP 502
 # giết trọn một lượt sinh Long.
-_RETRYABLE_HTTP_CODES = frozenset({429, 500, 502, 503, 504})
+# Cùng lý do như Vision: một định nghĩa duy nhất cho "lỗi server".
+_RETRYABLE_HTTP_CODES = frozenset({429})
 _TRANSIENT_BACKOFF_SEC = (1.0, 3.0)
 
 
@@ -76,12 +77,13 @@ def _is_transient_transport(exc: BaseException) -> bool:
         # HTTPError LÀ lớp con của URLError, nên phải xét mã trước — nếu không,
         # một 400 sẽ bị coi là lỗi mạng thoáng qua và bị hỏi lại vô ích.
         if isinstance(current, urllib_error.HTTPError):
-            return current.code in _RETRYABLE_HTTP_CODES
+            return current.code >= 500 or current.code in _RETRYABLE_HTTP_CODES
         if isinstance(current, (urllib_error.URLError, TimeoutError)):
             return True
         match = re.search(r"trả HTTP (\d{3})", str(current))
         if match is not None:
-            return int(match.group(1)) in _RETRYABLE_HTTP_CODES
+            code = int(match.group(1))
+            return code >= 500 or code in _RETRYABLE_HTTP_CODES
         current = current.__cause__
     return False
 
