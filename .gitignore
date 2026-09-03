@@ -81,3 +81,4 @@ tests/test_negation_word_order.py
 tests/test_visual_detail_density.py
 tests/test_5xx_retry_range.py
 tests/test_judge_model_override.py
+tests/test_ledger_cancelled_topics.py

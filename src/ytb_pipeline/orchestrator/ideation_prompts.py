@@ -959,15 +959,29 @@ def build_start_prompt(num_of_vid: int, type_of_vid: str, type_of_rules: str) ->
 
 
 def ledger_topics(ledger_text: str) -> list[str]:
-    """Cột 'Tiêu đề' từ text ledger.md — dùng làm blacklist chủ đề đã làm."""
-    topics: list[str] = []
+    """Cột 'Tiêu đề' từ ledger.md — blacklist chủ đề, TRỪ tập đã huỷ.
+
+    `ytb batch cancel` ghi một dòng `stage=cancel` với tiêu đề TRỐNG, nên tiêu
+    đề cũ ở dòng `stage=ideation` vẫn nằm nguyên trong blacklist. Hệ quả đo
+    2026-09-04: huỷ một tập vì kịch bản không sản xuất được, sinh lại đúng chủ
+    đề đó, và bị chặn bởi chính thứ vừa huỷ (similarity=0.58).
+
+    Ta huỷ CHÍNH VÌ muốn làm lại. Một tập chưa từng lên sóng không ràng buộc
+    series — nó chỉ là một lần thử đã bỏ.
+    """
+    rows: list[tuple[str, str, str]] = []
     for line in ledger_text.splitlines():
         if not line.startswith("|"):
             continue
         cols = [part.strip() for part in line.strip("|").split("|")]
-        if len(cols) >= 3 and cols[2] and cols[2].lower() != "tiêu đề":
-            topics.append(cols[2])
-    return topics
+        if len(cols) >= 4:
+            rows.append((cols[1], cols[2], cols[3].lower()))
+    cancelled = {slug for slug, _title, stage in rows if slug and stage == "cancel"}
+    return [
+        title
+        for slug, title, _stage in rows
+        if title and title.lower() != "tiêu đề" and slug not in cancelled
+    ]
 
 
 def local_script_prompt(
