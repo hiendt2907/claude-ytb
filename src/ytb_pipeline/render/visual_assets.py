@@ -55,6 +55,35 @@ if TYPE_CHECKING:
     from .scene_plan import ScenePlan, Shot
 
 
+
+def resolve_judge_target(judge_cfg: Any) -> tuple[str, str]:
+    """Provider/model nào thật sự chấm ảnh cho shot này.
+
+    Model Judge được khai trong profile, và script ghim `profile_version`, nên
+    snapshot đóng băng cả LỰA CHỌN HẠ TẦNG lẫn hợp đồng nội dung. Snapshot tồn
+    tại để luật kể chuyện không đổi dưới chân một script đã viết; đóng băng
+    luôn tên nhà cung cấp chỉ là tác dụng phụ của việc để chung một file.
+
+    Đo 2026-09-04: `qwen/qwen3.8-max:free` trả HTTP 500 cho mọi request, kể cả
+    text-only, và cả họ qwen cùng hỏng trên gateway. Mọi script ghim version có
+    model đó trở thành KHÔNG BAO GIỜ sản xuất được — kể cả sau khi profile mới
+    đã đổi sang model chạy được.
+
+    `settings.visual_judge_provider/model` đã tồn tại nhưng chỉ được một smoke
+    tool dùng. Ở đây chúng là cửa thoát TƯỜNG MINH cho operator: đặt env thì nó
+    thắng, bỏ trống thì profile thắng đúng như trước. Không có mặc định ẩn nào
+    thay đổi.
+    """
+    provider = (settings.visual_judge_provider or "").strip() or judge_cfg.provider
+    model = (settings.visual_judge_model or "").strip() or judge_cfg.model
+    if model != judge_cfg.model or provider != judge_cfg.provider:
+        _judge_logger.warning(
+            "visual_judge.operator_override profile=%s/%s -> %s/%s",
+            judge_cfg.provider, judge_cfg.model, provider, model,
+        )
+    return provider, model
+
+
 @dataclass(frozen=True)
 class VisualRequest:
     """Provider-neutral semantic need of a single ScenePlan shot."""
@@ -996,7 +1025,8 @@ class VisualAssetResolver:
                 if judge is None:
                     from ..providers.vision import get_visual_judge
 
-                    judge = get_visual_judge(judge_cfg.provider, judge_cfg.model)
+                    provider_name, model_name = resolve_judge_target(judge_cfg)
+                    judge = get_visual_judge(provider_name, model_name)
                 result = judge.evaluate(request, tuple(candidates), context)
             except Exception as exc:
                 if not judge_cfg.hard_fail_on_judge_error:
