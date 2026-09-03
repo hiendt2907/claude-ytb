@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "profile_id": "ban-so-6",
-  "version": "2.6.0",
+  "version": "2.5.0",
   "display_name": "Bàn số 6 — Truyện đời thường",
   "topic": "Những lựa chọn nhỏ của Minh và An tại Bàn số 6",
   "narrative_mode": "character_story",
@@ -92,8 +92,8 @@
     "visual_judge": {
       "enabled": true,
       "provider": "xkiro",
-      "model": "minimax/minimax-m3:free",
-      "policy_version": "ban-so-6-gate1-v2",
+      "model": "qwen/qwen3.8-max:free",
+      "policy_version": "ban-so-6-gate1-v1",
       "minimum_score": 0.5,
       "hard_fail_on_judge_error": true
     },
