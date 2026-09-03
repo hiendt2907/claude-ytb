@@ -123,6 +123,26 @@ STORY_HOOK_CONTRACT = (
     "situation, not a separate topic."
 )
 
+# This must stay aligned with
+# `agents.qa_agent::_UNRENDERABLE_VISUAL_INTENT`. The field is both an image
+# prompt and a clause-by-clause Judge contract, so every hard-fail family must
+# be stated when the script is first written and when a narrow repair is asked
+# for. Production 2026-09-03 showed the cost of drift: the gate learned the
+# sixth family (two temporal beats) while both prompts still named only three.
+VISUAL_INTENT_RENDERABILITY_CONTRACT = (
+    "A visual_intent describes exactly ONE still frame. Never require: "
+    "(1) readable text or numbers on a screen, page or sign; "
+    "(2) a specific small prop held in a hand; "
+    "(3) an exact hand/finger position or close-up of hands; "
+    "(4) a directed gesture such as 'chỉ tay' or 'trỏ về phía'; "
+    "(5) handing/turning an object toward someone, such as 'chìa', 'trao', "
+    "'đưa ... cho', or 'quay ... về phía'; or "
+    "(6) two temporal beats joined by 'rồi', 'sau đó', or 'trước khi'. "
+    "Keep one readable-at-a-glance action. An object may be present on a table "
+    "or in the room, but it must not be read, held, handed over, or precisely "
+    "pointed at."
+)
+
 
 # Sourced from `agents/qa_agent.py::_check_immediate_action` /
 # `_is_narrator_lesson_closing` — the profile-declared
@@ -472,11 +492,7 @@ def visual_intent_repair_prompt(payload: dict, *, section_indexes: tuple[int, ..
         "YouTube script. Each one currently asks for something an image model cannot "
         "deliver, so a vision model hard-fails every candidate frame and production "
         "stops.\n"
-        "Three forms are rejected outright, however well written:\n"
-        "  1. readable text or numbers inside the frame (a screen showing a line, a "
-        "sign, a page being read);\n"
-        "  2. a specific small prop held in a hand;\n"
-        "  3. an exact hand or finger placement, or a close-up of hands.\n"
+        f"{VISUAL_INTENT_RENDERABILITY_CONTRACT}\n"
         "Write instead what a single still frame can show and be judged on: who is "
         "present, where they are, the light and time of day, posture and mood, and one "
         "action readable at a glance. The object may stay in the scene — put it on the "
@@ -1258,15 +1274,8 @@ def local_script_prompt(
                 # all scored 1.000. Say what the field is judged on.
                 "IMPORTANT — how visual_intent is used: it becomes BOTH the image "
                 "generation prompt AND the requirement a vision model scores the "
-                "resulting frame against, clause by clause, pass/fail. Write only what "
-                "a single still frame can actually show and be judged on: who is "
-                "present, where they are, the light and time of day, posture and mood, "
-                "and one action readable at a glance. Do NOT require readable text or "
-                "numbers inside the frame (a screen, a page, a sign), a specific small "
-                "prop held in a hand, or an exact hand/finger placement — an image "
-                "model cannot deliver those reliably and every one of them becomes a "
-                "hard failure. Name the object if it matters to the scene, but describe "
-                "it as present in the frame, not as something being read or held.\n"
+                "resulting frame against, clause by clause, pass/fail. "
+                f"{VISUAL_INTENT_RENDERABILITY_CONTRACT}\n"
             )
         else:
             names = ", ".join(content_profile.visual_asset_names)

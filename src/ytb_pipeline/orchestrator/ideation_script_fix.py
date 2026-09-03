@@ -615,6 +615,24 @@ def normalize_long_overflow(payload: dict, expected_video_type: str | None = Non
     return payload, f"trimmed long narration to {short_narration_chars(payload)} chars"
 
 
+def normalize_inapplicable_strategy(
+    payload: dict, expected_video_type: str | None = None,
+) -> tuple[dict, str | None]:
+    """Remove model-authored Short strategy metadata from a generated Long.
+
+    The Long prompt explicitly excludes ``strategy`` and none of its downstream
+    contracts consume one. Some models nevertheless emit a story-planning
+    object under that name; letting the loader hydrate it as strategy-v1 turns
+    irrelevant metadata into a fatal ``strategy.hook`` shape error. Normalize
+    only at this generated-script boundary and leave the input untouched.
+    """
+    if expected_video_type != "long" or "strategy" not in payload:
+        return payload, None
+    normalized = dict(payload)
+    normalized.pop("strategy", None)
+    return normalized, "removed inapplicable strategy from Long"
+
+
 def append_long_extension(
     payload: dict, extension: dict, *, max_sections: int | None = None
 ) -> dict:
@@ -962,6 +980,9 @@ async def validate_or_repair_script(
         # transcript. They may repair only a previously repaired opening/final
         # contract that this editorial delta materially changed.
         is_deterministic_attempt = attempt <= max_attempts
+        current, strategy_note = normalize_inapplicable_strategy(
+            current, expected_video_type
+        )
         current, long_note = normalize_long_overflow(current, expected_video_type)
         current, normalized_note = normalize_short_narration(
             current, expected_video_type=expected_video_type
@@ -970,7 +991,7 @@ async def validate_or_repair_script(
             current,
             source_long_title=str((source_long_context or {}).get("title") or ""),
         )
-        for note in (long_note, normalized_note, slug_note):
+        for note in (strategy_note, long_note, normalized_note, slug_note):
             if not note:
                 continue
             if console_prefix:
