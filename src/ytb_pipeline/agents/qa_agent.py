@@ -989,14 +989,21 @@ def _is_narrator_lesson_closing(profile: Any, final_segment: Any, final_text: st
 
 def _check_immediate_action(script: Any) -> list[dict[str, str]]:
     segments = _segments_of(script)
-    final_text = _narration_of(segments[-1]).lower() if segments else ""
+    # GIỮ nguyên chữ hoa: `_is_narrator_lesson_closing` phân biệt tên riêng
+    # ("Minh") với âm tiết trong từ ghép ("xác minh") bằng chính chữ hoa. Bản
+    # trước viết thường ở đây rồi truyền xuống, nên từ cf24cf6 phép kiểm tên
+    # cast không bao giờ khớp được nữa — cổng chết âm thầm và rubric LLM phải
+    # bắt thay. Chỉ hạ chữ cho các phép so khớp thật sự không phân biệt hoa
+    # thường.
+    final_text = _narration_of(segments[-1]) if segments else ""
+    lowered_final = final_text.lower()
     profile = _content_profile(script)
     if (
         profile is not None
         and profile.narrative_mode == "character_story"
         and profile.content_rules.narrator_lesson_closing
     ):
-        if any(marker in final_text for marker in _NARRATOR_REFLECTION_IMPERATIVES):
+        if any(marker in lowered_final for marker in _NARRATOR_REFLECTION_IMPERATIVES):
             return [_repair(
                 "narrator_reflection",
                 "Lời chốt của narrator phải là phản chiếu khiêm tốn, không phải mệnh lệnh.",
@@ -1016,7 +1023,7 @@ def _check_immediate_action(script: Any) -> list[dict[str, str]]:
         and _requires_funnel_bridge(script, profile)
     ):
         return _check_funnel_bridge(script, final_text)
-    if any(hint in final_text for hint in _IMMEDIATE_ACTION_HINTS):
+    if any(hint in lowered_final for hint in _IMMEDIATE_ACTION_HINTS):
         return []
     if (
         profile is not None
