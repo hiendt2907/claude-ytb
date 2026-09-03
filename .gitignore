@@ -77,3 +77,4 @@ tests/test_llm_transient_retry.py
 tests/test_negated_visual_object.py
 tests/test_prop_pose_and_action.py
 tests/test_cast_leak_case_regression.py
+tests/test_negation_word_order.py

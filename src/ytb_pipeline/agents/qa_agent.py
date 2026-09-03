@@ -583,6 +583,13 @@ def renderability_contract_text() -> str:
     )
 
 
+# Danh từ vật thể mà một `visual_intent` hay nhắc tới. Dùng chung cho mẫu phủ
+# định ở cả hai thứ tự từ, để thêm một danh từ là cả hai hướng cùng học được.
+_VISUAL_OBJECT_NOUNS = (
+    "tách|ly|cốc|khay|bút|điện thoại|laptop|máy tính|giấy|tờ|sổ|cuốn|hộp|"
+    "chìa khoá|chìa khóa|túi|mũ|áo khoác|đồng hồ|cà phê|nước|bình|đĩa|thìa|muỗng"
+)
+
 _UNRENDERABLE_VISUAL_INTENT: tuple[tuple[str, "re.Pattern[str]"], ...] = (
     (
         "vị trí tay/ngón chính xác",
@@ -663,10 +670,18 @@ _UNRENDERABLE_VISUAL_INTENT: tuple[tuple[str, "re.Pattern[str]"], ...] = (
     ),
     (
         "yêu cầu một vật KHÔNG có trong khung",
+        # Hai thứ tự từ, cùng một lỗi. Bản đầu chỉ đo trên "tách cà phê chưa
+        # có" nên chỉ phủ được danh-từ-trước; vài giờ sau "chưa có cà phê" lọt
+        # qua và chặn shot đầu của lượt kế tiếp, dù guard báo kịch bản sạch.
+        # Một mẫu chỉ phủ một cách viết của cùng một lỗi thì chưa phải là luật.
         re.compile(
-            r"(?:tách|ly|cốc|khay|bút|điện thoại|laptop|máy tính|giấy|tờ|sổ|cuốn|"
-            r"hộp|chìa khoá|chìa khóa|túi|mũ|áo khoác|đồng hồ)"
-            r"[^,.;]{0,20}?\s+(?:chưa|không)\s+(?:có|xuất hiện|còn|nằm|đặt)\b",
+            r"(?:"
+            r"(?P<noun_first>" + _VISUAL_OBJECT_NOUNS + r")"
+            r"[^,.;]{0,20}?\s+(?:chưa|không)\s+(?:có|xuất hiện|còn|nằm|đặt)\b"
+            r"|"
+            r"(?:chưa|không)\s+(?:có|xuất hiện|còn)\s+"
+            r"(?:\S+\s+){0,2}?(?:" + _VISUAL_OBJECT_NOUNS + r")\b"
+            r")",
             re.IGNORECASE,
         ),
     ),
