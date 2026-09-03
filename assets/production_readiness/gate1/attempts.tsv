@@ -1,0 +1,23 @@
+ts	stage	result	class	owner	evidence
+2026-09-02T19:49:43	ideate	FAIL	UNCLASSIFIED	unknown	✗ Không thể tạo đủ 1 script sau 1 candidate bị QA từ chối.
+2026-09-02T19:55:58	ideate	RESTART	-	-	loat moi: code 76213e5 (length budget) + brief v14 khong con rang buoc viet tay
+2026-09-02T19:59:47	ideate	NOTE	-	-	luot 1 chay code 76213e5; guard mo rong 8e99d64 chi anh huong luot 2+
+2026-09-02T20:12:22	ideate	FAIL	QA_UNRENDERABLE_INTENT	ideation/prompt	"rule": "unrenderable_visual_intent",
+2026-09-02T20:16:52	ideate	RESTART	-	-	profile 2.3.0 (2c6acd1): An co cap Uu tien/Tranh cu the
+2026-09-02T20:19:53	ideate	CORRECTION	EDITORIAL_REJECT	ideation/content	dong 20:12:22 phan loai SAI (QA_UNRENDERABLE_INTENT): loi do da duoc sua thanh cong o vong 1 va khong quay lai; nguyen nhan that la editorial_review vong 5. Classifier da sua de chi doc reason= cuoi cung.
+2026-09-02T20:22:55	ideate	PASS	-	-	
+2026-09-02T20:22:56	produce	FAIL	UNCLASSIFIED	unknown	/private/tmp/claude-501/-Users-hiendang-claude-ytb/dfe35545-42ba-48fe-b6e6-14f0fc692f16/scratchpad/drive_pipeline.sh: line 13: 1: can slug
+2026-09-02T20:24:02	ideate	CORRECTION	TRANSPORT_UFFFD	provider/xkiro	dong 20:22:55 ghi PASS la SAI: ideation chet vi U+FFFD sau khi het retry, runner chi do dau ✗ nen traceback lot qua. Da sua runner dung exit code + kiem tra file that.
+2026-09-02T20:28:59	ideate	RESTART	-	-	runner sua: dung exit code + kiem tra file that; LLM retry co log (e8363f9)
+2026-09-02T20:38:13	ideate	FAIL	UNCLASSIFIED	unknown	reason=✗ LLM tạo script không qua QA sau 8 lượt (gồm 3 lượt contract, tối đa 2 rewrite editorial và hậu kiểm có giới hạn). validation=None qa={'passed': False, 'violations': [{'rule': 'narrator_reflection', 'detail': 'Lời chốt story cần là phản chiếu trực tiếp, khiêm tốn của narrator.', 'suggestion'
+2026-09-02T20:46:12	ideate	RESTART	-	-	8539904: sua nguoc lai loi do chinh 76213e5 gay ra (ngan sach ep loi chot thanh cau le the)
+2026-09-02T20:57:43	ideate	INTERRUPTED	-	-	bi dung tu ben ngoai o vong 3 (dang rewrite bien tap); khong phai loi engine, khong tinh la FAIL
+2026-09-02T21:05:56	ideate	FAIL	QA_NARRATOR_REFLECTION	ideation/content	reason=✗ LLM tạo script không qua QA sau 8 lượt (gồm 3 lượt contract, tối đa 2 rewrite editorial và hậu kiểm có giới hạn). validation=None qa={'passed': False, 'violations': [{'rule': 'series_semantic_dedup', 'detail': "Chủ đề/title 'Câu Hỏi Vì Sao Tối Qua Không Nói Sớm' gần trùng 'Vì Sao Tối Qua Kh
+2026-09-02T21:12:00	ideate	RESTART	-	-	cf24cf6 (ten cast la danh tu rieng) + brief v15: trung tam la cuoc tro chuyen, co che khac de tranh dedup
+2026-09-02T21:35:30	ideate	FAIL	QA:unrenderable_visual_intent	ideation/prompt	Section 2 yêu cầu vật nhỏ cầm trên tay ('tay cầm'); image model không dựng nổi nên Judge sẽ hard-fail mọi candidate.
+2026-09-02T21:35:33	ideate	FAIL	QA:unrenderable_visual_intent	ideation/prompt	Section 2 yêu cầu vật nhỏ cầm trên tay ('tay cầm'); image model không dựng nổi nên Judge sẽ hard-fail mọi candidate.
+2026-09-02T21:35:35	ideate	FAIL	QA:unrenderable_visual_intent	ideation/prompt	Section 2 yêu cầu vật nhỏ cầm trên tay ('tay cầm'); image model không dựng nổi nên Judge sẽ hard-fail mọi candidate.
+2026-09-02T21:35:36	ideate	FAIL	QA:unrenderable_visual_intent	ideation/prompt	Section 2 yêu cầu vật nhỏ cầm trên tay ('tay cầm'); image model không dựng nổi nên Judge sẽ hard-fail mọi candidate.
+2026-09-02T21:40:21	ideate	RESTART	-	-	433dc85: nho candidate da loai giua cac lan chay (gateway cache request giong het)
+2026-09-02T21:47:10	ideate	FAIL	UNCLASSIFIED	unknown	compliance.passed must be true and include community/copyright/accuracy/advertiser/coppa/notes.
+2026-09-03T09:16:51	ideate	RESTART	-	-	runner: class_count chi dem trong loat nay (truoc do dem ca ledger nen dung som sau 1 luot that)

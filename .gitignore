@@ -59,3 +59,10 @@ scripts/archive/
 # Backup của các file vận hành vốn đã gitignore (ledger, auto_state, worker state).
 data/archive/
 assets/archive/
+
+# Runtime/derived state duoi assets/ — sinh lai duoc, khong phai nguon su that.
+assets/asset_registry.json
+assets/.asset_registry.json.lock
+assets/editorial_review_cache/
+# Bang chung Gate 1 duoc theo doi (attempts.tsv), nhung audio benchmark thi khong.
+assets/production_readiness/**/audio/
