@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 from ..analytics.quality_report import REQUIRED_PURPOSES_BY_VIDEO_TYPE
 from ..config.settings import settings
+from ..agents.qa_agent import renderability_contract_text
 from ..content_contract import (
     CONTRACT_VERSION,
     SHORT_SITUATION_TENSION_MARKERS,
@@ -123,25 +124,17 @@ STORY_HOOK_CONTRACT = (
     "situation, not a separate topic."
 )
 
-# This must stay aligned with
-# `agents.qa_agent::_UNRENDERABLE_VISUAL_INTENT`. The field is both an image
-# prompt and a clause-by-clause Judge contract, so every hard-fail family must
-# be stated when the script is first written and when a narrow repair is asked
-# for. Production 2026-09-03 showed the cost of drift: the gate learned the
-# sixth family (two temporal beats) while both prompts still named only three.
-VISUAL_INTENT_RENDERABILITY_CONTRACT = (
-    "A visual_intent describes exactly ONE still frame. Never require: "
-    "(1) readable text or numbers on a screen, page or sign; "
-    "(2) a specific small prop held in a hand; "
-    "(3) an exact hand/finger position or close-up of hands; "
-    "(4) a directed gesture such as 'chỉ tay' or 'trỏ về phía'; "
-    "(5) handing/turning an object toward someone, such as 'chìa', 'trao', "
-    "'đưa ... cho', or 'quay ... về phía'; or "
-    "(6) two temporal beats joined by 'rồi', 'sau đó', or 'trước khi'. "
-    "Keep one readable-at-a-glance action. An object may be present on a table "
-    "or in the room, but it must not be read, held, handed over, or precisely "
-    "pointed at."
-)
+# DỰNG từ `agents.qa_agent::_UNRENDERABLE_VISUAL_INTENT`, không chép tay.
+#
+# Bản trước là một chuỗi viết tay kèm comment "phải giữ đồng bộ với bảng đó".
+# Comment không phải cơ chế: 2026-09-03 bảng học họ thứ 6 trong khi cả hai
+# prompt còn nêu 3; sửa xong, cùng ngày bảng lên 8 còn prompt vẫn 6. Mỗi lần
+# lệch, cổng chặn một thứ người viết chưa bao giờ được bảo là cấm — và tốn
+# trọn một lượt sinh kịch bản để phát hiện.
+#
+# `renderability_contract_text()` raise nếu một họ mới chưa có mô tả, nên thêm
+# họ mà quên prompt là không thể nữa.
+VISUAL_INTENT_RENDERABILITY_CONTRACT = renderability_contract_text()
 
 
 # Sourced from `agents/qa_agent.py::_check_immediate_action` /

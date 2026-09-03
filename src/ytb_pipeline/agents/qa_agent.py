@@ -526,6 +526,63 @@ def _check_speaker_prefix_leak(script: Any) -> list[dict[str, str]]:
 # them becomes a hard failure" — đo trên hàng thật thì đúng vậy, không candidate
 # nào qua nổi. Mẫu bám chính xác ba điều đó, không mở rộng sang mô tả cảnh
 # thường (đứng cạnh bàn, nhìn về phía ai, phòng họp sáng đèn... đều hợp lệ).
+# Câu tiếng Anh mô tả từng họ, dùng để DỰNG prompt thay vì chép tay sang đó.
+#
+# Trước đây `ideation_prompts.VISUAL_INTENT_RENDERABILITY_CONTRACT` là một chuỗi
+# viết tay kèm comment "phải giữ đồng bộ với bảng này". Comment không phải cơ
+# chế: 2026-09-03 bảng học họ thứ 6 trong khi prompt còn nêu 3, và ngay trong
+# ngày đó bảng lên 8 còn prompt vẫn 6. Một luật ở hai nơi, đồng bộ bằng lời
+# nhắc, thì sẽ lệch — và mỗi lần lệch tốn một lượt sinh kịch bản.
+#
+# `renderability_contract_text()` dựng câu contract từ chính bảng, và raise nếu
+# một họ mới chưa có mô tả. Thêm họ mà quên prompt là không thể nữa.
+_UNRENDERABLE_INTENT_GUIDANCE: dict[str, str] = {
+    "vị trí tay/ngón chính xác":
+        "an exact hand or finger position, or a close-up of hands",
+    "vật nhỏ cầm trên tay":
+        "a specific small prop held in a hand",
+    "chữ/số đọc được trong khung":
+        "readable text or numbers on a screen, page or sign",
+    "cử chỉ có đích":
+        "a directed gesture such as 'chỉ tay' or 'trỏ về phía'",
+    "trao/xoay vật về phía người khác":
+        "handing or turning an object toward someone — 'chìa', 'trao', "
+        "'đưa ... cho', 'quay ... về phía'",
+    "chuỗi hai nhịp trong một khung hình":
+        "two temporal beats joined by 'rồi', 'sau đó' or 'trước khi'",
+    "yêu cầu một vật KHÔNG có trong khung":
+        "an object described as absent — naming it is what makes the model "
+        "draw it; say what IS on the table instead",
+    "vật ở tư thế chỉ định hoặc đang được thao tác":
+        "an object in a demanded pose ('úp', 'ngửa', 'nghiêng') or mid-handling "
+        "('đặt ... xuống', 'đang rót/nâng/lật')",
+}
+
+
+def renderability_contract_text() -> str:
+    """Câu contract cho prompt, dựng từ chính bảng hard-fail.
+
+    Raise khi một họ chưa có mô tả — thà hỏng to lúc import còn hơn để prompt
+    im lặng thiếu một luật mà cổng vẫn chặn.
+    """
+    missing = [label for label, _p in _UNRENDERABLE_VISUAL_INTENT
+               if label not in _UNRENDERABLE_INTENT_GUIDANCE]
+    if missing:
+        raise RuntimeError(
+            "Thiếu mô tả prompt cho họ unrenderable: " + ", ".join(missing)
+        )
+    items = "; ".join(
+        f"({index}) {_UNRENDERABLE_INTENT_GUIDANCE[label]}"
+        for index, (label, _p) in enumerate(_UNRENDERABLE_VISUAL_INTENT, start=1)
+    )
+    return (
+        "A visual_intent describes exactly ONE still frame. Never require: "
+        f"{items}. Keep one readable-at-a-glance action. An object may be "
+        "present on a table or in the room, but it must not be read, held, "
+        "handed over, precisely pointed at, posed, or described as missing."
+    )
+
+
 _UNRENDERABLE_VISUAL_INTENT: tuple[tuple[str, "re.Pattern[str]"], ...] = (
     (
         "vị trí tay/ngón chính xác",
