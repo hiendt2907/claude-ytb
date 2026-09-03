@@ -73,3 +73,7 @@ tests/test_editorial_rewrite_length_budget.py
 tests/test_rejected_candidate_memory.py
 tests/test_vision_transport_retry.py
 tests/test_visual_intent_repair.py
+tests/test_llm_transient_retry.py
+tests/test_negated_visual_object.py
+tests/test_prop_pose_and_action.py
+tests/test_cast_leak_case_regression.py
