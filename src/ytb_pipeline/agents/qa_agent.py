@@ -574,6 +574,28 @@ _UNRENDERABLE_VISUAL_INTENT: tuple[tuple[str, "re.Pattern[str]"], ...] = (
         #
         # "rồi" là từ rất thường ("cà phê nguội rồi"), nên chỉ chặn khi ngay
         # sau nó là một ĐỘNG TỪ HÀNH ĐỘNG — tức mệnh đề đang mô tả nhịp thứ hai.
+        # Đo trên hàng thật, project cuoc-goi-ban-luc-bay-gio-muoi, shot
+        # scene-000-shot-00: "...tách cà phê CHƯA CÓ" — 4/4 candidate qua 2
+        # vòng hard-fail với đúng một lý do: "Xuất hiện tách cà phê trên bàn
+        # trong khi yêu cầu bắt buộc là chưa có."
+        #
+        # Diffusion model không vẽ được sự vắng mặt: nhắc tên một vật là vẽ ra
+        # nó. Judge rồi tính đúng sự hiện diện đó là mâu thuẫn ngữ nghĩa, nên
+        # mọi candidate sai mãi mãi. Cách viết đúng là tả thứ CÓ trong khung
+        # ("mặt bàn gần như trống"), không tả thứ không có.
+        #
+        # Chỉ chặn khi phủ định bám vào một DANH TỪ VẬT THỂ. "quán chưa đông"
+        # hay "quán vắng" là trạng thái cảnh, model dựng được, và chặn chúng
+        # sẽ giết những mô tả cảnh hoàn toàn hợp lệ.
+        "yêu cầu một vật KHÔNG có trong khung",
+        re.compile(
+            r"(?:tách|ly|cốc|khay|bút|điện thoại|laptop|máy tính|giấy|tờ|sổ|cuốn|"
+            r"hộp|chìa khoá|chìa khóa|túi|mũ|áo khoác|đồng hồ)"
+            r"[^,.;]{0,20}?\s+(?:chưa|không)\s+(?:có|xuất hiện|còn|nằm|đặt)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
         "chuỗi hai nhịp trong một khung hình",
         re.compile(
             r"(?:rồi|sau đó|trước khi)\s+"
