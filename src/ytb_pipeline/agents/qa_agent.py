@@ -590,6 +590,25 @@ _VISUAL_OBJECT_NOUNS = (
     "chìa khoá|chìa khóa|túi|mũ|áo khoác|đồng hồ|cà phê|nước|bình|đĩa|thìa|muỗng"
 )
 
+# Trần số CHI TIẾT "vật + trạng thái" trong một visual_intent.
+#
+# Tám họ hard-fail ở trên đều cấm một LOẠI chi tiết, và vá theo loại không bao
+# giờ hết — vì nguyên nhân là SỐ LƯỢNG. Judge chấm từng mệnh đề như hợp đồng
+# bắt buộc, nên mỗi chi tiết là một cơ hội ĐỘC LẬP để image model vẽ trượt, và
+# trượt một cái là hard-fail cả shot.
+#
+# Đo trên 5 shot đầu của hai-lan-may-ban-mot-tin-nhan-gui-di, cùng kịch bản,
+# cùng model:
+#     3 chi tiết -> CHẶN      0 chi tiết -> qua
+#     4 chi tiết -> CHẶN      1 chi tiết -> qua (x2)
+# Trần 2 giữ nguyên mọi shot đã qua và bắt đúng hai shot đã chặn.
+MAX_STATED_OBJECT_DETAILS = 2
+
+_OBJECT_STATE_WORDS = (
+    "sáng|tối|ướt|khô|mở|đóng|cạn|rỗng|đầy|nguội|nóng|ấm|nằm|treo|chỉ|còn|chưa|"
+    "vơi|nghiêng|úp|ngửa|bốc khói|sạc|tắt|bật"
+)
+
 _UNRENDERABLE_VISUAL_INTENT: tuple[tuple[str, "re.Pattern[str]"], ...] = (
     (
         "vị trí tay/ngón chính xác",
@@ -709,6 +728,15 @@ _UNRENDERABLE_VISUAL_INTENT: tuple[tuple[str, "re.Pattern[str]"], ...] = (
 )
 
 
+# Một "chi tiết có trạng thái" = danh từ vật thể + một từ trạng thái ngay sau,
+# cho phép tối đa hai tiếng đệm ở giữa ("màn hình vẫn sáng", "cà phê đã nguội").
+_STATED_OBJECT_DETAIL = re.compile(
+    rf"(?:{_VISUAL_OBJECT_NOUNS}|màn hình|tạp dề)"
+    rf"(?:\s+\S+){{0,2}}?\s+(?:{_OBJECT_STATE_WORDS})\b",
+    re.IGNORECASE,
+)
+
+
 def _check_unrenderable_visual_intent(script: Any) -> list[dict[str, str]]:
     """Chặn `visual_intent` đòi thứ image model không dựng nổi.
 
@@ -739,6 +767,18 @@ def _check_unrenderable_visual_intent(script: Any) -> list[dict[str, str]]:
                 "hay một vật nhỏ phải nằm trên tay ai.",
             ))
             break
+        else:
+            detail_count = len(_STATED_OBJECT_DETAIL.findall(intent))
+            if detail_count > MAX_STATED_OBJECT_DETAILS:
+                violations.append(_repair(
+                    "unrenderable_visual_intent",
+                    f"Section {index} nêu {detail_count} chi tiết vật-có-trạng-thái "
+                    f"(tối đa {MAX_STATED_OBJECT_DETAILS}); Judge chấm từng mệnh đề nên "
+                    "mỗi chi tiết là một cơ hội độc lập để hard-fail cả shot.",
+                    "Giữ tối đa hai chi tiết thật sự cần cho cảnh; bỏ những chi tiết "
+                    "phụ (trạng thái màn hình, độ nóng/nguội, giờ trên đồng hồ, quần "
+                    "áo ướt) — chúng không đổi ý nghĩa cảnh nhưng đều bị chấm.",
+                ))
     return violations
 
 
