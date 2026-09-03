@@ -12,6 +12,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
+import time
 import uuid
 from urllib import error as urllib_error
 from urllib import request as urllib_request
@@ -47,6 +49,41 @@ MAX_CORRUPT_RESPONSE_RETRIES = 2
 
 class _CorruptResponseError(RuntimeError):
     """Body không phải UTF-8 hợp lệ — byte hỏng trên đường truyền."""
+
+
+# 5xx = phía gateway hỏng, 429 = tạm hết lượt: cả hai đều có thể qua ở lần sau.
+# 400/401/403/413 thì hỏi lại bao nhiêu lần cũng vậy — retry chỉ làm chậm và
+# che mất nguyên nhân thật. Cùng ranh giới đã dùng cho Vision provider
+# (d639bd6); đây là lỗ tương ứng còn hở ở LLM, đo được 2026-09-03: một HTTP 502
+# giết trọn một lượt sinh Long.
+_RETRYABLE_HTTP_CODES = frozenset({429, 500, 502, 503, 504})
+_TRANSIENT_BACKOFF_SEC = (1.0, 3.0)
+
+
+def _is_transient_transport(exc: BaseException) -> bool:
+    """Lỗi này có khả năng qua ở lần hỏi sau không.
+
+    Đi theo chuỗi `__cause__`: `_complete_once` bọc lỗi mạng thành
+    `ProviderUnavailableError`, nên nhìn riêng lớp ngoài thì một timeout trông
+    y hệt một 401. Nguyên nhân gốc mới nói được điều đó.
+    """
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, _CorruptResponseError):
+            return False
+        # HTTPError LÀ lớp con của URLError, nên phải xét mã trước — nếu không,
+        # một 400 sẽ bị coi là lỗi mạng thoáng qua và bị hỏi lại vô ích.
+        if isinstance(current, urllib_error.HTTPError):
+            return current.code in _RETRYABLE_HTTP_CODES
+        if isinstance(current, (urllib_error.URLError, TimeoutError)):
+            return True
+        match = re.search(r"trả HTTP (\d{3})", str(current))
+        if match is not None:
+            return int(match.group(1)) in _RETRYABLE_HTTP_CODES
+        current = current.__cause__
+    return False
 
 
 class _ResponseFormatUnsupportedError(RuntimeError):
@@ -102,6 +139,25 @@ class XkiroLLMProvider:
                 return await self._complete_once(
                     model, request_prompt, system, max_tokens, temperature, response_format
                 )
+            except ProviderUnavailableError as exc:
+                # `_complete_once` đã đổi lỗi transport thành ProviderUnavailable.
+                # Lỗi thoáng qua (429/5xx/timeout) đi vào ĐÚNG vòng retry của
+                # phản hồi hỏng, kể cả phần đổi byte để trượt cache: gateway
+                # cache theo request, nên hỏi lại y hệt cũng chỉ đọc lại lỗi cũ.
+                if not _is_transient_transport(exc) or attempt == MAX_CORRUPT_RESPONSE_RETRIES:
+                    raise
+                logger.warning(
+                    "llm.transient_transport.retry provider=xkiro model=%s "
+                    "attempt=%d/%d reason=%s",
+                    model,
+                    attempt + 1,
+                    MAX_CORRUPT_RESPONSE_RETRIES + 1,
+                    exc,
+                )
+                time.sleep(
+                    _TRANSIENT_BACKOFF_SEC[min(attempt, len(_TRANSIENT_BACKOFF_SEC) - 1)]
+                )
+                continue
             except _CorruptResponseError as exc:
                 # Retry im lặng làm tỉ lệ hỏng của gateway không đo được: một
                 # lượt sinh hỏng 3 lần liên tiếp trông giống hệt một lượt hỏng
