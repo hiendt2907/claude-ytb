@@ -587,6 +587,24 @@ _UNRENDERABLE_VISUAL_INTENT: tuple[tuple[str, "re.Pattern[str]"], ...] = (
         # Chỉ chặn khi phủ định bám vào một DANH TỪ VẬT THỂ. "quán chưa đông"
         # hay "quán vắng" là trạng thái cảnh, model dựng được, và chặn chúng
         # sẽ giết những mô tả cảnh hoàn toàn hợp lệ.
+        # Cùng giới hạn vật lý với "vật nhỏ cầm trên tay", hai hình dạng khác.
+        # Đo trên 8 candidate qua 2 shot của cuoc-goi-ban-luc-bay-gio-muoi:
+        #   "điện thoại úp trên mặt bàn"          -> 4/4 "Thiếu điện thoại úp"
+        #   "đặt một tách cà phê xuống mặt bàn"   -> 4/4 "Thiếu hành động đặt"
+        # character/composition/continuity ~1.0 cả 8 lần: người và nơi chốn
+        # luôn đúng, chỉ VẬT và HÀNH ĐỘNG hỏng. Một khung tĩnh không kể được
+        # "đang đặt xuống", và một vật nhỏ ở tư thế chỉ định thì model bỏ qua.
+        #
+        # Vật vẫn được phép CÓ MẶT — chỉ cấm đòi tư thế hoặc thao tác dở.
+        "vật ở tư thế chỉ định hoặc đang được thao tác",
+        re.compile(
+            r"(?:úp|ngửa|nghiêng|dựng đứng)\s+(?:trên|xuống|vào)\b"
+            r"|đặt\s+[^,.;]{0,25}?\s+xuống\b"
+            r"|đang\s+(?:đặt|rót|nâng|nhấc|mở|gấp|lật)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
         "yêu cầu một vật KHÔNG có trong khung",
         re.compile(
             r"(?:tách|ly|cốc|khay|bút|điện thoại|laptop|máy tính|giấy|tờ|sổ|cuốn|"
