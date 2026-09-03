@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import uuid
 from urllib import error as urllib_error
 from urllib import request as urllib_request
 
@@ -84,10 +85,22 @@ class XkiroLLMProvider:
 
         model = self.model_name()
         response_format = self._response_format(json_output, response_schema)
+        retry_request_id = uuid.uuid4().hex
         for attempt in range(MAX_CORRUPT_RESPONSE_RETRIES + 1):
+            request_prompt = prompt
+            if attempt:
+                # xKiro caches byte-identical requests. Retrying the same body
+                # can only replay the same corrupt response, including U+FFFD.
+                # Keep the first request stable, then vary only transport
+                # metadata on bounded retries so a fresh generation is forced.
+                request_prompt = (
+                    f"{prompt}\n\n"
+                    f"[transport retry id: {retry_request_id}-{attempt}; "
+                    "ignore this metadata when answering]"
+                )
             try:
                 return await self._complete_once(
-                    model, prompt, system, max_tokens, temperature, response_format
+                    model, request_prompt, system, max_tokens, temperature, response_format
                 )
             except _CorruptResponseError as exc:
                 # Retry im lặng làm tỉ lệ hỏng của gateway không đo được: một
