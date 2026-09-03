@@ -66,3 +66,10 @@ assets/.asset_registry.json.lock
 assets/editorial_review_cache/
 # Bang chung Gate 1 duoc theo doi (attempts.tsv), nhung audio benchmark thi khong.
 assets/production_readiness/**/audio/
+
+# Test khong duoc commit (yeu cau 2026-09-03). Van chay duoc tai cho.
+tests/test_cast_leak_word_boundary.py
+tests/test_editorial_rewrite_length_budget.py
+tests/test_rejected_candidate_memory.py
+tests/test_vision_transport_retry.py
+tests/test_visual_intent_repair.py
