@@ -565,6 +565,23 @@ _UNRENDERABLE_VISUAL_INTENT: tuple[tuple[str, "re.Pattern[str]"], ...] = (
         # Cùng bộ đo: trao/xoay một vật về phía người kia đòi hai nhân vật phối
         # hợp chính xác quanh một vật thể — hỏng y hệt cách "tay cầm" hỏng.
         # "quay về phía cửa kính" (xoay người, không có vật) vẫn qua.
+        # Đo trên hàng thật, project minh-neu-rui-ro-trong-cuoc-hop, shot
+        # scene-001-shot-00: "mắt nhìn tách cà phê RỒI nhìn Minh" — 4/4
+        # candidate hard-fail `semantic_contradiction`, semantic 0.2 trong khi
+        # character 1.0 và composition 0.9. Một khung hình tĩnh không kể được
+        # hai nhịp thời gian, nên mọi candidate đều sai mãi mãi và production
+        # dừng chờ người sau khi đã đốt 4 lượt sinh ảnh.
+        #
+        # "rồi" là từ rất thường ("cà phê nguội rồi"), nên chỉ chặn khi ngay
+        # sau nó là một ĐỘNG TỪ HÀNH ĐỘNG — tức mệnh đề đang mô tả nhịp thứ hai.
+        "chuỗi hai nhịp trong một khung hình",
+        re.compile(
+            r"(?:rồi|sau đó|trước khi)\s+"
+            r"(?:nhìn|quay|đưa|cầm|đặt|mở|đóng|bước|ngồi|đứng|với|kéo|đẩy|gõ|cúi|ngẩng)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
         "trao/xoay vật về phía người khác",
         re.compile(
             # Tên vật dài ngắn khác nhau ("khay", "màn hình", "tách cà phê"),
