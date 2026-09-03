@@ -75,24 +75,6 @@ một quy luật cho mọi người, chẩn đoán hay lời khuyên tuyệt đ�
   nhất", "ai cũng", hay mệnh lệnh hành động tức thời.
 - Phản chiếu phải bắt nguồn từ chính lựa chọn/hệ quả của tập; không lặp slogan
   tách khỏi cảnh vừa xem và không gọi tên Minh/An trong phần phản chiếu.
-
-  **Phép thử một câu:** nếu câu đó vẫn đúng và vẫn hay khi người ta CHƯA XEM
-  tập này, thì nó là một quy luật, không phải phản chiếu — và bị loại. Phản
-  chiếu chỉ có nghĩa vì người xem vừa thấy chuyện gì xảy ra.
-
-  Danh sách cấm từ khoá là không đủ: cả ba câu dưới đây đều đã bị biên tập loại
-  trong hàng thật, và không câu nào dùng "ai cũng" hay "cách duy nhất". Chúng
-  hỏng vì phát biểu một quy luật, dù đã rào đón.
-
-  Tránh:
-  - "Chưa thấy nhẹ không phải lúc nào cũng là bằng chứng của sai lầm."
-  - "Cảm giác sẵn sàng có thể đến sau, hoặc không đến."
-  - "Nếu bạn từng phải chọn giữa nói ra và im lặng, thì cái giá luôn tới trước."
-
-  Ưu tiên — ở lại trong cảnh vừa xem, để nghĩa mở:
-  - "Cuộc gọi bận. Việc vẫn còn nguyên trên bàn."
-  - "Cậu ấy đã gọi, và vẫn chưa có ai trả lời."
-  - "Tách cà phê vơi một nửa. Sáng mai chắc lại có người ngồi xuống đó."
 - Cầu nối tập sau chỉ được nhắc sau phản chiếu, từ một vật, câu hỏi hoặc lựa
   chọn đã xuất hiện trong tập. Phải có tinh thần hẹn gặp lại, không dán trailer
   rỗng lên một câu chuyện đã kết.
