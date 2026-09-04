@@ -54,6 +54,12 @@ class WorkflowNode:
     started_at: str | None = None
     completed_at: str | None = None
     retry_count: int = 0
+    # The contract this node's work was done under. Empty means the node
+    # predates fingerprinting; see contract.invalidation.stale_node_ids, which
+    # deliberately leaves those alone rather than resetting every project on
+    # disk the first time it runs.
+    creative_fingerprint: str = ""
+    runtime_fingerprint: str = ""
 
     def to_dict(self) -> dict:
         return {
@@ -66,6 +72,8 @@ class WorkflowNode:
             "started_at": self.started_at,
             "completed_at": self.completed_at,
             "retry_count": self.retry_count,
+            "creative_fingerprint": self.creative_fingerprint,
+            "runtime_fingerprint": self.runtime_fingerprint,
         }
 
     @classmethod
@@ -80,6 +88,8 @@ class WorkflowNode:
             started_at=d.get("started_at"),
             completed_at=d.get("completed_at"),
             retry_count=d.get("retry_count", 0),
+            creative_fingerprint=d.get("creative_fingerprint", ""),
+            runtime_fingerprint=d.get("runtime_fingerprint", ""),
         )
 
 

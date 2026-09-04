@@ -17,10 +17,12 @@ from .effective import (
     compile_contract,
 )
 from .fingerprint import creative_policy_fingerprint, runtime_binding_fingerprint
+from .invalidation import NODE_FINGERPRINT_DEPS, stale_node_ids
 
 __all__ = [
     "CONTRACT_SCHEMA_VERSION",
     "EditorialPolicy",
+    "NODE_FINGERPRINT_DEPS",
     "EffectiveProductionContract",
     "ProviderCapabilitySnapshot",
     "RuntimeBinding",
@@ -30,4 +32,5 @@ __all__ = [
     "compile_contract",
     "creative_policy_fingerprint",
     "runtime_binding_fingerprint",
+    "stale_node_ids",
 ]

@@ -34,6 +34,7 @@ from .agents.editorial_review_agent import EDITORIAL_REVIEW_DIMENSIONS, run_edit
 from .agents.qa_agent import QAAgent
 from .content_contract import CONTRACT_VERSION
 from .content_profiles import load_content_profile, profile_fingerprint
+from .contract.invalidation import stale_node_ids
 from .ideation.generator import load_script
 from .ideation.script_contract import validate_script_payload
 from .project.checkpoint import CheckpointManager
@@ -475,6 +476,19 @@ def _reset_stale_nodes(project: Project) -> Project:
     # Chạy TRƯỚC vòng reset QA bên dưới: vòng đó xoá output_data của
     # `audio_quality`, mà đó chính là chỗ ghi segment nào hỏng.
     current = _recover_mismatched_audio(project)
+
+    # Reset theo hợp đồng, TRƯỚC các phép kiểm file-còn-hay-mất: một node có
+    # thể còn nguyên output trên đĩa mà vẫn phải làm lại vì luật đã đổi kể từ
+    # lúc nó chạy. Vòng này chỉ động vào node có ghi fingerprint, nên
+    # `project.json` cũ (chưa có trường này) không bị đụng tới; Step 2c là chỗ
+    # bắt đầu ghi chúng.
+    creative = str(current.metadata.get("creative_policy_fingerprint") or "")
+    runtime = str(current.metadata.get("runtime_binding_fingerprint") or "")
+    if creative or runtime:
+        for node_id in stale_node_ids(current, creative=creative, runtime=runtime):
+            node = current.nodes.get(node_id)
+            if node is not None:
+                current = current.with_node(_pending_again(node))
 
     publish = current.nodes.get("publish")
     if publish is not None and publish.status == NodeStatus.DONE:
