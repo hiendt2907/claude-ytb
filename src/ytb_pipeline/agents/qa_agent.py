@@ -579,7 +579,11 @@ def renderability_contract_text() -> str:
         "A visual_intent describes exactly ONE still frame. Never require: "
         f"{items}. Keep one readable-at-a-glance action. An object may be "
         "present on a table or in the room, but it must not be read, held, "
-        "handed over, precisely pointed at, posed, or described as missing."
+        "handed over, precisely pointed at, posed, or described as missing. "
+        f"Name at most {MAX_STATED_OBJECT_DETAILS} object details that carry a "
+        "STATE (lit, cold, open, empty, face-down, showing a time): the Judge "
+        "scores each one separately, so every extra detail is another "
+        "independent chance to fail the whole shot."
     )
 
 

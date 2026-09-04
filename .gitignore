@@ -82,3 +82,4 @@ tests/test_visual_detail_density.py
 tests/test_5xx_retry_range.py
 tests/test_judge_model_override.py
 tests/test_ledger_cancelled_topics.py
+tests/test_density_reaches_repair_and_prompt.py

@@ -786,7 +786,11 @@ def apply_visual_intent_repair(payload: dict, delta: dict) -> dict:
     would keep spending the repair budget on a script the gate will reject
     anyway, which is slower than not repairing at all.
     """
-    from ytb_pipeline.agents.qa_agent import _UNRENDERABLE_VISUAL_INTENT
+    from ytb_pipeline.agents.qa_agent import (
+        _STATED_OBJECT_DETAIL,
+        _UNRENDERABLE_VISUAL_INTENT,
+        MAX_STATED_OBJECT_DETAILS,
+    )
 
     entries = delta.get("sections")
     if not isinstance(entries, list) or not entries:
@@ -814,6 +818,15 @@ def apply_visual_intent_repair(payload: dict, delta: dict) -> dict:
                 raise ValueError(
                     f"Section {index}: bản sửa vẫn vi phạm {label} ('{found.group(0)}')."
                 )
+        # Trần mật độ KHÔNG phải một pattern, nên vòng trên không thấy nó. Thiếu
+        # dòng này thì applier nhận một bản sửa vẫn quá dày, cổng chặn lại ngay
+        # sau đó, và cả lượt sinh mất — đo 2026-09-04, Section 9, 4 chi tiết.
+        detail_count = len(_STATED_OBJECT_DETAIL.findall(intent))
+        if detail_count > MAX_STATED_OBJECT_DETAILS:
+            raise ValueError(
+                f"Section {index}: bản sửa vẫn nêu {detail_count} chi tiết "
+                f"vật-có-trạng-thái (tối đa {MAX_STATED_OBJECT_DETAILS})."
+            )
         enriched["sections"][index - 1]["visual_intent"] = intent
     return enriched
 
