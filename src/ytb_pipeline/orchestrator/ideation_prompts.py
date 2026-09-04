@@ -454,7 +454,12 @@ def hook_repair_prompt(
     )
 
 
-def visual_intent_repair_prompt(payload: dict, *, section_indexes: tuple[int, ...]) -> str:
+def visual_intent_repair_prompt(
+    payload: dict,
+    *,
+    section_indexes: tuple[int, ...],
+    rejection_feedback: str = "",
+) -> str:
     """Ask for a bounded rewrite of ONLY the flagged sections' `visual_intent`.
 
     The three unrenderable forms are already stated in the generation prompt and
@@ -480,6 +485,12 @@ def visual_intent_repair_prompt(payload: dict, *, section_indexes: tuple[int, ..
         for index in section_indexes
         if 1 <= index <= len(sections) and isinstance(sections[index - 1], dict)
     ]
+    feedback = str(rejection_feedback or "").strip()
+    feedback_block = (
+        "\nThe previous repair was rejected by the same gate. Fix this exact problem "
+        f"before returning the next delta: {feedback}\n"
+        if feedback else ""
+    )
     return (
         "Rewrite ONLY the `visual_intent` of the listed sections of this Vietnamese "
         "YouTube script. Each one currently asks for something an image model cannot "
@@ -492,6 +503,7 @@ def visual_intent_repair_prompt(payload: dict, *, section_indexes: tuple[int, ..
         "table, in the room — just never read from or held.\n"
         "Keep the same characters, place and moment as the sentence being spoken over "
         "it. Do not change the story.\n"
+        f"{feedback_block}"
         'Return ONLY one JSON object shaped {"sections": [{"section_index": <int>, '
         '"visual_intent": <new Vietnamese scene description>}]}, one entry per listed '
         "section, no other field and no markdown.\n\n"

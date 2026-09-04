@@ -62,6 +62,11 @@ class IdeationQualityFailure(RuntimeError):
 _EVIDENCE_SOURCE_TYPES = {"primary", "peer_reviewed", "official"}
 _EVIDENCE_FIELDS = ("claim", "source_title", "publisher", "published_year", "url", "source_type")
 
+# A visual delta is cheap and field-scoped, but still must be bounded.  A
+# rejected delta consumes one provider call; two retries are enough to feed the
+# concrete applier feedback back to the model without opening an unbounded loop.
+MAX_VISUAL_INTENT_REPAIR_ATTEMPTS = 3
+
 
 def _explicit_profile(payload: dict) -> ContentProfile | None:
     profile_id = str(payload.get("profile_id") or "").strip()
@@ -968,7 +973,8 @@ async def validate_or_repair_script(
     identity_repair_attempted = False
     hook_repair_attempted = False
     narrator_reflection_repair_attempted = False
-    visual_intent_repair_attempted = False
+    visual_intent_repair_attempts = 0
+    visual_intent_repair_feedback = ""
     post_editorial_repairable_rules: set[str] = set()
     editorial_rewrites = 0
     report_path = script_path.parent.parent / "assets" / "quality_reports" / "ideation_errors.jsonl"
@@ -986,7 +992,10 @@ async def validate_or_repair_script(
     post_editorial_attempt_budget = (
         2 * editorial_retry_budget + 1 if editorial_retry_budget else 0
     )
-    total_attempts = max_attempts + post_editorial_attempt_budget
+    # Reserve one validation turn after the final bounded visual repair.  A
+    # repair may succeed on the last allowed call; without this slot the loop
+    # would continue past the end and mark the now-valid payload as failed.
+    total_attempts = max_attempts + post_editorial_attempt_budget + 1
 
     for attempt in range(1, total_attempts + 1):
         # Editorial-reserved retries validate and re-review the rewritten
@@ -1406,10 +1415,15 @@ async def validate_or_repair_script(
                 # three of five real rejections on 2026-09-01..02.
                 if (
                     is_deterministic_attempt
-                    and not visual_intent_repair_attempted
+                    and visual_intent_repair_attempts < MAX_VISUAL_INTENT_REPAIR_ATTEMPTS
                     and "unrenderable_visual_intent" in violation_rules
+                    and any(
+                        _section_indexes_in(str(v.get("detail") or ""))
+                        for v in (last_qa_output or {}).get("violations", [])
+                        if str(v.get("rule")) == "unrenderable_visual_intent"
+                    )
                 ):
-                    visual_intent_repair_attempted = True
+                    visual_intent_repair_attempts += 1
                     repaired_anything = True
                     flagged_indexes = tuple(
                         sorted(
@@ -1420,7 +1434,9 @@ async def validate_or_repair_script(
                         )
                     )
                     visual_request = visual_intent_repair_prompt(
-                        current, section_indexes=flagged_indexes
+                        current,
+                        section_indexes=flagged_indexes,
+                        rejection_feedback=visual_intent_repair_feedback,
                     )
                     if console_prefix:
                         print(
@@ -1460,8 +1476,10 @@ async def validate_or_repair_script(
                         append_local_start_log(log_path, "VISUAL_INTENT_REPAIR_RESPONSE", visual_text)
                     try:
                         current = apply_visual_intent_repair(current, json_from_llm(visual_text))
+                        visual_intent_repair_feedback = ""
                     except (ValueError, json.JSONDecodeError) as exc:
                         last_validation_error = f"Visual intent repair không dùng được: {exc}"
+                        visual_intent_repair_feedback = last_validation_error
                         if log_path:
                             append_local_start_log(
                                 log_path, "VISUAL_INTENT_REPAIR_FAILED", last_validation_error

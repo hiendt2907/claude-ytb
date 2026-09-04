@@ -471,7 +471,10 @@ async def _cmd_start_local(args: argparse.Namespace) -> None:
     generated_summaries: list[str] = list(
         rejected_candidate_history(
             cli.ROOT / "assets" / "script_revisions" / "failed_ideation",
-            profile_id=str(getattr(args, "profile", "") or _cli().settings.content_profile_id),
+            # `--profile` is parsed into `profile_id`; use the already-resolved
+            # profile so rejected-candidate memory cannot silently fall back to
+            # the ambient default profile.
+            profile_id=content_profile.profile_id,
         )
     )
     analytics_feedback = AnalyticsStore().feedback_summary()

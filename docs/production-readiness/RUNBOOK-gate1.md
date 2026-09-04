@@ -72,5 +72,15 @@ lại field này có làm đổi thứ khán giả nghe được không?* Nếu 
 chính MP4, subtitle, visual. Chạy hết rồi mới kết luận, không dừng ở tầng đầu
 tiên báo lỗi: cần biết *lớp nào* hỏng, không chỉ *có hỏng không*.
 
+Verifier tái lập được trong repository:
+
+```bash
+PYTHONPATH=src .venv/bin/python tools/gate1/check_video.py <slug>
+```
+
+Lệnh này luôn chạy đủ năm tầng, tổng hợp exit code fail-closed và in
+`HUMAN_WATCH_REQUIRED`. Không dùng các bản runner trong thư mục tạm làm bằng
+chứng sản xuất.
+
 Cái duy nhất script không làm được là ngồi xem. Đó là việc của người, và không
 có kết luận PASS nào hợp lệ nếu bước đó bị bỏ.
