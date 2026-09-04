@@ -187,28 +187,6 @@ main {
 .card h3 { margin: 0 0 .2rem; font-size: var(--step-0); font-weight: 600; }
 .card .note { margin: 0 0 1rem; font-size: var(--step--1); color: var(--ink-soft); }
 
-.dim + .dim { margin-top: 1.1rem; padding-top: 1.1rem; border-top: 1px solid var(--rule); }
-.dim-name { font-size: var(--step--1); font-weight: 600; display: flex; justify-content: space-between; gap: .5rem; }
-.dim-name output { font-variant-numeric: tabular-nums; color: var(--accent); font-weight: 700; }
-.dim-help { font-size: .75rem; color: var(--ink-soft); margin: .15rem 0 .5rem; line-height: 1.45; }
-.scale { display: grid; grid-template-columns: repeat(11, 1fr); gap: 2px; }
-.scale button {
-  aspect-ratio: 1;
-  border: 1px solid var(--rule-strong);
-  border-radius: 2px;
-  background: transparent;
-  color: var(--ink-faint);
-  font: inherit;
-  font-size: .6875rem;
-  font-variant-numeric: tabular-nums;
-  cursor: pointer;
-  padding: 0;
-}
-.scale button:hover { border-color: var(--accent); color: var(--ink); }
-.scale button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--surface); font-weight: 700; }
-:root[data-theme="dark"] .scale button[aria-pressed="true"],
-:root:not([data-theme="light"]) .scale button[aria-pressed="true"] { color: var(--navy); }
-
 .actions { display: flex; gap: .5rem; flex-wrap: wrap; }
 .btn {
   font: inherit;
@@ -226,6 +204,22 @@ main {
 :root[data-theme="dark"] .btn.primary,
 :root:not([data-theme="light"]) .btn.primary { color: var(--navy); }
 .btn.primary:disabled { opacity: .4; cursor: not-allowed; }
+.verdict-btn { flex: 1; padding: .7rem .6rem; font-weight: 600; }
+#correct[aria-pressed="true"] { background: var(--agree); border-color: var(--agree); color: var(--surface); }
+#wrongful[aria-pressed="true"] { background: var(--disagree); border-color: var(--disagree); color: var(--surface); }
+:root[data-theme="dark"] .verdict-btn[aria-pressed="true"],
+:root:not([data-theme="light"]) .verdict-btn[aria-pressed="true"] { color: var(--navy); }
+.note-input {
+  width: 100%;
+  font: inherit;
+  font-size: var(--step--1);
+  padding: .45rem .6rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: 4px;
+  background: var(--surface-sunk);
+  color: var(--ink);
+}
+.verdict-shown .findings { margin-top: .2rem; }
 .btn:focus-visible, .scale button:focus-visible, .rail button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .verdict[hidden] { display: none; }
@@ -256,8 +250,8 @@ main {
 
 <header class="masthead">
   <div>
-    <h1>Bàn chấm kịch bản</h1>
-    <p>Đọc kịch bản, cho điểm năm tiêu chí, rồi mới thấy máy đã chấm gì. Chấm trước để nhãn không bị máy dẫn dắt.</p>
+    <h1>Loại đúng hay loại oan</h1>
+    <p>Mỗi bản dưới đây đã bị máy loại. Đọc, rồi trả lời một câu: loại vậy đúng, hay oan? Một cú nhấp là xong một bản.</p>
   </div>
   <div class="tally"><span>Đã chấm</span> <b id="done">0</b> <span>/ <span id="total">0</span></span></div>
 </header>
@@ -274,22 +268,26 @@ main {
   </article>
 
   <aside class="panel">
-    <section class="card">
-      <h3>Chấm điểm</h3>
-      <p class="note">0 = hỏng hẳn · 9 = đạt ngưỡng phát hành · 10 = mẫu mực</p>
-      <div id="dims"></div>
-      <div class="actions" style="margin-top:1.1rem">
-        <button class="btn primary" id="save" disabled>Lưu &amp; xem máy chấm</button>
-        <button class="btn" id="next">Kịch bản sau</button>
-      </div>
-    </section>
-
-    <section class="card verdict" id="verdict" hidden>
-      <h3>Máy đã chấm</h3>
+    <section class="card verdict-shown">
+      <h3>Máy đã loại bản này</h3>
       <p class="note" id="vsource"></p>
-      <div id="vrows"></div>
       <ul class="findings" id="vfindings"></ul>
       <div class="rules" id="vrules"></div>
+    </section>
+
+    <section class="card">
+      <h3>Loại vậy đúng không?</h3>
+      <p class="note">Chỉ cần một trong hai. Ghi chú để trống cũng được.</p>
+      <div class="actions">
+        <button class="btn verdict-btn" id="correct" data-verdict="correct">Loại đúng</button>
+        <button class="btn verdict-btn" id="wrongful" data-verdict="wrongful">Loại oan</button>
+      </div>
+      <label class="note" for="note" style="display:block;margin:.9rem 0 .3rem">Vì sao (tuỳ chọn)</label>
+      <input id="note" class="note-input" type="text" placeholder="vd: hook đủ mạnh rồi" />
+      <div class="actions" style="margin-top:.9rem">
+        <button class="btn" id="prev">Trước</button>
+        <button class="btn primary" id="next">Sau</button>
+      </div>
     </section>
 
     <section class="card export">
@@ -308,7 +306,6 @@ let labels = {};
 try { labels = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) { labels = {}; }
 
 let current = 0;
-let draft = {};
 
 const $ = (id) => document.getElementById(id);
 const SPEAKER = { narrator: "Người kể" };
@@ -374,43 +371,11 @@ function renderDims() {
   $("save").disabled = DATA.dimensions.some((d) => !(d.key in draft));
 }
 
-function renderVerdict(show) {
-  const box = $("verdict");
-  if (!show) { box.hidden = true; return; }
-  const item = DATA.items[current];
-  const m = item.machine;
-  box.hidden = false;
+function renderMachineReason() {
+  const m = DATA.items[current].machine;
   $("vsource").textContent = m.source === "editorial_review_cache"
-    ? `Rubric LLM · tổng ${m.overall_score}/10 · ${m.passed ? "đạt" : "không đạt"}`
-    : `Cổng QA tất định · ${m.passed ? "đạt" : "không đạt"} (không có điểm rubric)`;
-
-  const rows = [];
-  const dims = m.dimension_scores || {};
-  for (const { key } of DATA.dimensions) {
-    if (!(key in dims)) continue;
-    const mine = draft[key];
-    const gap = Math.abs(mine - dims[key]);
-    const row = document.createElement("div");
-    row.className = "row";
-    const l = document.createElement("span");
-    l.textContent = key.replace(/_/g, " ");
-    const r = document.createElement("span");
-    r.innerHTML = `bạn <b>${mine}</b> · máy <b>${dims[key]}</b> `;
-    const tag = document.createElement("span");
-    tag.className = gap <= 1 ? "gap-agree" : "gap-off";
-    tag.textContent = gap <= 1 ? "khớp" : `lệch ${gap}`;
-    r.append(tag);
-    row.append(l, r);
-    rows.push(row);
-  }
-  if (!rows.length) {
-    const p = document.createElement("div");
-    p.className = "row";
-    p.textContent = "Bản ghi này chỉ có kết luận đạt/không đạt, không có điểm từng tiêu chí.";
-    rows.push(p);
-  }
-  $("vrows").replaceChildren(...rows);
-
+    ? `Rubric LLM · tổng ${m.overall_score}/10 · các tiêu chí dưới ngưỡng 9`
+    : `Cổng QA tất định · luật: ${(m.violated_rules || []).join(", ") || "(không ghi)"}`;
   $("vfindings").replaceChildren(...(m.blocking_findings || []).slice(0, 6).map((f) => {
     const li = document.createElement("li");
     li.textContent = f;
@@ -421,6 +386,14 @@ function renderVerdict(show) {
     s.textContent = r;
     return s;
   }));
+}
+
+function renderAnswer() {
+  const saved = labels[DATA.items[current].id];
+  for (const b of document.querySelectorAll(".verdict-btn")) {
+    b.setAttribute("aria-pressed", String(Boolean(saved) && saved.verdict === b.dataset.verdict));
+  }
+  $("note").value = saved ? (saved.note || "") : "";
 }
 
 function go(index) {
@@ -450,19 +423,35 @@ function go(index) {
     return row;
   }));
 
-  renderDims();
-  renderVerdict(Boolean(labels[item.id]));
+  renderMachineReason();
+  renderAnswer();
   renderRail();
   window.scrollTo({ top: 0, behavior: "instant" });
 }
 
-$("save").addEventListener("click", () => {
-  const item = DATA.items[current];
-  labels[item.id] = { scores: { ...draft }, at: new Date().toISOString() };
-  persist();
-  renderVerdict(true);
+for (const button of document.querySelectorAll(".verdict-btn")) {
+  button.addEventListener("click", () => {
+    const item = DATA.items[current];
+    labels[item.id] = {
+      verdict: button.dataset.verdict,
+      note: $("note").value.trim(),
+      title: item.title,
+      rules: item.machine.violated_rules || [],
+      at: new Date().toISOString(),
+    };
+    persist();
+    renderAnswer();
+    // Move on by itself: the answer is one click, so a second click to advance
+    // is the slowest part of the loop.
+    if (current < DATA.items.length - 1) setTimeout(() => go(current + 1), 180);
+  });
+}
+$("note").addEventListener("input", () => {
+  const saved = labels[DATA.items[current].id];
+  if (saved) { saved.note = $("note").value.trim(); persist(); }
 });
 $("next").addEventListener("click", () => go(current + 1));
+$("prev").addEventListener("click", () => go(current - 1));
 
 $("total").textContent = DATA.items.length;
 persist();

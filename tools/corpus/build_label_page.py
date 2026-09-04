@@ -1,13 +1,18 @@
 """Emit the human-labelling page for the golden corpus.
 
-The corpus records what the MACHINE decided. Calibration needs what a person
-decides, scored without seeing the machine first — so this page shows the
-transcript alone, takes the five dimension scores, and only then reveals the
-recorded verdict for comparison.
+The open question is not "how good is this script" — the owner already answered
+that for the series as a whole. It is whether the 91% rejection rate on
+ban-so-6 Longs (52 of 57) is the gate protecting quality or the gate blocking
+it. So the page asks one thing per script: was this rejection right, or wrong?
 
-Selection favours entries whose LLM rubric scores survived the hash join: those
-give a direct human-vs-rubric pair on the same text. The rest fill in from the
-stratified corpus so both profiles and both outcomes are represented.
+That is one click per entry instead of five scores, and it produces exactly the
+disagreement data Step 5 and Step 7 need. Rubric rejections sort first because
+`editorial_review` causes 22 of the 52.
+
+An earlier round asked for five-dimension scores across 20 scripts, of which
+only 5 were the format under refactor and every rejection shown was a Short for
+a Long-only series. That sample is the reason `stratify` now buckets on
+video_type too.
 
     PYTHONPATH=src .venv/bin/python tools/corpus/build_label_page.py --write
 """
@@ -24,7 +29,7 @@ CORPUS = ROOT / "assets" / "golden_corpus" / "editorial.json"
 TEMPLATE = Path(__file__).resolve().parent / "label_page.html"
 OUT = ROOT / "assets" / "golden_corpus" / "label_page.html"
 
-TARGET = 20
+TARGET = 12
 _PLACEHOLDER = "/*__CORPUS_DATA__*/null"
 
 _DIMENSION_HELP = {
@@ -59,34 +64,45 @@ def _sections_of(source: str) -> list[dict[str, str]]:
     return out
 
 
-def select(entries: list[dict[str, Any]], target: int = TARGET) -> list[dict[str, Any]]:
-    """Rubric-joined entries first; then a spread across profile and outcome."""
-    def has_rubric(entry: dict[str, Any]) -> bool:
-        return bool(entry["machine_verdict"].get("dimension_scores"))
+def select(
+    entries: list[dict[str, Any]],
+    target: int = TARGET,
+    *,
+    profile_id: str = "",
+    video_type: str = "",
+    rejected_only: bool = False,
+) -> list[dict[str, Any]]:
+    """Pick what is worth a person's time.
 
-    chosen = [e for e in entries if has_rubric(e)]
-    chosen_ids = {e["entry_id"] for e in chosen}
+    The first round asked about 20 scripts of which only 5 were the format
+    actually being refactored, and every rejection shown was a Short for a
+    Long-only series. Narrowing to one profile and one format costs the reader
+    far less and answers the question that is actually open.
+    """
+    pool = [
+        e for e in entries
+        if (not profile_id or e["profile_id"] == profile_id)
+        and (not video_type or e["video_type"] == video_type)
+        and (not rejected_only or not e["machine_verdict"]["passed"])
+    ]
 
-    remaining = [e for e in entries if e["entry_id"] not in chosen_ids]
-    # Round-robin the buckets so filling up cannot skew the set toward whichever
-    # bucket happens to be largest.
-    buckets: dict[tuple[str, bool], list[dict[str, Any]]] = {}
-    for entry in remaining:
-        key = (entry["profile_id"], bool(entry["machine_verdict"]["passed"]))
-        buckets.setdefault(key, []).append(entry)
-    order = sorted(buckets)
-    index = 0
-    while len(chosen) < target and any(buckets[k] for k in order):
-        bucket = buckets[order[index % len(order)]]
-        if bucket:
-            chosen.append(bucket.pop(0))
-        index += 1
-    return chosen[:target]
+    def sort_key(entry: dict[str, Any]) -> tuple[int, str]:
+        # Rubric rejections first: that gate causes 22 of 52 Long rejections,
+        # so a disagreement there is worth more than one anywhere else.
+        rules = entry["machine_verdict"].get("violated_rules") or []
+        return (0 if "editorial_review" in rules else 1, entry["entry_id"])
+
+    return sorted(pool, key=sort_key)[:target]
 
 
 def build() -> str:
     corpus = json.loads(CORPUS.read_text(encoding="utf-8"))
-    picked = select(corpus["entries"])
+    picked = select(
+        corpus["entries"],
+        profile_id="ban-so-6",
+        video_type="long",
+        rejected_only=True,
+    )
 
     items = []
     for entry in picked:

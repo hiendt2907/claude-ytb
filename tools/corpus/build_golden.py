@@ -104,6 +104,13 @@ def _iter_script_payloads() -> Iterator[tuple[Path, dict[str, Any]]]:
                 continue
             if not isinstance(payload, dict) or not payload.get("sections"):
                 continue
+            # A draft the provider corrupted mid-transfer (U+FFFD where a
+            # Vietnamese character should be) was rejected by
+            # `xkiro_provider`, not by any editorial judgement. It teaches
+            # nothing about content quality and would put a broken transcript
+            # in front of a human reviewer. 23 such drafts exist on disk.
+            if "�" in path.read_text(encoding="utf-8", errors="replace"):
+                continue
             # Identical drafts saved under several names must not appear twice.
             fingerprint = hashlib.sha256(
                 json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")
@@ -244,10 +251,18 @@ def collect() -> tuple[list[Entry], Counter[str]]:
 
 
 def stratify(entries: list[Entry], per_bucket: int = _PER_BUCKET) -> list[Entry]:
-    """Balanced sample, chosen by entry_id so the result is reproducible."""
-    buckets: dict[tuple[str, bool], list[Entry]] = {}
+    """Balanced sample, chosen by entry_id so the result is reproducible.
+
+    Bucketing includes `video_type`. Without it the first build drew 13 Shorts
+    against 9 Longs for ban-so-6 — a series that is Long-only by ratified
+    decision — so most of the sample measured a format the profile does not
+    produce, and the labelling round spent on it said nothing about the Long
+    pipeline being refactored.
+    """
+    buckets: dict[tuple[str, str, bool], list[Entry]] = {}
     for entry in entries:
-        buckets.setdefault((entry.profile_id, entry.machine_passed), []).append(entry)
+        key = (entry.profile_id, entry.video_type, entry.machine_passed)
+        buckets.setdefault(key, []).append(entry)
     chosen: list[Entry] = []
     for key in sorted(buckets):
         # Sorting by entry_id is a content-derived order: stable across runs and
