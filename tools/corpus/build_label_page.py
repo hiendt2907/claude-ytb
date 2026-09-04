@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -39,6 +40,20 @@ _DIMENSION_HELP = {
     "spoken_naturalness": "Đọc thành tiếng một hơi được không, hay là văn viết đeo vào miệng người?",
     "useful_restraint": "Có kìm được việc rút đạo lý hộ người xem không?",
 }
+
+
+# Findings cite sections in both languages: "Section 6", "đoạn 14",
+# "Các đoạn 13, 17", "mục 4". Pulling those out is what turns a 74-minute
+# reading task into a 30-second one, which is the difference between a label
+# somebody can actually give and a label they have to guess at.
+_CITED = re.compile(r"(?:section|đoạn|mục)\s+(\d+(?:\s*,\s*\d+)*)", re.IGNORECASE)
+
+
+def _cited_sections(finding: str) -> tuple[int, ...]:
+    numbers: list[int] = []
+    for group in _CITED.findall(finding):
+        numbers.extend(int(part) for part in re.findall(r"\d+", group))
+    return tuple(sorted(set(numbers)))
 
 
 def _sections_of(source: str) -> list[dict[str, str]]:
@@ -109,6 +124,19 @@ def build() -> str:
         sections = _sections_of(entry["source"])
         if not sections:
             continue
+        charges = []
+        for finding in entry["machine_verdict"].get("blocking_findings", []):
+            cited = _cited_sections(finding)
+            charges.append(
+                {
+                    "finding": finding,
+                    "quotes": [
+                        {"index": n, **sections[n - 1]}
+                        for n in cited
+                        if 1 <= n <= len(sections)
+                    ],
+                }
+            )
         items.append(
             {
                 "id": entry["entry_id"],
@@ -118,6 +146,7 @@ def build() -> str:
                 "sectionCount": entry["section_count"],
                 "totalChars": entry["total_chars"],
                 "sections": sections,
+                "charges": charges,
                 "machine": entry["machine_verdict"],
             }
         )

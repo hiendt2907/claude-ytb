@@ -172,7 +172,29 @@ main {
   text-wrap: balance;
 }
 
-.transcript { max-width: var(--measure); }
+.charge { margin-bottom: 2rem; }
+.charge-text {
+  font-size: var(--step-1);
+  line-height: 1.55;
+  border-left: 3px solid var(--disagree);
+  padding: .1rem 0 .1rem 1rem;
+  margin: 0 0 .9rem;
+  max-width: var(--measure);
+}
+.quote { margin-left: 1rem; padding-left: 1rem; border-left: 1px solid var(--rule-strong); }
+.quote + .quote { margin-top: .75rem; }
+.quote-num {
+  font-size: .6875rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: .2rem;
+}
+.no-quote { font-size: var(--step--1); color: var(--ink-faint); font-style: italic; margin-left: 1rem; }
+.full { margin-top: 1.5rem; border-top: 1px solid var(--rule); padding-top: 1rem; }
+.full summary { cursor: pointer; font-size: var(--step--1); color: var(--ink-soft); }
+.full summary:hover { color: var(--accent); }
+.transcript { max-width: var(--measure); margin-top: 1rem; }
 .line { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); gap: 1.25rem; padding: .7rem 0; border-bottom: 1px solid var(--rule); }
 .line:last-child { border-bottom: 0; }
 .who { font-size: .6875rem; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); padding-top: .35rem; }
@@ -251,7 +273,7 @@ main {
 <header class="masthead">
   <div>
     <h1>Loại đúng hay loại oan</h1>
-    <p>Mỗi bản dưới đây đã bị máy loại. Đọc, rồi trả lời một câu: loại vậy đúng, hay oan? Một cú nhấp là xong một bản.</p>
+    <p>Mỗi bản đã bị máy loại. Ở đây chỉ hiện LỜI CHÊ và đúng những đoạn bị chỉ mặt — không cần đọc cả kịch bản. Chê vậy đúng, hay oan?</p>
   </div>
   <div class="tally"><span>Đã chấm</span> <b id="done">0</b> <span>/ <span id="total">0</span></span></div>
 </header>
@@ -264,19 +286,23 @@ main {
       <div class="eyebrow" id="meta"></div>
       <h2 id="title"></h2>
     </div>
-    <div class="transcript" id="transcript"></div>
+    <div id="charges"></div>
+    <details class="full">
+      <summary>Xem toàn bộ kịch bản</summary>
+      <div class="transcript" id="transcript"></div>
+    </details>
   </article>
 
   <aside class="panel">
     <section class="card verdict-shown">
-      <h3>Máy đã loại bản này</h3>
+      <h3>Máy loại vì</h3>
       <p class="note" id="vsource"></p>
       <ul class="findings" id="vfindings"></ul>
       <div class="rules" id="vrules"></div>
     </section>
 
     <section class="card">
-      <h3>Loại vậy đúng không?</h3>
+      <h3>Lời chê đó đúng không?</h3>
       <p class="note">Chỉ cần một trong hai. Ghi chú để trống cũng được.</p>
       <div class="actions">
         <button class="btn verdict-btn" id="correct" data-verdict="correct">Loại đúng</button>
@@ -371,16 +397,47 @@ function renderDims() {
   $("save").disabled = DATA.dimensions.some((d) => !(d.key in draft));
 }
 
-function renderMachineReason() {
-  const m = DATA.items[current].machine;
+function renderCharges() {
+  const item = DATA.items[current];
+  const box = $("charges");
+  const nodes = [];
+  for (const charge of item.charges) {
+    const wrap = document.createElement("section");
+    wrap.className = "charge";
+
+    const text = document.createElement("p");
+    text.className = "charge-text";
+    text.textContent = charge.finding;
+    wrap.append(text);
+
+    if (charge.quotes.length) {
+      for (const q of charge.quotes) {
+        const quote = document.createElement("div");
+        quote.className = "quote";
+        const num = document.createElement("div");
+        num.className = "quote-num";
+        num.textContent = `Đoạn ${q.index} · ${SPEAKER[q.speaker] || q.speaker}`;
+        const said = document.createElement("div");
+        said.className = "said";
+        said.textContent = q.voiceover;
+        quote.append(num, said);
+        wrap.append(quote);
+      }
+    } else {
+      const none = document.createElement("p");
+      none.className = "no-quote";
+      none.textContent = "Lời chê này không chỉ vào đoạn cụ thể nào.";
+      wrap.append(none);
+    }
+    nodes.push(wrap);
+  }
+  box.replaceChildren(...nodes);
+
+  const m = item.machine;
   $("vsource").textContent = m.source === "editorial_review_cache"
-    ? `Rubric LLM · tổng ${m.overall_score}/10 · các tiêu chí dưới ngưỡng 9`
-    : `Cổng QA tất định · luật: ${(m.violated_rules || []).join(", ") || "(không ghi)"}`;
-  $("vfindings").replaceChildren(...(m.blocking_findings || []).slice(0, 6).map((f) => {
-    const li = document.createElement("li");
-    li.textContent = f;
-    return li;
-  }));
+    ? `Rubric LLM · tổng ${m.overall_score}/10`
+    : `Luật: ${(m.violated_rules || []).join(", ") || "(không ghi)"}`;
+  $("vfindings").replaceChildren();
   $("vrules").replaceChildren(...(m.violated_rules || []).map((r) => {
     const s = document.createElement("span");
     s.textContent = r;
@@ -423,7 +480,7 @@ function go(index) {
     return row;
   }));
 
-  renderMachineReason();
+  renderCharges();
   renderAnswer();
   renderRail();
   window.scrollTo({ top: 0, behavior: "instant" });
