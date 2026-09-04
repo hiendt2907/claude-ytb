@@ -1,0 +1,1056 @@
+{
+  "schema_version": 1,
+  "dimensions": [
+    "causal_coherence",
+    "human_truth",
+    "role_fidelity",
+    "spoken_naturalness",
+    "useful_restraint"
+  ],
+  "entries": [
+    {
+      "entry_id": "012402813900d4eb",
+      "profile_id": "ban-so-6",
+      "profile_version": "2.2.0",
+      "video_type": "long",
+      "slug": "minh-neu-rui-ro-trong-cuoc-hop",
+      "title": "Ngày Hàng Về Kho Chưa Ai Xác Nhận",
+      "source": "assets/script_revisions/minh-neu-rui-ro-trong-cuoc-hop/20260831_201422_250906.json",
+      "section_count": 24,
+      "total_chars": 6262,
+      "machine_verdict": {
+        "source": "editorial_review_cache",
+        "passed": true,
+        "overall_score": 9,
+        "dimension_scores": {
+          "causal_coherence": 9,
+          "human_truth": 9,
+          "role_fidelity": 9,
+          "spoken_naturalness": 9,
+          "useful_restraint": 9
+        },
+        "violated_rules": [],
+        "blocking_findings": []
+      }
+    },
+    {
+      "entry_id": "022f1b7ad9b317bf",
+      "profile_id": "legacy-pre-profile",
+      "profile_version": "",
+      "video_type": "long",
+      "slug": "chi-phi-co-hoi-phuong-an-tu-bo",
+      "title": "Chi Phí Cơ Hội: Thứ Bạn Thật Sự Bỏ Lỡ Khi Chọn Một Điều",
+      "source": "assets/script_revisions/failed_ideation/chi-phi-co-hoi-phuong-an-tu-bo_20260825_090929_212032.json",
+      "section_count": 10,
+      "total_chars": 6430,
+      "machine_verdict": {
+        "source": "script.quality_review.qa",
+        "passed": false,
+        "overall_score": null,
+        "dimension_scores": {},
+        "violated_rules": [
+          "hook"
+        ],
+        "blocking_findings": [
+          "Hook 3-5 giây đầu chưa đủ mạnh hoặc chưa có nghịch lý/vấn đề rõ."
+        ]
+      }
+    },
+    {
+      "entry_id": "022fa2eac0694279",
+      "profile_id": "ban-so-6",
+      "profile_version": "1.4.0",
+      "video_type": "short",
+      "slug": "minh-hoi-dung-mot-cau",
+      "title": "Minh Định Tự Đoán, Rồi Dừng Lại Hỏi Một Câu",
+      "source": "assets/script_revisions/failed_ideation/minh-hoi-dung-mot-cau_20260826_093025_326400.json",
+      "section_count": 4,
+      "total_chars": 532,
+      "machine_verdict": {
+        "source": "script.quality_review.qa",
+        "passed": false,
+        "overall_score": null,
+        "dimension_scores": {},
+        "violated_rules": [
+          "hook"
+        ],
+        "blocking_findings": [
+          "Cảnh mở đầu chưa neo được khoảnh khắc hoặc chưa có gì để mất."
+        ]
+      }
+    },
+    {
+      "entry_id": "04a69873a1ebda95",
+      "profile_id": "ban-so-6",
+      "profile_version": "2.1.0",
+      "video_type": "short",
+      "slug": "48-phut-mot-dong-rui-ro",
+      "title": "48 Phút, Dòng Rủi Ro Chưa Báo",
+      "source": "assets/script_revisions/failed_ideation/48-phut-mot-dong-rui-ro_20260829_232851_364483.json",
+      "section_count": 9,
+      "total_chars": 691,
+      "machine_verdict": {
+        "source": "script.quality_review.qa",
+        "passed": false,
+        "overall_score": null,
+        "dimension_scores": {},
+        "violated_rules": [
+          "editorial_review"
+        ],
+        "blocking_findings": [
+          "Minh's personal stake is never made concrete; reporting old data costs nothing visible beyond a deadline.",
+          "The later meeting does not earn the core answer: the response creates a verification task, not a clearly lost or gained chance for confirmation.",
+          "An is only two prompt lines and then disappears, so she reads as an audience device rather than a person with her own life.",
+          "The ending names the meaning of the unfinished reconciliation instead of staying with the feedback already shown.",
+          "Điểm biên tập 7/10 dưới ngưỡng 9/10 của profile.",
+          "Các tiêu chí dưới ngưỡng 9/10: causal_coherence, human_truth, role_fidelity, useful_restraint."
+        ]
+      }
+    },
+    {
+      "entry_id": "04be0a564d0a2429",
+      "profile_id": "ban-so-6",
+      "profile_version": "2.5.0",
+      "video_type": "long",
+      "slug": "hai-lan-may-ban-mot-tin-nhan-gui-di",
+      "title": "Hai Lần Máy Bận, Một Tin Nhắn Gửi Đi",
+      "source": "scripts/hai-lan-may-ban-mot-tin-nhan-gui-di.json",
+      "section_count": 18,
+      "total_chars": 5848,
+      "machine_verdict": {
+        "source": "editorial_review_cache",
+        "passed": true,
+        "overall_score": 9,
+        "dimension_scores": {
+          "causal_coherence": 9,
+          "human_truth": 9,
+          "role_fidelity": 9,
+          "spoken_naturalness": 9,
+          "useful_restraint": 9
+        },
+        "violated_rules": [],
+        "blocking_findings": []
+      }
+    },
+    {
+      "entry_id": "0536384cc9af0804",
+      "profile_id": "ban-so-6",
+      "profile_version": "2.2.0",
+      "video_type": "short",
+      "slug": "48-phut-mot-dong-rui-ro",
+      "title": "Con Số Chưa Chắc Trước Cuộc Họp",
+      "source": "scripts/48-phut-mot-dong-rui-ro.json",
+      "section_count": 12,
+      "total_chars": 1261,
+      "machine_verdict": {
+        "source": "editorial_review_cache",
+        "passed": true,
+        "overall_score": 9,
+        "dimension_scores": {
+          "causal_coherence": 9,
+          "human_truth": 9,
+          "role_fidelity": 10,
+          "spoken_naturalness": 9,
+          "useful_restraint": 10
+        },
+        "violated_rules": [],
+        "blocking_findings": []
+      }
+    },
+    {
+      "entry_id": "0bce39cfdac61dac",
+      "profile_id": "ban-so-6",
+      "profile_version": "2.1.0",
+      "video_type": "short",
+      "slug": "noi-mot-rui-ro-o-trang-bon",
+      "title": "Nói Một Rủi Ro Ở Trang Bốn",
+      "source": "assets/script_revisions/failed_ideation/noi-mot-rui-ro-o-trang-bon_20260829_012519_899258.json",
+      "section_count": 5,
+      "total_chars": 625,
+      "machine_verdict": {
+        "source": "script.quality_review.qa",
+        "passed": false,
+        "overall_score": null,
+        "dimension_scores": {},
+        "violated_rules": [
+          "narrator_reflection"
+        ],
+        "blocking_findings": [
+          "Lời chốt story cần là phản chiếu trực tiếp, khiêm tốn của narrator."
+        ]
+      }
+    },
+    {
+      "entry_id": "0c1fc02dd2936742",
+      "profile_id": "ban-so-6",
+      "profile_version": "2.1.0",
+      "video_type": "short",
+      "slug": "48-phut-mot-dong-rui-ro",
+      "title": "Dòng Bôi Vàng Trước Buổi Chốt Số",
+      "source": "assets/script_revisions/failed_ideation/48-phut-mot-dong-rui-ro_20260830_102832_122483.json",
+      "section_count": 9,
+      "total_chars": 730,
+      "machine_verdict": {
+        "source": "script.quality_review.qa",
+        "passed": false,
+        "overall_score": null,
+        "dimension_scores": {},
+        "violated_rules": [
+          "length"
+        ],
+        "blocking_findings": [
+          "Short quá dài 45s: audio 46.2s."
+        ]
+      }
+    },
+    {
+      "entry_id": "0caacaefb4d8b9b7",
+      "profile_id": "ban-so-6",
+      "profile_version": "2.2.0",
+      "video_type": "long",
+      "slug": "sau-gio-muoi-lam-mot-dong-van-cho",
+      "title": "Sáu Giờ Mười Lăm, Một Dòng Vẫn Chờ",
+      "source": "assets/script_revisions/failed_ideation/sau-gio-muoi-lam-mot-dong-van-cho_20260902_110008_268947.json",
+      "section_count": 20,
+      "total_chars": 6454,
+      "machine_verdict": {
+        "source": "script.quality_review.qa",
+        "passed": false,
+        "overall_score": null,
+        "dimension_scores": {},
+        "violated_rules": [
+          "unrenderable_visual_intent"
+        ],
+        "blocking_findings": [
+          "Section 6 yêu cầu chữ/số đọc được trong khung ('Màn hình sáng'); image model không dựng nổi nên Judge sẽ hard-fail mọi candidate.",
+          "Section 10 yêu cầu chữ/số đọc được trong khung ('màn hình sáng'); image model không dựng nổi nên Judge sẽ hard-fail mọi candidate."
+        ]
+      }
+    },
+    {
+      "entry_id": "0e7375b5c5299fbd",
+      "profile_id": "ban-so-6",
+      "profile_version": "2.1.0",
+      "video_type": "short",
+      "slug": "con-48-phut-im-hay-noi",
+      "title": "Còn 48 phút: Im hay nói?",
+      "source": "assets/script_revisions/failed_ideation/con-48-phut-im-hay-noi_20260829_073123_073835.json",
+      "section_count": 6,
+      "total_chars": 518,
+      "machine_verdict": {
+        "source": "script.quality_review.qa",
+        "passed": false,
+        "overall_score": null,
+        "dimension_scores": {},
+        "violated_rules": [
+          "editorial_review"
+        ],
+        "blocking_findings": [
+          "Minh's concrete price/stake is never shown; only 'rủi ro' is named, so the choice lacks weight.",
+          "The 6:18 table scene jumps to the 8:55 meeting without a causal beat showing Minh deciding or the cost rising.",
+          "Section 6 closes by stating a general rule about silence keeping risk in the room, which the scene has not proven.",
+          "Điểm biên tập 6/10 dưới ngưỡng 9/10 của profile.",
+          "Các tiêu chí dưới ngưỡng 9/10: causal_coherence, human_truth, spoken_naturalness, useful_restraint.",
+          "Điểm biên tập 6/10 dưới ngưỡng 9/10 của profile.",
+          "Các tiêu chí dưới ngưỡng 9/10: causal_coherence, human_truth, spoken_naturalness, useful_restraint."
+        ]
+      }
+    },
+    {
+      "entry_id": "0f8c764fe8c8f6e4",
+      "profile_id": "ban-so-6",
+      "profile_version": "2.1.0",
+      "video_type": "short",
+      "slug": "48-phut-mot-dong-rui-ro",
+      "title": "Số Cũ Hai Ngày Trong Cuộc Họp",
+      "source": "assets/script_revisions/failed_ideation/48-phut-mot-dong-rui-ro_20260829_235859_207740.json",
+      "section_count": 9,
+      "total_chars": 855,
+      "machine_verdict": {
+        "source": "script.quality_review.qa",
+        "passed": false,
+        "overall_score": null,
+        "dimension_scores": {},
+        "violated_rules": [
+          "editorial_review"
+        ],
+        "blocking_findings": [
+          "Phần kết diễn giải ý nghĩa chưa được chứng minh: 'slide dừng lại đã cho thấy rủi ro không còn bị giữ một mình'.",
+          "Lời thoại của Minh đọc như luận điểm hoặc lời coach, không phải lời nói thật giữa khách quen và chủ quán lúc 6h sáng.",
+          "Hệ quả phòng họp được narrator tóm tắt thay vì cho thấy phản hồi thật của đồng nghiệp để lựa chọn của Minh có giá.",
+          "Thiếu cái giá cụ thể và lựa chọn khó: Minh trả lời quá dễ dãi, mâu thuẫn chưa được sống.",
+          "An chỉ là công cụ hỏi để lộ luận điểm, chưa có phản ứng quan sát tự nhiên.",
+          "Điểm biên tập 5/10 dưới ngưỡng 9/10 của profile.",
+          "Các tiêu chí dưới ngưỡng 9/10: causal_coherence, human_truth, role_fidelity, spoken_naturalness, useful_restraint.",
+          "Điểm biên tập 5/10 dưới ngưỡng 9/10 của profile.",
+          "Các tiêu chí dưới ngưỡng 9/10: causal_coherence, human_truth, role_fidelity, spoken_naturalness, useful_restraint."
+        ]
+      }
+    },
+    {
+      "entry_id": "121b7df25acf566b",
+      "profile_id": "ban-so-6",
+      "profile_version": "2.1.0",
+      "video_type": "short",
+      "slug": "48-phut-mot-dong-rui-ro",
+      "title": "Dòng Trống Trước Cuộc Họp",
+      "source": "assets/script_revisions/failed_ideation/48-phut-mot-dong-rui-ro_20260829_190350_043879.json",
+      "section_count": 9,
+      "total_chars": 700,
+      "machine_verdict": {
+        "source": "script.quality_review.qa",
+        "passed": false,
+        "overall_score": null,
+        "dimension_scores": {},
+        "violated_rules": [
+          "editorial_review"
+        ],
+        "blocking_findings": [
+          "An đảm nhận vai ghi biên bản và chủ động xử lý rủi ro thay Minh, biến An thành người xử lý hộ thay vì quan sát và mở câu hỏi.",
+          "Kết thúc khái quát 'Khi bạn chọn nói ra...' biến câu chuyện thành bài học, không còn phản chiếu khiêm tốn.",
+          "Chuyển cảnh sang phòng họp không giải thích vì sao An có mặt, làm đứt mạch nhân quả.",
+          "Lựa chọn của Minh được kể là khó nhưng chưa được thể hiện qua lưỡng lự hay cái giá; phản hồi chấp nhận ngay khiến hệ quả chưa đủ thật.",
+          "Điểm biên tập 5/10 dưới ngưỡng 9/10 của profile.",
+          "Các tiêu chí dưới ngưỡng 9/10: causal_coherence, human_truth, role_fidelity, spoken_naturalness, useful_restraint."
+        ]
+      }
+    },
+    {
+      "entry_id": "13b3b0844a3c311b",
+      "profile_id": "ban-so-6",
+      "profile_version": "2.1.0",
+      "video_type": "short",
+      "slug": "48-phut-mot-dong-rui-ro",
+      "title": "Im Lặng Làm Mất Chỗ Xác Nhận",
+      "source": "assets/script_revisions/failed_ideation/48-phut-mot-dong-rui-ro_20260830_095453_701158.json",
+      "section_count": 4,
+      "total_chars": 696,
+      "machine_verdict": {
+        "source": "script.quality_review.qa",
+        "passed": false,
+        "overall_score": null,
+        "dimension_scores": {},
+        "violated_rules": [
+          "editorial_review"
+        ],
+        "blocking_findings": [
+          "Section 3 turns Minh into a narrator: he recites his two-day fear and the cost of missing child pickup inside a meeting line instead of letting it emerge through live exchange.",
+          "No An-Minh exchange follows the core answer; the script jumps from 6:12 at the cafe to a 9:15 meeting, so An never opens a real question and the causal link is missing.",
+          "The colleague's 'missing appendix B' and added wait time exist only in visual_intent, not as spoken dialogue, so the payoff voices an outcome that is not earned in the transcript.",
+          "Narrator does not set scene or time for section 3; role fidelity is broken because Minh's voiceover carries narrative exposition in the meeting.",
+          "Điểm biên tập 5/10 dưới ngưỡng 9/10 của profile.",
+          "Các tiêu chí dưới ngưỡng 9/10: causal_coherence, human_truth, role_fidelity, spoken_naturalness, useful_restraint."
+        ]
+      }
+    },
+    {
+      "entry_id": "15e4d5dedb1bd249",
+      "profile_id": "one-cup-cafe-6h",
+      "profile_version": "1.0.0",
+      "video_type": "long",
+      "slug": "cang-chuan-bi-ky-cang-kho-mo-slide-dau-tien",
+      "title": "Càng Chuẩn Bị Kỹ, Càng Khó Mở Slide Đầu Tiên",
+      "source": "assets/script_revisions/failed_ideation/cang-chuan-bi-ky-cang-kho-mo-slide-dau-tien_20260826_115904_371471.json",
+      "section_count": 13,
+      "total_chars": 6068,
+      "machine_verdict": {
+        "source": "script.quality_review.qa",
+        "passed": false,
+        "overall_score": null,
+        "dimension_scores": {},
+        "violated_rules": [
+          "immediate_action"
+        ],
+        "blocking_findings": [
+          "Phần chốt chưa có một hành động có thể làm ngay sau khi xem."
+        ]
+      }
+    },
+    {
+      "entry_id": "17ea5a8a2dac67b6",
+      "profile_id": "legacy-pre-profile",
+      "profile_version": "",
+      "video_type": "short",
+      "slug": "tien-thuong-va-nhan-tu-thuong",
+      "title": "Tiền Thưởng Vừa Về, Vì Sao Món Ngoài Kế Hoạch Bỗng Có Vẻ Hợp Lý?",
+      "source": "assets/script_revisions/failed_ideation/tien-thuong-va-nhan-tu-thuong_20260722_105349_027727.json",
+      "section_count": 6,
+      "total_chars": 3970,
+      "machine_verdict": {
+        "source": "script.quality_review.qa",
+        "passed": false,
+        "overall_score": null,
+        "dimension_scores": {},
+        "violated_rules": [
+          "health_finance_claim"
+        ],
+        "blocking_findings": [
+          "Phát hiện tuyên bố y tế/tài chính tuyệt đối hoặc áp dụng cho mọi người."
+        ]
+      }
+    },
+    {
+      "entry_id": "1818237563de403a",
+      "profile_id": "ban-so-6",
+      "profile_version": "2.4.0",
+      "video_type": "long",
+      "slug": "noi-dieu-chua-ai-xac-nhan-roi-viec-lai-nhieu-hon",
+      "title": "Nói Điều Chưa Ai Xác Nhận Rồi, Việc Lại Nhiều Hơn",
+      "source": "assets/script_revisions/failed_ideation/noi-dieu-chua-ai-xac-nhan-roi-viec-lai-nhieu-hon_20260903_120837_882059.json",
+      "section_count": 22,
+      "total_chars": 5830,
+      "machine_verdict": {
+        "source": "script.quality_review.qa",
+        "passed": false,
+        "overall_score": null,
+        "dimension_scores": {},
+        "violated_rules": [
+          "editorial_review"
+        ],
+        "blocking_findings": [
+          "Minh voiceover ở đoạn 14 tường thuật hành động người thứ ba như narrator (Duy hỏi, mọi người nhìn, ghi tên, chuyển slide); vi phạm role_fidelity.",
+          "Narrator đoạn 22 gọi tên Minh ngoài cầu nối tập sau và cắt nghĩa 'một lựa chọn nhỏ' thay người xem; vi phạm useful_restraint.",
+          "Các đoạn 13, 17 lặp tách cà phê/điện thoại/im lặng thay vì tiến triển; bỏ đi cảnh gần như không đổi.",
+          "An ở đoạn 15/18 nói thay kết luận và dồn quyết định ('việc xác minh đó là của cậu', 'cậu định để đó đến bao giờ?') thay vì chỉ hỏi từ thứ thấy.",
+          "Điểm biên tập 4/10 dưới ngưỡng 9/10 của profile.",
+          "Các tiêu chí dưới ngưỡng 9/10: causal_coherence, human_truth, role_fidelity, spoken_naturalness, useful_restraint."
+        ]
+      }
+    },
+    {
+      "entry_id": "1ad74fcb0f46cfeb",
+      "profile_id": "ban-so-6",
+      "profile_version": "2.1.0",
+      "video_type": "short",
+      "slug": "48-phut-mot-dong-rui-ro",
+      "title": "Sáu Giờ Mười, Minh Nói Ra Ô Tổng Chưa Chắc",
+      "source": "assets/script_revisions/failed_ideation/48-phut-mot-dong-rui-ro_20260830_115522_038243.json",
+      "section_count": 10,
+      "total_chars": 784,
+      "machine_verdict": {
+        "source": "script.quality_review.qa",
+        "passed": false,
+        "overall_score": null,
+        "dimension_scores": {},
+        "violated_rules": [
+          "editorial_review"
+        ],
+        "blocking_findings": [
+          "Rủi ro của Minh chỉ được kể trong lời thoại ('ngại', 'từng nhắc em chậm') nhưng sau khi nói không có phản hồi hay cái giá từ chị Hạnh; hệ quả chỉ là xác nhận có lợi.",
+          "Đoạn quán cà phê dừng ở nỗi sợ của Minh; không có lượt thoại của An khiến Minh đổi hành động, nên cảnh 6:10 chưa thực sự đẩy lựa chọn 8:00.",
+          "Section 9 dùng narrator báo 'bản in lệch mười hai triệu' thay vì cho chị Hạnh phản hồi lại lời Minh, khiến câu trả lời gốc được minh hoạ nhưng chưa được thử thách bởi con người.",
+          "Kết narrator khái quát thành bài học 'nói ra sớm làm lộ cái sai trước khi chốt' khi chưa có phản hồi người thật nào được chứng minh.",
+          "Điểm biên tập 7/10 dưới ngưỡng 9/10 của profile.",
+          "Các tiêu chí dưới ngưỡng 9/10: causal_coherence, human_truth, spoken_naturalness, useful_restraint."
+        ]
+      }
+    },
+    {
+      "entry_id": "1b0220f4f8994e10",
+      "profile_id": "ban-so-6",
+      "profile_version": "2.1.0",
+      "video_type": "short",
+      "slug": "48-phut-mot-dong-rui-ro",
+      "title": "Im Lặng Hay Nói Thật Trước Giờ Họp",
+      "source": "assets/script_revisions/failed_ideation/48-phut-mot-dong-rui-ro_20260830_101756_706829.json",
+      "section_count": 4,
+      "total_chars": 664,
+      "machine_verdict": {
+        "source": "script.quality_review.qa",
+        "passed": false,
+        "overall_score": null,
+        "dimension_scores": {},
+        "violated_rules": [
+          "editorial_review"
+        ],
+        "blocking_findings": [
+          "Section 4 asserts the outcome 'gật đầu xác nhận lệch ba đơn' without showing Minh making the choice or the meeting response, so the core answer in section 2 is not earned.",
+          "Section 3 gives An a question but no Minh reply or subsequent action; a required turn is omitted and the scene does not progress.",
+          "Section 4 closes as a generalized lesson rather than a modest reflection on a shown consequence, turning one morning into a rule.",
+          "Điểm biên tập 3/10 dưới ngưỡng 9/10 của profile.",
+          "Các tiêu chí dưới ngưỡng 9/10: causal_coherence, human_truth, role_fidelity, spoken_naturalness, useful_restraint."
+        ]
+      }
+    },
+    {
+      "entry_id": "1b69b8f779832215",
+      "profile_id": "ban-so-6",
+      "profile_version": "2.2.0",
+      "video_type": "long",
+      "slug": "cau-hoi-chua-tra-loi-sau-cuoc-hop",
+      "title": "Sau Cuộc Họp, Một Câu Hỏi Vẫn Chưa Trả Lời",
+      "source": "assets/script_revisions/failed_ideation/cau-hoi-chua-tra-loi-sau-cuoc-hop_20260902_104326_024427.json",
+      "section_count": 21,
+      "total_chars": 5252,
+      "machine_verdict": {
+        "source": "script.quality_review.qa",
+        "passed": false,
+        "overall_score": null,
+        "dimension_scores": {},
+        "violated_rules": [
+          "unrenderable_visual_intent"
+        ],
+        "blocking_findings": [
+          "Section 2 yêu cầu vật nhỏ cầm trên tay ('tay cầm'); image model không dựng nổi nên Judge sẽ hard-fail mọi candidate."
+        ]
+      }
+    },
+    {
+      "entry_id": "1be11580bbf92713",
+      "profile_id": "ban-so-6",
+      "profile_version": "2.2.0",
+      "video_type": "long",
+      "slug": "minh-neu-rui-ro-trong-cuoc-hop",
+      "title": "Một Ô Trống Trước Cuộc Họp Chốt Số",
+      "source": "assets/script_revisions/failed_ideation/minh-neu-rui-ro-trong-cuoc-hop_20260831_082617_551621.json",
+      "section_count": 24,
+      "total_chars": 4922,
+      "machine_verdict": {
+        "source": "script.quality_review.qa",
+        "passed": false,
+        "overall_score": null,
+        "dimension_scores": {},
+        "violated_rules": [
+          "editorial_review"
+        ],
+        "blocking_findings": [
+          "Minh voiceover chứa mô tả cảnh/hành động người thứ ba và nhảy thời gian: '6 giờ 19, Minh ngồi...' nằm trong speaker_id minh.",
+          "Narrator kết thúc bằng bài học chung 'Nếu bạn từng sợ mình chậm...', biến sự kiện thành quy luật thay vì phản chiếu khiêm tốn.",
+          "An phân tích tâm lý kiểu chuyên gia: '...hai cái đó đang trộn vào nhau', làm An không còn chỉ quan sát và mở câu hỏi.",
+          "Điểm biên tập 4/10 dưới ngưỡng 9/10 của profile.",
+          "Các tiêu chí dưới ngưỡng 9/10: causal_coherence, role_fidelity, spoken_naturalness, useful_restraint."
+        ]
+      }
+    },
+    {
+      "entry_id": "34fd4c4f38b9b61d",
+      "profile_id": "legacy-pre-profile",
+      "profile_version": "",
+      "video_type": "short",
+      "slug": "vi-sao-quyet-dinh-mo-khien-nao-cho-rang-chua-den-luc-bat-dau",
+      "title": "Vì Sao Bạn Vẫn Chọn Điều Cũ Dù Biết Nó Không Còn Hợp?",
+      "source": "assets/script_revisions/failed_ideation/vi-sao-quyet-dinh-mo-khien-nao-cho-rang-chua-den-luc-bat-dau_20260720.json",
+      "section_count": 3,
+      "total_chars": 1235,
+      "machine_verdict": {
+        "source": "script.quality_review.qa",
+        "passed": false,
+        "overall_score": null,
+        "dimension_scores": {},
+        "violated_rules": [
+          "central_mechanism"
+        ],
+        "blocking_findings": [
+          "Script đang nêu nhiều cơ chế cạnh tranh: hiệu ứng mặc định, hành vi trong đời sống hằng ngày."
+        ]
+      }
+    },
+    {
+      "entry_id": "380a6d041a3edc03",
+      "profile_id": "one-cup-cafe-6h",
+      "profile_version": "1.1.0",
+      "video_type": "long",
+      "slug": "ap-luc-to-ra-on-tren-mang-xa-hoi",
+      "title": "Tỏ Ra Ổn Trên Mạng Khi Đời Đang Rối",
+      "source": "scripts/ap-luc-to-ra-on-tren-mang-xa-hoi.json",
+      "section_count": 12,
+      "total_chars": 6589,
+      "machine_verdict": {
+        "source": "editorial_review_cache",
+        "passed": true,
+        "overall_score": 9,
+        "dimension_scores": {
+          "causal_coherence": 9,
+          "human_truth": 9,
+          "role_fidelity": 9,
+          "spoken_naturalness": 9,
+          "useful_restraint": 9
+        },
+        "violated_rules": [],
+        "blocking_findings": []
+      }
+    },
+    {
+      "entry_id": "380eb02f658a00a1",
+      "profile_id": "legacy-pre-profile",
+      "profile_version": "",
+      "video_type": "long",
+      "slug": "chi-phi-chim-kho-dung-khoan-chi",
+      "title": "Vì Sao Bạn Càng Đã Trả Tiền Càng Khó Dừng Một Khoản Chi?",
+      "source": "assets/script_revisions/failed_ideation/chi-phi-chim-kho-dung-khoan-chi_20260722_100038_537949.json",
+      "section_count": 9,
+      "total_chars": 20280,
+      "machine_verdict": {
+        "source": "script.quality_review.qa",
+        "passed": false,
+        "overall_score": null,
+        "dimension_scores": {},
+        "violated_rules": [
+          "health_finance_claim"
+        ],
+        "blocking_findings": [
+          "Phát hiện tuyên bố y tế/tài chính tuyệt đối hoặc áp dụng cho mọi người."
+        ]
+      }
+    },
+    {
+      "entry_id": "40cd37c07fc90b62",
+      "profile_id": "ban-so-6",
+      "profile_version": "2.5.0",
+      "video_type": "long",
+      "slug": "cuoc-goi-ban-luc-bay-gio-muoi",
+      "title": "Cuộc Gọi Bận Lúc Bảy Giờ Mười",
+      "source": "scripts/cuoc-goi-ban-luc-bay-gio-muoi.json",
+      "section_count": 16,
+      "total_chars": 5433,
+      "machine_verdict": {
+        "source": "editorial_review_cache",
+        "passed": true,
+        "overall_score": 9,
+        "dimension_scores": {
+          "causal_coherence": 9,
+          "human_truth": 9,
+          "role_fidelity": 9,
+          "spoken_naturalness": 9,
+          "useful_restraint": 9
+        },
+        "violated_rules": [],
+        "blocking_findings": []
+      }
+    },
+    {
+      "entry_id": "5c6e30023fee17c6",
+      "profile_id": "one-cup-cafe-6h",
+      "profile_version": "1.0.0",
+      "video_type": "short",
+      "slug": "cang-sua-cau-mo-dau-cang-kho-bam-trinh-chieu-short",
+      "title": "Bạn Càng Sửa Câu Mở Đầu, Càng Khó Bấm Trình Chiếu",
+      "source": "assets/script_revisions/failed_ideation/cang-sua-cau-mo-dau-cang-kho-bam-trinh-chieu-short_20260826_121117_266486.json",
+      "section_count": 4,
+      "total_chars": 651,
+      "machine_verdict": {
+        "source": "script.quality_review.qa",
+        "passed": false,
+        "overall_score": null,
+        "dimension_scores": {},
+        "violated_rules": [
+          "immediate_action"
+        ],
+        "blocking_findings": [
+          "Phần chốt chưa có một hành động có thể làm ngay sau khi xem."
+        ]
+      }
+    },
+    {
+      "entry_id": "6912e45b0204dbc9",
+      "profile_id": "legacy-pre-profile",
+      "profile_version": "",
+      "video_type": "short",
+      "slug": "hen-15-phut-nhung-tre-40-phut",
+      "title": "15 Phút Thành 40? Vì Sao Bạn Tính Sai?",
+      "source": "assets/script_revisions/failed_ideation/hen-15-phut-nhung-tre-40-phut_20260825_095434_264825.json",
+      "section_count": 4,
+      "total_chars": 753,
+      "machine_verdict": {
+        "source": "script.quality_review.qa",
+        "passed": false,
+        "overall_score": null,
+        "dimension_scores": {},
+        "violated_rules": [
+          "hook"
+        ],
+        "blocking_findings": [
+          "Hook 3-5 giây đầu chưa đủ mạnh hoặc chưa có nghịch lý/vấn đề rõ."
+        ]
+      }
+    },
+    {
+      "entry_id": "7346df0c32af5285",
+      "profile_id": "legacy-pre-profile",
+      "profile_version": "",
+      "video_type": "short",
+      "slug": "co-che-nao-bo-ne-tranh-su-mo-ho-2",
+      "title": "Tại Sao Bạn Biết Phải Làm Nhưng Vẫn Đứng Yên? Giải Mã Cơ Chế Né Tránh Sự Mơ Hồ",
+      "source": "assets/script_revisions/failed_ideation/co-che-nao-bo-ne-tranh-su-mo-ho-2_20260727_193645_784118.json",
+      "section_count": 6,
+      "total_chars": 2431,
+      "machine_verdict": {
+        "source": "script.quality_review.qa",
+        "passed": false,
+        "overall_score": null,
+        "dimension_scores": {},
+        "violated_rules": [
+          "series_dedup"
+        ],
+        "blocking_findings": [
+          "Chủ đề/title 'Tại Sao Bạn Biết Phải Làm Nhưng Vẫn Đứng Yên? Giải Mã Cơ Chế Né Tránh Sự Mơ Hồ' (slug=tai-sao-ban-biet-phai-lam-nhung-van-dung-yen-giai-ma-co-che-ne-tranh-su-mo-ho) đã có trong done_topics."
+        ]
+      }
+    },
+    {
+      "entry_id": "73f9235ecfeb992a",
+      "profile_id": "legacy-pre-profile",
+      "profile_version": "",
+      "video_type": "short",
+      "slug": "tien-thuong-ba-cau-hoi-truoc-khi-mua",
+      "title": "Tiền Thưởng: Đừng Để Một Nhãn Tự Quyết Khoản Mua",
+      "source": "assets/script_revisions/failed_ideation/tien-thuong-ba-cau-hoi-truoc-khi-mua_20260722_110847_142060.json",
+      "section_count": 6,
+      "total_chars": 3896,
+      "machine_verdict": {
+        "source": "script.quality_review.qa",
+        "passed": false,
+        "overall_score": null,
+        "dimension_scores": {},
+        "violated_rules": [
+          "health_finance_claim"
+        ],
+        "blocking_findings": [
+          "Phát hiện tuyên bố y tế/tài chính tuyệt đối hoặc áp dụng cho mọi người."
+        ]
+      }
+    },
+    {
+      "entry_id": "78d33588ba023d31",
+      "profile_id": "ban-so-6",
+      "profile_version": "2.2.0",
+      "video_type": "short",
+      "slug": "nam-lan-do-chuong-truoc-gio-hop",
+      "title": "Năm Lần Đổ Chuông Trước Giờ Họp",
+      "source": "scripts/nam-lan-do-chuong-truoc-gio-hop.json",
+      "section_count": 11,
+      "total_chars": 1286,
+      "machine_verdict": {
+        "source": "editorial_review_cache",
+        "passed": true,
+        "overall_score": 9,
+        "dimension_scores": {
+          "causal_coherence": 10,
+          "human_truth": 9,
+          "role_fidelity": 9,
+          "spoken_naturalness": 9,
+          "useful_restraint": 9
+        },
+        "violated_rules": [],
+        "blocking_findings": []
+      }
+    },
+    {
+      "entry_id": "9330ab2002394a4d",
+      "profile_id": "legacy-pre-profile",
+      "profile_version": "",
+      "video_type": "short",
+      "slug": "co-che-nao-bo-ne-tranh-su-mo-ho-2",
+      "title": "Tại Sao Bạn Biết Phải Làm Nhưng Vẫn Đứng Yên? Giải Mã Cơ Chế Né Tránh Sự Mơ Hồ",
+      "source": "assets/script_revisions/failed_ideation/co-che-nao-bo-ne-tranh-su-mo-ho-2_20260727_193019_126811.json",
+      "section_count": 6,
+      "total_chars": 1982,
+      "machine_verdict": {
+        "source": "script.quality_review.qa",
+        "passed": false,
+        "overall_score": null,
+        "dimension_scores": {},
+        "violated_rules": [
+          "hook_contract",
+          "series_dedup"
+        ],
+        "blocking_findings": [
+          "Chủ đề/title 'Tại Sao Bạn Biết Phải Làm Nhưng Vẫn Đứng Yên? Giải Mã Cơ Chế Né Tránh Sự Mơ Hồ' (slug=tai-sao-ban-biet-phai-lam-nhung-van-dung-yen-giai-ma-co-che-ne-tranh-su-mo-ho) đã có trong done_topics.",
+          "Strategy Short phải có hook đầy đủ, funnel đích và segment purpose='core_answer'."
+        ]
+      }
+    },
+    {
+      "entry_id": "a365b498910980ef",
+      "profile_id": "ban-so-6",
+      "profile_version": "2.2.0",
+      "video_type": "short",
+      "slug": "vi-sao-toi-qua-khong-noi-som",
+      "title": "Vì Sao Tối Qua Không Nói Sớm?",
+      "source": "scripts/vi-sao-toi-qua-khong-noi-som.json",
+      "section_count": 11,
+      "total_chars": 1323,
+      "machine_verdict": {
+        "source": "editorial_review_cache",
+        "passed": true,
+        "overall_score": 9,
+        "dimension_scores": {
+          "causal_coherence": 9,
+          "human_truth": 9,
+          "role_fidelity": 9,
+          "spoken_naturalness": 9,
+          "useful_restraint": 9
+        },
+        "violated_rules": [],
+        "blocking_findings": []
+      }
+    },
+    {
+      "entry_id": "a8488707c6bcc247",
+      "profile_id": "legacy-pre-profile",
+      "profile_version": "",
+      "video_type": "long",
+      "slug": "co-che-nao-bo-ne-tranh-su-mo-ho",
+      "title": "Vì Sao Bạn Đứng Yên Trước Việc Khó? Giải Mã Cơ Chế Né Tránh Sự Mơ Hồ",
+      "source": "assets/script_revisions/failed_ideation/co-che-nao-bo-ne-tranh-su-mo-ho_20260727_143301_526064.json",
+      "section_count": 16,
+      "total_chars": 6233,
+      "machine_verdict": {
+        "source": "script.quality_review.qa",
+        "passed": false,
+        "overall_score": null,
+        "dimension_scores": {},
+        "violated_rules": [
+          "hook",
+          "intro"
+        ],
+        "blocking_findings": [
+          "Video dài phải mở đầu bằng \"Mến chào các bạn,\".",
+          "Hook 3-5 giây đầu chưa đủ mạnh hoặc chưa có nghịch lý/vấn đề rõ."
+        ]
+      }
+    },
+    {
+      "entry_id": "ac77bba5e4026f7e",
+      "profile_id": "one-cup-cafe-6h",
+      "profile_version": "1.0.0",
+      "video_type": "short",
+      "slug": "cang-sua-cau-mo-dau-cang-kho-bam-f5",
+      "title": "Càng sửa câu mở đầu, càng khó bấm F5",
+      "source": "scripts/cang-sua-cau-mo-dau-cang-kho-bam-f5.json",
+      "section_count": 4,
+      "total_chars": 675,
+      "machine_verdict": {
+        "source": "script.quality_review.qa",
+        "passed": false,
+        "overall_score": null,
+        "dimension_scores": {},
+        "violated_rules": [
+          "immediate_action"
+        ],
+        "blocking_findings": [
+          "Phần chốt chưa có một hành động có thể làm ngay sau khi xem."
+        ]
+      }
+    },
+    {
+      "entry_id": "bba517005135877c",
+      "profile_id": "legacy-pre-profile",
+      "profile_version": "",
+      "video_type": "long",
+      "slug": "co-che-nao-bo-ne-tranh-su-mo-ho",
+      "title": "Não Bộ Né Tránh Sự Mơ Hồ: Vì Sao Bạn Không Bắt Đầu?",
+      "source": "assets/script_revisions/failed_ideation/co-che-nao-bo-ne-tranh-su-mo-ho_20260727_163051_067313.json",
+      "section_count": 31,
+      "total_chars": 6212,
+      "machine_verdict": {
+        "source": "script.quality_review.qa",
+        "passed": false,
+        "overall_score": null,
+        "dimension_scores": {},
+        "violated_rules": [
+          "central_mechanism",
+          "final_payoff",
+          "immediate_action"
+        ],
+        "blocking_findings": [
+          "Script đang nêu nhiều cơ chế cạnh tranh: này, não bộ này hữu ích, né tránh sự mơ hồ.",
+          "Phần chốt chưa có một hành động có thể làm ngay sau khi xem.",
+          "Section cuối thiếu payoff nêu rõ người xem nhận được gì khi áp dụng."
+        ]
+      }
+    },
+    {
+      "entry_id": "bf23f98d8a439079",
+      "profile_id": "legacy-pre-profile",
+      "profile_version": "",
+      "video_type": "short",
+      "slug": "vi-sao-danh-dau-viec-de-lai-khien-ban-tri-hoan",
+      "title": "Vì Sao Đánh Dấu Việc Dễ Lại Khiến Bạn Trì Hoãn?",
+      "source": "assets/script_revisions/failed_ideation/vi-sao-danh-dau-viec-de-lai-khien-ban-tri-hoan_20260720.json",
+      "section_count": 3,
+      "total_chars": 1369,
+      "machine_verdict": {
+        "source": "script.quality_review.qa",
+        "passed": false,
+        "overall_score": null,
+        "dimension_scores": {},
+        "violated_rules": [
+          "series_semantic_dedup"
+        ],
+        "blocking_findings": [
+          "Chủ đề/title 'Vì Sao Đánh Dấu Việc Dễ Lại Khiến Bạn Trì Hoãn?' gần trùng 'Vì Sao Danh Sách Việc Xen Kẽ Khiến Bạn Trì Hoãn?' (similarity=0.57)."
+        ]
+      }
+    },
+    {
+      "entry_id": "c023400ba1940031",
+      "profile_id": "legacy-pre-profile",
+      "profile_version": "",
+      "video_type": "long",
+      "slug": "co-che-am-big-data-tri-hoan",
+      "title": "Não Bộ Sợ 'Mơ Hồ': Lý Do Bạn Không Thể Bắt Đầu Việc Khó",
+      "source": "assets/script_revisions/failed_ideation/co-che-am-big-data-tri-hoan_20260727_160229_865579.json",
+      "section_count": 21,
+      "total_chars": 5542,
+      "machine_verdict": {
+        "source": "script.quality_review.qa",
+        "passed": false,
+        "overall_score": null,
+        "dimension_scores": {},
+        "violated_rules": [
+          "central_mechanism",
+          "final_payoff",
+          "immediate_action"
+        ],
+        "blocking_findings": [
+          "Script đang nêu nhiều cơ chế cạnh tranh: khác thường đi đôi với sự mơ hồ, né tránh sự mơ hồ, phòng vệ.",
+          "Phần chốt chưa có một hành động có thể làm ngay sau khi xem.",
+          "Section cuối thiếu payoff nêu rõ người xem nhận được gì khi áp dụng."
+        ]
+      }
+    },
+    {
+      "entry_id": "c1c3265f79171469",
+      "profile_id": "legacy-pre-profile",
+      "profile_version": "",
+      "video_type": "long",
+      "slug": "aoi-avoidance-brain-mechanism",
+      "title": "Tại Sao Não Bộ Lại 'Ngại' Sự Mơ Hồ? Giải Mã Cản Trở Bắt Đầu",
+      "source": "assets/script_revisions/failed_ideation/aoi-avoidance-brain-mechanism_20260727_154413_056119.json",
+      "section_count": 36,
+      "total_chars": 6259,
+      "machine_verdict": {
+        "source": "script.quality_review.qa",
+        "passed": false,
+        "overall_score": null,
+        "dimension_scores": {},
+        "violated_rules": [
+          "central_mechanism"
+        ],
+        "blocking_findings": [
+          "Script đang nêu nhiều cơ chế cạnh tranh: né tránh sự mơ hồ, ẩn sau hành vi con người."
+        ]
+      }
+    },
+    {
+      "entry_id": "c381d3c891def966",
+      "profile_id": "legacy-pre-profile",
+      "profile_version": "",
+      "video_type": "long",
+      "slug": "qua-tai-lua-chon-khi-moi-thu-deu-co-ve-hop-ly",
+      "title": "Có Quá Nhiều Lựa Chọn — Vì Sao Bạn Càng Khó Bắt Đầu?",
+      "source": "assets/script_revisions/failed_ideation/qua-tai-lua-chon-khi-moi-thu-deu-co-ve-hop-ly_20260720.json",
+      "section_count": 10,
+      "total_chars": 13145,
+      "machine_verdict": {
+        "source": "script.quality_review.qa",
+        "passed": false,
+        "overall_score": null,
+        "dimension_scores": {},
+        "violated_rules": [
+          "central_mechanism"
+        ],
+        "blocking_findings": [
+          "Script đang nêu nhiều cơ chế cạnh tranh: hành vi trong đời sống thật, quá tải lựa chọn chọn một thử nghiệm nhỏ."
+        ]
+      }
+    },
+    {
+      "entry_id": "d268cdbc865e4174",
+      "profile_id": "one-cup-cafe-6h",
+      "profile_version": "1.1.0",
+      "video_type": "long",
+      "slug": "nhom-ban-da-co-gia-dinh-minh-van-ngoi-lai-ban-cu",
+      "title": "Nhóm Bạn Đã Có Gia Đình, Mình Vẫn Ngồi Lại Bàn Cũ",
+      "source": "assets/script_revisions/failed_ideation/nhom-ban-da-co-gia-dinh-minh-van-ngoi-lai-ban-cu_20260827_095446_176902.json",
+      "section_count": 11,
+      "total_chars": 6126,
+      "machine_verdict": {
+        "source": "script.quality_review.qa",
+        "passed": false,
+        "overall_score": null,
+        "dimension_scores": {},
+        "violated_rules": [
+          "hook"
+        ],
+        "blocking_findings": [
+          "Hook 3-5 giây đầu chưa đủ mạnh hoặc chưa có nghịch lý/vấn đề rõ."
+        ]
+      }
+    },
+    {
+      "entry_id": "d83634f0c432297a",
+      "profile_id": "ban-so-6",
+      "profile_version": "2.3.0",
+      "video_type": "long",
+      "slug": "lam-dung-roi-van-nang",
+      "title": "Làm Đúng Rồi Vẫn Nặng",
+      "source": "scripts/lam-dung-roi-van-nang.json",
+      "section_count": 20,
+      "total_chars": 6210,
+      "machine_verdict": {
+        "source": "editorial_review_cache",
+        "passed": true,
+        "overall_score": 9,
+        "dimension_scores": {
+          "causal_coherence": 9,
+          "human_truth": 9,
+          "role_fidelity": 10,
+          "spoken_naturalness": 9,
+          "useful_restraint": 9
+        },
+        "violated_rules": [],
+        "blocking_findings": []
+      }
+    },
+    {
+      "entry_id": "dc319ab61322bead",
+      "profile_id": "one-cup-cafe-6h",
+      "profile_version": "1.1.0",
+      "video_type": "long",
+      "slug": "kiet-suc-vi-luon-phai-la-nguoi-dang-tin-cay-trong-mat-moi-nguoi",
+      "title": "Người Đáng Tin Ai Cũng Nhờ, Nhưng Ai Gánh Cùng Anh?",
+      "source": "assets/script_revisions/failed_ideation/kiet-suc-vi-luon-phai-la-nguoi-dang-tin-cay-trong-mat-moi-nguoi_20260827_092455_779310.json",
+      "section_count": 12,
+      "total_chars": 7704,
+      "machine_verdict": {
+        "source": "script.quality_review.qa",
+        "passed": false,
+        "overall_score": null,
+        "dimension_scores": {},
+        "violated_rules": [
+          "hook"
+        ],
+        "blocking_findings": [
+          "Hook 3-5 giây đầu chưa đủ mạnh hoặc chưa có nghịch lý/vấn đề rõ."
+        ]
+      }
+    },
+    {
+      "entry_id": "f0797425712e6f18",
+      "profile_id": "ban-so-6",
+      "profile_version": "2.2.0",
+      "video_type": "long",
+      "slug": "minh-cham-hon-dong-nghiep-tre",
+      "title": "Dòng Vàng Cuối Slide",
+      "source": "scripts/minh-cham-hon-dong-nghiep-tre.json",
+      "section_count": 20,
+      "total_chars": 6047,
+      "machine_verdict": {
+        "source": "editorial_review_cache",
+        "passed": true,
+        "overall_score": 9,
+        "dimension_scores": {
+          "causal_coherence": 9,
+          "human_truth": 9,
+          "role_fidelity": 9,
+          "spoken_naturalness": 9,
+          "useful_restraint": 9
+        },
+        "violated_rules": [],
+        "blocking_findings": []
+      }
+    }
+  ]
+}

@@ -1,0 +1,470 @@
+<title>Bàn Chấm Kịch Bản</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap">
+
+<style>
+/* Palette lifted from the series' own visual bible (profiles/ban-so-6):
+   navy #26394A, cream #E9DFC8, ochre #D8B26E, slate teal #667C7A,
+   burnt orange #B96842, brown #5A4032. Light = paper at dawn; dark = the room
+   before sunrise. Same six values, roles swapped. */
+:root {
+  --navy: #26394A;
+  --cream: #E9DFC8;
+  --ochre: #D8B26E;
+  --teal: #667C7A;
+  --orange: #B96842;
+  --brown: #5A4032;
+
+  --ground: #F2ECDC;
+  --surface: #FBF7EC;
+  --surface-sunk: #E8E0CB;
+  --ink: #26394A;
+  --ink-soft: #55645F;
+  --ink-faint: #8A9188;
+  --rule: #D8CFB6;
+  --rule-strong: #BFB393;
+  --accent: #9A6B2F;
+  --accent-ground: #F0E2C4;
+  --agree: #4C6B54;
+  --disagree: #A9552F;
+  --shadow: 0 1px 2px rgba(38,57,74,.06), 0 8px 24px rgba(38,57,74,.07);
+
+  --measure: 63ch;
+  --step--1: .8125rem;
+  --step-0: .9375rem;
+  --step-1: 1.0625rem;
+  --step-2: 1.375rem;
+  --step-3: clamp(1.6rem, 1.2rem + 1.4vw, 2.1rem);
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #1B2833;
+    --surface: #22323F;
+    --surface-sunk: #182530;
+    --ink: #E9DFC8;
+    --ink-soft: #B3BCB4;
+    --ink-faint: #7E8B8A;
+    --rule: #334755;
+    --rule-strong: #47606F;
+    --accent: #D8B26E;
+    --accent-ground: #2E4152;
+    --agree: #8FBF9C;
+    --disagree: #E09468;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 28px rgba(0,0,0,.28);
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #1B2833;
+  --surface: #22323F;
+  --surface-sunk: #182530;
+  --ink: #E9DFC8;
+  --ink-soft: #B3BCB4;
+  --ink-faint: #7E8B8A;
+  --rule: #334755;
+  --rule-strong: #47606F;
+  --accent: #D8B26E;
+  --accent-ground: #2E4152;
+  --agree: #8FBF9C;
+  --disagree: #E09468;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 28px rgba(0,0,0,.28);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: "Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: var(--step-0);
+  line-height: 1.6;
+}
+
+.masthead {
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface);
+  padding: 1.1rem clamp(1rem, 4vw, 2.5rem);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: .5rem 1.5rem;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+.masthead h1 {
+  font-family: Newsreader, Georgia, serif;
+  font-weight: 500;
+  font-size: var(--step-2);
+  margin: 0;
+  letter-spacing: -.01em;
+}
+.masthead p { margin: 0; color: var(--ink-soft); font-size: var(--step--1); max-width: 58ch; }
+.tally {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--step--1);
+  color: var(--ink-soft);
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+.tally b { color: var(--ink); font-weight: 600; font-size: var(--step-1); }
+
+/* The rail encodes real state: which scripts are done, which one is open. */
+.rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: .75rem clamp(1rem, 4vw, 2.5rem);
+  background: var(--surface-sunk);
+  border-bottom: 1px solid var(--rule);
+  position: sticky;
+  top: 0;
+  z-index: 19;
+}
+.rail button {
+  width: 2rem;
+  height: 1.9rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ink-faint);
+  font: inherit;
+  font-size: var(--step--1);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background .12s, color .12s, border-color .12s;
+}
+.rail button:hover { border-color: var(--accent); color: var(--ink); }
+.rail button[data-done="true"] { background: var(--accent-ground); color: var(--ink); border-color: var(--accent); }
+.rail button[aria-current="true"] { outline: 2px solid var(--accent); outline-offset: 1px; color: var(--ink); font-weight: 600; }
+
+main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 22rem;
+  gap: clamp(1.5rem, 3vw, 3rem);
+  align-items: start;
+  padding: clamp(1.25rem, 3vw, 2.5rem) clamp(1rem, 4vw, 2.5rem) 5rem;
+}
+@media (max-width: 60rem) { main { grid-template-columns: minmax(0, 1fr); } }
+
+.script-head { border-bottom: 2px solid var(--ink); padding-bottom: .85rem; margin-bottom: 1.75rem; }
+.eyebrow {
+  font-size: .6875rem;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  display: flex;
+  gap: .9rem;
+  flex-wrap: wrap;
+  margin-bottom: .5rem;
+}
+.script-head h2 {
+  font-family: Newsreader, Georgia, serif;
+  font-weight: 400;
+  font-size: var(--step-3);
+  line-height: 1.2;
+  margin: 0;
+  text-wrap: balance;
+}
+
+.transcript { max-width: var(--measure); }
+.line { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); gap: 1.25rem; padding: .7rem 0; border-bottom: 1px solid var(--rule); }
+.line:last-child { border-bottom: 0; }
+.who { font-size: .6875rem; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); padding-top: .35rem; }
+.line[data-speaker="narrator"] .who { color: var(--teal); }
+.line:not([data-speaker="narrator"]) .who { color: var(--accent); font-weight: 600; }
+.said { font-family: Newsreader, Georgia, serif; font-size: var(--step-1); line-height: 1.62; }
+.line:not([data-speaker="narrator"]) .said { font-style: italic; }
+
+.panel { position: sticky; top: 8.5rem; display: flex; flex-direction: column; gap: 1rem; }
+@media (max-width: 60rem) { .panel { position: static; } }
+.card { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 1.1rem 1.15rem; box-shadow: var(--shadow); }
+.card h3 { margin: 0 0 .2rem; font-size: var(--step-0); font-weight: 600; }
+.card .note { margin: 0 0 1rem; font-size: var(--step--1); color: var(--ink-soft); }
+
+.dim + .dim { margin-top: 1.1rem; padding-top: 1.1rem; border-top: 1px solid var(--rule); }
+.dim-name { font-size: var(--step--1); font-weight: 600; display: flex; justify-content: space-between; gap: .5rem; }
+.dim-name output { font-variant-numeric: tabular-nums; color: var(--accent); font-weight: 700; }
+.dim-help { font-size: .75rem; color: var(--ink-soft); margin: .15rem 0 .5rem; line-height: 1.45; }
+.scale { display: grid; grid-template-columns: repeat(11, 1fr); gap: 2px; }
+.scale button {
+  aspect-ratio: 1;
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--ink-faint);
+  font: inherit;
+  font-size: .6875rem;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  padding: 0;
+}
+.scale button:hover { border-color: var(--accent); color: var(--ink); }
+.scale button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--surface); font-weight: 700; }
+:root[data-theme="dark"] .scale button[aria-pressed="true"],
+:root:not([data-theme="light"]) .scale button[aria-pressed="true"] { color: var(--navy); }
+
+.actions { display: flex; gap: .5rem; flex-wrap: wrap; }
+.btn {
+  font: inherit;
+  font-size: var(--step--1);
+  font-weight: 500;
+  padding: .5rem .9rem;
+  border-radius: 4px;
+  border: 1px solid var(--rule-strong);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+:root[data-theme="dark"] .btn.primary,
+:root:not([data-theme="light"]) .btn.primary { color: var(--navy); }
+.btn.primary:disabled { opacity: .4; cursor: not-allowed; }
+.btn:focus-visible, .scale button:focus-visible, .rail button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.verdict[hidden] { display: none; }
+.verdict .row { display: flex; justify-content: space-between; gap: 1rem; font-size: var(--step--1); padding: .3rem 0; border-bottom: 1px solid var(--rule); font-variant-numeric: tabular-nums; }
+.verdict .row:last-of-type { border-bottom: 0; }
+.gap-agree { color: var(--agree); font-weight: 600; }
+.gap-off { color: var(--disagree); font-weight: 600; }
+.findings { margin: .75rem 0 0; padding-left: 1.1rem; font-size: .75rem; color: var(--ink-soft); line-height: 1.5; }
+.findings li + li { margin-top: .35rem; }
+.rules { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .6rem; }
+.rules span { font-size: .6875rem; padding: .15rem .45rem; border: 1px solid var(--rule-strong); border-radius: 999px; color: var(--ink-soft); }
+
+.export textarea {
+  width: 100%;
+  min-height: 8rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .75rem;
+  background: var(--surface-sunk);
+  color: var(--ink);
+  border: 1px solid var(--rule-strong);
+  border-radius: 4px;
+  padding: .6rem;
+  resize: vertical;
+}
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<header class="masthead">
+  <div>
+    <h1>Bàn chấm kịch bản</h1>
+    <p>Đọc kịch bản, cho điểm năm tiêu chí, rồi mới thấy máy đã chấm gì. Chấm trước để nhãn không bị máy dẫn dắt.</p>
+  </div>
+  <div class="tally"><span>Đã chấm</span> <b id="done">0</b> <span>/ <span id="total">0</span></span></div>
+</header>
+
+<nav class="rail" id="rail" aria-label="Danh sách kịch bản"></nav>
+
+<main>
+  <article>
+    <div class="script-head">
+      <div class="eyebrow" id="meta"></div>
+      <h2 id="title"></h2>
+    </div>
+    <div class="transcript" id="transcript"></div>
+  </article>
+
+  <aside class="panel">
+    <section class="card">
+      <h3>Chấm điểm</h3>
+      <p class="note">0 = hỏng hẳn · 9 = đạt ngưỡng phát hành · 10 = mẫu mực</p>
+      <div id="dims"></div>
+      <div class="actions" style="margin-top:1.1rem">
+        <button class="btn primary" id="save" disabled>Lưu &amp; xem máy chấm</button>
+        <button class="btn" id="next">Kịch bản sau</button>
+      </div>
+    </section>
+
+    <section class="card verdict" id="verdict" hidden>
+      <h3>Máy đã chấm</h3>
+      <p class="note" id="vsource"></p>
+      <div id="vrows"></div>
+      <ul class="findings" id="vfindings"></ul>
+      <div class="rules" id="vrules"></div>
+    </section>
+
+    <section class="card export">
+      <h3>Gửi lại kết quả</h3>
+      <p class="note">Chọn hết ô dưới, copy, dán vào khung chat.</p>
+      <textarea id="out" readonly spellcheck="false"></textarea>
+    </section>
+  </aside>
+</main>
+
+<script>
+const DATA = /*__CORPUS_DATA__*/null;
+const KEY = "ytb-editorial-labels-v1";
+
+let labels = {};
+try { labels = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) { labels = {}; }
+
+let current = 0;
+let draft = {};
+
+const $ = (id) => document.getElementById(id);
+const SPEAKER = { narrator: "Người kể" };
+
+function persist() {
+  try { localStorage.setItem(KEY, JSON.stringify(labels)); } catch (e) { /* private window */ }
+  const done = Object.keys(labels).length;
+  $("done").textContent = done;
+  $("out").value = done ? JSON.stringify(labels, null, 1) : "";
+  renderRail();
+}
+
+function renderRail() {
+  const rail = $("rail");
+  rail.replaceChildren(...DATA.items.map((item, i) => {
+    const b = document.createElement("button");
+    b.textContent = i + 1;
+    b.dataset.done = String(Boolean(labels[item.id]));
+    if (i === current) b.setAttribute("aria-current", "true");
+    b.title = item.title;
+    b.addEventListener("click", () => go(i));
+    return b;
+  }));
+}
+
+function renderDims() {
+  const saved = labels[DATA.items[current].id];
+  draft = saved ? { ...saved.scores } : {};
+  $("dims").replaceChildren(...DATA.dimensions.map(({ key, help }) => {
+    const wrap = document.createElement("div");
+    wrap.className = "dim";
+
+    const name = document.createElement("div");
+    name.className = "dim-name";
+    const label = document.createElement("span");
+    label.textContent = key.replace(/_/g, " ");
+    const out = document.createElement("output");
+    out.textContent = key in draft ? draft[key] : "–";
+    name.append(label, out);
+
+    const hint = document.createElement("p");
+    hint.className = "dim-help";
+    hint.textContent = help;
+
+    const scale = document.createElement("div");
+    scale.className = "scale";
+    for (let n = 0; n <= 10; n++) {
+      const b = document.createElement("button");
+      b.textContent = n;
+      b.setAttribute("aria-pressed", String(draft[key] === n));
+      b.setAttribute("aria-label", `${key} ${n} điểm`);
+      b.addEventListener("click", () => {
+        draft[key] = n;
+        out.textContent = n;
+        [...scale.children].forEach((c, i) => c.setAttribute("aria-pressed", String(i === n)));
+        $("save").disabled = DATA.dimensions.some((d) => !(d.key in draft));
+      });
+      scale.append(b);
+    }
+    wrap.append(name, hint, scale);
+    return wrap;
+  }));
+  $("save").disabled = DATA.dimensions.some((d) => !(d.key in draft));
+}
+
+function renderVerdict(show) {
+  const box = $("verdict");
+  if (!show) { box.hidden = true; return; }
+  const item = DATA.items[current];
+  const m = item.machine;
+  box.hidden = false;
+  $("vsource").textContent = m.source === "editorial_review_cache"
+    ? `Rubric LLM · tổng ${m.overall_score}/10 · ${m.passed ? "đạt" : "không đạt"}`
+    : `Cổng QA tất định · ${m.passed ? "đạt" : "không đạt"} (không có điểm rubric)`;
+
+  const rows = [];
+  const dims = m.dimension_scores || {};
+  for (const { key } of DATA.dimensions) {
+    if (!(key in dims)) continue;
+    const mine = draft[key];
+    const gap = Math.abs(mine - dims[key]);
+    const row = document.createElement("div");
+    row.className = "row";
+    const l = document.createElement("span");
+    l.textContent = key.replace(/_/g, " ");
+    const r = document.createElement("span");
+    r.innerHTML = `bạn <b>${mine}</b> · máy <b>${dims[key]}</b> `;
+    const tag = document.createElement("span");
+    tag.className = gap <= 1 ? "gap-agree" : "gap-off";
+    tag.textContent = gap <= 1 ? "khớp" : `lệch ${gap}`;
+    r.append(tag);
+    row.append(l, r);
+    rows.push(row);
+  }
+  if (!rows.length) {
+    const p = document.createElement("div");
+    p.className = "row";
+    p.textContent = "Bản ghi này chỉ có kết luận đạt/không đạt, không có điểm từng tiêu chí.";
+    rows.push(p);
+  }
+  $("vrows").replaceChildren(...rows);
+
+  $("vfindings").replaceChildren(...(m.blocking_findings || []).slice(0, 6).map((f) => {
+    const li = document.createElement("li");
+    li.textContent = f;
+    return li;
+  }));
+  $("vrules").replaceChildren(...(m.violated_rules || []).map((r) => {
+    const s = document.createElement("span");
+    s.textContent = r;
+    return s;
+  }));
+}
+
+function go(index) {
+  current = (index + DATA.items.length) % DATA.items.length;
+  const item = DATA.items[current];
+
+  $("title").textContent = item.title || "(không tiêu đề)";
+  $("meta").replaceChildren(...[
+    `${current + 1} / ${DATA.items.length}`,
+    item.profile,
+    item.videoType,
+    `${item.sectionCount} mục`,
+    `${item.totalChars.toLocaleString("vi-VN")} ký tự`,
+  ].map((t) => { const s = document.createElement("span"); s.textContent = t; return s; }));
+
+  $("transcript").replaceChildren(...item.sections.map((s) => {
+    const row = document.createElement("div");
+    row.className = "line";
+    row.dataset.speaker = s.speaker;
+    const who = document.createElement("div");
+    who.className = "who";
+    who.textContent = SPEAKER[s.speaker] || s.speaker;
+    const said = document.createElement("div");
+    said.className = "said";
+    said.textContent = s.voiceover;
+    row.append(who, said);
+    return row;
+  }));
+
+  renderDims();
+  renderVerdict(Boolean(labels[item.id]));
+  renderRail();
+  window.scrollTo({ top: 0, behavior: "instant" });
+}
+
+$("save").addEventListener("click", () => {
+  const item = DATA.items[current];
+  labels[item.id] = { scores: { ...draft }, at: new Date().toISOString() };
+  persist();
+  renderVerdict(true);
+});
+$("next").addEventListener("click", () => go(current + 1));
+
+$("total").textContent = DATA.items.length;
+persist();
+go(0);
+</script>
