@@ -104,7 +104,84 @@ def normalize_for_speech(text: str) -> str:
     """
     for pattern, say in _build_patterns():
         text = pattern.sub(say, text)
-    return text
+    return speak_clock_times(text)
+
+
+# ---------------------------------------------------------------------------
+# Giờ đồng hồ -> chữ tiếng Việt.
+#
+# Kịch bản mang cả hai dạng: viết chữ ("sáu giờ lẻ năm") và dạng số ("6:07").
+# Dạng chữ đọc đúng vì người viết đã quyết định cách đọc; dạng số thì giao cho
+# provider tự đoán, mỗi provider một kiểu và không kiểm chứng được. Chuyển tại
+# đây để cách đọc là quyết định của pipeline, test được, và giống nhau trên mọi
+# provider.
+# ---------------------------------------------------------------------------
+
+_UNITS = ("không", "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín")
+
+# Biến âm bắt buộc khi đứng sau hàng chục: 1 -> "mốt", 4 -> "tư", 5 -> "lăm".
+# "hai mươi năm" nghe như "hai mươi năm (tuổi)"; "hai mươi lăm" mới là con số.
+_AFTER_TENS = {1: "mốt", 4: "tư", 5: "lăm"}
+
+
+def _vietnamese_number(value: int) -> str:
+    """0..59 thành chữ, theo đúng biến âm khi nói."""
+    if value < 10:
+        return _UNITS[value]
+    tens, unit = divmod(value, 10)
+    head = "mười" if tens == 1 else f"{_UNITS[tens]} mươi"
+    if unit == 0:
+        return head
+    if tens == 1:
+        # 15 là "mười lăm", nhưng 11 là "mười một" (không phải "mười mốt").
+        return f"{head} {'lăm' if unit == 5 else _UNITS[unit]}"
+    return f"{head} {_AFTER_TENS.get(unit, _UNITS[unit])}"
+
+
+def _say_time(hour: int, minute: int) -> str:
+    spoken_hour = f"{_vietnamese_number(hour)} giờ"
+    if minute == 0:
+        return spoken_hour
+    if minute == 30:
+        return f"{spoken_hour} rưỡi"
+    if minute < 10:
+        # Phút một chữ số cần "lẻ", nếu không "sáu giờ hai" nghe như 6h20.
+        return f"{spoken_hour} lẻ {_UNITS[minute]}"
+    return f"{spoken_hour} {_vietnamese_number(minute)}"
+
+
+# Chỉ khớp giờ hợp lệ 0-23:00-59. Ràng buộc này giữ cho tỉ lệ ("3:1"), điểm số
+# ("30:70") và mã ("6:99") không bị viết lại. Chặn hai đầu bằng ranh giới số để
+# "30:70" không khớp phần "0:7" ở giữa.
+_CLOCK = re.compile(r"(?<![\d:])([01]?\d|2[0-3]):([0-5]\d)(?![\d:])")
+
+# Một số cặp số hợp lệ như giờ nhưng KHÔNG phải giờ; phân biệt được nhờ danh từ
+# đứng ngay trước. "Chương 2:14" là trích dẫn, "2:14" một mình là hai giờ mười
+# bốn. Không có từ dẫn thì mặc định là giờ — đó là dạng áp đảo trong kịch bản.
+_NOT_A_TIME_CUE = re.compile(
+    r"(?:chương|câu|điều|khoản|mục|trang|phần|tỉ lệ|tỷ lệ|tỉ số|tỷ số|"
+    r"điểm|mã|phiên bản|version|chapter|verse)\s*$",
+    re.IGNORECASE,
+)
+
+# Đầu chuỗi, hoặc ngay sau dấu kết câu / xuống dòng / mở ngoặc kép.
+_SENTENCE_START = re.compile(r'(?:^|[.!?…:;\n]["“”\'’)\]]?\s+|^["“\'(\[])$')
+
+
+def speak_clock_times(text: str) -> str:
+    """Đổi mọi giờ dạng `H:MM` trong `text` thành chữ tiếng Việt."""
+    def replace(match: re.Match[str]) -> str:
+        lead = text[max(0, match.start() - 24):match.start()]
+        if _NOT_A_TIME_CUE.search(lead):
+            return match.group(0)
+        spoken = _say_time(int(match.group(1)), int(match.group(2)))
+        # "6:02 sáng" mở đầu một câu: chữ số không mang chữ hoa, nhưng chữ thì
+        # có — thiếu bước này lời dẫn bắt đầu bằng chữ thường.
+        if _SENTENCE_START.search(lead):
+            return spoken[:1].upper() + spoken[1:]
+        return spoken
+
+    return _CLOCK.sub(replace, text)
 
 
 # ---------------------------------------------------------------------------
