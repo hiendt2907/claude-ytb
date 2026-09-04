@@ -122,6 +122,55 @@ Kết cục không phải "ảnh sai lọt lưới" mà là **cháy ngân sách 
 thừa dồn vào cổng người bắt buộc**. Với budget đã chốt (3 candidate × 2 vòng),
 đây là blocker cứng cho canary Step 12.
 
+## §0.45 GIẢ ĐỊNH LÀM VIỆC — cổng đang đúng
+
+**Đây là giả định do chủ repo chỉ định (2026-09-04), KHÔNG phải nhãn đo được.**
+Ai đọc file này phải phân biệt được hai thứ đó.
+
+Bối cảnh: hai vòng chấm đều không cho ra dữ liệu dùng được — vòng một lấy mẫu
+sai (chỉ 5/20 là Long, mọi bản bị loại đều là Short cho series Long-only), vòng
+hai trả về 12/12 trong 58 giây trên kịch bản cần ~74 phút để đọc. Thay vì chờ,
+chủ repo chốt: **coi như mọi lần loại đều đúng.**
+
+Giả định này **nhất quán** với phần đã biết: 20 bản chủ repo thật sự đọc đều
+được chấm 9–10/10, và cả 5 bản `ban-so-6` Long trong đó đều là bản ĐÃ ĐẠT. Nên
+"bản qua cổng thì tốt, bản rớt thì rớt đáng" không mâu thuẫn với gì cả.
+
+### Hệ quả — đổi thứ tự ưu tiên thật sự
+
+Nếu cổng đúng thì vấn đề **không phải** nới cổng, mà là engine sinh ra hàng
+không đạt:
+
+```
+ban-so-6 Long: 5 dat / 51  =  10%
+=> trung binh ~10 lượt sinh mới ra 1 Long dùng được
+```
+
+Đó mới là thứ đang đốt thời gian, không phải render hay TTS. Và thứ tự phải sửa
+là thứ tự tần suất loại:
+
+| % số lần loại | Rule | Step nào xử |
+|---|---|---|
+| 41% | `editorial_review` | **Step 5** (tách NarrativePlan/ScriptDraft) + Step 7 |
+| 22% | `unrenderable_visual_intent` | **Step 8b** (VisualSpec, required vs optional) |
+| 10% | `narrator_reflection` | Step 5 |
+| 8% | không ghi rule | Step 6 (mọi Finding phải có `rule_id`) |
+| 6% | `character_voiceover_direct` | Step 5 |
+| 6% | `series_semantic_dedup` | Step 6 |
+
+**Xác nhận Phase 2 là đúng hướng.** `editorial_review` một mình chiếm 41%, và
+đó chính xác là thứ Step 5 nhắm tới: một response LLM đang phải vừa dựng
+narrative vừa viết thoại vừa giữ continuity. Tách kế hoạch khỏi lời văn là cách
+duy nhất đã biết để giảm con số đó.
+
+### Cái giả định này KHÔNG mua được
+
+- **Không** cho phép nói "đã calibration với nhãn người". Chưa có nhãn nào.
+- Step 9 (`hard gate precision ≥ 0.9`) **bỏ tiêu chí đó** — nó cần nhãn ẢNH, chưa
+  từng có, và một giả định không thay được phép đo.
+- Nếu sau này Phase 2 chạy mà tỉ lệ đạt vẫn ~10%, phải quay lại chất vấn chính
+  giả định này chứ không tiếp tục siết engine.
+
 ## §0.5 Worktree phải bảo toàn
 
 **Không revert, không stage khi chưa được yêu cầu.** Agent phải chạy lại
