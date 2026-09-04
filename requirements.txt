@@ -3,8 +3,10 @@ anthropic>=0.40.0          # LLM: ý tưởng + kịch bản (Claude, fallback)
 pydantic>=2.0             # validation tại ranh giới hệ thống
 pydantic-settings>=2.0    # config qua env vars
 python-dotenv>=1.0
-json_repair>=0.61          # heal JSON hỏng từ Ollama/Qwen local (xem ideation_json_heal.py)
-mlx-lm>=0.31; platform_machine == "arm64"   # ideation local qua MLX (Apple Silicon), xem providers/llm/mlx_provider.py
+json_repair>=0.61          # heal JSON hỏng từ LLM provider (xem ideation_json_heal.py)
+# mlx-lm đã gỡ 2026-09-04: amendment 2026-08-24 bỏ hẳn local LLM khỏi codebase
+# (providers/llm/mlx_provider.py không còn tồn tại), nhưng dependency vẫn nằm lại
+# đây và bị cài cho mỗi lần `make setup`.
 
 # Voiceover (TTS)
 elevenlabs>=1.0           # TTS chất lượng cao (tuỳ chọn)
@@ -23,3 +25,4 @@ google-auth-oauthlib>=1.0
 pytest>=8.0
 pytest-asyncio>=0.23
 pytest-cov>=5.0
+mypy>=1.11                # type gate; config + per-package strictness in mypy.ini

@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 from typing import Literal
 
-from pydantic import AliasChoices, Field, field_validator
+from pydantic import AliasChoices, Field, ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -262,4 +262,39 @@ class Settings(BaseSettings):
             self.tts_provider = "f5"
 
 
-settings = Settings()
+class SettingsError(RuntimeError):
+    """A configuration problem, stated without the configuration's secrets."""
+
+
+def _redacted_reason(exc: ValidationError) -> str:
+    """Render a validation failure from `loc` + `msg` only.
+
+    Pydantic attaches the *input* to every error it raises. For a check that
+    runs in `model_post_init` that input is the entire settings mapping, so the
+    default rendering prints credentials — `xkiro_api_key`, `telegram_bot_token`
+    and `dashboard_password` among them — into stderr and any log that captures
+    the exception. Nothing here reads `error["input"]`, and the caller raises
+    outside the `except` block so the original never survives as `__context__`.
+    """
+    reasons = []
+    for error in exc.errors():
+        field = ".".join(str(part) for part in error.get("loc", ()))
+        message = str(error.get("msg", "")).strip()
+        reasons.append(f"{field}: {message}" if field else message)
+    return "; ".join(reasons) or "cấu hình không hợp lệ."
+
+
+def build_settings() -> Settings:
+    """Load `Settings` from the environment, failing without echoing secrets."""
+    reason: str | None = None
+    try:
+        return Settings()
+    except ValidationError as exc:
+        reason = _redacted_reason(exc)
+    # Raised out here on purpose: inside the handler Python would record the
+    # original ValidationError as `__context__`, putting the secret-bearing
+    # mapping back within reach of anything that walks the exception chain.
+    raise SettingsError(f"Cấu hình không hợp lệ: {reason}")
+
+
+settings = build_settings()
