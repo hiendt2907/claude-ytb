@@ -89,18 +89,10 @@ một quy luật cho mọi người, chẩn đoán hay lời khuyên tuyệt đ�
   - "Cảm giác sẵn sàng có thể đến sau, hoặc không đến."
   - "Nếu bạn từng phải chọn giữa nói ra và im lặng, thì cái giá luôn tới trước."
 
-  Ưu tiên — phải có ĐỦ HAI thứ: nói với người xem, VÀ ở lại trong cảnh vừa
-  xem. Bỏ vế đầu thì cổng chặn; bỏ vế sau thì thành quy luật.
-  - "Có lẽ bạn cũng từng gửi đi một tin rồi ngồi nhìn màn hình tối dần. Tách
-    cà phê trên bàn vẫn còn đầy."
-  - "Có lẽ bạn cũng từng gọi hai lần và cả hai đều bận. Việc thì vẫn nằm
-    nguyên đó, chờ một câu trả lời chưa tới."
-  - "Nếu bạn từng ngồi lại sau khi đã làm xong phần của mình, chắc bạn biết
-    cái khoảng lặng đó. Sáng mai quán lại mở, và chiếc bàn ấy lại có người."
-
-  Phần bài học (trước cầu nối tập sau) BẮT BUỘC chứa một trong các từ hướng
-  về người xem: "bạn", "chúng ta", "lần tới", "lần sau", "mỗi khi", "mỗi lần".
-  Một đoạn chốt thuần quan sát cảnh, không có người xem trong đó, sẽ bị loại.
+  Ưu tiên — ở lại trong cảnh vừa xem, để nghĩa mở:
+  - "Cuộc gọi bận. Việc vẫn còn nguyên trên bàn."
+  - "Cậu ấy đã gọi, và vẫn chưa có ai trả lời."
+  - "Tách cà phê vơi một nửa. Sáng mai chắc lại có người ngồi xuống đó."
 - Cầu nối tập sau chỉ được nhắc sau phản chiếu, từ một vật, câu hỏi hoặc lựa
   chọn đã xuất hiện trong tập. Phải có tinh thần hẹn gặp lại, không dán trailer
   rỗng lên một câu chuyện đã kết.
