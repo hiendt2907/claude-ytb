@@ -54,3 +54,37 @@ ts	stage	result	class	owner	evidence
 2026-09-03T15:28:15	ideate	FAIL	QA:editorial_review	ideation/content	Minh's spoken lines in sections 5, 7, 10, 12 are internal monologue disguised as dialogue; they state reasoning, plans, and emotional state aloud to An without a conversational trigger.
 2026-09-03T15:53:38	ideate	FAIL	QA:editorial_review	ideation/content	Section 15 mở đầu phần kết gọi tên 'Minh' trong phản chiếu trực tiếp, vi phạm yêu cầu không gọi tên nhân vật ngoài cầu nối tập sau.
 2026-09-03T16:27:00	ideate	FAIL	TRANSPORT_HTTP	provider/xkiro	ytb_pipeline.providers.errors.ProviderUnavailableError: xKiro LLM (deepseek/deepseek-v4-pro) trả HTTP 200 với body rỗng. (đã thử 3 lượt)
+2026-09-03T17:06:59	ideate	FAIL	QA:editorial_review	ideation/content	Lời thoại của Minh ở mục 17 thành đoạn tự thuật/giải thích nội tâm thay vì lời nói tự nhiên với An.
+2026-09-03T17:08:02	ideate	RESTART	-	-	brief v18: Minh chi DAP LAI, cau ngan mot hoi tho, cam tu thuat/giai thich. Lop nay hong 2 lan (15:28, 16:27).
+2026-09-03T17:33:25	ideate	PASS	-	-	hai-lan-may-ban-mot-tin-nhan-gui-di
+2026-09-03T18:02:44	produce	FAIL	VISUAL_BLOCKED	render/visual	=== DUNG: co shot bi chan, khong accept anh hong ===
+2026-09-03T18:37:19	produce	FAIL	VISUAL_BLOCKED	render/visual	=== DUNG: co shot bi chan, khong accept anh hong ===
+2026-09-04T05:57:10	produce	RESUME	-	-	afd9669 tran mat do chi tiet + driver tu giam mat do; tiep tu shot 3
+2026-09-04T05:57:12	produce	FAIL	VISUAL_BLOCKED	render/visual	=== DUNG: co shot bi chan, khong accept anh hong ===
+2026-09-04T06:01:41	produce	FAIL	UNCLASSIFIED	unknown	PIPELINE_STATE=INFRASTRUCTURE_FAILED node=visual_assets error=VisualJudge lỗi hạ tầng và hard_fail_on_judge_error=true cho shot scene-003-shot-00: xKiro vision provider unavailable.
+2026-09-04T06:03:52	produce	FAIL	UNCLASSIFIED	unknown	PIPELINE_STATE=INFRASTRUCTURE_FAILED node=visual_assets error=VisualJudge lỗi hạ tầng và hard_fail_on_judge_error=true cho shot scene-003-shot-00: xKiro vision provider unavailable.
+2026-09-04T06:10:07	produce	RESUME	-	-	profile 2.6.0: judge model qwen(500 het) -> minimax/minimax-m3:free
+2026-09-04T06:10:14	produce	FAIL	UNCLASSIFIED	unknown	PIPELINE_STATE=INFRASTRUCTURE_FAILED node=visual_assets error=VisualJudge lỗi hạ tầng và hard_fail_on_judge_error=true cho shot scene-003-shot-00: xKiro vision provider unavailable.
+2026-09-04T06:13:13	produce	RESUME	-	-	86f3347 + VISUAL_JUDGE_MODEL=minimax: script ghim 2.5.0 nen profile 2.6.0 khong toi duoc no; override runtime moi go duoc
+2026-09-04T06:13:42	produce	FAIL	VISUAL_BLOCKED	render/visual	=== DUNG: co shot bi chan, khong accept anh hong ===
+2026-09-04T06:14:32	produce	OPERATOR	-	render/visual	scene-003: bo dien thoai (6/6 candidate ve tren tay hoac mat han, model thay bang laptop) va dong ho treo tuong (vang 6/6)
+2026-09-04T06:14:34	produce	FAIL	VISUAL_BLOCKED	render/visual	=== DUNG: co shot bi chan, khong accept anh hong ===
+2026-09-04T06:16:03	ideate	RESTART	-	-	sinh lai: kich ban cu co 5/18 intent bi guard chan; ngan sach override shot-003 da can (driver dot het). Driver da ngung regenerate.
+2026-09-04T06:43:45	ideate	FAIL	QA:editorial_review	ideation/content	Kết thúc (mục 16) nói thay ý nghĩa 'Việc đúng đã xong... cái nhẹ vẫn chưa tới' khi cảnh chỉ mới có dấu đã gửi; đây là lỗi hard fail theo rubric.
+2026-09-04T06:53:23	ideate	FAIL	QA:series_semantic_dedup	ideation/prompt	Chủ đề/title 'Hai Lần Máy Bận, Một Tin Nhắn Chưa Hồi Âm' gần trùng 'Hai Lần Máy Bận, Một Tin Nhắn Gửi Đi' (similarity=0.58).
+2026-09-04T07:10:18	ideate	FAIL	QA:narrator_reflection	ideation/content	Lời chốt story cần là phản chiếu trực tiếp, khiêm tốn của narrator.
+2026-09-04T07:12:25	ideate	RESTART	-	-	profile 2.7.0: 3 vi du Uu tien cua 2.5.0 deu truot chinh cong closing; da sua va verify tung cau
+2026-09-04T07:28:37	ideate	FAIL	QA:unrenderable_visual_intent	ideation/prompt	Section 10 nêu 5 chi tiết vật-có-trạng-thái (tối đa 2); Judge chấm từng mệnh đề nên mỗi chi tiết là một cơ hội độc lập để hard-fail cả shot.
+2026-09-04T07:49:53	ideate	FAIL	QA:editorial_review	ideation/content	Minh mở thoại lệch câu hỏi chỗ ngồi của An, không phản ứng lời trước.
+2026-09-04T07:53:01	ideate	RESTART	-	-	brief v19: 16 section, 5.400-5.900 ky tu — cua so LUON >5 phut o moi toc do do duoc (5.176-6.026)
+2026-09-04T07:59:48	ideate	FAIL	QA:unrenderable_visual_intent	ideation/prompt	Section 9 nêu 4 chi tiết vật-có-trạng-thái (tối đa 2); Judge chấm từng mệnh đề nên mỗi chi tiết là một cơ hội độc lập để hard-fail cả shot.
+2026-09-04T07:59:49	ideate	FAIL	QA:unrenderable_visual_intent	ideation/prompt	Section 9 nêu 4 chi tiết vật-có-trạng-thái (tối đa 2); Judge chấm từng mệnh đề nên mỗi chi tiết là một cơ hội độc lập để hard-fail cả shot.
+2026-09-04T07:59:50	ideate	FAIL	QA:unrenderable_visual_intent	ideation/prompt	Section 9 nêu 4 chi tiết vật-có-trạng-thái (tối đa 2); Judge chấm từng mệnh đề nên mỗi chi tiết là một cơ hội độc lập để hard-fail cả shot.
+2026-09-04T07:59:51	ideate	FAIL	QA:unrenderable_visual_intent	ideation/prompt	Section 9 nêu 4 chi tiết vật-có-trạng-thái (tối đa 2); Judge chấm từng mệnh đề nên mỗi chi tiết là một cơ hội độc lập để hard-fail cả shot.
+2026-09-04T08:01:50	ideate	RESTART	-	-	tran mat do gio toi duoc ban sua + ca hai prompt
+2026-09-04T08:13:50	ideate	FAIL	QA:unrenderable_visual_intent	ideation/prompt	Section 6 yêu cầu trao/xoay vật về phía người khác ('quay đầu nhìn về phía'); image model không dựng nổi nên Judge sẽ hard-fail mọi candidate.
+2026-09-04T08:23:31	ideate	FAIL	QA:unrenderable_visual_intent	ideation/prompt	Section 5 yêu cầu vật nhỏ cầm trên tay ('tay cầm'); image model không dựng nổi nên Judge sẽ hard-fail mọi candidate.
+2026-09-04T08:44:59	ideate	FAIL	QA:unrenderable_visual_intent	ideation/prompt	Section 2 yêu cầu vật nhỏ cầm trên tay ('tay cầm'); image model không dựng nổi nên Judge sẽ hard-fail mọi candidate.
+2026-09-04T08:52:24	ideate	FAIL	ENCODING_ASCII	ideation/model	Wording Engine encoding flag: narration thiếu dấu tiếng Việt (MISSING_VIETNAMESE_DIACRITICS)
+2026-09-04T08:52:25	ideate	FAIL	ENCODING_ASCII	ideation/model	Wording Engine encoding flag: narration thiếu dấu tiếng Việt (MISSING_VIETNAMESE_DIACRITICS)
+2026-09-04T08:52:26	ideate	FAIL	ENCODING_ASCII	ideation/model	Wording Engine encoding flag: narration thiếu dấu tiếng Việt (MISSING_VIETNAMESE_DIACRITICS)
