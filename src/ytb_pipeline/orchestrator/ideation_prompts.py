@@ -26,7 +26,7 @@ from ..content_profiles import (
     load_content_profile,
 )
 from ..ideation.generation_schema import SECTION_PURPOSES
-from .ideation_budget import ambient_budget
+from .ideation_budget import ambient_budget, build_budget
 
 if TYPE_CHECKING:
     from ..content_profiles import ContentProfile
@@ -161,17 +161,25 @@ def _total_length_bounds(
 
     Returning None keeps malformed payloads unchanged.
     """
-    _b = ambient_budget()
-    LONG_SAFE_MAX_CHARS = _b.long_safe_max_chars
-    LONG_SAFE_MIN_CHARS = _b.long_safe_min_chars
     sections = payload.get("sections") or []
     if not sections:
         return None
     video_type = str(payload.get("video_type") or "").strip().lower()
     if video_type == "long":
-        # The Long window is a whole-script constant, not a per-segment
-        # computation: the same bounds the generation prompt already quotes.
-        return LONG_SAFE_MIN_CHARS, LONG_SAFE_MAX_CHARS
+        # The Long window must be the SAME one the generation prompt quotes.
+        # It was not: this branch ignored `content_profile` and answered from
+        # the ambient budget, which plans at the raw provider rate. For
+        # ban-so-6 that is 5,892-7,359 characters where the generator was told
+        # 4,599-5,764 — so an editorial rewrite was aiming at a window the
+        # runtime gate rejects, in the direction of overshooting the ceiling.
+        # The Short branch below already resolved the profile; the Long branch
+        # simply never did.
+        budget = (
+            build_budget(content_profile.providers.tts, content_profile)
+            if content_profile is not None
+            else ambient_budget()
+        )
+        return budget.long_safe_min_chars, budget.long_safe_max_chars
     if video_type != "short":
         return None
     provider = (
