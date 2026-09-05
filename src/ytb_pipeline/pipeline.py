@@ -14,7 +14,9 @@ Voiceover/Render/Publish chọn provider qua `providers/registry.py` —
 KHÔNG còn `if tts_provider == ...` / `if render_provider == ...` ở đây.
 """
 
+from contextlib import suppress
 from dataclasses import asdict, is_dataclass, replace
+from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
@@ -34,7 +36,10 @@ from .agents.editorial_review_agent import EDITORIAL_REVIEW_DIMENSIONS, run_edit
 from .agents.qa_agent import QAAgent
 from .content_contract import CONTRACT_VERSION
 from .content_profiles import load_content_profile, profile_fingerprint
+from .contract import capability_for, compile_contract, snapshot_from_settings
 from .contract.invalidation import stale_node_ids
+from .observability import NodeOutcome, RunManifest
+from .observability.run_manifest import new_run_id
 from .ideation.generator import load_script
 from .ideation.script_contract import validate_script_payload
 from .project.checkpoint import CheckpointManager
@@ -337,11 +342,55 @@ def _script_profile(path: Path) -> dict[str, str]:
     profile = load_content_profile(
         profile_id, version=str(raw.get("profile_version") or "").strip() or None,
     )
+    contract = compile_contract(
+        profile,
+        snapshot_from_settings(settings),
+        capability_for(profile.providers.tts),
+    )
     return {
         "content_profile_id": profile_id,
         "content_profile_version": str(raw.get("profile_version") or "").strip(),
         "content_profile_fingerprint": profile_fingerprint(profile),
+        # The split pair. `content_profile_fingerprint` above stays as the blunt
+        # "anything changed" signal the existing wipe uses; these two are what
+        # makes a resume reset proportionally instead of all-or-nothing.
+        "creative_policy_fingerprint": contract.creative_policy_fingerprint,
+        "runtime_binding_fingerprint": contract.runtime_binding_fingerprint,
     }
+
+
+def write_run_manifest(project: Project, project_dir: Path) -> Path:
+    """One record of what this run decided, beside its checkpoint.
+
+    Reconstructing a past run currently means joining project.json, the
+    candidate store, the evaluation store and the logs by hand. This is the
+    place a later reader — or a shadow evaluation — starts from.
+    """
+    metadata = project.metadata
+    manifest = RunManifest(
+        run_id=new_run_id(datetime.now(timezone.utc)),
+        started_at=project.created_at or "",
+        profile_id=str(metadata.get("content_profile_id") or ""),
+        profile_version=str(metadata.get("content_profile_version") or ""),
+        creative_policy_fingerprint=str(metadata.get("creative_policy_fingerprint") or ""),
+        runtime_binding_fingerprint=str(metadata.get("runtime_binding_fingerprint") or ""),
+        provider_bindings={
+            "llm": settings.llm_provider,
+            "tts": settings.tts_provider,
+            "render": settings.render_provider,
+        },
+    )
+    for node_id, node in sorted(project.nodes.items()):
+        manifest = manifest.record_node(NodeOutcome(
+            node_id=node_id,
+            status=node.status.value,
+            started_at=node.started_at or "",
+            finished_at=node.completed_at or "",
+            attempts=max(1, node.retry_count + 1),
+            detail=node.error or "",
+            artifact_hashes={"output_ref": node.output_ref} if node.output_ref else {},
+        ))
+    return manifest.write(project_dir)
 
 
 def validate_editorial_release_approval(script_path: Path, input_data: dict[str, Any]) -> None:
@@ -997,7 +1046,24 @@ async def run_project(project: Project, checkpoint: CheckpointManager, through: 
     nodes = [node_map[name] for name in node_names]
 
     graph = WorkflowGraph(nodes, checkpoint)
-    return await graph.execute(project)
+    try:
+        result = await graph.execute(project)
+    except Exception:
+        # A failed run is the one most worth reading back, so write the manifest
+        # on the way out too. Reload from disk: `execute` saves each node as it
+        # goes, so the checkpoint holds the failure and the local `project`
+        # object does not.
+        #
+        # OSError is suppressed HERE ONLY: letting an observability write
+        # replace the run's real exception would hide the thing the operator
+        # actually needs to see. The success path below deliberately does not
+        # suppress anything.
+        latest = checkpoint.load(project.project_id) or project
+        with suppress(OSError):
+            write_run_manifest(latest, checkpoint.project_dir / project.project_id)
+        raise
+    write_run_manifest(result, checkpoint.project_dir / result.project_id)
+    return result
 
 
 def _cleanup_after_success(result: PublishResult) -> None:

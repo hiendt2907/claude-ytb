@@ -214,3 +214,35 @@ def compile_contract(
         generates_shorts=profile.content_rules.allow_short_generation,
         _rates=rates,
     )
+
+
+def snapshot_from_settings(source: object) -> SettingsSnapshot:
+    """The boundary: read the live settings ONCE, then compile purely from it.
+
+    Every other function in this package takes the snapshot. That is what makes
+    the fingerprints reproducible — a contract compiled from ambient globals
+    could differ between two calls in the same run and would be useless as an
+    invalidation key.
+    """
+    def text(name: str) -> str:
+        return str(getattr(source, name, "") or "")
+
+    def number(name: str) -> float:
+        return float(getattr(source, name, 0.0) or 0.0)
+
+    def count(name: str) -> int:
+        return int(getattr(source, name, 0) or 0)
+
+    return SettingsSnapshot(
+        tts_provider=text("tts_provider"),
+        llm_provider=text("llm_provider"),
+        short_viewer_min_sec=number("short_viewer_min_sec"),
+        short_viewer_max_sec=number("short_viewer_max_sec"),
+        short_min_sections=count("short_min_sections"),
+        long_viewer_min_sec=number("long_viewer_min_sec"),
+        long_viewer_max_sec=number("long_viewer_max_sec"),
+        long_min_sections=count("long_min_sections"),
+        e2e_test=bool(getattr(source, "e2e_test", False)),
+        visual_judge_provider=text("visual_judge_provider"),
+        visual_judge_model=text("visual_judge_model"),
+    )

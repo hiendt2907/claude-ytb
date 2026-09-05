@@ -75,6 +75,12 @@ class CheckpointManager:
             output_data=output_data or {},
             completed_at=_now_iso(),
             error=None,
+            # Stamp the contract this work was done under, so a later resume can
+            # tell "still valid" from "made under rules that have since moved".
+            # Absent metadata leaves them empty, which
+            # `contract.invalidation.stale_node_ids` reads as "do not touch".
+            creative_fingerprint=str(project.metadata.get("creative_policy_fingerprint") or ""),
+            runtime_fingerprint=str(project.metadata.get("runtime_binding_fingerprint") or ""),
         )
         return project.with_node(node)
 

@@ -15,6 +15,7 @@ from .effective import (
     SettingsSnapshot,
     VisualPolicy,
     compile_contract,
+    snapshot_from_settings,
 )
 from .fingerprint import creative_policy_fingerprint, runtime_binding_fingerprint
 from .invalidation import NODE_FINGERPRINT_DEPS, stale_node_ids
@@ -32,5 +33,6 @@ __all__ = [
     "compile_contract",
     "creative_policy_fingerprint",
     "runtime_binding_fingerprint",
+    "snapshot_from_settings",
     "stale_node_ids",
 ]
