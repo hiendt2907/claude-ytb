@@ -71,20 +71,33 @@ LONG_SAFE_MIN_CHARS = 5892 · LONG_SAFE_MAX_CHARS = 7359   (tính ở cpm RAW)
    cổng thật   →  300s .. 420s
 ```
 
-`SCRIPT_GENERATION_SYSTEM_PROMPT` (`ideation_prompts.py:692`) là **f-string eval
-lúc import**, nướng sẵn `5892–7359` vào `:699`, `:1098`, `:1603`. Ở tốc độ đọc
-thật của profile, **cả nửa trên của khoảng nằm ngoài trần**, cận dưới chỉ cách
-trần 16 giây. Trong khi `effective_chars_per_min` — hàm CÓ hiệu chỉnh — đã tồn
-tại và đã được gọi ở `:227, :755, :1039, :1043`.
+**ĐÍNH CHÍNH (2026-09-05, sau khi sửa ở Step 3b).** Bản đầu của mục này nói
+prompt sinh nướng sẵn `5892–7359`. **Sai.** Đường profile-aware vốn đã lập kế
+hoạch ở tốc độ hiệu chỉnh, và prompt production của `ban-so-6` chứa
+`4599–5764` — kiểm bằng cách dựng prompt thật rồi tìm chuỗi.
 
-Đây là nguyên nhân gốc của 423.7s vượt trần trong handoff, và là lý do brief v19
-phải tay chỉnh xuống 5400–5900 thay vì tin prompt. **Một luật, hai nơi, không gì
-giữ đồng bộ** — đúng mô típ đã cắn repo này nhiều lần (`cf24cf6`, `4d63387`,
-`fefedb8`).
+Chênh hai tốc độ là **có thật**, nhưng ở một hàm xa hơn:
+`_total_length_bounds` nhận `content_profile`, dùng nó ở nhánh Short, và **bỏ
+qua ở nhánh Long** — rơi về ambient budget với 1109 cpm thô.
 
-> Review đối kháng báo lỗi này là "prompt đặt 12 phút trong khi gate 5–7". Sai:
-> reviewer đọc `settings.py:165` (default 720/900) mà không chạy; `.env` override
-> về 300/420. Cơ chế đúng là chênh **tốc độ đọc**, không phải chênh phút.
+```
+prompt sinh nói      : 4599–5764 ký tự  (876 cpm — tốc độ audio đọc thật)
+repair/rewrite nghe  : 5892–7359 ký tự  (1109 cpm — hằng số provider thô)
+```
+
+Nên một lượt rewrite biên tập được bảo nhắm quá trần mà cổng runtime sẽ loại.
+Cả hai chiều đều với tới được: chính handoff ghi một rewrite rơi xuống 278.1s
+so với sàn 297.0s sau một lượt sinh mười sáu phút — đó là cùng lỗi này nhìn từ
+đầu kia. **Một luật, hai nơi, không gì giữ đồng bộ** — đúng mô típ đã cắn repo
+này nhiều lần (`cf24cf6`, `4d63387`, `fefedb8`).
+
+Đã sửa ở `c6e2d25`, kèm test khẳng định cửa sổ repair và prompt sinh trích
+**cùng một con số**, nên chúng không thể lệch nhau âm thầm lần nữa.
+
+> Review đối kháng báo lỗi này là "prompt đặt 12 phút trong khi gate 5–7". Cũng
+> sai: reviewer đọc `settings.py:165` (default 720/900) mà không chạy; `.env`
+> override về 300/420. Hai lần liên tiếp cùng một bài học: **chạy thử rồi hãy
+> kết luận**, đừng suy từ source.
 
 ## §0.4 LỖI CHẶN B — đơn vị công việc của resolver là segment, không phải shot
 
