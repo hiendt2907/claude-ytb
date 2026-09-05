@@ -26,72 +26,56 @@ from ..content_profiles import (
     load_content_profile,
 )
 from ..ideation.generation_schema import SECTION_PURPOSES
+from .ideation_budget import ambient_budget
 
 if TYPE_CHECKING:
     from ..content_profiles import ContentProfile
+    from .ideation_budget import PromptBudget
 
-SHORT_CONTRACT = contract_for("short")
-LONG_CONTRACT = contract_for("long")
-LONG_MIN_MINUTES = int(LONG_CONTRACT.viewer_runtime_bounds_sec[0] / 60)
-LONG_MAX_MINUTES = int(LONG_CONTRACT.viewer_runtime_bounds_sec[1] / 60)
-SHORT_MIN_MINUTES = SHORT_CONTRACT.viewer_runtime_bounds_sec[0] / 60
-SHORT_MAX_MINUTES = SHORT_CONTRACT.viewer_runtime_bounds_sec[1] / 60
-SHORT_ANSWER_START_TARGET_SEC = SHORT_CONTRACT.answer_start_target_sec or 4.0
+# Ngân sách độ dài KHÔNG còn tính lúc import. Bản cũ đóng băng hơn hai chục
+# hằng số ngay khi module được nạp, đọc `settings.tts_provider` tại thời điểm
+# đó — nên đổi provider hoặc profile giữa chừng hoàn toàn vô hiệu, và test phải
+# reload module mới thấy setting mới.
+#
+# `__getattr__` (PEP 562) giữ nguyên MỌI tên cũ cho ~110 chỗ tham chiếu trong
+# file này và cho test bên ngoài, nhưng giá trị nay được tính khi truy cập, từ
+# settings hiện hành. Số không đổi — Step 3a là refactor thuần; Step 3b mới
+# luồn profile vào để dùng tốc độ đọc đã hiệu chỉnh.
+_BUDGET_FIELDS = {
+    "SHORT_CONTRACT": "short_contract",
+    "LONG_CONTRACT": "long_contract",
+    "LONG_MIN_MINUTES": "long_min_minutes",
+    "LONG_MAX_MINUTES": "long_max_minutes",
+    "SHORT_MIN_MINUTES": "short_min_minutes",
+    "SHORT_MAX_MINUTES": "short_max_minutes",
+    "SHORT_ANSWER_START_TARGET_SEC": "short_answer_start_target_sec",
+    "PLANNING_CHARS_PER_MIN": "planning_chars_per_min",
+    "LONG_PLANNING_CHARS_PER_MIN": "long_planning_chars_per_min",
+    "SHORT_SITUATION_MAX_CHARS": "short_situation_max_chars",
+    "SHORT_MIN_CHARS": "short_min_chars",
+    "SHORT_MAX_CHARS": "short_max_chars",
+    "SHORT_SAFE_MIN_CHARS": "short_safe_min_chars",
+    "SHORT_SAFE_MAX_CHARS": "short_safe_max_chars",
+    "SHORT_TARGET_CHARS": "short_target_chars",
+    "SHORT_PROMPT_SECTIONS": "short_prompt_sections",
+    "SHORT_REQUIRED_PURPOSES": "short_required_purposes",
+    "SHORT_PAYOFF_MAX_CHARS": "short_payoff_max_chars",
+    "SHORT_BODY_SECTION_CHARS": "short_body_section_chars",
+    "LONG_MIN_CHARS": "long_min_chars",
+    "LONG_MAX_CHARS": "long_max_chars",
+    "LONG_SAFE_MIN_CHARS": "long_safe_min_chars",
+    "LONG_SAFE_MAX_CHARS": "long_safe_max_chars",
+}
 
-# Ideation and loader must plan with the same active TTS profile.  F5 is the
-# production default, while Edge remains a valid deterministic development path.
-PLANNING_CHARS_PER_MIN = chars_per_min_for_provider(settings.tts_provider, video_type="short")
-# A Long is one continuous read and runs faster than a Short of the same
-# character count, so its budget must be planned at its own measured rate.
-LONG_PLANNING_CHARS_PER_MIN = chars_per_min_for_provider(
-    settings.tts_provider, video_type="long",
-)
-# Derived from the active TTS rate, never a fixed literal: the same character
-# count starts the answer at a different second on each provider.
-SHORT_SITUATION_MAX_CHARS = SHORT_CONTRACT.situation_char_budget(
-    chars_per_minute=PLANNING_CHARS_PER_MIN,
-)
-SHORT_MIN_CHARS, SHORT_MAX_CHARS = SHORT_CONTRACT.audio_runtime_bounds_sec(
-    segment_count=SHORT_CONTRACT.minimum_sections
-)
-SHORT_MIN_CHARS = int(PLANNING_CHARS_PER_MIN * SHORT_MIN_CHARS / 60)
-SHORT_MAX_CHARS = int(PLANNING_CHARS_PER_MIN * SHORT_MAX_CHARS / 60)
-SHORT_SAFE_MIN_CHARS, SHORT_SAFE_MAX_CHARS = SHORT_CONTRACT.safe_character_bounds(
-    chars_per_minute=PLANNING_CHARS_PER_MIN, segment_count=SHORT_CONTRACT.minimum_sections
-)
-# Where `normalize_short_narration` aims when it has to trim an overlong Short.
-# This used to be `PLANNING_CHARS_PER_MIN * 1.25` — the midpoint of the old
-# 60-90s window written as a literal.  Once the window moved to 30-45s that
-# literal (1,287 chars) sat ABOVE SHORT_MAX_CHARS (793), so the trimmer computed
-# a growth ratio, left every section untouched, and still reported success; the
-# script then failed the runtime gate after ideation had already been paid for.
-# Deriving the midpoint from the active safe band keeps the same intent at any
-# window and can never exceed the cap it is supposed to enforce.
-SHORT_TARGET_CHARS = (SHORT_SAFE_MIN_CHARS + SHORT_SAFE_MAX_CHARS) // 2
-# Per-section prompt budgets, derived instead of tabulated.  The prompt used to
-# name a fixed six-section table (evidence 550-700, example 550-700, ...) whose
-# sum was roughly three times the 30-45s budget, so the model could not satisfy
-# the total and the table at once and reliably overshot.  Deriving the shares
-# keeps the same editorial shape at any window.
-SHORT_PROMPT_SECTIONS = SHORT_CONTRACT.minimum_sections
-# Named from the release gate itself: the prompt used to list an editorial
-# order (…, evidence, application, payoff) that a minimum-length Short could
-# satisfy while dropping a purpose the gate requires.
-SHORT_REQUIRED_PURPOSES = ", ".join(REQUIRED_PURPOSES_BY_VIDEO_TYPE["short"])
-SHORT_PAYOFF_MAX_CHARS = int(SHORT_SAFE_MAX_CHARS * 0.20)
-SHORT_BODY_SECTION_CHARS = max(
-    80,
-    (SHORT_SAFE_MAX_CHARS - SHORT_SITUATION_MAX_CHARS - SHORT_PAYOFF_MAX_CHARS)
-    // max(1, SHORT_PROMPT_SECTIONS - 2),
-)
-LONG_MIN_CHARS, LONG_MAX_CHARS = LONG_CONTRACT.audio_runtime_bounds_sec(
-    segment_count=LONG_CONTRACT.minimum_sections
-)
-LONG_MIN_CHARS = int(LONG_PLANNING_CHARS_PER_MIN * LONG_MIN_CHARS / 60)
-LONG_MAX_CHARS = int(LONG_PLANNING_CHARS_PER_MIN * LONG_MAX_CHARS / 60)
-LONG_SAFE_MIN_CHARS, LONG_SAFE_MAX_CHARS = LONG_CONTRACT.safe_character_bounds(
-    chars_per_minute=LONG_PLANNING_CHARS_PER_MIN, segment_count=LONG_CONTRACT.minimum_sections
-)
+
+def __getattr__(name: str):  # PEP 562
+    field = _BUDGET_FIELDS.get(name)
+    if field is not None:
+        return getattr(ambient_budget(), field)
+    if name == "SCRIPT_GENERATION_SYSTEM_PROMPT":
+        return _script_generation_system_prompt_text(ambient_budget())
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 # Trần cấu trúc của lời chốt narrator: prompt sửa nó đòi ĐÚNG 2-3 câu nói
 # thành tiếng. Ba câu tiếng Việt đọc tự nhiên hiếm khi quá ~400 ký tự; để 420
@@ -177,6 +161,9 @@ def _total_length_bounds(
 
     Returning None keeps malformed payloads unchanged.
     """
+    _b = ambient_budget()
+    LONG_SAFE_MAX_CHARS = _b.long_safe_max_chars
+    LONG_SAFE_MIN_CHARS = _b.long_safe_min_chars
     sections = payload.get("sections") or []
     if not sections:
         return None
@@ -689,7 +676,30 @@ factual claim. `compliance.passed` is false until this register is complete.
 # System contract dùng chung cho lần sinh đầu và mọi vòng repair. Giữ ở đây để
 # prompt là artifact có version/diff, không phân tán thành câu lệnh ngắn trong
 # các call-site provider.
-SCRIPT_GENERATION_SYSTEM_PROMPT = f"""You are the senior editorial writer and factual-safety reviewer for a Vietnamese YouTube channel.
+def _script_generation_system_prompt_text(budget: "PromptBudget") -> str:
+    """The base system prompt, built from a budget instead of frozen at import."""
+    LONG_MIN_MINUTES = budget.long_min_minutes
+    LONG_MAX_MINUTES = budget.long_max_minutes
+    LONG_MIN_CHARS = budget.long_min_chars
+    LONG_MAX_CHARS = budget.long_max_chars
+    LONG_SAFE_MIN_CHARS = budget.long_safe_min_chars
+    LONG_SAFE_MAX_CHARS = budget.long_safe_max_chars
+    LONG_PLANNING_CHARS_PER_MIN = budget.long_planning_chars_per_min
+    SHORT_MIN_CHARS = budget.short_min_chars
+    SHORT_MAX_CHARS = budget.short_max_chars
+    SHORT_SAFE_MIN_CHARS = budget.short_safe_min_chars
+    SHORT_SAFE_MAX_CHARS = budget.short_safe_max_chars
+    SHORT_MIN_MINUTES = budget.short_min_minutes
+    SHORT_MAX_MINUTES = budget.short_max_minutes
+    SHORT_SITUATION_MAX_CHARS = budget.short_situation_max_chars
+    SHORT_PROMPT_SECTIONS = budget.short_prompt_sections
+    SHORT_REQUIRED_PURPOSES = budget.short_required_purposes
+    SHORT_PAYOFF_MAX_CHARS = budget.short_payoff_max_chars
+    SHORT_BODY_SECTION_CHARS = budget.short_body_section_chars
+    SHORT_ANSWER_START_TARGET_SEC = budget.short_answer_start_target_sec
+    PLANNING_CHARS_PER_MIN = budget.planning_chars_per_min
+    SHORT_TARGET_CHARS = budget.short_target_chars
+    return f"""You are the senior editorial writer and factual-safety reviewer for a Vietnamese YouTube channel.
 Return exactly one valid JSON object and no markdown. Treat the user requirement and the declared JSON title/topic as the editorial contract.
 Timing estimates use the active TTS provider's calibrated Vietnamese narration rate; measured audio is the final authority.
 
@@ -719,7 +729,7 @@ def script_generation_system_prompt(
     not yet declare a profile. New batch generation always supplies one.
     """
     if content_profile is None:
-        return SCRIPT_GENERATION_SYSTEM_PROMPT
+        return _script_generation_system_prompt_text(ambient_budget())
     requested_type = (video_type or "").strip().lower()
     if requested_type and requested_type not in {"short", "long"}:
         raise ContentProfileError(f"video_type không hợp lệ: {video_type!r}.")
@@ -1010,6 +1020,14 @@ def local_script_prompt(
     content_profile: "ContentProfile | None" = None,
 ) -> str:
     """Prompt sinh 1 script JSON qua local/structured LLM (khác luồng Claude skill)."""
+    _b = ambient_budget()
+    LONG_CONTRACT = _b.long_contract
+    LONG_MAX_MINUTES = _b.long_max_minutes
+    LONG_MIN_MINUTES = _b.long_min_minutes
+    LONG_SAFE_MAX_CHARS = _b.long_safe_max_chars
+    LONG_SAFE_MIN_CHARS = _b.long_safe_min_chars
+    PLANNING_CHARS_PER_MIN = _b.planning_chars_per_min
+    SHORT_PROMPT_SECTIONS = _b.short_prompt_sections
     normalized_type = (type_of_vid or "").strip().lower()
     if normalized_type not in {"short", "long"}:
         raise ContentProfileError(f"video_type không hợp lệ: {type_of_vid!r}.")
@@ -1541,6 +1559,16 @@ def repair_prompt(
     recovery_directive: str = "",
 ) -> str:
     """Prompt yêu cầu LLM sửa script JSON không qua validation/QA."""
+    _b = ambient_budget()
+    LONG_MAX_MINUTES = _b.long_max_minutes
+    LONG_MIN_MINUTES = _b.long_min_minutes
+    LONG_SAFE_MAX_CHARS = _b.long_safe_max_chars
+    LONG_SAFE_MIN_CHARS = _b.long_safe_min_chars
+    PLANNING_CHARS_PER_MIN = _b.planning_chars_per_min
+    SHORT_MAX_CHARS = _b.short_max_chars
+    SHORT_MAX_MINUTES = _b.short_max_minutes
+    SHORT_MIN_CHARS = _b.short_min_chars
+    SHORT_MIN_MINUTES = _b.short_min_minutes
     issues = {
         "validation_error": validation_error,
         "qa": qa_output or {},

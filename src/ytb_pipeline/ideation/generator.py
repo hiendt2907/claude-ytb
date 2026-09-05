@@ -46,19 +46,32 @@ def chars_per_min_for_provider(
     return _contract_chars_per_min(provider or settings.tts_provider, video_type=video_type)
 
 
-# Compatibility export for older callers.  It must match the configured voice
-# provider; keeping F5 here would make fixtures and planning disagree with the
-# runtime duration gate whenever the provider changes.
-CHARS_PER_MIN = chars_per_min_for_provider()
-# Compatibility exports.  Values belong to ``content_contract.py``; stages
-# must call ``contract_for`` rather than introduce format-local thresholds.
-LONG_MIN_MINUTES = int(contract_for("long").viewer_runtime_bounds_sec[0] / 60)
-LONG_MAX_MINUTES = int(contract_for("long").viewer_runtime_bounds_sec[1] / 60)
-LONG_RUNTIME_MAX_MINUTES = LONG_MAX_MINUTES
-LONG_MIN_SECTIONS = contract_for("long").minimum_sections
-SHORT_MIN_MINUTES = contract_for("short").viewer_runtime_bounds_sec[0] / 60
-SHORT_MAX_MINUTES = contract_for("short").viewer_runtime_bounds_sec[1] / 60
-SHORT_ANSWER_START_TARGET_SEC = contract_for("short").answer_start_target_sec or 4.0
+# Compatibility exports, resolved when READ rather than at import. Values belong
+# to `content_contract.py`; stages must call `contract_for` rather than keep a
+# format-local threshold. Computing them at import froze them to whatever
+# settings existed then, which is not necessarily the profile the run is for.
+
+
+def _compat_value(name: str):
+    if name == "CHARS_PER_MIN":
+        return chars_per_min_for_provider()
+    if name == "LONG_MIN_MINUTES":
+        return int(contract_for("long").viewer_runtime_bounds_sec[0] / 60)
+    if name in ("LONG_MAX_MINUTES", "LONG_RUNTIME_MAX_MINUTES"):
+        return int(contract_for("long").viewer_runtime_bounds_sec[1] / 60)
+    if name == "LONG_MIN_SECTIONS":
+        return contract_for("long").minimum_sections
+    if name == "SHORT_MIN_MINUTES":
+        return contract_for("short").viewer_runtime_bounds_sec[0] / 60
+    if name == "SHORT_MAX_MINUTES":
+        return contract_for("short").viewer_runtime_bounds_sec[1] / 60
+    if name == "SHORT_ANSWER_START_TARGET_SEC":
+        return contract_for("short").answer_start_target_sec or 4.0
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __getattr__(name: str):  # PEP 562
+    return _compat_value(name)
 
 # Mở đầu LONG-FORM (mục 1b video-quality-rules.md): phần CỐ ĐỊNH duy nhất của lời
 # chào. Phần sau cụm này do kịch bản tự sinh đa dạng (đọc tiêu đề + câu móc).
