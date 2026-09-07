@@ -499,8 +499,21 @@ class VisualReviewStore:
             return updated
 
     def resolve_accept_existing(
-        self, review_id: str, *, request_fingerprint: str, asset_id: str
+        self,
+        review_id: str,
+        *,
+        request_fingerprint: str,
+        asset_id: str,
+        selection_mode: str = "operator_override",
     ) -> VisualReviewEntry:
+        """`selection_mode` records WHO settled the shot.
+
+        It defaults to the operator because that is who used to be the only
+        one who could. An automatic disposition must pass its own mode: an
+        audit trail that says a person chose, when nobody did, is worse than
+        no audit trail.
+        """
+
         def update(entry: VisualReviewEntry) -> VisualReviewEntry:
             if asset_id not in entry.candidate_asset_ids:
                 raise VisualReviewError(
@@ -511,7 +524,7 @@ class VisualReviewStore:
                 status=ReviewStatus.RESOLVED,
                 disposition=ReviewDisposition.ACCEPT_EXISTING,
                 selected_asset_id=asset_id,
-                selection_mode="operator_override",
+                selection_mode=selection_mode,
                 last_error=None,
             )
 

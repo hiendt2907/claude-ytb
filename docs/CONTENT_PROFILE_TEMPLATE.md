@@ -172,6 +172,32 @@ buộc khi `enabled=true`), `minimum_score` (mặc định `0.5`, khoảng
 thuật hợp lệ), `hard_fail_on_judge_error` (mặc định `false` — khi `false`,
 lỗi hạ tầng VisualJudge (timeout/provider lỗi/response hỏng sau 1 lần repair)
 rơi về `first_valid`; khi `true`, `visual_assets` fail closed thay vì fallback).
+
+Khi Judge loại **mọi** candidate của một shot, mặc định pipeline dừng và chờ
+người (`ReviewRequiredError`). Ba field sau cho profile tự dàn xếp thay vì
+dừng — xem `render/visual_disposition.py`:
+
+- `auto_disposition` (mặc định `"halt"`) — `"halt"` giữ nguyên hành vi cũ;
+  `"accept_best"` cho engine tự nhận một candidate theo đúng các điều kiện
+  dưới đây.
+- `auto_accept_minimum_score` (mặc định `0.0`, khoảng `[0.0, 1.0]`) — sàn
+  điểm riêng cho đường cứu vãn này. Cố ý TÁCH khỏi `minimum_score`:
+  `minimum_score` quyết định cái gì đạt sạch, field này quyết định cái gì còn
+  chấp nhận được khi không có gì đạt sạch.
+- `auto_accept_ignorable_hard_failures` (mặc định `[]`) — danh sách mã
+  hard-failure được phép bỏ qua. Đo trên 4 Long bị kẹt: **không** shot nào có
+  candidate sạch `hard_failures`, và 2 shot đã vượt `minimum_score` rồi vẫn bị
+  loại — nên nới ngưỡng không mở được gì, phải nêu đích danh mã nào tha được.
+  `semantic_contradiction` (sai tư thế/hành động) là mã người xem bỏ qua;
+  `wrong_environment` thì không — nó biến phòng họp thành quán cà phê.
+  `required_character_absent` và `wrong_main_character` **không profile nào
+  được phép tha** — thiếu nhân vật hoặc sai nhân vật là tập phim hỏng.
+
+Operator có thể ghi đè cả ba qua env `VISUAL_AUTO_DISPOSITION`,
+`VISUAL_AUTO_ACCEPT_MINIMUM_SCORE`, `VISUAL_AUTO_ACCEPT_WAIVED_FAILURES`
+(phân tách bằng dấu phẩy) — cần thiết vì mỗi project ghim **snapshot** profile,
+nên policy thêm vào profile đang sống không với tới việc đang dở.
+
 VisualJudge KHÔNG chấm điểm vẻ đẹp/sức hấp dẫn/tuổi/giới tính/chủng tộc — chỉ
 chấm mức khớp yêu cầu và bố cục/kỹ thuật. Kết quả đánh giá lưu riêng mỗi
 project tại `assets/projects/<slug>/visual_evaluations.json` — không ghi vào

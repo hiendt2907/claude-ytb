@@ -26,6 +26,7 @@ from .visual_candidates import (
     resolve_selection_policy,
     validate_candidate_image,
 )
+from .visual_disposition import AutoDispositionPolicy, choose_auto_accept
 from .visual_evaluation_store import ShotEvaluationSet, VisualEvaluationStore
 from .visual_judge import (
     CONTRACT_VERSION as _JUDGE_CONTRACT_VERSION,
@@ -82,6 +83,44 @@ def resolve_judge_target(judge_cfg: Any) -> tuple[str, str]:
             judge_cfg.provider, judge_cfg.model, provider, model,
         )
     return provider, model
+
+
+def resolve_auto_disposition(judge_cfg: Any) -> "AutoDispositionPolicy":
+    """The disposition policy in force, profile first, operator override last.
+
+    Same shape and same reason as `resolve_judge_target` above. Four ban-so-6
+    Longs are pinned to profile snapshots 2.2.0 and 2.5.0, so a policy added to
+    the live `profile.json` can never reach them — the snapshot exists exactly
+    so story rules do not shift under a written script, and it freezes this
+    with them. The env override is the explicit way out for an operator, and
+    when it is unset the profile wins, unchanged.
+    """
+    from .visual_disposition import AutoDispositionPolicy, DispositionError
+
+    # `judge_cfg` is duck-typed across this module. Anything that never
+    # declared a disposition has not opted in, and halting is what not opting
+    # in means — so read it defensively rather than requiring the full profile.
+    reader = getattr(judge_cfg, "auto_disposition_policy", None)
+    declared = reader() if callable(reader) else AutoDispositionPolicy()
+    mode = (settings.visual_auto_disposition or "").strip()
+    if not mode:
+        return declared
+    raw_codes = (settings.visual_auto_accept_waived_failures or "").strip()
+    codes = frozenset(part.strip() for part in raw_codes.split(",") if part.strip())
+    try:
+        override = AutoDispositionPolicy(
+            mode=mode,
+            minimum_score=settings.visual_auto_accept_minimum_score,
+            ignorable_hard_failures=codes,
+        )
+    except DispositionError as exc:
+        raise DispositionError(f"Operator override không hợp lệ: {exc}") from exc
+    _judge_logger.warning(
+        "visual_judge.disposition_override profile=%s -> %s waived=%s min=%.2f",
+        declared.mode, override.mode, ",".join(sorted(codes)) or "-",
+        override.minimum_score,
+    )
+    return override
 
 
 @dataclass(frozen=True)
@@ -465,9 +504,12 @@ class VisualAssetResolver:
         *,
         reason: ReviewReason,
         evaluation_fingerprint: str,
-    ) -> None:
+        visual: Any = None,
+    ) -> str | None:
         """Persist the human boundary when a project-local store is available.
 
+        Returns an asset id when the profile's disposition policy lets the
+        engine settle the shot itself, and raises as before when it does not.
         Direct resolver callers without a project context retain the Phase-12
         ValueError behavior; production ``prepare_visual_assets`` always
         injects the durable review store.
@@ -502,7 +544,59 @@ class VisualAssetResolver:
             entry.review_reason.value,
             entry.status.value,
         )
+        accepted = self._auto_accept(request, entry, visual)
+        if accepted is not None:
+            return accepted
         raise ReviewRequiredError(entry)
+
+    def _auto_accept(
+        self, request: VisualRequest, entry: Any, visual: Any
+    ) -> str | None:
+        """Settle the shot without a person, when the profile allows it.
+
+        Deliberately runs AFTER `ensure_pending`: the review entry is the audit
+        record either way, so a shot the engine settled is still visible as a
+        shot that needed settling, and `resolve_accept_existing` re-checks the
+        asset against the entry's own candidate list.
+        """
+        judge_cfg = getattr(visual, "visual_judge", None) if visual is not None else None
+        if judge_cfg is None:
+            return None
+        policy = resolve_auto_disposition(judge_cfg)
+        if not policy.accepts_automatically or self.evaluation_store is None:
+            return None
+        evaluated = self.evaluation_store.get(request.shot_id)
+        if evaluated is None:
+            return None
+        evaluations = tuple(evaluated.evaluations.values())
+        index = {
+            asset_id: position
+            for position, asset_id in enumerate(entry.candidate_asset_ids)
+        }
+        chosen = choose_auto_accept(
+            evaluations, policy=policy, candidate_index_by_asset=index
+        )
+        if chosen is None:
+            return None
+        if self.review_store is None:  # pragma: no cover - guarded by caller
+            return None
+        self.review_store.resolve_accept_existing(
+            entry.review_id,
+            request_fingerprint=request.request_fingerprint,
+            asset_id=chosen,
+            selection_mode="auto_accept_best",
+        )
+        waived = sorted(
+            code
+            for evaluation in evaluations
+            if evaluation.asset_id == chosen
+            for code in evaluation.hard_failures
+        )
+        _candidate_logger.warning(
+            "visual_review.auto_accepted shot_id=%s review_id=%s asset_id=%s waived=%s",
+            request.shot_id, entry.review_id, chosen, ",".join(waived) or "-",
+        )
+        return chosen
 
     @staticmethod
     def _manual_candidate_slot(slot: Any) -> CandidateSlot:
@@ -920,19 +1014,25 @@ class VisualAssetResolver:
                     request.shot_id,
                     target_count * 2,
                 )
-                self._raise_semantic_review(
+                selected_asset_id = self._raise_semantic_review(
                     request,
                     candidate_set,
                     reason=ReviewReason.SEMANTIC_RECOVERY_EXHAUSTED,
                     evaluation_fingerprint=rejected_evaluation_fingerprint,
+                    visual=visual,
                 )
-            if semantic_rejection_for_review:
-                self._raise_semantic_review(
+            if selected_asset_id is None and semantic_rejection_for_review:
+                selected_asset_id = self._raise_semantic_review(
                     request,
                     candidate_set,
                     reason=ReviewReason.SEMANTIC_FAIL_CLOSED,
                     evaluation_fingerprint=rejected_evaluation_fingerprint,
+                    visual=visual,
                 )
+            if selected_asset_id is not None:
+                candidate_set.selected_asset_id = selected_asset_id
+                candidate_set.selection_status = "auto_accepted"
+                store.write()
             raise ValueError(
                 f"Không có candidate hợp lệ nào cho shot {request.shot_id} "
                 f"(target_count={target_count})."

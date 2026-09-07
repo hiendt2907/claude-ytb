@@ -96,7 +96,12 @@
       "model": "minimax/minimax-m3:free",
       "policy_version": "ban-so-6-gate1-v2",
       "minimum_score": 0.5,
-      "hard_fail_on_judge_error": true
+      "hard_fail_on_judge_error": true,
+      "auto_disposition": "accept_best",
+      "auto_accept_minimum_score": 0.5,
+      "auto_accept_ignorable_hard_failures": [
+        "semantic_contradiction"
+      ]
     },
     "characters": {
       "minh": "identity/minh.png",

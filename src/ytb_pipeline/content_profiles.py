@@ -486,6 +486,14 @@ class VisualJudgeProfile:
     policy_version: str
     minimum_score: float = 0.5
     hard_fail_on_judge_error: bool = False
+    # What the engine may do when the Judge rejects every candidate for a shot.
+    # `"halt"` keeps the historic behaviour: raise, and wait for a person.
+    # `"accept_best"` lets it settle the shot itself, but only on the terms
+    # below — see `render/visual_disposition.py` for why naming the waivable
+    # failure codes matters more than any threshold here.
+    auto_disposition: str = "halt"
+    auto_accept_minimum_score: float = 0.0
+    auto_accept_ignorable_hard_failures: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if self.enabled and not self.provider.strip():
@@ -494,8 +502,27 @@ class VisualJudgeProfile:
             raise ContentProfileError("visual_judge.model không được rỗng khi enabled=true.")
         if not (0.0 <= self.minimum_score <= 1.0):
             raise ContentProfileError("visual_judge.minimum_score phải nằm trong [0.0, 1.0].")
+        # Validated by the policy object itself so the rules live in one place.
+        self.auto_disposition_policy()
         if self.enabled and not self.policy_version.strip():
             raise ContentProfileError("visual_judge.policy_version không được rỗng khi enabled=true.")
+
+    def auto_disposition_policy(self) -> "AutoDispositionPolicy":
+        """The declared policy as a validated object.
+
+        Imported lazily: `render/` may import `content_profiles`, so binding
+        the other direction at module scope would close the cycle.
+        """
+        from .render.visual_disposition import AutoDispositionPolicy, DispositionError
+
+        try:
+            return AutoDispositionPolicy(
+                mode=self.auto_disposition,
+                minimum_score=self.auto_accept_minimum_score,
+                ignorable_hard_failures=frozenset(self.auto_accept_ignorable_hard_failures),
+            )
+        except DispositionError as exc:
+            raise ContentProfileError(f"visual_judge.{exc}") from exc
 
 
 @dataclass(frozen=True)
@@ -854,7 +881,23 @@ def _visual_judge_profile(raw: Any) -> "VisualJudgeProfile | None":
         policy_version=str(mapping.get("policy_version") or "").strip(),
         minimum_score=_finite_number(mapping, "minimum_score", prefix="visual_judge", default=0.5),
         hard_fail_on_judge_error=_exact_bool(mapping, "hard_fail_on_judge_error", prefix="visual_judge", default=False),
+        auto_disposition=str(mapping.get("auto_disposition") or "halt").strip(),
+        auto_accept_minimum_score=_finite_number(
+            mapping, "auto_accept_minimum_score", prefix="visual_judge", default=0.0,
+        ),
+        auto_accept_ignorable_hard_failures=_failure_code_tuple(
+            mapping, "auto_accept_ignorable_hard_failures", prefix="visual_judge",
+        ),
     )
+
+
+def _failure_code_tuple(mapping: Mapping[str, Any], key: str, *, prefix: str) -> tuple[str, ...]:
+    raw = mapping.get(key)
+    if raw is None:
+        return ()
+    if not isinstance(raw, list) or not all(isinstance(item, str) for item in raw):
+        raise ContentProfileError(f"{prefix}.{key} phải là mảng chuỗi.")
+    return tuple(item.strip() for item in raw)
 
 
 def _visual_generation_profile(raw: Any, profile_id: str) -> "VisualGenerationProfile | None":

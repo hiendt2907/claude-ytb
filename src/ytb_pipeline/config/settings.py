@@ -37,6 +37,15 @@ class Settings(BaseSettings):
     # values do not enable `vlm_ranked` globally.
     visual_judge_provider: str = ""
     visual_judge_model: str = ""
+    # Operator override for what the engine may accept on its own when the
+    # Judge rejects every candidate. Empty keeps whatever the content profile
+    # declares — including the default, which is to halt and wait for a person.
+    # This exists because a project pins its profile SNAPSHOT, so a policy
+    # added to a live profile cannot reach work already in flight.
+    visual_auto_disposition: str = ""
+    visual_auto_accept_minimum_score: float = 0.0
+    # Comma-separated Judge hard-failure codes the override may waive.
+    visual_auto_accept_waived_failures: str = ""
     # Optional operator override for Edge remote speech rate. Empty keeps the profile rate.
     edge_tts_rate_override: str = ""
     # Explicit local F5 backend. Production keeps Apple Silicon MPS; CPU is a
