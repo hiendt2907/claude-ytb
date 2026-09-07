@@ -1151,11 +1151,20 @@ class VisualAssetResolver:
         store = self.evaluation_store or VisualEvaluationStore(Path(self.cache_dir or ".") / "visual_evaluations.json")
         store_key = evaluation_store_key or request.shot_id
         existing = store.get(store_key)
+        # Compare against the judge that WOULD run now, not the one the profile
+        # declares. `store.save` below records `result.judge_provider/model` —
+        # the resolved target — and `try_auto_accept` compares against the same,
+        # so asking a third question here left the two answers disagreeing:
+        # under an operator override the reuse check called a qwen-judged row
+        # fresh while auto-accept called it stale, and the shot could be neither
+        # re-judged nor settled. That override exists for a dead profile model,
+        # which is exactly when the two identifiers always differ.
+        reuse_provider, reuse_model = resolve_judge_target(judge_cfg)
         can_reuse = (
             existing is not None and not existing.fallback_used
             and existing.matches_context(
-                request_fingerprint=request.request_fingerprint, judge_provider=judge_cfg.provider,
-                judge_model=judge_cfg.model, judge_policy_version=judge_cfg.policy_version,
+                request_fingerprint=request.request_fingerprint, judge_provider=reuse_provider,
+                judge_model=reuse_model, judge_policy_version=judge_cfg.policy_version,
                 judge_contract_version=_JUDGE_CONTRACT_VERSION,
             )
             and existing.matches_candidate_identity(candidate_identity)

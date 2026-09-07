@@ -31,6 +31,17 @@ _WINDOW_ENV = {
     "LONG_VIEWER_MIN_SEC": "long_viewer_min_sec",
     "LONG_VIEWER_MAX_SEC": "long_viewer_max_sec",
     "LONG_MIN_SECTIONS": "long_min_sections",
+    # Operator escape hatches, same reasoning one step further out. A developer
+    # whose `.env` overrides the visual judge or the disposition policy was
+    # silently running a different pipeline than the suite describes: once the
+    # evaluation-reuse check started resolving the judge target instead of
+    # reading the profile, a stray `VISUAL_JUDGE_MODEL` turned four unrelated
+    # reuse tests red. A test that cares about an override sets it explicitly.
+    "VISUAL_JUDGE_PROVIDER": "visual_judge_provider",
+    "VISUAL_JUDGE_MODEL": "visual_judge_model",
+    "VISUAL_AUTO_DISPOSITION": "visual_auto_disposition",
+    "VISUAL_AUTO_ACCEPT_MINIMUM_SCORE": "visual_auto_accept_minimum_score",
+    "VISUAL_AUTO_ACCEPT_WAIVED_FAILURES": "visual_auto_accept_waived_failures",
 }
 
 
