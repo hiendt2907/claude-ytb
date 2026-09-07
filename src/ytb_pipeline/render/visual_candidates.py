@@ -302,10 +302,15 @@ class VisualCandidateStore:
         generation_key: str, candidate_policy_version: str, target_candidate_count: int,
     ) -> VisualCandidateSet:
         existing = self._sets.get(shot_id)
-        if existing is not None and existing.request_fingerprint == request_fingerprint:
+        if (
+            existing is not None
+            and existing.request_fingerprint == request_fingerprint
+            and existing.generation_key == generation_key
+        ):
             # A changed target count or selection-policy version does NOT
-            # invalidate already-generated candidates (items 26/27) — only
-            # a changed semantic request fingerprint does (item 25).
+            # invalidate already-generated candidates.  A generation key does:
+            # it binds the profile release version and visual prompt inputs, so
+            # reusing its old pixels would cross a release boundary.
             existing.request_id = request_id
             existing.generation_key = generation_key
             existing.candidate_policy_version = candidate_policy_version
