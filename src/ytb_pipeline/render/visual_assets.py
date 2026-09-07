@@ -123,6 +123,79 @@ def resolve_auto_disposition(judge_cfg: Any) -> "AutoDispositionPolicy":
     return override
 
 
+def try_auto_accept(
+    entry: Any,
+    request: "VisualRequest",
+    *,
+    judge_cfg: Any,
+    review_store: Any,
+    evaluation_store: Any,
+    registry: AssetRegistry,
+) -> str | None:
+    """Settle one pending review by policy, or return None to keep waiting.
+
+    Called from two places on purpose. A review entry outlives the run that
+    created it, so a policy enabled afterwards would never reach the shots
+    already halted if this only ran where the halt is first raised — which is
+    exactly the state four ban-so-6 Longs were in.
+    """
+    if judge_cfg is None or review_store is None or evaluation_store is None:
+        return None
+    policy = resolve_auto_disposition(judge_cfg)
+    if not policy.accepts_automatically:
+        return None
+    evaluated = evaluation_store.get(request.shot_id)
+    if evaluated is None or evaluated.fallback_used:
+        return None
+    candidate_identity: dict[str, str] = {}
+    for asset_id in entry.candidate_asset_ids:
+        record = registry.find_by_asset_id(asset_id)
+        if record is None:
+            return None
+        path = Path(str(record.get("local_path") or ""))
+        if not path.is_file() or observed_content_sha256(path) != record.get("content_sha256"):
+            return None
+        candidate_identity[asset_id] = str(record["content_sha256"])
+    judge_provider, judge_model = resolve_judge_target(judge_cfg)
+    if (
+        not evaluated.matches_context(
+            request_fingerprint=request.request_fingerprint,
+            judge_provider=judge_provider,
+            judge_model=judge_model,
+            judge_policy_version=judge_cfg.policy_version,
+            judge_contract_version=_JUDGE_CONTRACT_VERSION,
+        )
+        or not evaluated.matches_candidate_identity(candidate_identity)
+        or set(evaluated.evaluations) != set(candidate_identity)
+    ):
+        return None
+    evaluations = tuple(evaluated.evaluations[asset_id] for asset_id in entry.candidate_asset_ids)
+    index = {
+        asset_id: position
+        for position, asset_id in enumerate(entry.candidate_asset_ids)
+    }
+    chosen = choose_auto_accept(evaluations, policy=policy, candidate_index_by_asset=index)
+    if chosen is None:
+        return None
+    review_store.resolve_accept_existing(
+        entry.review_id,
+        request_fingerprint=request.request_fingerprint,
+        asset_id=chosen,
+        selection_mode="auto_accept_best",
+    )
+    waived = sorted(
+        code
+        for evaluation in evaluations
+        if evaluation.asset_id == chosen
+        for code in evaluation.hard_failures
+    )
+    _candidate_logger.warning(
+        "visual_review.auto_accepted shot_id=%s review_id=%s asset_id=%s waived=%s",
+        request.shot_id, entry.review_id, chosen, ",".join(waived) or "-",
+    )
+    return chosen
+
+
 @dataclass(frozen=True)
 class VisualRequest:
     """Provider-neutral semantic need of a single ScenePlan shot."""
@@ -559,44 +632,14 @@ class VisualAssetResolver:
         shot that needed settling, and `resolve_accept_existing` re-checks the
         asset against the entry's own candidate list.
         """
-        judge_cfg = getattr(visual, "visual_judge", None) if visual is not None else None
-        if judge_cfg is None:
-            return None
-        policy = resolve_auto_disposition(judge_cfg)
-        if not policy.accepts_automatically or self.evaluation_store is None:
-            return None
-        evaluated = self.evaluation_store.get(request.shot_id)
-        if evaluated is None:
-            return None
-        evaluations = tuple(evaluated.evaluations.values())
-        index = {
-            asset_id: position
-            for position, asset_id in enumerate(entry.candidate_asset_ids)
-        }
-        chosen = choose_auto_accept(
-            evaluations, policy=policy, candidate_index_by_asset=index
+        return try_auto_accept(
+            entry,
+            request,
+            judge_cfg=getattr(visual, "visual_judge", None) if visual is not None else None,
+            review_store=self.review_store,
+            evaluation_store=self.evaluation_store,
+            registry=self.registry,
         )
-        if chosen is None:
-            return None
-        if self.review_store is None:  # pragma: no cover - guarded by caller
-            return None
-        self.review_store.resolve_accept_existing(
-            entry.review_id,
-            request_fingerprint=request.request_fingerprint,
-            asset_id=chosen,
-            selection_mode="auto_accept_best",
-        )
-        waived = sorted(
-            code
-            for evaluation in evaluations
-            if evaluation.asset_id == chosen
-            for code in evaluation.hard_failures
-        )
-        _candidate_logger.warning(
-            "visual_review.auto_accepted shot_id=%s review_id=%s asset_id=%s waived=%s",
-            request.shot_id, entry.review_id, chosen, ",".join(waived) or "-",
-        )
-        return chosen
 
     @staticmethod
     def _manual_candidate_slot(slot: Any) -> CandidateSlot:
@@ -1031,12 +1074,17 @@ class VisualAssetResolver:
                 )
             if selected_asset_id is not None:
                 candidate_set.selected_asset_id = selected_asset_id
-                candidate_set.selection_status = "auto_accepted"
+                # A policy settlement is a real selection.  Keep the normal
+                # reusable status while recording *how* it was chosen, so the
+                # next run can reuse the manifest without pretending a clean
+                # Judge pass picked it.
+                candidate_set.selection_mode = "auto_accept_best"
                 store.write()
-            raise ValueError(
-                f"Không có candidate hợp lệ nào cho shot {request.shot_id} "
-                f"(target_count={target_count})."
-            )
+            else:
+                raise ValueError(
+                    f"Không có candidate hợp lệ nào cho shot {request.shot_id} "
+                    f"(target_count={target_count})."
+                )
         candidate_set.selected_asset_id = selected_asset_id
         candidate_set.selection_status = "selected"
         store.write()
@@ -1264,6 +1312,25 @@ def prepare_visual_assets(voiceover: "Voiceover", profile: "ContentProfile", *, 
         if review is not None and review.request_fingerprint == request.request_fingerprint:
             if review.status == ReviewStatus.ABANDONED:
                 raise VisualAbandonedError(review)
+            if (
+                review.status == ReviewStatus.PENDING
+                and review.disposition != ReviewDisposition.MANUAL_REGENERATE
+            ):
+                judge_cfg = getattr(
+                    getattr(profile, "visual_generation", None), "visual_judge", None
+                )
+                accepted = try_auto_accept(
+                    review,
+                    request,
+                    judge_cfg=judge_cfg,
+                    review_store=review_store,
+                    evaluation_store=evaluation_store,
+                    registry=registry,
+                )
+                if accepted is not None:
+                    refreshed = review_store.current_for_shot(request.shot_id)
+                    if refreshed is not None:
+                        review = refreshed
             if review.status == ReviewStatus.RESOLVED:
                 record = _resolved_review_record(review, candidate_store, registry)
                 if record is None:
@@ -1291,6 +1358,7 @@ def prepare_visual_assets(voiceover: "Voiceover", profile: "ContentProfile", *, 
             if (
                 review.status == ReviewStatus.PENDING
                 and review.disposition != ReviewDisposition.MANUAL_REGENERATE
+                and not resolve_auto_disposition(judge_cfg).accepts_automatically
             ):
                 raise ReviewRequiredError(review)
         existing = manifest.shots.get(request.shot_id)
