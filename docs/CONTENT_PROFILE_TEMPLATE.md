@@ -128,9 +128,23 @@ Cổng LLM chấm điểm rubric — đọc
 luật nào nên nằm ở đây thay vì ở QA heuristic.
 - `enabled` — bật/tắt.
 - `rubric_prompt_name` — key trong `prompts` chứa nội dung rubric.
-- `minimum_score` (mặc định `0`) — điểm sàn `[0, 10]`.
 - `max_rewrites` (mặc định `0`) — số lần cho phép LLM viết lại theo phản hồi
   rubric.
+
+Ngưỡng đạt khai theo **một trong hai** dạng, không được đặt cả hai (hai thang
+cùng sống thì không ai nói được cái nào đã loại kịch bản):
+
+- `minimum_score` (mặc định `0`) — thang vô hướng `[0, 10]`, áp **liên kết**:
+  điểm tổng và **mọi** tiêu chí đều phải đạt. Đơn giản nhưng khắt khe theo cấp
+  số nhân khi số tiêu chí tăng.
+- `minimum_mean_score` (mặc định `0.0`, `[0, 10]`) + `minimum_dimension_score`
+  (mặc định `0`, `[0, 10]`) — trung bình các tiêu chí phải đạt
+  `minimum_mean_score`, và **không** tiêu chí nào được dưới sàn
+  `minimum_dimension_score`. Sàn không được lớn hơn trung bình. Dạng này giữ
+  được khả năng loại kịch bản hỏng hẳn ở một trục, mà không coi mọi vết xước
+  là chí mạng. `ban-so-6` chuyển sang dạng này ở 3.0.0 sau khi đo 170 lượt
+  chấm thật: bar `9` liên kết chỉ cho qua 8.2% video dài, trong khi trung vị
+  từng tiêu chí là 6–7.
 
 ### `visual_generation` (tuỳ chọn, chỉ hợp lệ khi `narrative_mode == "character_story"`)
 Sinh ảnh cảnh local qua ComfyUI/IPAdapter, neo danh tính nhân vật —

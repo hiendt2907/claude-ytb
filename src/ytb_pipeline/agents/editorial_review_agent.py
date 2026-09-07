@@ -24,7 +24,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Mapping, Protocol
 
-from ..content_profiles import ContentProfile, profile_fingerprint
+from ..content_profiles import ContentProfile, EditorialReviewProfile, profile_fingerprint
 
 
 EDITORIAL_REVIEW_DIMENSIONS = frozenset({
@@ -146,13 +146,74 @@ def _parse_review_response(text: str) -> EditorialReviewResult:
     )
 
 
+def _bar_description(review_profile: "EditorialReviewProfile") -> str:
+    """The bar in words, so the prompt and the code cannot quote different ones.
+
+    The reviewer LLM sets `passed` itself. When it was told a 9/10 bar the code
+    no longer enforces, it marked acceptable work failed and the repair loop
+    chased a target nothing was measuring.
+    """
+    if review_profile.uses_mean_bar:
+        return (
+            f"trung bình năm tiêu chí >= {review_profile.minimum_mean_score:g}/10 "
+            f"và không tiêu chí nào dưới {review_profile.minimum_dimension_score}/10"
+        )
+    return f"mọi tiêu chí >= {review_profile.minimum_score}/10"
+
+
+def _bar_findings(
+    review_profile: "EditorialReviewProfile",
+    dimensions: Mapping[str, int],
+    overall_score: int,
+) -> list[str]:
+    """Why this script missed — naming the dimension and the gap, not the bar.
+
+    36% of the 855 blocking findings recorded under the old bar were bare
+    restatements of the threshold ("các tiêu chí dưới ngưỡng 9/10: ..."), which
+    tells a rewrite nothing it can act on.
+    """
+    if not review_profile.uses_mean_bar:
+        bar = review_profile.minimum_score
+        low = sorted(name for name, score in dimensions.items() if score < bar)
+        findings: list[str] = []
+        if overall_score < bar:
+            findings.append(f"Điểm biên tập {overall_score}/10 dưới ngưỡng {bar}/10 của profile.")
+        if low:
+            findings.append(f"Các tiêu chí dưới ngưỡng {bar}/10: {', '.join(low)}.")
+        return findings
+
+    floor = review_profile.minimum_dimension_score
+    mean_bar = review_profile.minimum_mean_score
+    mean = sum(dimensions.values()) / len(dimensions)
+    findings = []
+    below = sorted(
+        (name for name, score in dimensions.items() if score < floor),
+        key=lambda name: dimensions[name],
+    )
+    for name in below:
+        findings.append(
+            f"{name} đạt {dimensions[name]}/10, dưới sàn {floor}/10 — "
+            "tiêu chí này phải sửa, không bù được bằng tiêu chí khác."
+        )
+    if mean < mean_bar:
+        weakest = ", ".join(
+            f"{name} {dimensions[name]}"
+            for name in sorted(dimensions, key=lambda n: dimensions[n])[:2]
+        )
+        findings.append(
+            f"Trung bình {mean:.1f}/10 dưới ngưỡng {mean_bar:g}/10; "
+            f"kéo điểm xuống nhiều nhất: {weakest}."
+        )
+    return findings
+
+
 def _enforce_profile_score(
     profile: ContentProfile,
     result: EditorialReviewResult,
 ) -> EditorialReviewResult:
     """Apply the current profile bar to both fresh and cached verdicts."""
     review_profile = profile.editorial_review
-    if review_profile is None or not review_profile.minimum_score:
+    if review_profile is None or not (review_profile.minimum_score or review_profile.uses_mean_bar):
         return result
     if result.overall_score is None:
         raise ValueError(
@@ -171,25 +232,12 @@ def _enforce_profile_score(
             "Editorial review profile có minimum_score nhưng dimension_scores "
             f"phải có đúng năm tiêu chí ({'; '.join(detail) or 'không hợp lệ'})."
         )
-    low_dimensions = sorted(
-        name for name, score in dimensions.items() if score < review_profile.minimum_score
-    )
-    if result.overall_score < review_profile.minimum_score or low_dimensions:
-        findings = list(result.blocking_findings)
-        if result.overall_score < review_profile.minimum_score:
-            findings.append(
-                f"Điểm biên tập {result.overall_score}/10 dưới ngưỡng "
-                f"{review_profile.minimum_score}/10 của profile."
-            )
-        if low_dimensions:
-            findings.append(
-                "Các tiêu chí dưới ngưỡng "
-                f"{review_profile.minimum_score}/10: {', '.join(low_dimensions)}."
-            )
+    findings = _bar_findings(review_profile, dimensions, result.overall_score)
+    if findings:
         return replace(
             result,
             passed=False,
-            blocking_findings=tuple(findings),
+            blocking_findings=tuple([*result.blocking_findings, *findings]),
             repair_brief=result.repair_brief or "Viết lại theo các tiêu chí rubric chưa đạt.",
         )
     return result
@@ -239,8 +287,9 @@ async def run_editorial_review(
         "human_truth, spoken_naturalness, causal_coherence, role_fidelity, useful_restraint), blocking_findings "
         "(array of short strings), section_refs (array of one-based section indices "
         "the findings refer to), repair_brief (a short instruction for how to fix "
-        "the findings, empty string when passed is true). A score below the profile "
-        f"bar ({review_profile.minimum_score}/10) MUST set passed=false. Do not award "
+        "the findings, empty string when passed is true). The profile bar is: "
+        f"{_bar_description(review_profile)}. Scores missing that bar MUST set "
+        "passed=false; scores meeting it MUST set passed=true. Do not award "
         "a high score merely because the JSON schema or an abstract structure is correct.\n\n"
         f"Rubric:\n{rubric}{cold_open_contract}\n\n"
         f"Script JSON:\n{json.dumps(review_payload, ensure_ascii=False, indent=2)}"

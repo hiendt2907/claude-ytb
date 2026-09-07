@@ -407,6 +407,21 @@ class EditorialReviewProfile:
     # valid schema/detail, so it is bounded by profile data rather than a
     # global magic number. Zero preserves the historic fail-closed behaviour.
     max_rewrites: int = 0
+    # The scalar bar above is conjunctive: it demands the SAME score on every
+    # rubric dimension at once. Measured over 170 real ban-so-6 reviews, a bar
+    # of 9 admitted 8.2% of Longs against a median dimension score of 6-7 —
+    # about twelve generations per usable video — while the only human reading
+    # on record rated that rejected pool 9/10. These two fields express the
+    # shape the measurement supports instead: a hard floor that still fails a
+    # script broken on one axis, under a mean that tolerates a scratch.
+    # Both zero keeps `minimum_score` in charge, so profiles that never moved
+    # behave exactly as before.
+    minimum_mean_score: float = 0.0
+    minimum_dimension_score: int = 0
+
+    @property
+    def uses_mean_bar(self) -> bool:
+        return bool(self.minimum_mean_score or self.minimum_dimension_score)
 
     def __post_init__(self) -> None:
         if self.enabled and not self.rubric_prompt_name.strip():
@@ -417,6 +432,25 @@ class EditorialReviewProfile:
             raise ContentProfileError("editorial_review.minimum_score phải nằm trong [0, 10].")
         if self.max_rewrites < 0:
             raise ContentProfileError("editorial_review.max_rewrites phải >= 0.")
+        if not 0.0 <= self.minimum_mean_score <= 10.0:
+            raise ContentProfileError(
+                "editorial_review.minimum_mean_score phải nằm trong [0, 10]."
+            )
+        if not 0 <= self.minimum_dimension_score <= 10:
+            raise ContentProfileError(
+                "editorial_review.minimum_dimension_score phải nằm trong [0, 10]."
+            )
+        if self.uses_mean_bar and self.minimum_score:
+            raise ContentProfileError(
+                "editorial_review không được đặt đồng thời minimum_score và "
+                "minimum_mean_score/minimum_dimension_score — hai thang chấm "
+                "cùng sống thì không ai nói được cái nào đã loại kịch bản."
+            )
+        if self.minimum_dimension_score > self.minimum_mean_score > 0:
+            raise ContentProfileError(
+                "editorial_review.minimum_dimension_score không được lớn hơn "
+                "minimum_mean_score — sàn cao hơn trung bình thì trung bình vô nghĩa."
+            )
 
 
 # Phase 9 — conservative hard bound on opt-in multi-candidate generation.
@@ -789,6 +823,12 @@ def _editorial_review_profile(raw: Any) -> "EditorialReviewProfile | None":
         ),
         max_rewrites=_bounded_nonnegative_int(
             mapping, "max_rewrites", prefix="editorial_review", maximum=10,
+        ),
+        minimum_mean_score=_finite_number(
+            mapping, "minimum_mean_score", prefix="editorial_review", default=0.0,
+        ),
+        minimum_dimension_score=_bounded_nonnegative_int(
+            mapping, "minimum_dimension_score", prefix="editorial_review", maximum=10,
         ),
     )
 
