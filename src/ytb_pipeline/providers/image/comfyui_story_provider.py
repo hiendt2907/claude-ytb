@@ -132,7 +132,7 @@ class ComfyUIStoryProvider:
         return {
             "ckpt": self._checkpoint_node(),
             "pos": self._text_node(f"{prompt}, {vg.style_prompt}", ["ckpt", 1]),
-            "neg": self._text_node(vg.negative_prompt, ["ckpt", 1]),
+            "neg": self._text_node(self._scene_negative_prompt(vg, character_count=0), ["ckpt", 1]),
             "latent": {"class_type": "EmptyLatentImage", "inputs": {"width": width, "height": height, "batch_size": 1}},
             "sampler": self._sampler_node(vg, seed, ["ckpt", 0], ["latent", 0], denoise=1.0),
             "vaedecode": self._decode_node(["ckpt", 2]),
@@ -153,7 +153,7 @@ class ComfyUIStoryProvider:
                 model=["ckpt", 0], image=["refimg", 0], weight=vg.solo_weight,
             ),
             "pos": self._text_node(f"{prompt}, {vg.style_prompt}", ["ckpt", 1]),
-            "neg": self._text_node(vg.negative_prompt, ["ckpt", 1]),
+            "neg": self._text_node(self._scene_negative_prompt(vg, character_count=1), ["ckpt", 1]),
             "latent": {"class_type": "EmptyLatentImage", "inputs": {"width": width, "height": height, "batch_size": 1}},
             "sampler": self._sampler_node(vg, seed, ["ipadapter", 0], ["latent", 0], denoise=1.0),
             "vaedecode": self._decode_node(["ckpt", 2]),
@@ -188,7 +188,7 @@ class ComfyUIStoryProvider:
             ),
             "vaeencode": {"class_type": "VAEEncode", "inputs": {"pixels": ["baseresize", 0], "vae": ["ckpt", 2]}},
             "pos": self._text_node(f"{prompt}, {vg.style_prompt}", ["ckpt", 1]),
-            "neg": self._text_node(vg.negative_prompt, ["ckpt", 1]),
+            "neg": self._text_node(self._scene_negative_prompt(vg, character_count=2), ["ckpt", 1]),
             "sampler": self._sampler_node(
                 vg, seed, ["ipa_second", 0], ["vaeencode", 0], denoise=vg.duo_denoise,
             ),
@@ -196,6 +196,16 @@ class ComfyUIStoryProvider:
             "save": self._save_node(),
         }
         return workflow
+
+    @staticmethod
+    def _scene_negative_prompt(vg: VisualGenerationProfile, *, character_count: int) -> str:
+        if character_count == 1:
+            exclusion = "multiple people, two people, duplicate person, extra person"
+        elif character_count == 2:
+            exclusion = "third person, extra person, duplicate person"
+        else:
+            exclusion = "people, person, character"
+        return f"{vg.negative_prompt}, {exclusion}"
 
     def _checkpoint_node(self) -> dict:
         return {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": settings.comfyui_sdxl_checkpoint}}
