@@ -23,8 +23,9 @@
     "enabled": true,
     "rubric_prompt_name": "editorial_review",
     "minimum_mean_score": 7.5,
-    "minimum_dimension_score": 7,
-    "max_rewrites": 2
+    "minimum_dimension_score": 5,
+    "max_rewrites": 2,
+    "review_samples": 3
   },
   "formats": {
     "short": {

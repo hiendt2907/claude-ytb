@@ -137,6 +137,17 @@ cùng sống thì không ai nói được cái nào đã loại kịch bản):
 - `minimum_score` (mặc định `0`) — thang vô hướng `[0, 10]`, áp **liên kết**:
   điểm tổng và **mọi** tiêu chí đều phải đạt. Đơn giản nhưng khắt khe theo cấp
   số nhân khi số tiêu chí tăng.
+- `review_samples` (mặc định `1`, số **lẻ** trong `[1, 5]`) — số lượt chấm độc
+  lập gộp lại thành một verdict, mỗi tiêu chí lấy trung vị riêng. Đo 2026-09-07
+  trên **một** kịch bản Long không đổi, 9 lượt chấm ở `temperature=0.0`: từng
+  tiêu chí dao động 2–3 điểm (stdev 0.47–0.74), mean dao động 1.40 (stdev
+  0.39). Kịch bản đó có mean thật ≈7.33 so với bar 7.5, nên `mean>=7.5 &
+  sàn>=7` cho PASS **1/9 lượt** còn `mean>=7.0 & sàn>=6` cho PASS 8/9 — cùng
+  một kịch bản, không đổi chữ nào. Nặng hơn: gateway cache theo byte request
+  (`xkiro_provider.py:131`), nên lượt nào rơi trước sẽ bị đông cứng vĩnh viễn
+  cho kịch bản đó; nhiễu không làm verdict nhấp nháy mà **gán cố định** một
+  kết quả ngẫu nhiên, xoá cache cục bộ cũng không lật lại được. Trung vị N
+  lượt giảm sai số chuẩn theo căn N (0.39 → 0.22 ở N=3), đổi lại N lần token.
 - `minimum_mean_score` (mặc định `0.0`, `[0, 10]`) + `minimum_dimension_score`
   (mặc định `0`, `[0, 10]`) — trung bình các tiêu chí phải đạt
   `minimum_mean_score`, và **không** tiêu chí nào được dưới sàn

@@ -22,7 +22,7 @@ import hashlib
 import json
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Mapping, Protocol
+from typing import Mapping, Protocol, Sequence
 
 from ..content_profiles import ContentProfile, EditorialReviewProfile, profile_fingerprint
 
@@ -144,6 +144,54 @@ def _parse_review_response(text: str) -> EditorialReviewResult:
         overall_score=score,
         dimension_scores=dimension_scores,
     )
+
+
+def median_review(draws: Sequence[EditorialReviewResult]) -> EditorialReviewResult:
+    """Merge repeated reviews of one script into the verdict they agree on.
+
+    Measured 2026-09-07 over nine independent reviews of one unchanged Long at
+    `temperature=0.0`: individual dimensions ranged over 2-3 points (stdev
+    0.47-0.74) and the mean over 1.40 (stdev 0.39). With that script's true
+    mean at ~7.33 against a 7.5 bar, `mean>=7.5 & floor>=7` passed 1 draw in 9
+    while `mean>=7.0 & floor>=6` passed 8 — same script, no word changed.
+
+    Each dimension takes its own median, so one dimension's outlier cannot
+    carry the verdict, and the findings come from whichever draw sits nearest
+    the merged scores: findings that describe a different draw would send a
+    repair after faults this verdict is not claiming.
+    """
+    if not draws:
+        raise ValueError("median_review cần ít nhất một lượt chấm.")
+    if len(draws) == 1:
+        return draws[0]
+
+    dimensions = sorted({name for draw in draws for name in (draw.dimension_scores or {})})
+    merged_scores = {
+        name: _lower_median(
+            [int(draw.dimension_scores[name]) for draw in draws if name in (draw.dimension_scores or {})]
+        )
+        for name in dimensions
+    }
+    # Lower median, not the arithmetic mean: the rubric emits integers, and a
+    # verdict of 7.5 is not a score any single review could have returned.
+    nearest = min(
+        draws,
+        key=lambda draw: sum(
+            abs(int((draw.dimension_scores or {}).get(name, 0)) - merged_scores[name])
+            for name in dimensions
+        ),
+    )
+    merged_overall = round(sum(merged_scores.values()) / len(merged_scores)) if merged_scores else 0
+    return replace(
+        nearest,
+        dimension_scores=merged_scores,
+        overall_score=merged_overall,
+    )
+
+
+def _lower_median(values: list[int]) -> int:
+    ordered = sorted(values)
+    return ordered[(len(ordered) - 1) // 2]
 
 
 def _bar_description(review_profile: "EditorialReviewProfile") -> str:
@@ -294,25 +342,38 @@ async def run_editorial_review(
         f"Rubric:\n{rubric}{cold_open_contract}\n\n"
         f"Script JSON:\n{json.dumps(review_payload, ensure_ascii=False, indent=2)}"
     )
-    text = await provider.complete(
-        prompt,
-        system=(
-            "You are a strict editorial reviewer applying exactly the rubric given; "
-            "do not invent rules the rubric does not state."
-        ),
-        max_tokens=1024,
-        temperature=0.0,
-        json_output=True,
-    )
-    try:
-        result = _enforce_profile_score(profile, _parse_review_response(text))
-    except ValueError as exc:
-        # Fail closed, but never lose the evidence: the parse error alone does
-        # not say what the judge actually returned, and production 2026-08-30
-        # ended with a traceback and an empty review log.
-        raise ValueError(
-            f"Editorial review response không dùng được: {exc} | raw={text!r:.2000}"
-        ) from exc
+    draws: list[EditorialReviewResult] = []
+    samples = max(1, review_profile.review_samples)
+    for index in range(samples):
+        # The gateway caches byte-identical requests, so a second identical
+        # call replays the first rather than drawing again. Vary only transport
+        # metadata — the same escape `XkiroLLMProvider` uses to get past a
+        # cached corrupt response — so every draw sees the same script and the
+        # same rubric.
+        request_prompt = prompt if not index else (
+            f"{prompt}\n\n[review sample {index + 1} of {samples}; "
+            "ignore this metadata when answering]"
+        )
+        text = await provider.complete(
+            request_prompt,
+            system=(
+                "You are a strict editorial reviewer applying exactly the rubric given; "
+                "do not invent rules the rubric does not state."
+            ),
+            max_tokens=1024,
+            temperature=0.0,
+            json_output=True,
+        )
+        try:
+            draws.append(_parse_review_response(text))
+        except ValueError as exc:
+            # Fail closed, but never lose the evidence: the parse error alone
+            # does not say what the judge actually returned, and production
+            # 2026-08-30 ended with a traceback and an empty review log.
+            raise ValueError(
+                f"Editorial review response không dùng được: {exc} | raw={text!r:.2000}"
+            ) from exc
+    result = _enforce_profile_score(profile, median_review(draws))
     cache_path.write_text(
         json.dumps({
             "passed": result.passed,

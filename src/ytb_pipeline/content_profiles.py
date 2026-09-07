@@ -418,6 +418,13 @@ class EditorialReviewProfile:
     # behave exactly as before.
     minimum_mean_score: float = 0.0
     minimum_dimension_score: int = 0
+    # How many independent reviews to merge into one verdict. Measured over
+    # nine draws of one unchanged Long at temperature 0: dimensions ranged 2-3
+    # points and the mean 1.40 (stdev 0.39), so a bar near the score's own
+    # distribution decides by luck, and the gateway then freezes that luck for
+    # the script forever. Median of N cuts the standard error by sqrt(N) at N
+    # times the tokens. One keeps the historic single-draw behaviour.
+    review_samples: int = 1
 
     @property
     def uses_mean_bar(self) -> bool:
@@ -445,6 +452,16 @@ class EditorialReviewProfile:
                 "editorial_review không được đặt đồng thời minimum_score và "
                 "minimum_mean_score/minimum_dimension_score — hai thang chấm "
                 "cùng sống thì không ai nói được cái nào đã loại kịch bản."
+            )
+        if not 1 <= self.review_samples <= 5:
+            raise ContentProfileError(
+                "editorial_review.review_samples phải nằm trong [1, 5] — mỗi mẫu "
+                "là một lượt gọi LLM đầy đủ."
+            )
+        if self.review_samples % 2 == 0:
+            raise ContentProfileError(
+                "editorial_review.review_samples phải là số lẻ để trung vị có "
+                "một lượt chấm thật ở giữa."
             )
         if self.minimum_dimension_score > self.minimum_mean_score > 0:
             raise ContentProfileError(
@@ -856,6 +873,12 @@ def _editorial_review_profile(raw: Any) -> "EditorialReviewProfile | None":
         ),
         minimum_dimension_score=_bounded_nonnegative_int(
             mapping, "minimum_dimension_score", prefix="editorial_review", maximum=10,
+        ),
+        review_samples=(
+            _bounded_nonnegative_int(
+                mapping, "review_samples", prefix="editorial_review", maximum=5,
+            )
+            or 1
         ),
     )
 
