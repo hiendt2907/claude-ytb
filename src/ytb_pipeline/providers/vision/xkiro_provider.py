@@ -23,7 +23,7 @@ from typing import Any
 from urllib import error as urllib_error
 from urllib import request as urllib_request
 
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 from ...config.settings import settings
 from ...render.visual_judge import (
@@ -40,6 +40,11 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_MAX_IMAGE_BYTES = 8 * 1024 * 1024
 DEFAULT_MAX_IMAGE_PIXELS = 16_000_000
+# Candidate PNGs are kept at render resolution.  Their transport copies do
+# not need that much detail for a semantic judge, and four base64 PNGs can
+# otherwise exceed gateway write budgets before the provider sees a request.
+DEFAULT_TRANSPORT_MAX_EDGE = 1024
+DEFAULT_TRANSPORT_MAX_IMAGE_BYTES = 1 * 1024 * 1024
 DEFAULT_TIMEOUT_SEC = 90.0
 _PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 _JPEG_SIGNATURE = b"\xff\xd8\xff"
@@ -274,6 +279,36 @@ def _mime_and_bytes(
     return mime, payload
 
 
+def _transport_mime_and_bytes(
+    mime: str,
+    payload: bytes,
+    *,
+    max_edge: int,
+    max_image_bytes: int,
+) -> tuple[str, bytes]:
+    """Create a bounded judge-only copy without changing the source asset."""
+    try:
+        with Image.open(BytesIO(payload)) as source:
+            if max(source.size) <= max_edge and len(payload) <= max_image_bytes:
+                return mime, payload
+
+            image = ImageOps.exif_transpose(source).convert("RGB")
+            image.thumbnail((max_edge, max_edge), Image.Resampling.LANCZOS)
+            for quality in (85, 75, 65, 55, 45, 35, 25):
+                encoded = BytesIO()
+                image.save(encoded, format="JPEG", quality=quality, optimize=True)
+                compressed = encoded.getvalue()
+                if len(compressed) <= max_image_bytes:
+                    return "image/jpeg", compressed
+    except (Image.DecompressionBombError, UnidentifiedImageError, OSError, SyntaxError) as exc:
+        raise JudgeInfrastructureError("Không thể chuẩn bị candidate media cho Judge transport.") from exc
+
+    raise JudgeInfrastructureError(
+        "Không thể nén candidate media xuống giới hạn Judge transport "
+        f"({max_image_bytes} bytes)."
+    )
+
+
 def _request_intro(request: Any, context: JudgeContext) -> str:
     constraints = tuple(getattr(request, "semantic_constraints", ()))
     dimensions = getattr(request, "dimensions", None)
@@ -314,6 +349,8 @@ class XkiroVisualJudge:
         transport: XkiroVisionTransport | Any | None = None,
         max_image_bytes: int = DEFAULT_MAX_IMAGE_BYTES,
         max_image_pixels: int = DEFAULT_MAX_IMAGE_PIXELS,
+        max_transport_edge: int = DEFAULT_TRANSPORT_MAX_EDGE,
+        max_transport_image_bytes: int = DEFAULT_TRANSPORT_MAX_IMAGE_BYTES,
     ) -> None:
         if not model.strip():
             raise ValueError("xKiro VisualJudge model không được rỗng.")
@@ -321,10 +358,16 @@ class XkiroVisualJudge:
             raise ValueError("max_image_bytes phải > 0.")
         if max_image_pixels <= 0:
             raise ValueError("max_image_pixels phải > 0.")
+        if max_transport_edge <= 0:
+            raise ValueError("max_transport_edge phải > 0.")
+        if max_transport_image_bytes <= 0:
+            raise ValueError("max_transport_image_bytes phải > 0.")
         self.model = model
         self.transport = transport or XkiroVisionTransport()
         self.max_image_bytes = max_image_bytes
         self.max_image_pixels = max_image_pixels
+        self.max_transport_edge = max_transport_edge
+        self.max_transport_image_bytes = max_transport_image_bytes
 
     def evaluate(
         self,
@@ -343,6 +386,12 @@ class XkiroVisualJudge:
                 candidate,
                 max_image_bytes=self.max_image_bytes,
                 max_image_pixels=self.max_image_pixels,
+            )
+            mime, payload = _transport_mime_and_bytes(
+                mime,
+                payload,
+                max_edge=self.max_transport_edge,
+                max_image_bytes=self.max_transport_image_bytes,
             )
             content.append(
                 {
