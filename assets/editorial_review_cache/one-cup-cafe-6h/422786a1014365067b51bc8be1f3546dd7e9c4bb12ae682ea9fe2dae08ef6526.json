@@ -1,0 +1,30 @@
+{
+  "passed": false,
+  "blocking_findings": [
+    "Toàn bộ voiceover là placeholder 'Nội dung phần X', không có cảnh mở thật hay chi tiết người đi làm nhận ra.",
+    "Không có lời nói tự nhiên; không thể đọc thành tiếng từ đầu đến cuối.",
+    "Không có chuỗi nhân quả: các phần không làm rõ tình huống, không quay lại cái giá ban đầu.",
+    "Không có người kể với góc nhìn cá nhân có giới hạn; không xác định được vai.",
+    "Không có ít nhất hai góc nhìn khác nhau hay một bước thử nhỏ có điều kiện, giới hạn và đánh đổi.",
+    "Thumbnail và visual đều là 'x' hoặc truy vấn chung chung, không hỗ trợ câu chuyện.",
+    "Điểm biên tập 0/10 dưới ngưỡng 9/10 của profile.",
+    "Các tiêu chí dưới ngưỡng 9/10: causal_coherence, human_truth, role_fidelity, spoken_naturalness, useful_restraint."
+  ],
+  "section_refs": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "repair_brief": "Viết lại toàn bộ transcript từ một cảnh mở cụ thể của người đi làm đang né việc khó, dùng lời nói bạn bè tự nhiên, triển khai hai góc nhìn giới hạn làm rõ cảnh đó, đưa một bước thử nhỏ có điều kiện và đánh đổi, rồi quay lại cái giá ban đầu; không dùng placeholder, không đóng vai chuyên gia, không hứa kết quả.",
+  "overall_score": 0,
+  "dimension_scores": {
+    "human_truth": 0,
+    "spoken_naturalness": 0,
+    "causal_coherence": 0,
+    "role_fidelity": 0,
+    "useful_restraint": 0
+  }
+}

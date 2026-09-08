@@ -1,7 +1,7 @@
 """StoryArchitectAgent — dựng outline 3-act (problem -> mechanism -> solution)
-qua LLMProvider (claude CLI mặc định, hoặc ollama local qua
-`settings.llm_provider`). Provider không khả dụng -> placeholder outline,
-KHÔNG raise (graceful degrade, giống ResearchAgent thiếu API key).
+qua LLMProvider (xkiro mặc định qua `settings.llm_provider`, hoặc claude/codex).
+Provider không khả dụng -> placeholder outline, KHÔNG raise (graceful degrade,
+giống ResearchAgent thiếu API key).
 """
 
 from __future__ import annotations

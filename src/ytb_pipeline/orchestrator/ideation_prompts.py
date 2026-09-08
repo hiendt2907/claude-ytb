@@ -7,45 +7,902 @@ prompt ở đây diff được qua git, không rải string trong logic gọi pr
 from __future__ import annotations
 
 import json
-from math import ceil, floor
+import re
+from typing import TYPE_CHECKING
 
-from ..ideation.generator import (
-    CHARS_PER_MIN,
-    LONG_MAX_MINUTES,
-    LONG_MIN_MINUTES,
-    SHORT_MAX_MINUTES,
-    SHORT_MIN_MINUTES,
+from ..analytics.quality_report import REQUIRED_PURPOSES_BY_VIDEO_TYPE
+from ..config.settings import settings
+from ..agents.qa_agent import renderability_contract_text
+from ..content_contract import (
+    CONTRACT_VERSION,
+    SHORT_SITUATION_TENSION_MARKERS,
+    chars_per_min_for_provider,
+    contract_for,
+    effective_chars_per_min,
+)
+from ..content_profiles import (
+    ContentProfileError,
+    LEGACY_SHORT_EXPANSION_PURPOSES,
+    load_content_profile,
+)
+from ..ideation.generation_schema import SECTION_PURPOSES
+from .ideation_budget import ambient_budget, build_budget
+
+if TYPE_CHECKING:
+    from ..content_profiles import ContentProfile
+    from .ideation_budget import PromptBudget
+
+# Ngân sách độ dài KHÔNG còn tính lúc import. Bản cũ đóng băng hơn hai chục
+# hằng số ngay khi module được nạp, đọc `settings.tts_provider` tại thời điểm
+# đó — nên đổi provider hoặc profile giữa chừng hoàn toàn vô hiệu, và test phải
+# reload module mới thấy setting mới.
+#
+# `__getattr__` (PEP 562) giữ nguyên MỌI tên cũ cho ~110 chỗ tham chiếu trong
+# file này và cho test bên ngoài, nhưng giá trị nay được tính khi truy cập, từ
+# settings hiện hành. Số không đổi — Step 3a là refactor thuần; Step 3b mới
+# luồn profile vào để dùng tốc độ đọc đã hiệu chỉnh.
+_BUDGET_FIELDS = {
+    "SHORT_CONTRACT": "short_contract",
+    "LONG_CONTRACT": "long_contract",
+    "LONG_MIN_MINUTES": "long_min_minutes",
+    "LONG_MAX_MINUTES": "long_max_minutes",
+    "SHORT_MIN_MINUTES": "short_min_minutes",
+    "SHORT_MAX_MINUTES": "short_max_minutes",
+    "SHORT_ANSWER_START_TARGET_SEC": "short_answer_start_target_sec",
+    "PLANNING_CHARS_PER_MIN": "planning_chars_per_min",
+    "LONG_PLANNING_CHARS_PER_MIN": "long_planning_chars_per_min",
+    "SHORT_SITUATION_MAX_CHARS": "short_situation_max_chars",
+    "SHORT_MIN_CHARS": "short_min_chars",
+    "SHORT_MAX_CHARS": "short_max_chars",
+    "SHORT_SAFE_MIN_CHARS": "short_safe_min_chars",
+    "SHORT_SAFE_MAX_CHARS": "short_safe_max_chars",
+    "SHORT_TARGET_CHARS": "short_target_chars",
+    "SHORT_PROMPT_SECTIONS": "short_prompt_sections",
+    "SHORT_REQUIRED_PURPOSES": "short_required_purposes",
+    "SHORT_PAYOFF_MAX_CHARS": "short_payoff_max_chars",
+    "SHORT_BODY_SECTION_CHARS": "short_body_section_chars",
+    "LONG_MIN_CHARS": "long_min_chars",
+    "LONG_MAX_CHARS": "long_max_chars",
+    "LONG_SAFE_MIN_CHARS": "long_safe_min_chars",
+    "LONG_SAFE_MAX_CHARS": "long_safe_max_chars",
+}
+
+
+def __getattr__(name: str):  # PEP 562
+    field = _BUDGET_FIELDS.get(name)
+    if field is not None:
+        return getattr(ambient_budget(), field)
+    if name == "SCRIPT_GENERATION_SYSTEM_PROMPT":
+        return _script_generation_system_prompt_text(ambient_budget())
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+# Trần cấu trúc của lời chốt narrator: prompt sửa nó đòi ĐÚNG 2-3 câu nói
+# thành tiếng. Ba câu tiếng Việt đọc tự nhiên hiếm khi quá ~400 ký tự; để 420
+# cho câu dài mà vẫn chặn được kiểu viết lê thê. Đây là ràng buộc cấu trúc,
+# không phải ràng buộc thời lượng — ngân sách độ dài không được vượt qua nó.
+REFLECTION_MAX_CHARS = 420
+
+CHANNEL_EDITORIAL_BRIEF = """Kênh là "1 Cốc Café 6h", theo ngách "phát triển bản thân THẬT, không self-help": giải thích một cơ chế tâm lý, hành vi hoặc mental model trong mỗi tập bằng tình huống đời thường cụ thể. Khán giả phải hiểu vì sao hành vi xảy ra, giới hạn của cơ chế và một bước áp dụng ít rào cản; không dùng khẩu hiệu, mẹo chữa nhanh hoặc lời hứa tuyệt đối. Short là phễu cho long-form cùng cơ chế, không phải clip độc lập chỉ để lấy view."""
+
+SECTION_PURPOSES_LIST = ", ".join(SECTION_PURPOSES)
+
+# Sourced from `agents/qa_agent.py::_check_story_hook` — that gate requires an
+# ANCHOR (a concrete moment: a clock time, a place, a named cast member, an
+# event already in progress) plus a STAKE (an unfinished obligation, deadline,
+# consequence, or risk) in the opening narration, for every profile whose
+# narrative_mode is "character_story". Before this constant existed, no
+# generation or repair prompt stated that contract, so a model could pass
+# every other gate and still fail QA's hook rule with no instruction telling
+# it why. Never mention a specific series, cast name, or fixed example scene
+# here — a new character_story profile must satisfy this from the rule alone.
+STORY_HOOK_CONTRACT = (
+    "The opening narration must pass a hook gate: it needs BOTH an anchor and "
+    "a stake, or it is rejected. Anchor: name a concrete moment already in "
+    "progress — a clock time, a specific place, or a named cast member — never "
+    "a vague general time like \"mornings\" or \"lately\". Stake: state an "
+    "unfinished obligation, a deadline, a consequence, or something the "
+    "character could still lose, in that same opening — an anchor with no "
+    "stake (a character just sitting somewhere) still fails this gate. Close "
+    "the opening with an action or question that follows directly from that "
+    "situation, not a separate topic."
 )
 
-SHORT_TARGET_CHARS = int(CHARS_PER_MIN * 1.25)
-SHORT_MIN_CHARS = ceil(CHARS_PER_MIN * SHORT_MIN_MINUTES)
-SHORT_MAX_CHARS = floor(CHARS_PER_MIN * SHORT_MAX_MINUTES)
-LONG_MIN_CHARS = ceil(CHARS_PER_MIN * LONG_MIN_MINUTES)
-LONG_MAX_CHARS = floor(CHARS_PER_MIN * LONG_MAX_MINUTES)
-# Biên AN TOÀN để `_validate_length` không reject: LLM khai target_minutes =
-# LONG_MIN (12) rồi viết DƯ tới ~13-14.5 phút, nên số phút đo được
-# (chars / CHARS_PER_MIN) luôn ≥ target và ≤ LONG_MAX (15). Tránh khai 14 rồi
-# viết 13.7 phút (est < target => "quá mỏng").
-LONG_SAFE_MIN_CHARS = int(CHARS_PER_MIN * 13.0)
-LONG_SAFE_MAX_CHARS = int(CHARS_PER_MIN * 14.5)
+# DỰNG từ `agents.qa_agent::_UNRENDERABLE_VISUAL_INTENT`, không chép tay.
+#
+# Bản trước là một chuỗi viết tay kèm comment "phải giữ đồng bộ với bảng đó".
+# Comment không phải cơ chế: 2026-09-03 bảng học họ thứ 6 trong khi cả hai
+# prompt còn nêu 3; sửa xong, cùng ngày bảng lên 8 còn prompt vẫn 6. Mỗi lần
+# lệch, cổng chặn một thứ người viết chưa bao giờ được bảo là cấm — và tốn
+# trọn một lượt sinh kịch bản để phát hiện.
+#
+# `renderability_contract_text()` raise nếu một họ mới chưa có mô tả, nên thêm
+# họ mà quên prompt là không thể nữa.
+VISUAL_INTENT_RENDERABILITY_CONTRACT = renderability_contract_text()
+
+
+# Sourced from `agents/qa_agent.py::_check_immediate_action` /
+# `_is_narrator_lesson_closing` — the profile-declared
+# `content_rules.narrator_lesson_closing` switches which ending contract that
+# gate enforces. Never mention a specific series, cast name, or fixed episode
+# here — this must hold for any character_story profile from the rule alone.
+_BOUNDED_ACTION_CLOSING = (
+    "End the final section on a concrete bounded action a viewer could "
+    "copy — name a real quantity such as twenty minutes, three lines, "
+    "one page — shown through what a character actually does."
+)
+
+
+def _short_total_length_bounds(
+    payload: dict, *, content_profile: "ContentProfile | None" = None
+) -> tuple[int, int] | None:
+    """Short-only view of `_total_length_bounds`.
+
+    The three Short repairs (hook, expansion, strategy rewrite) each rebuild a
+    Short-shaped delta and have their own measured evidence behind them; they
+    keep asking a helper that answers for Shorts and nothing else, so widening
+    the window below cannot reach them by accident.
+    """
+    if str(payload.get("video_type") or "").strip().lower() != "short":
+        return None
+    return _total_length_bounds(payload, content_profile=content_profile)
+
+
+def _total_length_bounds(
+    payload: dict, *, content_profile: "ContentProfile | None" = None
+) -> tuple[int, int] | None:
+    """Return BOTH character bounds a script must hold after a repair.
+
+    A Long is judged by the same two-sided duration gate a Short is, so a
+    repair that resizes several sections can miss it from either end. Measured
+    2026-09-02: an editorial rewrite whose own `repair_brief` said "cắt bớt
+    hoặc nén mục 11" landed the Long at 278.1s against a 297.0s floor and cost
+    a sixteen-minute generation. The rewrite was never told a floor existed.
+
+    Returning None keeps malformed payloads unchanged.
+    """
+    sections = payload.get("sections") or []
+    if not sections:
+        return None
+    video_type = str(payload.get("video_type") or "").strip().lower()
+    if video_type == "long":
+        # The Long window must be the SAME one the generation prompt quotes.
+        # It was not: this branch ignored `content_profile` and answered from
+        # the ambient budget, which plans at the raw provider rate. For
+        # ban-so-6 that is 5,892-7,359 characters where the generator was told
+        # 4,599-5,764 — so an editorial rewrite was aiming at a window the
+        # runtime gate rejects, in the direction of overshooting the ceiling.
+        # The Short branch below already resolved the profile; the Long branch
+        # simply never did.
+        budget = (
+            build_budget(content_profile.providers.tts, content_profile)
+            if content_profile is not None
+            else ambient_budget()
+        )
+        return budget.long_safe_min_chars, budget.long_safe_max_chars
+    if video_type != "short":
+        return None
+    provider = (
+        content_profile.providers.tts if content_profile is not None else None
+    ) or settings.tts_provider
+    # A Short is measured twice, with two different rates: the ideation contract
+    # plans on chars_per_min_for_provider while the QA length rule resolves to
+    # effective_chars_per_min. Quoting one gate's window hands the writer a
+    # budget the other gate rejects — production 2026-08-30 lost a 7/10
+    # candidate at 730 characters because the quoted cap of 726 already measured
+    # 46.0s against a 45.0s ceiling. Quote the intersection instead, so anything
+    # inside it clears every gate the artifact must pass.
+    return short_safe_bounds_for_every_gate(
+        segment_count=max(1, len(sections)),
+        tts_provider=provider,
+        content_profile=content_profile,
+    )
+
+
+def short_safe_bounds_for_every_gate(
+    *,
+    segment_count: int,
+    tts_provider: str,
+    content_profile: "ContentProfile | None",
+) -> tuple[int, int]:
+    """Character window that clears BOTH duration gates a Short must pass.
+
+    The two gates disagree on the narration rate, so either window alone is
+    wrong at one end: the ideation contract's cap is measured over the ceiling
+    by the QA rule, and the QA rule's floor is measured under the floor by the
+    ideation contract. Both were observed in production on 2026-08-30 — a 730
+    character candidate rejected at 46.2s, and a 505 character one at 29.4s.
+    Intersecting the windows is the only budget that satisfies each of them.
+    """
+    contract = contract_for("short", content_profile)
+    windows = [
+        contract.safe_character_bounds(chars_per_minute=rate, segment_count=segment_count)
+        for rate in (
+            chars_per_min_for_provider(tts_provider, video_type="short"),
+            effective_chars_per_min(
+                tts_provider, video_type="short", content_profile=content_profile
+            ),
+        )
+    ]
+    floor = max(window[0] for window in windows)
+    cap = min(window[1] for window in windows)
+    return (floor, cap) if floor < cap else windows[0]
+
+
+def _short_situation_marker_list() -> str:
+    """Spell out the closed whitelist the Short `situation` gate actually checks.
+
+    Naming the tokens is the whole point: a prompt that only asks for "a
+    concrete tension marker" describes the intent but not the test, so an
+    editorially correct line can still be rejected and, during an editorial
+    rewrite, discard the entire delta.
+    """
+    return ", ".join(repr(marker) for marker in SHORT_SITUATION_TENSION_MARKERS)
+
+
+def _character_story_closing_instruction(content_profile: "ContentProfile | None") -> str:
+    if content_profile is not None and content_profile.content_rules.narrator_lesson_closing:
+        narrator_id = content_profile.editorial_contract.narration_speaker_id
+        instruction = (
+            f"End on a section whose speaker_id is \"{narrator_id}\": the narrator "
+            "offers a 2-3 sentence, direct-to-viewer reflection rooted in the exact "
+            "choice and consequence the scene earned. It must be modest and conditional, "
+            "not a universal moral, diagnosis, or command to act right now; do not turn "
+            "the narrator into another character's dialogue."
+        )
+        if content_profile.content_rules.require_next_episode_bridge:
+            instruction += (
+                " In that same closing, naturally name the unresolved question or "
+                "choice the next episode will examine; use a clear next-episode bridge "
+                "such as 'Tập sau…', 'Lần tới…', or 'Hẹn gặp lại ở tập sau…'."
+            )
+        return instruction
+    instruction = _BOUNDED_ACTION_CLOSING
+    if content_profile is not None and content_profile.content_rules.require_next_episode_bridge:
+        instruction += (
+            " In the same natural closing, name the unresolved question or choice the next "
+            "episode will examine; use a clear next-episode bridge such as 'Tập sau…', "
+            "'Lần tới…', or 'Hẹn gặp lại ở tập sau…'."
+        )
+    return instruction
+
+
+def _story_series_role_instruction(content_profile: "ContentProfile") -> str:
+    """Return the profile-declared three-role story contract, if enabled."""
+    rules = content_profile.content_rules
+    if not rules.story_primary_speaker_id:
+        return ""
+    narrator_id = content_profile.editorial_contract.narration_speaker_id
+    return (
+        "This Long has exactly three speaking roles: narrator speaker_id is "
+        f"\"{narrator_id}\"; primary speaker_id is \"{rules.story_primary_speaker_id}\"; "
+        f"supporting speaker_id is \"{rules.story_supporting_speaker_id}\". "
+        "The narrator owns the opening context/stakes and the final meaning; the primary "
+        "character carries the choice under pressure; the supporting character listens, "
+        "questions, or offers a specific counterpoint. Both characters must speak in the "
+        "episode. Do not add a fourth speaker or turn the narrator into a second main character."
+    )
+
+
+def _hook_repair_directive(content_profile: "ContentProfile | None") -> str:
+    """The contract text used to fix a QA `rule=hook` violation.
+
+    Routed identically everywhere a hook repair can happen (the free-standing
+    `repair_prompt` and the bounded `hook_repair_prompt` below): a
+    character_story profile gets the same anchor+stake contract
+    `qa_agent.py::_check_story_hook` enforces. Explainers then follow their
+    declared Long opening mode, so a pain-first profile is never repaired into
+    a legacy channel greeting.
+    """
+    if content_profile is not None and content_profile.narrative_mode == "character_story":
+        return STORY_HOOK_CONTRACT
+    if (
+        content_profile is not None
+        and content_profile.content_rules.long_opening_mode == "pain_first"
+    ):
+        return (
+            "for a pain-first Long, keep the opening as a concrete observable pain scene "
+            "and do not add a greeting or title read. In its first 28 spoken words, make "
+            "the cost, contradiction, or question explicit with a concrete question or one "
+            "tension marker (nhưng, thật ra, đừng, không phải, vì sao, sai lầm)."
+        )
+    return (
+        "for a Long, keep the required greeting but make the first 28 spoken words "
+        "after it contain a concrete question or one explicit tension marker "
+        "(nhưng, thật ra, đừng, không phải, vì sao, sai lầm). Do not merely add a "
+        "marker later in the section."
+    )
+
+
+def _long_opening_instruction(content_profile: "ContentProfile") -> str:
+    """Return the one Long opening contract shared by generation and repair.
+
+    The profile data, not `narrative_mode` nor profile id, decides whether an
+    episode retains the historical greeting. This keeps new editorial formats
+    compatible with the same workflow engine.
+    """
+    mode = content_profile.content_rules.long_opening_mode
+    if mode == "pain_first":
+        return (
+            "OPENING MODE: PAIN_FIRST. For a Long, open immediately with one concrete, "
+            "observable audience pain and the cost or pressure around it. Do not greet, "
+            "read the title, or define the topic before that scene."
+        )
+    if mode == "story_context":
+        return (
+            "OPENING MODE: STORY_CONTEXT. For a Long, let the narrator open with a concrete "
+            "scene, anchor, and stake required by the story contract. Do not force a channel greeting."
+        )
+    return (
+        "OPENING MODE: CHANNEL_GREETING. For a Long, begin exactly with \"Mến chào các bạn,\" "
+        "then the title and a topic-specific hook. In the first 28 spoken words after the "
+        "greeting, include a concrete question or one explicit tension marker."
+    )
+
+
+def _long_closing_instruction(content_profile: "ContentProfile") -> str:
+    """State the final beat expected by the profile's narrative form.
+
+    This is deliberately a prompt contract, paired with the existing QA gates:
+    explainers end on the viewer's immediate action; a story ends through its
+    narrator's lesson and bridge. Neither format gets a detached promotional
+    epilogue after its real ending.
+    """
+    if content_profile.narrative_mode == "character_story":
+        return _character_story_closing_instruction(content_profile)
+    if content_profile.narrative_mode == "mechanism_explainer":
+        return (
+            "CLOSING MODE: FINAL_ACTION. The final spoken section must contain one direct, "
+            "specific action the viewer can do today, beginning with exactly \"Hãy \". Do not "
+            "append a separate trailer, next-video promotion, or generic CTA after that action."
+        )
+    return ""
+
+
+def _short_ending_instruction(content_profile: "ContentProfile") -> str:
+    """Describe the Short's ending without coupling the engine to a channel.
+
+    A funnel Short intentionally leaves the substantive answer for its declared
+    Long.  A standalone explainer Short instead closes on an immediate action.
+    The profile decides which outcome is editorially honest; QA verifies the
+    corresponding observable contract.
+    """
+    if content_profile.content_rules.short_ending_mode == "funnel_bridge":
+        return (
+            "SHORT ENDING MODE: FUNNEL_BRIDGE. The final spoken section must naturally name "
+            "what the declared Long will explain next and invite the viewer to continue there. "
+            "Keep long_form_slug, cta_target, and source_long_slug identical. Do not replace "
+            "that bridge with a generic imperative or pretend this Short has resolved the topic."
+        )
+    if content_profile.narrative_mode == "mechanism_explainer":
+        return (
+            "SHORT ENDING MODE: FINAL_ACTION. The final spoken section must contain one direct, "
+            "specific action the viewer can do immediately."
+        )
+    return ""
+
+
+def hook_repair_prompt(
+    payload: dict, detail: str, *, content_profile: "ContentProfile | None" = None,
+) -> str:
+    """Ask for a bounded rewrite of ONLY the opening section's spoken text.
+
+    Mirrors the shape of `short_expansion_prompt`/`long_extension_prompt`: one
+    small JSON delta, every other field (title, section count, purposes,
+    strategy, continuity, payoff/CTA) explicitly untouched, so a hook fix can
+    never become an uncontrolled full-script rewrite.
+    """
+    context = {key: payload.get(key) for key in ("slug", "topic", "title", "video_type")}
+    sections = payload.get("sections") or []
+    context["first_section"] = sections[0] if sections else None
+    directive = _hook_repair_directive(content_profile)
+    # This repair rewrites the exact section the Short marker gate polices, so it
+    # must be told the whitelist too. Production 2026-08-30: a well-anchored
+    # repaired opening carrying real tension but no listed token failed contract
+    # validation outright and killed the whole run twice.
+    strategy = payload.get("strategy")
+    marker_guard = ""
+    if (
+        payload.get("video_type") == "short"
+        and isinstance(strategy, dict)
+        and strategy.get("format_id") == "core_answer_first_v1"
+    ):
+        marker_guard = (
+            "\nMANDATORY: the rewritten opening must literally contain one of these exact "
+            f"Vietnamese markers: {_short_situation_marker_list()}. An opening without one of "
+            "them is rejected outright, however well anchored it is."
+        )
+        # Resizing the opening moves the whole-script total that the two-sided
+        # duration gate judges, so this repair needs both bounds.
+        bounds = _short_total_length_bounds(payload, content_profile=content_profile)
+        if bounds is not None:
+            floor_chars, cap_chars = bounds
+            others = sum(
+                len(str(section.get("voiceover") or section.get("narration") or ""))
+                for section in sections[1:]
+            )
+            situation_cap = contract_for("short", content_profile).situation_char_budget(
+                chars_per_minute=chars_per_min_for_provider(
+                    (content_profile.providers.tts if content_profile is not None else None)
+                    or settings.tts_provider,
+                    video_type="short",
+                )
+            )
+            marker_guard += (
+                f" LENGTH BUDGET: the whole Short must stay between {floor_chars} and {cap_chars} "
+                f"characters of spoken narration; the other sections already carry {others}, so your "
+                f"rewritten opening must be between {max(1, floor_chars - others)} and "
+                f"{max(1, min(situation_cap, cap_chars - others))} characters. Both ends are "
+                "rejected outright."
+            )
+    return (
+        "Rewrite ONLY the opening narration of this Vietnamese YouTube script to fix "
+        "a QA hook rejection.\n"
+        f"QA detail: {detail}\n"
+        f"{directive}{marker_guard}\n"
+        'Return ONLY one JSON object shaped {"voiceover": <new Vietnamese opening '
+        "text>}. Do not return the full script, markdown, or any other field. Keep "
+        "the same speaker, purpose, and scene as the existing opening; do not "
+        "introduce a new character, mechanism, event, or topic. Keep it natural to "
+        "speak aloud — no stage directions, no camera language.\n\n"
+        f"Script context:\n{json.dumps(context, ensure_ascii=False, indent=2)}"
+    )
+
+
+def visual_intent_repair_prompt(
+    payload: dict,
+    *,
+    section_indexes: tuple[int, ...],
+    rejection_feedback: str = "",
+) -> str:
+    """Ask for a bounded rewrite of ONLY the flagged sections' `visual_intent`.
+
+    The three unrenderable forms are already stated in the generation prompt and
+    the model still writes them — `_check_unrenderable_visual_intent` says as
+    much ("nêu luật không đủ"). What was missing is the consequence: `hook` and
+    `narrator_reflection` each get a narrow repair, this rule got none, so one
+    bad clause in one section discarded a multi-minute generation. Measured on
+    real production logs 2026-09-01..02: three of five rejections were this
+    rule alone.
+
+    `visual_intent` is not spoken. Rewriting it cannot move narration, the
+    editorial score, or anything the viewer hears, which is why a narrow repair
+    is safe here in a way a transcript rewrite would not be. The gate still runs
+    afterwards and still fails closed.
+    """
+    sections = payload.get("sections") or []
+    flagged = [
+        {
+            "section_index": index,
+            "voiceover": str(sections[index - 1].get("voiceover") or ""),
+            "visual_intent": str(sections[index - 1].get("visual_intent") or ""),
+        }
+        for index in section_indexes
+        if 1 <= index <= len(sections) and isinstance(sections[index - 1], dict)
+    ]
+    feedback = str(rejection_feedback or "").strip()
+    feedback_block = (
+        "\nThe previous repair was rejected by the same gate. Fix this exact problem "
+        f"before returning the next delta: {feedback}\n"
+        if feedback else ""
+    )
+    return (
+        "Rewrite ONLY the `visual_intent` of the listed sections of this Vietnamese "
+        "YouTube script. Each one currently asks for something an image model cannot "
+        "deliver, so a vision model hard-fails every candidate frame and production "
+        "stops.\n"
+        f"{VISUAL_INTENT_RENDERABILITY_CONTRACT}\n"
+        "Write instead what a single still frame can show and be judged on: who is "
+        "present, where they are, the light and time of day, posture and mood, and one "
+        "action readable at a glance. The object may stay in the scene — put it on the "
+        "table, in the room — just never read from or held.\n"
+        "Keep the same characters, place and moment as the sentence being spoken over "
+        "it. Do not change the story.\n"
+        f"{feedback_block}"
+        'Return ONLY one JSON object shaped {"sections": [{"section_index": <int>, '
+        '"visual_intent": <new Vietnamese scene description>}]}, one entry per listed '
+        "section, no other field and no markdown.\n\n"
+        f"Sections to fix:\n{json.dumps(flagged, ensure_ascii=False, indent=2)}"
+    )
+
+
+def short_funnel_bridge_target(payload: dict) -> str:
+    """Return the exact Long target when a Short carries a valid funnel trace."""
+    if str(payload.get("video_type") or "").strip().lower() != "short":
+        return ""
+    strategy = payload.get("strategy")
+    if not isinstance(strategy, dict):
+        return ""
+    targets = [
+        str(strategy.get(field) or "").strip()
+        for field in ("long_form_slug", "cta_target", "source_long_slug")
+    ]
+    return targets[0] if targets[0] and len(set(targets)) == 1 else ""
+
+
+def narrator_reflection_repair_prompt(
+    payload: dict, detail: str, *, content_profile: "ContentProfile | None" = None,
+) -> str:
+    """Ask for one bounded rewrite of only the final narrator reflection."""
+    sections = payload.get("sections") or []
+    narrator_id = (
+        content_profile.editorial_contract.narration_speaker_id
+        if content_profile is not None
+        else "narrator"
+    )
+    final_text = str((sections[-1] if sections else {}).get("voiceover") or "").casefold()
+    requires_bridge = (
+        content_profile.content_rules.require_next_episode_bridge
+        if content_profile is not None
+        else any(marker in final_text for marker in ("tập sau", "lần tới", "hẹn gặp lại"))
+    )
+    bridge_instruction = (
+        "Preserve a natural bridge beginning with 'Tập sau', 'Lần tới', or "
+        "'Hẹn gặp lại ở tập sau'; cast names are allowed only inside that bridge."
+        if requires_bridge
+        else "Do not invent a next-episode bridge when the profile does not require one."
+    )
+    funnel_target = short_funnel_bridge_target(payload)
+    funnel_instruction = (
+        " MANDATORY SHORT FUNNEL BRIDGE: preserve a spoken voiceover bridge "
+        f"containing both the phrase 'video dài' and the exact target '{funnel_target}'. "
+        "This bridge must remain inside the same 2-3 total spoken sentences."
+        if funnel_target
+        else ""
+    )
+    # This repair resizes the section that decides admission. Production
+    # 2026-08-30: a 556-character Short lost 69 characters here and was rejected
+    # at 28.4s against a 30.0s floor. State the floor the rewrite will be judged
+    # against instead of letting it discover the cap by being killed.
+    #
+    # A Long is judged by the same two-sided gate through the same code, and
+    # until 2026-09-02 was told nothing: in that run this repair ran immediately
+    # before the total fell under the floor and the generation was lost.
+    #
+    # But the floor may not fight this section's OWN structural limit. The same
+    # prompt demands exactly 2-3 spoken sentences, and on 2026-09-02 a
+    # short Long pushed its whole deficit here — "must be between 879 and 2346
+    # characters" — which is ~300 characters per sentence. The model obeyed the
+    # number, returned one run-on sentence, and `narrator_reflection` rejected
+    # it. A whole-script shortfall is `extend`'s job (it adds sections); a
+    # closing reflection cannot absorb it. The cap is always stated, because
+    # overshooting the ceiling is a real failure; the floor only when it fits.
+    length_instruction = ""
+    bounds = _total_length_bounds(payload, content_profile=content_profile)
+    if bounds is not None:
+        floor_chars, cap_chars = bounds
+        label = "Short" if payload.get("video_type") == "short" else "Long"
+        others = sum(
+            len(str(section.get("voiceover") or section.get("narration") or ""))
+            for section in sections[:-1]
+        )
+        section_floor = max(1, floor_chars - others)
+        section_cap = min(REFLECTION_MAX_CHARS, max(1, cap_chars - others))
+        if section_floor <= section_cap:
+            length_instruction = (
+                f" LENGTH BUDGET: the whole {label} must stay between {floor_chars} and {cap_chars} "
+                f"characters of spoken narration; the other sections already carry {others}, so your "
+                f"rewritten final section must be between {section_floor} and {section_cap} "
+                "characters. Both ends are rejected outright, so reach the floor by saying the "
+                "reflection fully rather than by padding it."
+            )
+        else:
+            # Phần thiếu của cả kịch bản lớn hơn thứ 2-3 câu chứa nổi. Ràng
+            # buộc ĐÚNG ở đây không phải "lấp cho đủ" mà là "đừng ngắn hơn bản
+            # đang thay" — đúng cái đã sai ngày 2026-08-30, khi lời chốt co từ
+            # 321 xuống 252 và kéo cả Short xuống dưới sàn. Phần thiếu còn lại
+            # là việc của `extend`, nó thêm section.
+            current_final = len(
+                str(sections[-1].get("voiceover") or sections[-1].get("narration") or "")
+            ) if sections else 0
+            keep_at_least = max(1, min(current_final, section_cap))
+            # "Đừng ngắn hơn bản đang thay" chỉ đúng khi bản đang thay còn nằm
+            # trong trần cấu trúc. Nếu nó đã dài hơn 2-3 câu thì lời đúng là
+            # rút ngắn, và nhắc con số cũ ở đó sẽ tự mâu thuẫn với chính trần
+            # vừa nêu.
+            keep_clause = (
+                f" — it may not come out shorter than the {current_final} it replaces, and it may "
+                "not exceed 2-3 spoken sentences"
+                if current_final <= section_cap
+                else f" — the {current_final} it replaces is already longer than 2-3 spoken "
+                     "sentences, so this rewrite must be tighter, not longer"
+            )
+            length_instruction = (
+                f" LENGTH BUDGET: the whole {label} must stay between {floor_chars} and {cap_chars} "
+                f"characters of spoken narration, and the other sections carry {others}. Your "
+                f"rewritten final section must be between {keep_at_least} and {section_cap} "
+                f"characters{keep_clause}. That leaves the {label} short of its floor; do not make "
+                "that up here — a closing reflection stretched to fill a whole-script shortfall "
+                "stops sounding like a person and is rejected."
+            )
+    context = {
+        key: payload.get(key)
+        for key in ("slug", "topic", "title", "video_type", "continuity")
+    }
+    context["final_section"] = sections[-1] if sections else None
+    return (
+        "Rewrite ONLY the final narrator reflection of this Vietnamese YouTube "
+        "script to fix a QA narrator_reflection rejection.\n"
+        f"QA detail: {detail}\n"
+        f'The existing final speaker remains "{narrator_id}". Write exactly 2-3 '
+        "natural spoken sentences addressed directly to the viewer (include "
+        "'bạn'), rooted in the exact choice and consequence already present. "
+        "Keep the reflection modest and conditional; do not issue a command, "
+        "diagnose the viewer, invent a new event, or state a universal moral. "
+        "Do not name a cast member in the reflection before any next-episode bridge. "
+        f"{bridge_instruction}{funnel_instruction}{length_instruction}\n"
+        'Return ONLY one JSON object shaped {"voiceover": <new Vietnamese final '
+        "text>}. Do not return the full script, markdown, or any other field. "
+        "Do not change title, topic, section count, purpose, speaker, continuity, "
+        "or any earlier section.\n\n"
+        f"Script context:\n{json.dumps(context, ensure_ascii=False, indent=2)}"
+    )
+
+
+STRATEGY_V1_CONTRACT = f"""Every newly generated Short MUST include a strategy object. strategy contains format_id, core_mechanism, audience_problem, angle, long_form_slug, playlist, cta_target, and hook. hook contains situation, core_answer, open_loop, answer_by_sec. Use format_id="core_answer_first_v1" unless explicit analytics feedback says another tested format won. The Short must show the situation in the first segment, put the exact core_answer in a section whose purpose is "core_answer", and set answer_by_sec to 5 or less. Every section must include purpose, one of exactly: {SECTION_PURPOSES_LIST}. Do not delay the core answer with a greeting, a generic question, or an abstract definition. The core_answer should be a careful explanation, not an absolute diagnosis or a dopamine cliché."""
+
+PERSONAL_FINANCE_PSYCHOLOGY_PROFILE = "personal_finance_psychology"
+_PERSONAL_FINANCE_MARKERS = ("tài chính", "tài chánh", "tiền bạc", "personal finance")
+
+
+def is_personal_finance_psychology_request(requirement: str) -> bool:
+    """Whether a batch must use the evidence-register safety contract."""
+    normalized = requirement.casefold()
+    # A scope exclusion ("không tư vấn tài chính") must not accidentally
+    # turn an unrelated psychology topic into a finance-evidence task.  Strip
+    # only the negated noun phrase; a real finance request elsewhere remains.
+    normalized = re.sub(
+        r"\b(?:không|khong|tránh|tranh)\b[^.;,\n]{0,32}?"
+        r"\b(?:tài chính|tài chánh|tiền bạc|personal finance)\b",
+        "",
+        normalized,
+    )
+    return any(marker in normalized for marker in _PERSONAL_FINANCE_MARKERS)
+
+
+def personal_finance_source_contract(requirement: str) -> str:
+    """Return the mandatory source contract only for financial-behaviour batches."""
+    if not is_personal_finance_psychology_request(requirement):
+        return ""
+    return f"""
+Financial editorial profile is mandatory: set `editorial_profile` to
+`{PERSONAL_FINANCE_PSYCHOLOGY_PROFILE}`. This is educational personal-finance
+psychology, never investment, tax, legal, credit, insurance, or product advice.
+Before writing, research the claim and retain only claims you can substantiate.
+Return an `evidence_register` array. Each factual, numerical, financial, legal,
+or research claim used in narration must have one row with: `claim`,
+`source_title`, `publisher`, `published_year`, `url`, and `source_type`.
+`source_type` is exactly `primary`, `peer_reviewed`, or `official`; every URL
+must be a direct HTTPS source. Use a primary, peer-reviewed, or official source
+where available. Never cite a search-result page, an unverifiable blog, another
+creator, a made-up author, or a source you did not actually check. If a claim
+cannot be entered in this register, remove it from the narration. In
+`compliance.accuracy`, explicitly state that the evidence_register covers every
+factual claim. `compliance.passed` is false until this register is complete.
+"""
 
 # System contract dùng chung cho lần sinh đầu và mọi vòng repair. Giữ ở đây để
 # prompt là artifact có version/diff, không phân tán thành câu lệnh ngắn trong
 # các call-site provider.
-SCRIPT_GENERATION_SYSTEM_PROMPT = f"""You are the senior editorial writer and factual-safety reviewer for a Vietnamese YouTube channel.
+def _script_generation_system_prompt_text(budget: "PromptBudget") -> str:
+    """The base system prompt, built from a budget instead of frozen at import."""
+    LONG_MIN_MINUTES = budget.long_min_minutes
+    LONG_MAX_MINUTES = budget.long_max_minutes
+    LONG_MIN_CHARS = budget.long_min_chars
+    LONG_MAX_CHARS = budget.long_max_chars
+    LONG_SAFE_MIN_CHARS = budget.long_safe_min_chars
+    LONG_SAFE_MAX_CHARS = budget.long_safe_max_chars
+    LONG_PLANNING_CHARS_PER_MIN = budget.long_planning_chars_per_min
+    SHORT_MIN_CHARS = budget.short_min_chars
+    SHORT_MAX_CHARS = budget.short_max_chars
+    SHORT_SAFE_MIN_CHARS = budget.short_safe_min_chars
+    SHORT_SAFE_MAX_CHARS = budget.short_safe_max_chars
+    SHORT_MIN_MINUTES = budget.short_min_minutes
+    SHORT_MAX_MINUTES = budget.short_max_minutes
+    SHORT_SITUATION_MAX_CHARS = budget.short_situation_max_chars
+    SHORT_PROMPT_SECTIONS = budget.short_prompt_sections
+    SHORT_REQUIRED_PURPOSES = budget.short_required_purposes
+    SHORT_PAYOFF_MAX_CHARS = budget.short_payoff_max_chars
+    SHORT_BODY_SECTION_CHARS = budget.short_body_section_chars
+    SHORT_ANSWER_START_TARGET_SEC = budget.short_answer_start_target_sec
+    PLANNING_CHARS_PER_MIN = budget.planning_chars_per_min
+    SHORT_TARGET_CHARS = budget.short_target_chars
+    return f"""You are the senior editorial writer and factual-safety reviewer for a Vietnamese YouTube channel.
 Return exactly one valid JSON object and no markdown. Treat the user requirement and the declared JSON title/topic as the editorial contract.
-Timing estimates use the pipeline's calibrated ~2x Vietnamese narration rate, shared by Edge-TTS and F5-TTS.
+Timing estimates use the active TTS provider's calibrated Vietnamese narration rate; measured audio is the final authority.
 
 Non-negotiable editorial rules:
-1. Every spoken sentence must directly serve the declared title and topic. Keep one coherent causal mechanism per video. Never import an example, mechanism, scene, CTA, or conclusion from another topic. Refer to that single mechanism by ONE consistent full name. Whenever the narration uses the word "cơ chế", follow it only with that one mechanism's own name (e.g. "cơ chế lời nguyền tri thức"). NEVER write "cơ chế" followed by a varying generic word such as "cơ chế duy nhất", "cơ chế này", "cơ chế đó", "cơ chế tâm lý", "cơ chế chung": an automated scanner reads every distinct phrase after "cơ chế" as a separate competing mechanism and REJECTS the script. For generic mentions use "hiện tượng", "hiệu ứng", "nguyên lý", or "quá trình" instead.
-2. For a Short without target_minutes, narration must be {SHORT_MIN_CHARS}-{SHORT_MAX_CHARS} Vietnamese characters for 1.0-1.5 minutes. Reach the range by developing the same topic with new, relevant reasoning and evidence; never pad length with generic filler, repetition, or a reusable template.
-3. For a Long, set target_minutes to EXACTLY {LONG_MIN_MINUTES} and write {LONG_SAFE_MIN_CHARS}-{LONG_SAFE_MAX_CHARS} Vietnamese characters (~13-14.5 spoken minutes), within the validator's absolute {LONG_MIN_CHARS}-{LONG_MAX_CHARS} character range for a 12-15 minutes Long. The pipeline measures runtime as total_characters / {CHARS_PER_MIN:.0f} and REJECTS the script if measured minutes fall below the declared target_minutes or above {LONG_MAX_MINUTES}. So always overshoot the declared floor and never declare a number you do not exceed — declaring 14 while writing ~13.7 minutes FAILS. Build depth from the same mechanism: causal explanation, supported evidence, exact-topic example, application, and next-episode bridge; never stretch the runtime with repeated phrasing.
-4. Open a Short with a concrete conflict, consequence, or question; do not greet or read the title. Open a Long with "Mến chào các bạn," then its title and a topic-specific hook. Each section must add information, explain why, and use visuals that match its spoken narration. The final narration section must include one direct, specific action the viewer can do immediately: start that sentence with exactly "Hãy " and name the object, action, and a concrete time or scope. A question inviting a comment may follow, but never replace that action.
-5. Write knowledge, not slogans: explain the mechanism, use a concrete example that belongs to this exact topic, and give an immediately usable application. Do not drift into generic self-help, comedy, or unrelated advice.
+1. Set root JSON field `ruleset_id` to EXACTLY `{CONTRACT_VERSION}`. Every spoken sentence must directly serve the declared title and topic. Keep one coherent causal mechanism per video. Never import an example, mechanism, scene, CTA, or conclusion from another topic. Describe it naturally in Vietnamese; do not contort normal wording to satisfy a removed phrase-scanner.
+2. For a Short without target_minutes, narration must be {SHORT_MIN_CHARS}-{SHORT_MAX_CHARS} Vietnamese characters for {SHORT_MIN_MINUTES:.2f}-{SHORT_MAX_MINUTES:.2f} minutes. Aim for {SHORT_SAFE_MIN_CHARS:,}-{SHORT_SAFE_MAX_CHARS:,} characters IN TOTAL; this total outranks every per-section number below. Use at least {SHORT_PROMPT_SECTIONS} sections and they MUST cover every required purpose, in this order: {SHORT_REQUIRED_PURPOSES}. A Short is REJECTED if any of them is missing, so spend the budget on those first and add an `evidence` section or a concrete example ONLY if the total still allows it. Keep situation ≤{SHORT_SITUATION_MAX_CHARS} characters and payoff/CTA ≤{SHORT_PAYOFF_MAX_CHARS} characters; split what remains among the middle sections, roughly {SHORT_BODY_SECTION_CHARS} characters each. Silently count the combined voiceover before responding and expand one middle section — never the hook — if under {SHORT_SAFE_MIN_CHARS:,}. For strategy-v1, the first `situation` is visual setup only, must include a concrete tension marker, and the `core_answer` must be section two. Its very first sentence must exactly equal hook.core_answer. `answer_by_sec` means when that sentence STARTS, not when the explanatory section ends. Keep the situation short enough that the answer is estimated to begin by {SHORT_ANSWER_START_TARGET_SEC:.0f}s, leaving safety before the hard 5s gate.
+3. For a Long, set target_minutes to EXACTLY {LONG_MIN_MINUTES} and write {LONG_SAFE_MIN_CHARS:,}-{LONG_SAFE_MAX_CHARS:,} Vietnamese characters, within the validator's absolute {LONG_MIN_CHARS}-{LONG_MAX_CHARS} character range for a {LONG_MIN_MINUTES}-{LONG_MAX_MINUTES} minute Long. The pipeline measures planning duration as total_characters / {LONG_PLANNING_CHARS_PER_MIN:.0f} and verifies the actual audio stays {LONG_MIN_MINUTES}-{LONG_MAX_MINUTES} minutes. Build depth from the same mechanism: causal explanation, supported evidence, exact-topic example, application, and next-episode bridge; never stretch runtime with repeated phrasing. A Long may use richer section purposes than a Short, but it MUST still contain at least one section of each purpose the release gate requires: situation, core_answer, evidence, application, payoff. Open with a `situation` section that sets the concrete scene, and state the mechanism plainly in a `core_answer` section early — do not bury it.
+4. Open a Short with a concrete conflict, consequence, or question; do not greet or read the title. Open a Long with "Mến chào các bạn," then its title and a topic-specific hook. In the first 28 spoken words after the greeting, the hook MUST contain either a concrete question or one explicit tension marker: "nhưng", "thật ra", "đừng", "không phải", "vì sao", or "sai lầm". Each section must add information, explain why, and use visuals that match its spoken narration. For EVERY section, `time_goal` is required and MUST be a positive JSON number in minutes (never 0/null/string/timestamp/range); use values such as 0.5, 0.75, or 1.0. Section time_goal values must sum approximately to the declared target duration. Use one optional retention beat in both Shorts and Longs: choose its natural position after the viewer has received a concrete insight (for a Short, usually the final third; for a Long, usually after an explanatory or application payoff). It should briefly state the specific value the viewer has just received and invite a lightweight next action such as liking or following/subscribing. Make it value-first, topic-specific, and conversational; do not use a fixed sentence, put it in every section, or interrupt the hook/explanation. The final narration section of BOTH Shorts and Longs must include: (a) one direct, specific action the viewer can do immediately, starting that sentence with exactly "Hãy " and naming the object, action, and a concrete time or scope; (b) a natural, brief invitation to like the video; and (c) a natural, brief invitation to subscribe to the channel for future videos. These like-and-subscribe invitations are a channel-growth requirement, not optional filler, and must fit the topic and tone without sounding repetitive or manipulative. For a Short with a funnel target, the long-form bridge CTA must remain present alongside the like and subscribe invitations. A question inviting a comment may follow, but never replace the action or the like-and-subscribe invitations.
+5. Write knowledge, not slogans: explain the mechanism when it genuinely helps, use a concrete example that belongs to this exact topic, and give an immediately usable application. Keep those elements explicit in the narration, but choose natural wording; do not rely on fixed labels or template phrases. Do not drift into generic self-help, comedy, or unrelated advice. Channel topic compass: {CHANNEL_EDITORIAL_BRIEF}
 6. Verify every factual, numerical, medical, financial, legal, or research claim before including it. Omit any claim whose source cannot be named in the compliance notes; never invent statistics, studies, authors, or certainty.
+   When the request is personal-finance psychology, follow its evidence-register contract exactly; a plausible-sounding citation is still a failure.
 7. Respect YouTube community safety, copyright, advertiser-friendliness, COPPA, and the existing-ledger blacklist supplied in the user prompt. Use original narration and license-safe B-roll instructions.
+8. When video_type is "short", strategy-v1 is mandatory: {STRATEGY_V1_CONTRACT} The JSON must contain this strategy object before sections; a missing or incomplete strategy is invalid output, never a legacy fallback.
+9. Every new script MUST include a `thumbnail_brief` JSON object with exactly these non-empty string fields: `visual_contradiction`, `subject`, `emotion`, and `headline`. Show one instantly understandable visual contradiction, a concrete human/object subject, and one emotion; `headline` must be 4 words or fewer. The headline must reinforce the title/hook rather than repeat the full title. Produce this brief in the first JSON response; do not wait for a separate thumbnail or repair prompt.
 
 Before responding, silently audit title/topic-to-narration coherence sentence by sentence, the character contract, factual support, one mechanism, visual alignment, and the required JSON schema. If any check fails, rewrite the script before returning it."""
+
+
+def script_generation_system_prompt(
+    content_profile: "ContentProfile | None" = None,
+    *,
+    video_type: str | None = None,
+) -> str:
+    """Build a profile-scoped system contract without changing pipeline code.
+
+    The historical constant remains the compatibility path for callers that do
+    not yet declare a profile. New batch generation always supplies one.
+    """
+    if content_profile is None:
+        return _script_generation_system_prompt_text(ambient_budget())
+    requested_type = (video_type or "").strip().lower()
+    if requested_type and requested_type not in {"short", "long"}:
+        raise ContentProfileError(f"video_type không hợp lệ: {video_type!r}.")
+    if requested_type and not content_profile.supports_generation(requested_type):
+        raise ContentProfileError(
+            f"Profile '{content_profile.profile_id}' không cho sinh {requested_type} mới."
+        )
+    active_types = (
+        (requested_type,)
+        if requested_type
+        else tuple(kind for kind in ("short", "long") if content_profile.supports_generation(kind))
+    )
+    if not active_types:
+        raise ContentProfileError(f"Profile '{content_profile.profile_id}' không có format nào được phép sinh.")
+    format_prompt_names = set(content_profile.format_prompts.values())
+    prompt_rules = "\n\n".join(
+        content_profile.prompt_text(name)
+        for name in content_profile.prompts
+        if name not in format_prompt_names
+    )
+    format_structure = "\n\n".join(
+        f"{kind.upper()} transcript structure:\n{content_profile.format_prompt_text(kind)}"
+        for kind in active_types
+        if content_profile.format_prompt_text(kind)
+    )
+    format_lines: list[str] = []
+    purpose_rules: list[str] = []
+    purpose_policy = content_profile.editorial_contract.purpose_policy
+    purpose_vocabulary = ", ".join(purpose_policy.vocabulary)
+    for kind in active_types:
+        profile_format = content_profile.format_for(kind)
+        format_contract = contract_for(kind, content_profile)
+        rate = effective_chars_per_min(
+            content_profile.providers.tts, video_type=kind, content_profile=content_profile,
+        )
+        chars = format_contract.safe_character_bounds(
+            chars_per_minute=rate, segment_count=profile_format.min_sections
+        )
+        label = "Short" if kind == "short" else "Long"
+        runtime = (
+            f"{profile_format.viewer_min_sec:g}-{profile_format.viewer_max_sec:g}s"
+            if kind == "short"
+            else f"{profile_format.viewer_min_sec / 60:g}-{profile_format.viewer_max_sec / 60:g} minutes"
+        )
+        format_lines.append(
+            f"- {label}: {runtime}, {profile_format.min_sections}-{profile_format.max_sections} "
+            f"sections, aim for {chars[0]}-{chars[1]} Vietnamese narration characters."
+        )
+        required = ", ".join(purpose_policy.required_for(kind)) or "(none declared)"
+        purpose_rules.append(f"- Required purposes for this {label}: {required}.")
+    required_purposes_rule = (
+        "\n".join(purpose_rules)
+        + f"\n- Use only purposes from this profile's vocabulary: {purpose_vocabulary}."
+    )
+    if (
+        content_profile.narrative_mode == "character_story"
+        and "long" in active_types
+        and "evidence" in purpose_policy.required_for("long")
+    ):
+        required_purposes_rule += (
+            " In a character story, evidence may be a concrete observed consequence, response, "
+            "or detail that tests the character's belief; do not invent a research claim just to "
+            "fill this beat."
+        )
+    vg = content_profile.visual_generation
+    story_long_contract = ""
+    if (
+        content_profile.narrative_mode == "character_story"
+        and (
+            requested_type == "long"
+            or (not requested_type and active_types == ("long",))
+        )
+    ):
+        story_long_contract = (
+            f" {_story_series_role_instruction(content_profile)}"
+            f" {_character_story_closing_instruction(content_profile)}"
+        )
+    if content_profile.narrative_mode == "character_story":
+        narrator_id = content_profile.editorial_contract.narration_speaker_id
+        visual_field_rule = (
+            "Every section must include speaker_id and scene_characters (array of "
+            f"cast ids visible in frame, from {sorted(n for n in content_profile.voice_cast if n != narrator_id)}, "
+            "at most 2, [] for an establishing/prop shot with nobody visible — never "
+            "invent visual_asset)."
+            if vg is not None and vg.enabled
+            else "Every section must include speaker_id and visual_asset."
+        )
+        narrative_contract = (
+            f"{visual_field_rule} Dialogue must react to the previous line and sound "
+            "natural when spoken. For a section whose speaker_id is a character, "
+            "voiceover is exactly that character's spoken utterance: never narrate "
+            "their action in third person and never put another character's reply "
+            "inside it. Put action in a narrator section or visual_intent, and split "
+            "a back-and-forth into separate speaker turns. Do not require strategy "
+            "or Pexels fields. "
+            + (
+                "Every section must include turn. Narrator sections set turn=null. "
+                "A character section sets turn to an object with non-empty scene and intent, "
+                "and responds_to as null or a previous one-based section number it answers. "
+                "turn is planning metadata only and must never appear in voiceover."
+                if content_profile.content_rules.require_conversation_turns else ""
+            )
+            + story_long_contract
+            + f" {STORY_HOOK_CONTRACT}"
+        )
+    else:
+        strategy_rule = (
+            f"For Shorts, strategy-v1 is mandatory: {STRATEGY_V1_CONTRACT}"
+            if content_profile.content_rules.require_short_source_trace
+            else "Do not require a strategy object unless the profile editorial contract above asks for one."
+        )
+        pexels_rule = (
+            "Every section must include a grounded pexels_query for real stock footage."
+            if content_profile.content_rules.require_pexels_query
+            else "Do not require pexels_query unless the profile editorial contract above asks for it."
+        )
+        narrative_contract = f"{strategy_rule} {pexels_rule}"
+    opening_contract = (
+        _long_opening_instruction(content_profile) if "long" in active_types else ""
+    )
+    closing_contract = (
+        _long_closing_instruction(content_profile) if "long" in active_types else ""
+    )
+    short_ending_contract = (
+        _short_ending_instruction(content_profile) if "short" in active_types else ""
+    )
+    review_config = content_profile.editorial_review
+    editorial_acceptance_bar = (
+        "EDITORIAL ACCEPTANCE BAR: this transcript will be reviewed separately "
+        f"against the profile rubric and must earn at least {review_config.minimum_score}/10. "
+        "Before returning, silently score it harshly for human truth, spoken naturalness, "
+        "causal coherence, role fidelity, and useful restraint. Rewrite any line that sounds "
+        "like generic content, an unsupported diagnosis, or an author speaking through a character."
+        if review_config is not None and review_config.enabled and review_config.minimum_score
+        else ""
+    )
+    format_contract_lines = "\n".join(format_lines)
+    return f"""You are the senior editorial writer for content profile
+`{content_profile.profile_id}` version `{content_profile.version}`.
+Return exactly one valid JSON object and no markdown. Set ruleset_id to
+`{CONTRACT_VERSION}`, profile_id to `{content_profile.profile_id}`, and
+profile_version to `{content_profile.version}`.
+
+Profile editorial contract:
+{prompt_rules}
+
+Format contract:
+{format_contract_lines}
+- Every section needs a positive numeric time_goal, purpose, voiceover, and visual_intent.
+{required_purposes_rule}
+
+Format-specific transcript structure:
+{format_structure or '(No extra structure file declared; follow the profile editorial contract.)'}
+
+Narrative contract:
+{narrative_contract}
+{opening_contract}
+{closing_contract}
+{short_ending_contract}
+{editorial_acceptance_bar}
+
+Use original, safe, advertiser-friendly Vietnamese. Verify or omit factual
+claims. Include a complete thumbnail_brief and compliance object. Silently
+audit semantic continuity, spoken naturalness, timing, and JSON schema before
+responding."""
 
 
 def build_resume_prompt(remaining: int, type_of_vid: str, type_of_rules: str, existing_slugs: list[str]) -> str:
@@ -67,6 +924,8 @@ def build_resume_prompt(remaining: int, type_of_vid: str, type_of_rules: str, ex
         f"Cần viết THÊM {remaining} video loại \"{vid_label}\" — dùng skill youtube-ideation, "
         f"tuân thủ ĐẦY ĐỦ .claude/skills/youtube-ideation/video-quality-rules.md "
         f"(cổng verify mục 0, luật series mục 0d, độ dài mục 2a/2b). {topic_guidance}\n\n"
+        f"La bàn chủ đề bắt buộc:\n{CHANNEL_EDITORIAL_BRIEF}\n\n"
+        "Every section MUST include time_goal as a positive JSON number of minutes; never 0/null/string/timestamp/range (examples: 0.5, 0.75, 1.0). The sum of time_goal values must approximately match the target duration.\n\n"
         "Trước khi chọn chủ đề: đọc data/ledger.md, loại bỏ mọi chủ đề trùng/tương tự "
         "(mọi status, không chỉ done).\n\n"
         "QUY TRÌNH BẮT BUỘC — làm TUẦN TỰ từng video, KHÔNG làm batch:\n"
@@ -107,6 +966,8 @@ def build_start_prompt(num_of_vid: int, type_of_vid: str, type_of_rules: str) ->
         f"\"{vid_label}\" — dùng skill youtube-ideation, tuân thủ ĐẦY ĐỦ "
         f".claude/skills/youtube-ideation/video-quality-rules.md (cổng verify mục 0, "
         f"luật series mục 0d, độ dài mục 2a/2b). {topic_guidance}\n\n"
+        f"La bàn chủ đề bắt buộc:\n{CHANNEL_EDITORIAL_BRIEF}\n\n"
+        "Every section MUST include time_goal as a positive JSON number of minutes; never 0/null/string/timestamp/range (examples: 0.5, 0.75, 1.0). The sum of time_goal values must approximately match the target duration.\n\n"
         "Trước khi chọn chủ đề: đọc data/ledger.md, loại bỏ mọi chủ đề trùng/tương tự "
         "(mọi status, không chỉ done).\n\n"
         "QUY TRÌNH BẮT BUỘC — làm TUẦN TỰ từng video, KHÔNG làm batch:\n"
@@ -128,15 +989,29 @@ def build_start_prompt(num_of_vid: int, type_of_vid: str, type_of_rules: str) ->
 
 
 def ledger_topics(ledger_text: str) -> list[str]:
-    """Cột 'Tiêu đề' từ text ledger.md — dùng làm blacklist chủ đề đã làm."""
-    topics: list[str] = []
+    """Cột 'Tiêu đề' từ ledger.md — blacklist chủ đề, TRỪ tập đã huỷ.
+
+    `ytb batch cancel` ghi một dòng `stage=cancel` với tiêu đề TRỐNG, nên tiêu
+    đề cũ ở dòng `stage=ideation` vẫn nằm nguyên trong blacklist. Hệ quả đo
+    2026-09-04: huỷ một tập vì kịch bản không sản xuất được, sinh lại đúng chủ
+    đề đó, và bị chặn bởi chính thứ vừa huỷ (similarity=0.58).
+
+    Ta huỷ CHÍNH VÌ muốn làm lại. Một tập chưa từng lên sóng không ràng buộc
+    series — nó chỉ là một lần thử đã bỏ.
+    """
+    rows: list[tuple[str, str, str]] = []
     for line in ledger_text.splitlines():
         if not line.startswith("|"):
             continue
         cols = [part.strip() for part in line.strip("|").split("|")]
-        if len(cols) >= 3 and cols[2] and cols[2].lower() != "tiêu đề":
-            topics.append(cols[2])
-    return topics
+        if len(cols) >= 4:
+            rows.append((cols[1], cols[2], cols[3].lower()))
+    cancelled = {slug for slug, _title, stage in rows if slug and stage == "cancel"}
+    return [
+        title
+        for slug, title, _stage in rows
+        if title and title.lower() != "tiêu đề" and slug not in cancelled
+    ]
 
 
 def local_script_prompt(
@@ -148,19 +1023,123 @@ def local_script_prompt(
     generated_summaries: list[str] | None = None,
     analytics_feedback: list[str] | None = None,
     funnel: dict[str, str] | None = None,
+    source_long_context: dict | None = None,
+    *,
+    content_profile: "ContentProfile | None" = None,
 ) -> str:
     """Prompt sinh 1 script JSON qua local/structured LLM (khác luồng Claude skill)."""
+    _b = ambient_budget()
+    LONG_CONTRACT = _b.long_contract
+    LONG_MAX_MINUTES = _b.long_max_minutes
+    LONG_MIN_MINUTES = _b.long_min_minutes
+    LONG_SAFE_MAX_CHARS = _b.long_safe_max_chars
+    LONG_SAFE_MIN_CHARS = _b.long_safe_min_chars
+    PLANNING_CHARS_PER_MIN = _b.planning_chars_per_min
+    SHORT_PROMPT_SECTIONS = _b.short_prompt_sections
+    normalized_type = (type_of_vid or "").strip().lower()
+    if normalized_type not in {"short", "long"}:
+        raise ContentProfileError(f"video_type không hợp lệ: {type_of_vid!r}.")
+    if content_profile is not None and not content_profile.supports_generation(normalized_type):
+        raise ContentProfileError(
+            f"Profile '{content_profile.profile_id}' không cho sinh {normalized_type} mới."
+        )
+    short_contract = contract_for("short", content_profile) if normalized_type == "short" else None
+    long_contract = contract_for("long", content_profile) if normalized_type == "long" else None
+    short_format = (
+        content_profile.format_for("short")
+        if content_profile is not None and normalized_type == "short"
+        else None
+    )
+    long_format = (
+        content_profile.format_for("long")
+        if content_profile is not None and normalized_type == "long"
+        else None
+    )
+    short_sections = short_format.min_sections if short_format else SHORT_PROMPT_SECTIONS
+    short_max_sections = short_format.max_sections if short_format else short_sections
+    long_max_sections = (
+        long_format.max_sections if long_format else int(LONG_CONTRACT.minimum_sections * 1.5)
+    )
+    tts_provider = content_profile.providers.tts if content_profile else settings.tts_provider
+    short_rate = (
+        effective_chars_per_min(tts_provider, video_type="short", content_profile=content_profile)
+        if normalized_type == "short" else 0.0
+    )
+    long_rate = (
+        effective_chars_per_min(tts_provider, video_type="long", content_profile=content_profile)
+        if normalized_type == "long" else 0.0
+    )
+    # Quote the window that clears BOTH duration gates. Quoting one gate's view
+    # told the writer 497 characters was a valid floor, which the ideation
+    # contract measures at 29.0s and rejects (production 2026-08-30, a 505
+    # character candidate failed at 29.4s).
+    short_safe = (
+        short_safe_bounds_for_every_gate(
+            segment_count=short_sections,
+            tts_provider=tts_provider,
+            content_profile=content_profile,
+        )
+        if short_contract is not None else (0, 0)
+    )
+    short_absolute_seconds = (
+        short_contract.audio_runtime_bounds_sec(segment_count=short_sections)
+        if short_contract is not None else (0.0, 0.0)
+    )
+    short_absolute = tuple(int(short_rate * seconds / 60) for seconds in short_absolute_seconds)
+    long_sections = long_format.min_sections if long_format else LONG_CONTRACT.minimum_sections
+    long_safe = (
+        long_contract.safe_character_bounds(chars_per_minute=long_rate, segment_count=long_sections)
+        if long_contract is not None else (0, 0)
+    )
+    long_minutes = (
+        tuple(value / 60 for value in long_contract.viewer_runtime_bounds_sec)
+        if long_contract is not None else (0.0, 0.0)
+    )
+    editorial_brief = (
+        "\n\n".join(filter(None, (
+            content_profile.prompt_text("editorial"),
+            content_profile.format_prompt_text(normalized_type),
+        )))
+        if content_profile else CHANNEL_EDITORIAL_BRIEF
+    )
+    # Ngân sách MỖI SECTION, suy ra từ tổng và số section cho phép.  Short đã có
+    # bảng này; Long thì không, nên model chọn đúng số section rồi viết mỗi
+    # section dài bằng một beat của Short — 16 section x 146 ký tự cho một Long
+    # cần 5.822. Nêu rõ phép chia là đòn bẩy còn thiếu.
+    def _per_section(total_chars: int, sections: int) -> int:
+        return int(total_chars / max(1, sections))
+
+    long_per_section = (
+        f"With {long_sections} sections that is about "
+        f"{_per_section(long_safe[0], long_sections):,} characters each; with "
+        f"{long_max_sections} sections about "
+        f"{_per_section(long_safe[0], long_max_sections):,} each. "
+        "Count the combined voiceover before responding and lengthen scenes — "
+        "never duplicate one — if the total falls short"
+    ) if type_of_vid == "long" else ""
+
     target = (
         (
-            '"video_type": "long", "target_minutes": 12 (declare EXACTLY 12), total narration '
-            f'{LONG_SAFE_MIN_CHARS}-{LONG_SAFE_MAX_CHARS} Vietnamese characters (~13-14.5 min so '
-            f'measured minutes = chars / {CHARS_PER_MIN:.0f} always exceed the declared 12 and stay '
-            f'under {LONG_MAX_MINUTES}), and 24-36 rich sections'
+            (
+                f'"video_type": "long", "target_minutes": {LONG_MIN_MINUTES} (declare EXACTLY {LONG_MIN_MINUTES}), total narration '
+                f'{LONG_SAFE_MIN_CHARS}-{LONG_SAFE_MAX_CHARS} Vietnamese characters ({LONG_MIN_MINUTES}-{LONG_MAX_MINUTES} min at '
+                f'{PLANNING_CHARS_PER_MIN:.0f} chars/min; actual audio must stay inside that range), and '
+                f'{LONG_CONTRACT.minimum_sections}-{long_max_sections} rich sections. {long_per_section}'
+            )
+            if content_profile is None
+            else (
+                f'"video_type": "long", "target_minutes": {long_minutes[0]:g}, total narration '
+                f'{long_safe[0]}-{long_safe[1]} Vietnamese characters ({long_minutes[0]:g}-{long_minutes[1]:g} min at '
+                f'{long_rate:.0f} chars/min; actual audio must stay inside that range), and '
+                f'{long_sections}-{long_max_sections} rich sections. {long_per_section}'
+            )
         )
         if type_of_vid == "long"
         else (
             '"video_type": "short", no target_minutes, and total narration '
-            f'{SHORT_MIN_CHARS}-{SHORT_MAX_CHARS} Vietnamese characters for a 1.0-1.5 minute Short'
+            f'{short_safe[0]:,}-{short_safe[1]:,} Vietnamese characters (safe target inside the '
+            f'absolute {short_absolute[0]}-{short_absolute[1]} range) for a '
+            f'{short_contract.viewer_runtime_bounds_sec[0]:g}-{short_contract.viewer_runtime_bounds_sec[1]:g} second Short'
         )
     )
     generated_summaries = generated_summaries or []
@@ -184,24 +1163,223 @@ def local_script_prompt(
             f"long_form_slug={funnel.get('long_form_slug', '')}; "
             f"playlist={funnel.get('playlist', '')}; "
             f"cta_target={funnel.get('cta_target', '')}. "
-            "Make the final spoken CTA point to that exact long-form topic.\n"
+            "Copy these three values into the strategy fields of the same name. They are "
+            "machine identifiers: NEVER say a slug out loud — no voiceover may contain one, "
+            "because the voice reads it letter by letter as noise. The closing line names the "
+            "long form by what happens in it (\"video dài kể tiếp buổi sáng hôm đó\"), keeping "
+            "a phrase such as \"video dài\" or \"xem tiếp\".\n"
         )
-    custom_rules = "" if type_of_rules == "auto" else (
-        "\nCustom idea rules:\n"
-        "- The user's idea overrides the default channel niche and old ledger topics.\n"
-        "- Use the ledger ONLY as a blacklist of topics/titles to avoid, not as inspiration.\n"
-        "- Current channel scope is sharing/knowledge, not entertainment. Do NOT write comedy, "
-        "comedy, punchline structure, or gag narration for this channel.\n"
-        "- Write a clear Vietnamese knowledge short: concrete everyday example, mechanism, "
-        "application step, and grounded Pexels queries for real stock footage.\n"
+    source_long_instruction = ""
+    if type_of_vid == "short" and source_long_context:
+        candidates = source_long_context.get("candidates", [])
+        candidate_text = "\n".join(
+            "- section_index={section_index}; purpose={purpose}; excerpt={excerpt}".format(
+                section_index=item.get("section_index"),
+                purpose=item.get("purpose", ""),
+                excerpt=item.get("excerpt", ""),
+            )
+            for item in candidates
+        )
+        source_long_instruction = (
+            "\nLong-derived Short contract: choose EXACTLY one source candidate below. It must be the "
+            "intersection of a concrete value and an unresolved curiosity, never a generic introduction, "
+            "retention beat, closing, or CTA. In strategy include source_long_slug, source_section_index, "
+            "and source_excerpt; source_excerpt must exactly equal the selected candidate excerpt. Preserve "
+            "the source segment's substantive claim and evidence scope. Add only a tension hook, a concise "
+            "everyday context or example, a low-risk observation step, and the funnel CTA. Do not add a new "
+            "factual claim unless it is covered by the evidence_register.\n"
+            f"Source Long: slug={source_long_context.get('slug', '')}; title={source_long_context.get('title', '')}\n"
+            f"Eligible source candidates:\n{candidate_text}\n"
+            "For every factual or research claim retained from the source segment, reuse the matching source "
+            "row from this Source Long evidence register; do not invent or substitute a citation.\n"
+            f"Source Long evidence register: {json.dumps(source_long_context.get('evidence_register', []), ensure_ascii=False)}\n"
+        )
+    format_name = "long-form video" if type_of_vid == "long" else "Short"
+    target_minutes_field = (
+        f'"target_minutes" is required for a Long and must be the JSON number {long_minutes[0]:g}.'
+        if type_of_vid == "long"
+        else 'Do not include "target_minutes" for a Short.'
+    )
+    pexels_rule = (
+            "- Add grounded Pexels queries for real stock footage.\n"
+        if content_profile is None or content_profile.content_rules.require_pexels_query
+        else ""
+    )
+    if type_of_rules == "auto":
+        custom_rules = ""
+    elif content_profile is not None:
+        custom_rules = (
+            "\nCustom idea rules:\n"
+            "- The user's idea selects the episode/topic, while every declared profile rule, "
+            "character fact, continuity fact, and format contract still applies.\n"
+            "- Use the ledger ONLY as a blacklist of topics/titles to avoid, not as inspiration.\n"
+            f"- Requested idea: {type_of_rules}\n"
+            f"{pexels_rule}"
+            "- Keep narration natural in Vietnamese and derive the insight from this exact scene.\n"
+        )
+    else:
+        custom_rules = (
+            "\nCustom idea rules:\n"
+            "- The user's idea overrides the default channel niche and old ledger topics.\n"
+            "- Use the ledger ONLY as a blacklist of topics/titles to avoid, not as inspiration.\n"
+            "- Current channel scope is sharing/knowledge, not entertainment. Do NOT write comedy, "
+            "punchline structure, or gag narration for this channel.\n"
+            f"- Write a clear Vietnamese knowledge {format_name}: concrete everyday example, "
+            "mechanism, and an application step.\n"
+            f"{pexels_rule}"
+            "- The narration must contain a concrete everyday example and an actionable application "
+            "in natural Vietnamese; do not use fixed labels or template phrases.\n"
+        )
+    requires_strategy = (
+        type_of_vid == "short"
+        and (
+            content_profile is None
+            or content_profile.content_rules.require_short_source_trace
+        )
+    )
+    strategy_instruction = (
+        f"\nStrategy-v1 contract:\n{STRATEGY_V1_CONTRACT}\n"
+        if requires_strategy
+        else (
+            "\nFor a Long, omit strategy; its single mechanism and series bridge belong in the narration.\n"
+            if type_of_vid == "long"
+            else "\nFor this character-story Short, omit strategy; conflict, choice and consequence belong in the scene.\n"
+        )
+    )
+    strategy_schema = '"strategy", ' if requires_strategy else ""
+    financial_source_contract = personal_finance_source_contract(type_of_rules)
+    financial_schema = '"editorial_profile", "evidence_register", ' if financial_source_contract else ""
+    uniqueness_instruction = (
+        "This Short may reuse the declared source Long only. Do not reuse any existing Short's slug, "
+        "title, source section, scene setup, or punchline listed below.\n"
+        if type_of_vid == "short" and source_long_context else
+        "This must be a NEW concept inside the current batch. Do not reuse any slug, title, "
+        "topic, scene setup, or punchline already listed below.\n"
+    )
+    profile_fields = (
+        f'profile_id (exactly "{content_profile.profile_id}"), '
+        f'profile_version (exactly "{content_profile.version}"), '
+        if content_profile else ""
+    )
+    auto_visuals = bool(
+        content_profile and content_profile.visual_generation and content_profile.visual_generation.enabled
+    )
+    if content_profile and content_profile.narrative_mode == "character_story":
+        cast_ids = sorted(
+            name for name in content_profile.voice_cast
+            if name != content_profile.editorial_contract.narration_speaker_id
+        )
+        section_fields = (
+            f"Each section also needs speaker_id and scene_characters (array subset of {cast_ids}, "
+            "at most 2, listing who is VISIBLE in this frame; use [] for an establishing/prop shot). "
+            + (
+                "Each section also needs turn: narrator uses null; a character uses an object with "
+                "scene, intent, and responds_to (null or a previous one-based section number). "
+                if content_profile.content_rules.require_conversation_turns else ""
+            )
+            if auto_visuals
+            else "Each section also needs speaker_id and visual_asset; visual_asset is a filename under the profile assets directory. "
+        )
+    else:
+        section_fields = "Each section also needs pexels_query. "
+    short_instruction = "" if type_of_vid != "short" else (
+        # `short_sections` is the profile MINIMUM. Stating it as an exact count
+        # instructed a shape the profile's own editorial gate keeps rejecting:
+        # four beats cannot show a character's question, the reply, the meeting
+        # response, the cost and a modest close, which is what every 2026-08-30
+        # rejection asked for. The only artifact that ever cleared the 9/10 bar
+        # for this format used seven. The runtime contract is unaffected — the
+        # character and duration bounds are identical across the whole window.
+        f"Use between {short_sections} and {short_max_sections} sections for this Short; "
+        f"prefer more, shorter beats over few long ones when the story needs a reply, a "
+        f"reaction or a consequence to be shown rather than summarised. Make `situation` first and "
+        f"keep it under {short_contract.situation_char_budget(chars_per_minute=short_rate)} characters with a concrete tension marker "
+        f"— it must literally contain one of these exact Vietnamese markers: {_short_situation_marker_list()}; "
+        "make `core_answer` the next section and begin with the exact strategy.hook.core_answer. "
+        "This immediate answer contract is mandatory.\n"
+        if requires_strategy
+        else f"Use exactly {short_sections} sections for this Short unless the profile allows a story beat expansion up to {short_max_sections}. Follow the profile's spoken-language and continuity rules.\n"
+    )
+    visual_asset_instruction = ""
+    if content_profile and content_profile.narrative_mode == "character_story":
+        if auto_visuals:
+            cast_ids = sorted(
+                name for name in content_profile.voice_cast
+                if name != content_profile.editorial_contract.narration_speaker_id
+            )
+            visual_asset_instruction = (
+                f"scene_characters lists who is on screen, from {cast_ids}, max 2 — "
+                "never a filename, never more than the two the profile can render together.\n"
+                # `visual_intent` is not prose for a human reader. It is sent
+                # verbatim to the image generator AND to the Vision Judge, which
+                # treats every clause in it as a binding requirement. Production
+                # 2026-08-30: three of three shots escalated to a human because
+                # the intent asked for readable on-screen text, a held prop and
+                # an exact hand position, while character/composition/continuity
+                # all scored 1.000. Say what the field is judged on.
+                "IMPORTANT — how visual_intent is used: it becomes BOTH the image "
+                "generation prompt AND the requirement a vision model scores the "
+                "resulting frame against, clause by clause, pass/fail. "
+                f"{VISUAL_INTENT_RENDERABILITY_CONTRACT}\n"
+            )
+        else:
+            names = ", ".join(content_profile.visual_asset_names)
+            visual_asset_instruction = (
+                "Use only these visual_asset filenames; never invent a path or filename: "
+                f"{names or '<no scene assets configured>'}.\n"
+            )
+        # Ledger được ghi từ chính tuyên bố này sau khi tập lên sóng, nên nó phải
+        # mô tả tập NÀY, không phải tóm tắt lại series. Áp dụng cho mọi profile
+        # character_story, không phụ thuộc auto_visuals.
+        visual_asset_instruction += (
+            "Also return a `continuity` object recording what THIS episode changed, "
+            "so the next episode can be written on top of it: episode_summary (one "
+            "sentence naming the choice made and its consequence), character_changes "
+            "(object mapping a cast id to what changed for that character; use {} if "
+            "nothing changed), threads_opened and threads_closed (arrays of short "
+            "Vietnamese sentences; use [] when empty). Do not restate the series "
+            "premise and do not invent events outside this episode.\n"
+            # Hai luật này trước đây chỉ tồn tại ở cổng QA, nên model chỉ biết
+            # sau khi đã bị từ chối một lượt sinh.
+            "Never prefix a line with the speaker name (write \"Cậu mở hộp thư "
+            "lần thứ mấy rồi?\", not \"An: Cậu mở hộp thư...\") — speaker_id "
+            "already routes the voice and the prefix gets read aloud. "
+            + (
+                f"{_story_series_role_instruction(content_profile)} "
+                f"{_character_story_closing_instruction(content_profile)}\n"
+                if normalized_type == "long"
+                else ""
+            )
+            + f"{STORY_HOOK_CONTRACT}\n"
+        )
+    opening_instruction = (
+        _long_opening_instruction(content_profile) + "\n"
+        if content_profile is not None and normalized_type == "long"
+        else ""
+    )
+    closing_instruction = (
+        _long_closing_instruction(content_profile) + "\n"
+        if content_profile is not None and normalized_type == "long"
+        else ""
+    )
+    short_ending_instruction = (
+        _short_ending_instruction(content_profile) + "\n"
+        if content_profile is not None and normalized_type == "short"
+        else ""
     )
     return (
         "You are writing a Vietnamese YouTube script JSON for a local-first pipeline.\n"
         f"Video {index}/{total}. Type: {type_of_vid}. Requirement: {topic}\n"
+        f"Content profile editorial compass:\n{editorial_brief}\n"
+        f"{opening_instruction}"
+        f"{closing_instruction}"
+        f"{short_ending_instruction}"
+        f"{strategy_instruction}"
         f"Length contract: {target}.\n"
         f"{funnel_instruction}"
-        "This must be a NEW concept inside the current batch. Do not reuse any slug, title, "
-        "topic, scene setup, or punchline already listed below.\n"
+        f"{source_long_instruction}"
+        f"{financial_source_contract}"
+        f"{uniqueness_instruction}"
         f"{custom_rules}\n"
         "Already generated in this batch:\n"
         f"{generated}\n\n"
@@ -211,46 +1389,415 @@ def local_script_prompt(
         "Blocked historical titles/topics:\n"
         f"{blocked_titles or '- none'}\n\n"
         "Return ONLY one JSON object with keys: slug, topic, title, description, tags, "
-        "video_type, voice_profile, sections, compliance. video_type is only long or short. "
-        "voice_profile is knowledge or inspiring. Each section needs time_goal, voiceover, "
-        "visual_intent, pexels_query, caption, hook, transition, payoff, emphasis. "
-        "Keep legacy narration equal to voiceover and broll equal to pexels_query for compatibility.\n"
+        f"{profile_fields}"
+        f"video_type, target_minutes, voice_profile, \"thumbnail_brief\", {financial_schema}{strategy_schema}sections, compliance. video_type is only long or short. "
+        f"{target_minutes_field} "
+        "voice_profile is knowledge or inspiring. Each section needs time_goal as a positive JSON number of minutes (never 0/null/string/timestamp/range), purpose, voiceover, "
+        "visual_intent, caption, hook, transition, payoff, emphasis. "
+        f"{section_fields}"
+        f"{visual_asset_instruction}"
+        "Use these canonical fields only; the pipeline reads voiceover and pexels_query directly.\n"
+        "thumbnail_brief is required for this newly generated script and has exactly four non-empty string fields: visual_contradiction, subject, emotion, headline. "
+        "Make the visual_contradiction immediately legible, name a concrete subject and one emotion, and use a headline of 4 words or fewer (never the full title).\n"
         "compliance.passed must be true and include community/copyright/accuracy/"
         "advertiser/coppa/notes."
+        f"{short_instruction}"
     )
 
 
-def repair_prompt(payload: dict, qa_output: dict | None, validation_error: str | None) -> str:
+def _long_extension_field_rule(content_profile: "ContentProfile | None") -> str:
+    """Field guidance a new Long section must follow, sourced from the profile.
+
+    This used to hardcode `pexels_query` as required on every added section —
+    correct for the explainer channel, but a story profile with auto-generated
+    scenes has no Pexels field at all, and Long extension paid for an LLM call
+    whose sections were then rejected by script_contract for having the wrong
+    shape. Every field this text asks for must be exactly what the profile's
+    own required-field policy (mirrored in generation_schema/script_contract)
+    will accept.
+    """
+    base = "purpose, time_goal (a positive number), voiceover, visual_intent"
+    if content_profile is None:
+        return f"Each new section must have {base}, pexels_query, caption, hook, transition, payoff, and emphasis."
+    if content_profile.narrative_mode == "character_story":
+        vg = content_profile.visual_generation
+        narrator_id = content_profile.editorial_contract.narration_speaker_id
+        auto_visuals = vg is not None and vg.enabled
+        if auto_visuals:
+            cast_ids = sorted(name for name in content_profile.voice_cast if name != narrator_id)
+            visual_field = (
+                f"scene_characters (array subset of {cast_ids}, at most 2, [] for no one "
+                "visible — never invent visual_asset)"
+            )
+        else:
+            visual_field = "visual_asset (a filename under the profile assets directory)"
+        rule = f"Each new section must have {base}, speaker_id, {visual_field}, caption, hook, transition, payoff, and emphasis."
+        if content_profile.content_rules.require_conversation_turns:
+            rule += (
+                " Each new section also needs turn: narrator sections set turn=null; a character "
+                "section sets turn to an object with non-empty scene and intent, and responds_to as "
+                "null or a previous one-based section number it answers."
+            )
+        return rule
+    pexels_clause = ", pexels_query" if content_profile.content_rules.require_pexels_query else ""
+    return f"Each new section must have {base}{pexels_clause}, caption, hook, transition, payoff, and emphasis."
+
+
+def long_extension_prompt(
+    payload: dict,
+    missing_chars: int,
+    *,
+    max_new_sections: int | None = None,
+    content_profile: "ContentProfile | None" = None,
+) -> str:
+    """Ask for only the missing Long sections, keeping one Codex response bounded."""
+    context = {
+        key: payload.get(key)
+        for key in ("slug", "topic", "title", "description", "tags", "voice_profile", "compliance")
+    }
+    context["existing_sections"] = [
+        {**section, "section_index": index}
+        for index, section in enumerate(payload.get("sections", []) or (), start=1)
+        if isinstance(section, dict)
+    ]
+    if max_new_sections == 1:
+        section_count_instruction = "Add 1 new, topic-specific section "
+    elif max_new_sections is not None:
+        section_count_instruction = f"Add 1-{max_new_sections} new, topic-specific sections "
+    else:
+        section_count_instruction = "Add only as many new, topic-specific sections as are needed "
+    field_rule = _long_extension_field_rule(content_profile)
+    return (
+        "Extend a Vietnamese long-form YouTube script without rewriting its existing narration.\n"
+        "Return ONLY one JSON object with a `sections` array and `insert_before_section_index`; do not return the full script or markdown. "
+        "insert_before_section_index is the one-based section_index of an EXISTING section that the new material must come immediately before. "
+        "Choose the chronological boundary from the supplied story: the first event in your additions must happen before that target section, never after a later time jump, flash-forward, meeting, or conclusion.\n"
+        f"Do not rewrite, repeat, or summarize the existing sections. {section_count_instruction}"
+        f"whose combined `voiceover` is at least {missing_chars:,} Vietnamese characters. {field_rule} Develop only the "
+        "same named mechanism through fresh evidence, concrete examples, limits, or applications. Prefer the fewest "
+        "complete beats that satisfy the missing runtime. Do not add a "
+        "second greeting, a duplicate CTA, a generic self-help list, or unsupported factual claims.\n\n"
+        f"Script context:\n{json.dumps(context, ensure_ascii=False, indent=2)}"
+    )
+
+
+def short_expansion_allowed_indexes(
+    payload: dict,
+    *,
+    content_profile: "ContentProfile | None" = None,
+) -> tuple[int, ...]:
+    """Return mutable Short beat indexes using the engine's zero-based contract.
+
+    Array position cannot determine what is safe to edit. Each profile declares
+    repairable purposes; the hook and final CTA always remain immutable. Scripts
+    without a profile preserve the documented legacy policy.
+    """
+    sections = payload.get("sections")
+    if not isinstance(sections, list):
+        return ()
+    if content_profile is None:
+        profile_id = str(payload.get("profile_id") or "").strip()
+        content_profile = load_content_profile(
+            profile_id, version=str(payload.get("profile_version") or "").strip() or None,
+        ) if profile_id else None
+    repairable_purposes = {
+        purpose.strip().casefold()
+        for purpose in (
+            content_profile.editorial_contract.short_expansion_purposes
+            if content_profile is not None
+            else LEGACY_SHORT_EXPANSION_PURPOSES
+        )
+    }
+    last_index = len(sections) - 1
+    return tuple(
+        index
+        for index, section in enumerate(sections)
+        if isinstance(section, dict)
+        and index != last_index
+        and not bool(section.get("hook"))
+        and str(section.get("purpose") or "").strip().casefold() in repairable_purposes
+    )
+
+
+def short_expansion_prompt(
+    payload: dict,
+    missing_chars: int,
+    *,
+    target_chars: int | None = None,
+    max_chars: int | None = None,
+    content_profile: "ContentProfile | None" = None,
+) -> str:
+    """Ask for one bounded Short addition, never a rewrite or CTA edit."""
+    context = {
+        key: payload.get(key)
+        for key in ("slug", "topic", "title", "strategy", "compliance")
+    }
+    context["sections"] = payload.get("sections", [])
+    allowed_indexes = short_expansion_allowed_indexes(
+        payload, content_profile=content_profile,
+    )
+    target_clause = (
+        f" aim for {target_chars:,} characters."
+        if target_chars is not None else ""
+    )
+    maximum_clause = (
+        f" use at most {max_chars:,} characters."
+        if max_chars is not None else ""
+    )
+    return (
+        "Expand only the underdeveloped middle narration of this Vietnamese Short.\n"
+        "Return ONLY one JSON object with a `section_updates` array. Do not return the full script "
+        "or markdown. `index` is a ZERO-BASED JSON array index, not a human section number. "
+        "Return exactly ONE item shaped `{\"index\": <allowed zero-based index>, "
+        "\"append_voiceover\": <new Vietnamese text>}`. "
+        f"ONLY legal index values: {list(allowed_indexes)}. Do not change title, metadata, hook, "
+        "source trace, section order, the first situation/core_answer sections, or the final payoff/CTA. "
+        "Add a specific topic-relevant explanation, example, or action that follows the chosen existing "
+        "section. Do not introduce a new person, place, event, or outcome outside that section's context. "
+        f"The appended text must be at least {missing_chars:,} characters.{target_clause}{maximum_clause} "
+        "Do not add greetings, duplicated CTA, generic self-help, or unsupported claims.\n\n"
+        f"Script context:\n{json.dumps(context, ensure_ascii=False, indent=2)}"
+    )
+
+
+def repair_prompt(
+    payload: dict,
+    qa_output: dict | None,
+    validation_error: str | None,
+    recovery_directive: str = "",
+) -> str:
     """Prompt yêu cầu LLM sửa script JSON không qua validation/QA."""
+    _b = ambient_budget()
+    LONG_MAX_MINUTES = _b.long_max_minutes
+    LONG_MIN_MINUTES = _b.long_min_minutes
+    LONG_SAFE_MAX_CHARS = _b.long_safe_max_chars
+    LONG_SAFE_MIN_CHARS = _b.long_safe_min_chars
+    PLANNING_CHARS_PER_MIN = _b.planning_chars_per_min
+    SHORT_MAX_CHARS = _b.short_max_chars
+    SHORT_MAX_MINUTES = _b.short_max_minutes
+    SHORT_MIN_CHARS = _b.short_min_chars
+    SHORT_MIN_MINUTES = _b.short_min_minutes
     issues = {
         "validation_error": validation_error,
         "qa": qa_output or {},
     }
+    is_financial_psychology = (
+        payload.get("editorial_profile") == PERSONAL_FINANCE_PSYCHOLOGY_PROFILE
+        or isinstance(payload.get("evidence_register"), list)
+        or "financial script" in (validation_error or "").casefold()
+    )
+    financial_repair_contract = (
+        "Preserve editorial_profile=personal_finance_psychology exactly. Preserve the complete "
+        "evidence_register and every source URL unless a source itself is invalid; do not replace "
+        "a cited claim with an uncited claim. Keep compliance.accuracy explicitly confirming that "
+        "the evidence_register covers every factual financial, psychological, or research claim. "
+        "Remove any wording that predicts the same financial behaviour or outcome for all people; "
+        "state the research scope and its limits instead.\n"
+        if is_financial_psychology
+        else ""
+    )
+    financial_schema = "editorial_profile, evidence_register, " if is_financial_psychology else ""
+    repair_profile_id = str(payload.get("profile_id") or "").strip()
+    repair_profile = load_content_profile(
+        repair_profile_id, version=str(payload.get("profile_version") or "").strip() or None,
+    ) if repair_profile_id else None
+    hook_repair_rule = (
+        "Rewrite the first narration section whenever the QA issues include rule "
+        f"'hook': {_hook_repair_directive(repair_profile)}\n"
+    )
+    # This repair returns the FULL script, so it can rewrite the situation
+    # section that the Short marker gate polices. Name the whitelist here too,
+    # or a corrected script gets rejected for a rule it was never told.
+    strategy_payload = payload.get("strategy")
+    if (
+        str(payload.get("video_type") or "").strip().lower() == "short"
+        and isinstance(strategy_payload, dict)
+        and strategy_payload.get("format_id") == "core_answer_first_v1"
+    ):
+        hook_repair_rule += (
+            "The situation section must literally contain one of these exact Vietnamese "
+            f"markers: {_short_situation_marker_list()}; a Short without one is rejected "
+            "outright.\n"
+        )
+    # The module constants are computed for the default profile at import time,
+    # so they hand a ban-so-6 Short a 793-character ceiling that measures 50.2s.
+    # Prefer the script's own profile window whenever it declares one.
+    short_repair_chars = _short_total_length_bounds(
+        payload, content_profile=repair_profile
+    ) or (SHORT_MIN_CHARS, SHORT_MAX_CHARS)
     return (
         "Repair this Vietnamese YouTube script JSON for the local-first pipeline.\n"
         "Return ONLY the full corrected JSON object. Do not add markdown.\n"
         "Preserve the topic and core story unless a listed violation requires a narrow fix.\n"
-        f"For Shorts without target_minutes, total narration MUST be {SHORT_MIN_CHARS}-{SHORT_MAX_CHARS} "
-        "Vietnamese characters for 1.0-1.5 minutes. Do not overshoot. Do not add greetings. "
+        "If Current JSON already has a strategy object, preserve it. For a strategy-v1 Short, keep "
+        "format_id, core_mechanism, audience_problem, angle, long_form_slug, playlist, cta_target, "
+        "source_long_slug, source_section_index, source_excerpt, and hook; retain a situation section followed by a core_answer section whose narration STARTS with "
+        "the exact hook.core_answer before hook.answer_by_sec seconds.\n"
+        f"{financial_repair_contract}"
+        f"For Shorts without target_minutes, total narration MUST be {short_repair_chars[0]}-{short_repair_chars[1]} "
+        f"Vietnamese characters for {SHORT_MIN_MINUTES:.2f}-{SHORT_MAX_MINUTES:.2f} minutes. Do not overshoot. Do not add greetings. "
         f"For Longs, target_minutes MUST be EXACTLY {LONG_MIN_MINUTES} and total narration MUST be "
-        f"{LONG_SAFE_MIN_CHARS}-{LONG_SAFE_MAX_CHARS} Vietnamese characters (~13-14.5 minutes); measured "
-        f"minutes = total_chars / {CHARS_PER_MIN:.0f} must be >= target_minutes and <= {LONG_MAX_MINUTES}. "
-        "When the narration uses 'cơ chế', follow it only with the one mechanism's own name; never pair "
-        "'cơ chế' with varying generic words (duy nhất, này, đó, tâm lý) or QA rejects it as competing mechanisms. "
-        "If the script is too short, "
-        "write the missing narration from scratch so every added sentence remains specific to the declared "
-        "title and topic; never reuse generic examples, mechanisms, or application steps from another video.\n"
+        f"{LONG_SAFE_MIN_CHARS}-{LONG_SAFE_MAX_CHARS} Vietnamese characters ({LONG_MIN_MINUTES}-{LONG_MAX_MINUTES} minutes at "
+        f"{PLANNING_CHARS_PER_MIN:.0f} chars/min); measured "
+        f"minutes = total_chars / {PLANNING_CHARS_PER_MIN:.0f} must be >= target_minutes and <= {LONG_MAX_MINUTES}. "
+        "If the script is too short, retain every valid existing narration section and add the missing specific "
+        "narration until the actual voiceover character count is inside the Long range. Do not shorten or delete "
+        "valid existing narration; every added sentence must remain specific to the declared title and topic, never "
+        "reuse generic examples, mechanisms, or application steps from another video.\n"
         "Current channel scope is sharing/knowledge, not entertainment. Remove comedy, "
         "punchline, and gag narration if present. Keep a concrete "
         "everyday example, mechanism, application step, and real-stock-footage Pexels queries.\n"
-        "If QA reports concrete_example, the repaired narration MUST contain one sentence "
-        "starting exactly with 'Ví dụ cụ thể:' and state all four parts: bối cảnh, "
-        "hành động, hậu quả, and cách áp dụng. Do not hide the example only in visual fields.\n"
-        "Required schema: slug, topic, title, description, tags, video_type, voice_profile, "
-        "sections, compliance. video_type is only short or long. voice_profile is knowledge "
-        "or inspiring. Each section needs time_goal, voiceover, visual_intent, pexels_query, "
-        "caption, hook, transition, payoff, emphasis. Also include legacy narration=voiceover "
-        "and broll=pexels_query. compliance.passed must be true.\n\n"
+        "If review reports a missing example, repair the narration with a specific everyday context, observable action, consequence, and practical application in natural Vietnamese. Do not add fixed labels merely to satisfy a parser.\n"
+        "For both Shorts and Longs, retain or add at most one value-first retention beat only where it follows a concrete insight: acknowledge the topic-specific value just delivered, then make a brief natural invitation to like or follow/subscribe. Do not use a fixed sentence, repeat it across sections, or place it before the hook.\n"
+        f"{hook_repair_rule}"
+        "Required schema: slug, topic, title, description, tags, video_type, target_minutes, voice_profile, "
+        f"{financial_schema}strategy, sections, compliance. video_type is only short or long. \"target_minutes\" is required for a Long "
+        f"and must be the JSON number {LONG_MIN_MINUTES}; omit it for a Short. voice_profile is knowledge "
+        "or inspiring. Each section needs time_goal as a positive JSON number of minutes (never 0/null/string/timestamp/range; examples 0.5, 0.75, 1.0), voiceover, visual_intent, pexels_query, "
+        "caption, hook, transition, payoff, emphasis, purpose. Use these canonical fields only. "
+        "compliance.passed must be true.\n\n"
+        f"Recovery directive:\n{recovery_directive or 'Apply the listed validation and QA fixes.'}\n\n"
         f"Issues:\n{json.dumps(issues, ensure_ascii=False, indent=2)}\n\n"
         f"Current JSON:\n{json.dumps(payload, ensure_ascii=False, indent=2)}"
+    )
+
+
+def editorial_rewrite_prompt(payload: dict, review: object) -> str:
+    """Ask for a bounded rewrite of ONLY the sections an editorial review cited.
+
+    A prior version asked for a complete transcript rewrite after any editorial
+    rejection. Production 2026-08-27: that full rewrite silently regressed the
+    opening hook — a section the reviewer never flagged — burning the whole
+    repair budget on a violation nobody asked it to fix. This prompt keeps the
+    full script as READ context (so continuity and callbacks stay coherent)
+    but demands output for only the cited `section_refs`, mirroring the same
+    narrow-delta discipline `apply_hook_repair`/`apply_short_expansion` already
+    use. The profile's system prompt still supplies all format/cast rules;
+    this prompt only carries the concrete reviewer evidence.
+    """
+    # `_editorial_review` is a receipt produced *after* a previous editorial
+    # verdict.  It is not story material.  Passing it back to the writer can
+    # anchor a retry on stale self-approval rather than the current diagnosis.
+    rewrite_context = {
+        key: value for key, value in payload.items() if key != "_editorial_review"
+    }
+    findings = list(getattr(review, "blocking_findings", ()) or ())
+    section_refs = list(getattr(review, "section_refs", ()) or ())
+    score = getattr(review, "overall_score", None)
+    dimension_scores = dict(getattr(review, "dimension_scores", None) or {})
+    repair_brief = str(getattr(review, "repair_brief", "") or "").strip()
+    profile_id = str(payload.get("profile_id") or "").strip()
+    profile_version = str(payload.get("profile_version") or "").strip() or None
+    try:
+        review_profile = load_content_profile(profile_id, version=profile_version) if profile_id else None
+    except ContentProfileError:
+        review_profile = None
+    minimum_score = (
+        review_profile.editorial_review.minimum_score
+        if review_profile is not None and review_profile.editorial_review is not None
+        else None
+    )
+    target_bar = (
+        f"target bar: every dimension and overall score must reach {minimum_score}/10"
+        if minimum_score else "target bar: satisfy the active profile editorial contract"
+    )
+    strategy = payload.get("strategy")
+    cold_open_guard = ""
+    funnel_bridge_guard = ""
+    if (
+        payload.get("video_type") == "short"
+        and isinstance(strategy, dict)
+        and strategy.get("format_id") == "core_answer_first_v1"
+    ):
+        hook = strategy.get("hook") if isinstance(strategy.get("hook"), dict) else {}
+        situation = str(hook.get("situation") or "").strip()
+        core_answer = str(hook.get("core_answer") or "").strip()
+        cold_open_guard = (
+            "\n\nMANDATORY SHORT COLD-OPEN CONTRACT (overrides any conflicting repair wording): "
+            "section 1 must remain a brief tension setup under 120 characters and must literally "
+            f"contain one of these exact Vietnamese markers: {_short_situation_marker_list()} — a rewrite "
+            "without one of them is rejected outright and your whole delta is discarded, so keep the "
+            f"marker even while rebuilding the scene. Stay consistent with {situation!r}; "
+            "you must start section 2 voiceover exactly "
+            f"with {core_answer!r}. Do not remove, delay, or paraphrase that prefix. Improve the cited "
+            "human scene around these structural invariants."
+        )
+    # An editorial rewrite may resize several sections at once, so it is the
+    # likeliest of all the repairs to move the whole-script total past the
+    # duration gate. State that budget alongside the other invariants.
+    length_guard = ""
+    # `review_profile` is already resolved above; without it the helper falls
+    # back to the default contract and quotes a window from another profile —
+    # production 2026-08-30 told this rewrite it could spend 784 characters,
+    # which measures 49.6s against a 45.0s ceiling.
+    rewrite_bounds = _total_length_bounds(payload, content_profile=review_profile)
+    if rewrite_bounds is not None:
+        rewrite_floor, rewrite_cap = rewrite_bounds
+        sections_now = [
+            section
+            for section in (payload.get("sections") or [])
+            if isinstance(section, dict)
+        ]
+        current_total = sum(
+            len(str(section.get("voiceover") or section.get("narration") or ""))
+            for section in sections_now
+        )
+        cited = {int(ref) for ref in section_refs if isinstance(ref, (int, float))}
+        untouched = sum(
+            len(str(section.get("voiceover") or section.get("narration") or ""))
+            for index, section in enumerate(sections_now, start=1)
+            if index not in cited
+        )
+        kind = "SHORT" if payload.get("video_type") == "short" else "LONG"
+        label = "Short" if kind == "SHORT" else "Long"
+        # The floor is the half a reviewer can talk the writer out of: a
+        # `repair_brief` may legitimately say "cắt bớt", and without a stated
+        # floor the rewrite obeys it straight through the duration gate. This
+        # guard is placed after the brief and marked as overriding it for
+        # exactly that reason.
+        length_guard = (
+            f"\n\nMANDATORY {kind} LENGTH BUDGET (overrides any conflicting repair wording): the "
+            f"whole {label} currently carries {current_total} characters of spoken narration and must "
+            f"end up between {rewrite_floor} and {rewrite_cap}. The sections you are NOT rewriting "
+            f"already carry {untouched}, so everything you return must total between "
+            f"{max(1, rewrite_floor - untouched)} and {max(1, rewrite_cap - untouched)} characters. "
+            "Both ends are rejected outright: rebuild the cited scenes at full length, but do not "
+            f"let a richer rewrite push the {label} past its ceiling, and do not let an instruction "
+            "to trim take it under the floor."
+        )
+    if payload.get("video_type") == "short" and isinstance(strategy, dict):
+        long_slug = str(strategy.get("long_form_slug") or "").strip()
+        cta_target = str(strategy.get("cta_target") or "").strip()
+        if long_slug or cta_target:
+            funnel_bridge_guard = (
+                "\n\nMANDATORY SHORT FUNNEL BRIDGE (overrides any conflicting repair wording): "
+                "the final spoken section must retain a natural spoken bridge to the declared Long "
+                f"{(cta_target or long_slug)!r}. Do not replace the funnel CTA with a generic next-episode "
+                "tease or reflection-only ending."
+            )
+    return (
+        "An editorial review found this Vietnamese YouTube script below the profile's quality bar. "
+        "The full current script is given below as READ CONTEXT ONLY, so you understand the scene, "
+        "continuity, and callbacks around the cited problem — do not rewrite the entire script. "
+        "Fix ONLY the sections listed in `sections` below (one-based indices, matching the script's own "
+        "section order). Return ONLY one JSON object shaped "
+        '{"sections": [{"section_index": <int>, "voiceover": "<corrected Vietnamese text>"}, ...]}, '
+        "with exactly one entry per cited section index and no other field or section. "
+        "Do not merely polish the cited sentences: rebuild the scene, turn, or payoff for THAT section "
+        "so it sounds like people rather than a content template — but its purpose, speaker, and place "
+        "in the story must stay the one already shown in the context below.\n\n"
+        "Editorial review findings:\n"
+        f"- score: {score!r}/10\n"
+        f"- {target_bar}\n"
+        f"- dimension scores: {json.dumps(dimension_scores, ensure_ascii=False, sort_keys=True)}\n"
+        f"- sections: {section_refs}\n"
+        f"- findings: {json.dumps(findings, ensure_ascii=False)}\n"
+        f"- repair brief: {repair_brief}{cold_open_guard}{funnel_bridge_guard}{length_guard}\n\n"
+        "Treat the review packet as the diagnosis: repair the cited weak dimensions and cited sections, "
+        "do not invent a different problem or answer with generic motivational language. Do not touch any "
+        "section index not listed above, even if you think it could also be improved.\n\n"
+        "Before returning, silently re-read each corrected line aloud, check that every claimed consequence "
+        "is earned by an earlier action, and apply the full profile system contract.\n\n"
+        f"Full current script (context only, non-cited sections must remain exactly as shown):\n"
+        f"{json.dumps(rewrite_context, ensure_ascii=False, indent=2)}"
     )

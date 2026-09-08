@@ -10,6 +10,11 @@ import pytest
 from ytb_pipeline.publish import youtube_auth as auth
 
 
+def test_youtube_scopes_include_comment_write_scope():
+    """CommentThreads.insert needs the YouTube Data API write scope."""
+    assert "https://www.googleapis.com/auth/youtube.force-ssl" in auth.YOUTUBE_SCOPES
+
+
 class _FakeCreds:
     def __init__(self, *, valid=False, expired=True, refresh_token="rt", raise_on_refresh=None):
         self.valid = valid

@@ -1,0 +1,8 @@
+{
+  "1": {
+    "slug": "minh-neu-rui-ro-trong-cuoc-hop",
+    "stage": "error",
+    "started_at": "2026-08-31T10:06:08+07:00",
+    "last_error": "en automatically converted to use the float32 compute type instead.\nPIPELINE_STATE=REVIEW_REQUIRED node=visual_assets REVIEW_REQUIRED: shot=scene-001-shot-00 reason=semantic_recovery_exhausted review_id=vrw_d6f9819e68069bbfbce2813f\n[0/3] Input     ✓  Ngày Hàng Về Kho Chưa Ai Xác Nhận (24 đoạn; approved by batch start)\n[2/4] Voiceover ▶  đang tạo audio...\n[2/4] Voiceover ✓  assets/audio/minh-neu-rui-ro-trong-cuoc-hop_xkiro.mp3  (353.1s)\n  ⚠ Audio quality gate phát hiện lỗi; đã lưu report cục bộ.\n"
+  }
+}

@@ -46,6 +46,12 @@ def test_is_valid_wav_false_for_missing_file(tmp_path):
 
 
 @pytest.mark.unit
+def test_inference_seed_rejects_values_python_cannot_use():
+    with pytest.raises(ValueError, match="0..4294967295"):
+        worker._inference_seed({"inference_seed": 2**32})
+
+
+@pytest.mark.unit
 def test_main_skips_job_with_existing_valid_wav(tmp_path, monkeypatch, capsys):
     done = tmp_path / "done.wav"
     _write_valid_wav(done)
@@ -69,7 +75,7 @@ def test_main_skips_job_with_existing_valid_wav(tmp_path, monkeypatch, capsys):
             pass
 
         def infer(self, **kwargs):
-            calls.append(kwargs["file_wave"])
+            calls.append(kwargs)
             _write_valid_wav(Path(kwargs["file_wave"]))
 
     fake_module = type(sys)("f5_tts.api")
@@ -80,7 +86,35 @@ def test_main_skips_job_with_existing_valid_wav(tmp_path, monkeypatch, capsys):
     code = worker.main()
 
     assert code == 0
-    assert calls == [str(pending)]  # job "done" KHÔNG được render lại
+    assert [call["file_wave"] for call in calls] == [str(pending)]  # job "done" KHÔNG được render lại
+    # F5-TTS tự chọn số ngẫu nhiên đến sys.maxsize khi seed=None, rồi ghi số đó
+    # vào PYTHONHASHSEED. CPython chỉ nhận seed 32-bit, nên worker phải luôn
+    # truyền seed hợp lệ thay vì để thư viện tự chọn.
+    assert calls[0]["seed"] == 0
     out = capsys.readouterr().out
     assert "JOB 1/2 skip (đã có)" in out
     assert "JOB 2/2 ok" in out
+
+
+@pytest.mark.unit
+def test_worker_forwards_manifest_inference_speed_to_every_f5_call(tmp_path):
+    """The batch boundary must preserve the provider duration calibration."""
+    out = tmp_path / "out.wav"
+    calls = []
+
+    class _FakeTTS:
+        def infer(self, **kwargs):
+            calls.append(kwargs)
+            _write_valid_wav(Path(kwargs["file_wave"]))
+
+    manifest = {
+        "ref_audio": "ref.wav",
+        "ref_text": "ref",
+        "inference_seed": 7,
+        "inference_speed": 0.85,
+        "jobs": [{"text": "Một câu đủ dài để kiểm thử.", "out": str(out)}],
+    }
+
+    assert worker._run_jobs(_FakeTTS(), manifest) == 0
+    assert calls[0]["seed"] == 7
+    assert calls[0]["speed"] == 0.85

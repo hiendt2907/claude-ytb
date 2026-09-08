@@ -1,11 +1,20 @@
 # 10 — LLM ENGINE
 
+> **Ghi chú thực trạng (2026-08-24, amendment PROJECT_VISION.md Amendment
+> Log):** Document này mô tả kiến trúc ĐÍCH (`LLMProviderRegistry` đa
+> capability, health-check chain, cost tracking) — CHƯA triển khai. Thực tế
+> hiện tại đơn giản hơn nhiều: `providers/registry.py::get_llm_provider()`
+> trực tiếp cho ideation. **Ollama và MLX-LM đã bị GỠ KHỎI CODEBASE** — mọi mô
+> tả "Ollama local là default" bên dưới đã lỗi thời. Default thực tế:
+> **xKiro / DeepSeek V4 Pro** duy nhất; lỗi dừng, không cascade sang Codex
+> hoặc Claude. Không đọc phần "Supported Providers"/"Provider Selection
+> Strategy" bên dưới như thực trạng — chỉ là roadmap tương lai.
+
 ## Purpose
 
 Provide every Agent (06-AGENTS) with a single, provider-agnostic way to call
-an LLM — text completion, structured output, or tool use — so that switching
-from Claude CLI subprocess calls to local Ollama/Qwen3 (or any future
-provider) is a config change, never a call-site rewrite.
+an LLM — text completion, structured output, or tool use — so changing a
+provider is a config/registry change, never a call-site rewrite.
 
 ## Provider Interface
 
@@ -58,16 +67,13 @@ class LLMProvider(Protocol):
 
 | Provider | Type | Notes |
 |---|---|---|
-| **Ollama** (Qwen3 family) | local | Primary provider. Runs on M4 via Metal/MLX acceleration. No network dependency, no per-token cost. |
-| **Anthropic Claude** | cloud | Used for high-stakes reasoning seats (Creative Director, QA Agent semantic checks — see 06-AGENTS) and as the offline-impossible fallback for cloud-only tool use (Research Agent's web search). |
-| **OpenAI** | cloud | Secondary cloud fallback / A-B comparison provider. |
-| **Gemini** | cloud | Tertiary cloud fallback; useful for its large context window on long-research-brief summarization tasks. |
+| **xKiro / DeepSeek V4 Pro** | cloud | The sole ideation adapter and pinned model. A failure is surfaced to the operator. |
 
 Each provider is a thin adapter implementing `LLMProvider` — no agent or
 engine code branches on provider name; all branching happens inside the
 selection strategy below.
 
-## Provider Selection Strategy: Local-First, Cloud Fallback
+## Provider Selection Strategy: pinned xKiro model
 
 ```python
 class LLMProviderRegistry:
@@ -75,7 +81,7 @@ class LLMProviderRegistry:
     to a ranked provider chain, then returns the first healthy one."""
 
     def __init__(self, chains: dict[str, list[LLMProvider]]):
-        self._chains = chains  # capability -> ordered [local, ..., cloud fallback]
+        self._chains = chains  # capability -> ordered providers
 
     async def resolve(self, capability: str) -> LLMProvider:
         for provider in self._chains[capability]:
@@ -84,18 +90,10 @@ class LLMProviderRegistry:
         raise NoProviderAvailable(capability)
 ```
 
-Default chain shape for most agents: `[ollama_qwen3, claude_sonnet]` — local
-is attempted first; cloud is only invoked when `health_check()` fails (Ollama
-not running, model not pulled, MPS unavailable) or when the capability is
-explicitly pinned to cloud (e.g. QA Agent's semantic judgment seat, Research
-Agent's web-search-dependent calls — see 06-AGENTS model recommendations per
-agent). This is config-driven (`llm_chains.yaml` or env), never hardcoded
-per-agent in Python.
-
-Offline-first mode (`OFFLINE_ONLY=true`) removes cloud providers from every
-chain at registry construction time — a capability with no remaining healthy
-provider fails fast with a clear error rather than silently blocking on a
-network call.
+The implemented ideation provider is `[xkiro / deepseek/deepseek-v4-pro]`.
+There is no model or cross-provider fallback: an unavailable or failed request
+is surfaced directly. There is no offline LLM mode because local LLM providers
+were deliberately removed in the 2026-08-24 amendment.
 
 ## Prompt Management: Version-Controlled, A/B-Testable
 
@@ -125,8 +123,8 @@ Rules:
   existing convention of an explicit ctx-size setting rather than relying on
   provider defaults) carries over here: every provider adapter declares its
   effective context window explicitly rather than trusting a hardcoded
-  model default, since local Ollama models are frequently run with a
-  smaller-than-max context for memory reasons on M4.
+  model default, since an adapter's effective context can be smaller than
+  its advertised maximum.
 - Truncation always reserves `max_tokens` worth of output budget before
   computing how much input fits — never compute fit on input alone and
   discover output gets clipped.
@@ -146,8 +144,7 @@ class SchemaValidator(Protocol):
 
 Strategy, in priority order:
 1. **Provider-native structured output** when available (Claude/OpenAI tool-
-   use / JSON mode; Ollama's `format=json` + grammar-constrained decoding for
-   Qwen3) — preferred because it constrains generation, not just validates
+   use / JSON mode) — preferred because it constrains generation, not just validates
    after the fact.
 2. **Post-hoc JSON-schema validation** (pydantic model from the agent's
    expected output dataclass) as a universal fallback for providers without
@@ -203,17 +200,10 @@ provider.complete(request)
    ┌────┴─────┐
    │ success   │ error / timeout
    ▼           ▼
-return     exponential backoff (1s, 4s, 9s) on same provider, max 2 retries
+return     surface the xKiro/Gemini error to the calling Agent
             │
-            │ still failing
             ▼
-   try next provider in chain (e.g. local → cloud)
-            │
-            │ chain exhausted
-            ▼
-   raise LLMEngineExhausted — propagated to the calling Agent's own
-   retry/escalation logic (06-AGENTS shared failure conventions), never
-   silently swallowed
+   no model or cross-provider fallback for ideation
 ```
 
 This two-level retry (within-provider backoff, then cross-provider fallback)
@@ -242,13 +232,13 @@ def build_claude_cmd(prompt: str, *, cont: bool = False) -> list[str]:
     return cmd
 ```
 
-## Migration Path to Direct SDK Usage
+## Historical Migration Path to Direct SDK Usage (superseded for local LLM)
 
 1. **Introduce `LLMProvider` + a `ClaudeCLIProvider` adapter first** — wrap
    the existing subprocess call behind the new interface without changing
    its behavior. This makes the migration's first commit a pure refactor
    (behavior-preserving), satisfying the project's TDD-before-rewrite norm.
-2. **Add `OllamaProvider`** using the `ollama` Python SDK (or its HTTP API
+2. **[Superseded] Add `OllamaProvider`** using the `ollama` Python SDK (or its HTTP API
    directly) against `host.orb.internal:11434`-style local endpoint
    (matching the project's existing convention of an explicit local-host
    Ollama endpoint for its sibling Omni project) — register it ahead of

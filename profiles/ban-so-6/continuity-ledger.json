@@ -1,0 +1,103 @@
+{
+ "series": "ban-so-6",
+ "season": 1,
+ "current_episode": 1,
+ "immutable_facts": {
+  "minh": {
+   "age": 29,
+   "job": "điều phối dự án tại công ty logistics",
+   "visual_ids": [
+    "kính chữ nhật",
+    "áo navy",
+    "sơ-mi be",
+    "túi canvas cam đất"
+   ]
+  },
+  "an": {
+   "age": 32,
+   "role": "quản lý ca sáng",
+   "visual_ids": [
+    "tóc bob",
+    "áo xanh xám",
+    "tạp dề nâu",
+    "bút chì"
+   ]
+  },
+  "table_6": [
+   "cạnh cửa kính",
+   "gỗ sẫm",
+   "vết xước ở góc phải"
+  ]
+ },
+ "state_before_episode_1": {
+  "minh_believes": [
+   "chỉ nên bắt đầu khi đủ thời gian làm liền mạch",
+   "bản chưa hoàn chỉnh dễ làm người khác thất vọng"
+  ],
+  "an_unresolved": [
+   "chưa gọi chủ nhà về chỗ dột trong kho"
+  ],
+  "open_threads": []
+ },
+ "planned_deltas": {
+  "episode_1": {
+   "minh_experienced": "gửi bản nháp ba dòng và nhận phản hồi có thể sửa",
+   "new_prop": "bản nháp xấu đầu tiên",
+   "open_threads": [
+    "đôi giày giảm giá",
+    "chỗ dột trong kho"
+   ]
+  },
+  "episode_2": {
+   "minh_experienced": "trì hoãn quyết định mua thay vì mua để lấy lại kiểm soát",
+   "prop_change": "quai túi canvas được sửa"
+  },
+  "episode_3": {
+   "minh_experienced": "trả lời chưa hoàn chỉnh thay vì tiếp tục im lặng",
+   "new_commitment": "thử dự án phụ trong một tuần"
+  },
+  "episode_4": {
+   "minh_experienced": "tạo góc làm việc dùng được thay vì sửa toàn bộ căn hộ",
+   "an_experienced": "gọi chủ nhà về chỗ dột"
+  }
+ },
+ "episodes": [
+  {
+   "episode": 1,
+   "slug": "chin-ban-nhap-mot-nut-gui",
+   "title": "Chín Bản Nháp, Một Nút Gửi",
+   "published_at": "",
+   "url": "https://youtu.be/ieKSFQXcSM0",
+   "summary": "Minh chọn gửi cho chị Hạnh đúng tiêu đề và đoạn mở đầu của email xin phản hồi, và nhận lại hai dòng chấp nhận hướng cùng yêu cầu bổ sung dữ liệu.",
+   "character_changes": {
+    "minh": "Từ chỗ sửa chín bản nháp và không gửi, Minh gửi phần nhỏ đầu tiên để nhận phản hồi thật, chấp nhận bản chưa hoàn chỉnh.",
+    "an": "An nhận ra mình đang tránh gọi chủ nhà về chỗ dột bằng cách soạn rồi xóa tin nhắn, tương tự cơ chế của Minh."
+   },
+   "threads_opened": [
+    "Minh cần gửi phần dữ liệu độ trễ cho chị Hạnh trước giờ họp.",
+    "An vẫn chưa gọi chủ nhà về chỗ dột trong kho."
+   ],
+   "threads_closed": [
+    "Minh ngừng yêu cầu bản email hoàn hảo trước khi gửi; cậu đã gửi phần mở đầu và nhận phản hồi."
+   ]
+  }
+ ],
+ "open_threads": [
+  "Minh cần gửi phần dữ liệu độ trễ cho chị Hạnh trước giờ họp.",
+  "An vẫn chưa gọi chủ nhà về chỗ dột trong kho."
+ ],
+ "character_state": {
+  "minh": [
+   {
+    "episode": 1,
+    "change": "Từ chỗ sửa chín bản nháp và không gửi, Minh gửi phần nhỏ đầu tiên để nhận phản hồi thật, chấp nhận bản chưa hoàn chỉnh."
+   }
+  ],
+  "an": [
+   {
+    "episode": 1,
+    "change": "An nhận ra mình đang tránh gọi chủ nhà về chỗ dột bằng cách soạn rồi xóa tin nhắn, tương tự cơ chế của Minh."
+   }
+  ]
+ }
+}

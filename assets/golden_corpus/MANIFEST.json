@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "entry_count": 60,
+  "content_sha256": "a664769a7cafcaa84f2ddad0d2bda8e2b8bbf3b904596cd61c792866760a38bf",
+  "by_profile": {
+    "ban-so-6": 36,
+    "legacy-pre-profile": 18,
+    "one-cup-cafe-6h": 6
+  },
+  "machine_passed": 9,
+  "machine_failed": 51
+}

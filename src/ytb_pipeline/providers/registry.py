@@ -52,6 +52,10 @@ publish_registry: ProviderRegistry[PublishProvider] = ProviderRegistry("publish"
 image_registry: ProviderRegistry[ImageProvider] = ProviderRegistry("image")
 video_registry: ProviderRegistry[VideoProvider] = ProviderRegistry("video")
 llm_registry: ProviderRegistry[LLMProvider] = ProviderRegistry("llm")
+# Separate from `image_registry`: a story-scene provider takes a profile +
+# named characters + seed (identity-anchored generation), a different shape
+# than the generic ImageProvider.generate(prompt, width, height, output_path).
+story_image_registry: ProviderRegistry = ProviderRegistry("story_image")
 
 
 def get_voice_provider(name: str | None = None) -> VoiceProvider:
@@ -90,7 +94,18 @@ def get_video_provider(name: str | None = None) -> VideoProvider:
 
 
 def get_llm_provider(name: str | None = None) -> LLMProvider:
-    """Trả provider theo tên, hoặc settings.llm_provider làm mặc định ("claude")."""
+    """Trả provider theo tên, hoặc xKiro mặc định từ settings."""
     from . import llm  # noqa: F401  — đảm bảo đã đăng ký
 
     return llm_registry.get(name or settings.llm_provider)
+
+
+def get_story_image_provider(name: str | None = None):
+    """Trả story-scene image provider theo tên, hoặc settings.story_image_provider.
+
+    Mặc định "comfyui" (local) — không đổi chính sách local-first của
+    CLAUDE.md. "codex" là lựa chọn thay thế qua config, không phải fallback.
+    """
+    from . import image  # noqa: F401  — đảm bảo đã đăng ký
+
+    return story_image_registry.get(name or settings.story_image_provider)

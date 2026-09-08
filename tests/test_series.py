@@ -168,3 +168,80 @@ def test_mark_episode_done_flips_series_to_done_when_last():
 def test_mark_episode_done_unknown_slug_fails_fast():
     with pytest.raises(ValueError, match="không có tập"):
         series.mark_episode_done(_block("queued"), "nope")
+
+
+# ---------------------------------------------------------------------------
+# Funnel clusters: CHANNEL_GROWTH_PLAN.md ships 1 Long + 2 Shorts per day, with
+# each Short pointing back at that day's Long. A flat one-video-per-day series
+# cannot express that dependency.
+# ---------------------------------------------------------------------------
+
+def _clusters() -> list[dict]:
+    return [
+        {"long": "Thiên kiến xác nhận", "shorts": ["Đọc review sau khi mua", "Nghe phần đồng ý"]},
+        {"long": "Chiết khấu hiện tại", "shorts": ["Tiêu tiền thưởng ngay", "Hoãn tập luyện"]},
+    ]
+
+
+def test_funnel_cluster_emits_one_long_then_its_shorts_each_day():
+    from ytb_pipeline.ideation.series import build_funnel_episodes, slugify
+
+    episodes = build_funnel_episodes(_clusters(), "2026-08-25")
+
+    assert len(episodes) == 6  # 2 ngày x (1 Long + 2 Short)
+    day1 = [e for e in episodes if e["day"] == 1]
+    assert [e["video_type"] for e in day1] == ["long", "short", "short"]
+
+    long_slug = slugify("Thiên kiến xác nhận")
+    assert day1[0]["slug"] == long_slug
+    assert day1[0].get("long_form_slug") in (None, "")
+    for short in day1[1:]:
+        assert short["long_form_slug"] == long_slug
+        assert short["cta_target"] == long_slug
+
+
+def test_funnel_cluster_schedules_long_and_shorts_at_their_own_hours():
+    from ytb_pipeline.ideation.series import build_funnel_episodes
+
+    episodes = build_funnel_episodes(
+        _clusters(), "2026-08-25", long_hour=6, short_hours=(11, 20),
+    )
+    day1 = [e for e in episodes if e["day"] == 1]
+
+    assert day1[0]["publish_at"].startswith("2026-08-26T06:00")
+    assert day1[1]["publish_at"].startswith("2026-08-26T11:00")
+    assert day1[2]["publish_at"].startswith("2026-08-26T20:00")
+    # Day 2 rolls forward one calendar day, keeping each slot's hour.
+    assert [e for e in episodes if e["day"] == 2][0]["publish_at"].startswith("2026-08-27T06:00")
+
+
+def test_next_episode_holds_a_short_until_its_long_is_done():
+    """Mirrors `process_next`, which refuses a Short whose Long has not published."""
+    from ytb_pipeline.ideation.series import (
+        build_funnel_episodes, mark_episode_done, next_episode, slugify,
+    )
+
+    block = {"status": "active", "episodes": build_funnel_episodes(_clusters(), "2026-08-25")}
+    long_slug = slugify("Thiên kiến xác nhận")
+
+    assert next_episode(block)["slug"] == long_slug  # Long đi trước
+
+    block = mark_episode_done(block, long_slug)
+    following = next_episode(block)
+
+    assert following["video_type"] == "short"
+    assert following["long_form_slug"] == long_slug
+
+
+def test_next_episode_skips_to_the_following_long_when_shorts_are_blocked():
+    """A cluster whose Long failed must not stall the whole series."""
+    from ytb_pipeline.ideation.series import build_funnel_episodes, next_episode, slugify
+
+    episodes = build_funnel_episodes(_clusters(), "2026-08-25")
+    # Day 1's Long is neither queued nor done (e.g. permanently rejected by QA).
+    episodes = [e for e in episodes if not (e["day"] == 1 and e["video_type"] == "long")]
+    block = {"status": "active", "episodes": episodes}
+
+    following = next_episode(block)
+
+    assert following["slug"] == slugify("Chiết khấu hiện tại")

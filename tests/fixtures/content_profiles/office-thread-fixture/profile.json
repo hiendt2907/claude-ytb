@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "profile_id": "office-thread-fixture",
+  "version": "1.0.0",
+  "display_name": "Office Thread (test fixture)",
+  "topic": "Two coworkers navigating small workplace decisions",
+  "narrative_mode": "character_story",
+  "prompts": {
+    "editorial": "prompts/editorial.md"
+  },
+  "formats": {
+    "short": {"viewer_min_sec": 30, "viewer_max_sec": 45, "min_sections": 4},
+    "long": {"viewer_min_sec": 300, "viewer_max_sec": 420, "min_sections": 10}
+  },
+  "providers": {
+    "llm": "xkiro",
+    "tts": "xkiro",
+    "render": "story",
+    "broll_strategy": "none",
+    "broll_allow_downloads": false
+  },
+  "voice_cast": {
+    "narrator": "standard-female-vietnamese",
+    "lan": "confident-male-vietnamese",
+    "duy": "sweet-female-vietnamese"
+  },
+  "content_rules": {
+    "require_pexels_query": false,
+    "require_short_source_trace": false,
+    "require_conversation_turns": true
+  },
+  "render": {
+    "assets_dir": "assets",
+    "show_captions": true,
+    "inter_segment_gap_sec": 0.3,
+    "transition_overlap_sec": 0.3
+  }
+}

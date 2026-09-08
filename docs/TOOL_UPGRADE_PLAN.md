@@ -14,9 +14,77 @@ Không sửa tool chỉ để tăng số lượng video. Mỗi thay đổi phả
 
 - Đọc `data/ledger.md` và `assets/auto_state.json` trước khi tạo hoặc chạy video.
 - Không sản xuất chủ đề trùng nghĩa với bất kỳ dòng ledger nào.
-- Không gọi Ollama cho việc viết kịch bản.
-- Claude hoặc Codex là provider hợp lệ cho ideation.
-- QA phải chặn script không có ví dụ cụ thể, hành động áp dụng hoặc payoff.
+- Claude, Codex hoặc xKiro là provider hợp lệ cho ideation (Ollama/MLX-LM đã
+  gỡ khỏi codebase — xem Amendment 2026-08-24 bên dưới).
+- QA phải chặn script không có ví dụ cụ thể, hành động áp dụng hoặc payoff — bắt
+  buộc như nhau bất kể provider nào sinh script (xem `_cmd_start_local`,
+  `strict_qa=True` cho mọi provider).
+- **Historical — superseded by Amendment 2026-08-24. Amendment 2026-07-23**
+  (chủ sở hữu quyết định: User): đảo ngược invariant cũ
+  "Không gọi Ollama cho việc viết kịch bản". Lý do: Qwen3.6:27b (local, đã pull
+  qua Ollama) kết hợp lớp heal JSON quyết định (`ideation_json_heal.py`, dùng
+  `json_repair` khi `json.loads` chuẩn thất bại) đạt chất lượng đủ dùng cho
+  script generation, và local-first là nguyên tắc bất biến gốc của dự án
+  (`CLAUDE.md` §Triết lý dự án). `llm_provider` mặc định đổi từ `"claude"` sang
+  `"ollama"`; `OllamaScriptProvider` fallback tự động về Claude CLI khi Ollama
+  không sẵn sàng hoặc lỗi giữa chừng — QA gate không đổi, vẫn `strict_qa=True`
+  bất kể provider nào sinh ra script.
+- **Historical — superseded by Amendment 2026-08-24. Amendment 2026-08-12**
+  (chủ sở hữu quyết định: User): `OLLAMA_MODEL` đổi
+  từ `qwen3.6:27b` sang `qwen3:8b` (nhanh hơn nhiều, đã pull sẵn) — nếu QA gate
+  `strict_qa=True` bắt đầu reject nhiều hơn hoặc script "ngáo" như lịch sử
+  2026-07-06, quay lại `qwen3.6:27b` chỉ bằng cách sửa `.env`, không cần sửa
+  code. Thêm `MLXProvider` (`providers/llm/mlx_provider.py`) làm backend local
+  thứ hai — chạy `mlx-lm` in-process trên Apple Silicon, không cần daemon
+  Ollama; chọn qua `LLM_PROVIDER=mlx` + `MLX_MODEL` (default
+  `mlx-community/Qwen3-8B-8bit` — Qwen3.6 không có bản 8B nên dùng Qwen3 cùng
+  kích cỡ với `ollama_model` để so sánh công bằng). `ideation_cmd._configured_script_provider("mlx")`
+  bọc qua `OllamaScriptProvider` sẵn có (đã provider-agnostic), fallback Claude
+  giống hệt path Ollama. Benchmark thực tế: MLX 9.5s/JSON hợp lệ ngay lần đầu;
+  Ollama 10.9s nhưng khi chạy song song với MLX (tranh chấp RAM/Metal GPU)
+  daemon Ollama trả `{"model": "", "response": "", "done": false}` — bug thật,
+  không phải do `think`/`format`/model (chạy riêng lẻ với payload y hệt luôn
+  thành công). Đã fix `OllamaProvider.complete()`
+  (`providers/llm/ollama_provider.py`): raise `ProviderUnavailableError` khi
+  `done=false` + `response` rỗng thay vì âm thầm trả `""` (trước đây khiến
+  ideation tưởng nhầm là JSON lỗi thay vì provider lỗi, không trigger fallback
+  Claude đúng lúc). Default provider vẫn là `ollama` (`qwen3:8b`) vì hoạt động
+  bình thường khi chạy đơn lẻ (đúng luồng production, ideation không chạy song
+  song nhiều provider); `mlx` là lựa chọn thay thế tương đương tốc độ, chọn qua
+  `LLM_PROVIDER=mlx` nếu muốn tránh phụ thuộc Ollama daemon.
+- **Amendment 2026-08-24** (chủ sở hữu quyết định: User, xem
+  `PROJECT_VISION.md` Amendment Log cho amendment cấp Non-Negotiable
+  Decision): đảo ngược lại Amendment 2026-07-23/2026-08-12 — MacBook không
+  còn chạy local LLM/TTS inference, chỉ chạy workflow/pipeline orchestration
+  + render, để giảm tải máy. `llm_provider`/`tts_provider` mặc định đổi
+  sang `"xkiro"` (cloud, OpenAI-compatible aggregator, endpoint
+  `/v1/chat/completions`); cascade tự động Codex CLI → Claude CLI khi xKiro
+  lỗi qua `CascadeScriptProvider` (thay `OllamaScriptProvider`, gỡ khỏi
+  codebase — `ideation_local_provider.py` → đổi tên
+  `ideation_provider_cascade.py`). **XÓA HẲN**
+  `providers/llm/ollama_provider.py`, `providers/llm/mlx_provider.py`,
+  `providers/local_stack.py` (OMNI_LOCAL, dead code chưa từng được gọi).
+  `settings.allow_cloud_providers` default đổi sang `true` (trước `false`)
+  để không tự ép `tts_provider` về lại `"f5"` trên máy mới. Model xKiro
+  chính + fallback chốt qua benchmark thật 2026-08-24 (14 model, xem
+  `config/settings.py::xkiro_llm_model`/`xkiro_llm_fallback_models`) — model
+  gắn nhãn anthropic/openai/google/qwen bị HTTP 403 với free-tier key hiện
+  tại, không dùng được. **Rủi ro đã biết:** xKiro là aggregator bên thứ ba
+  chưa có track record được biết trước tại thời điểm amendment; endpoint
+  `GET /v1/models` liệt kê tên model trùng khớp bất thường với chính tên
+  model Claude hiện tại — đã báo cho User, User xác nhận chấp nhận rủi ro và
+  tiếp tục. Ảnh (Flux)/video (Wan2.2) KHÔNG đổi, vẫn local-first.
+- **Amendment 2026-08-26** (chủ sở hữu quyết định: User): ideation chỉ dùng
+  xKiro model `google/gemini-3.7-flash` (Gemini 3.7 Flash). Xóa model
+  fallback và CLI cascade
+  Codex → Claude cho bước sinh kịch bản: lỗi xKiro phải dừng minh bạch, không
+  âm thầm đổi provider/model. TTS xKiro và visual/render không đổi.
+- **Amendment 2026-08-26 (thay thế model cùng ngày):** model Gemini bị key
+  hiện tại trả 403 nên không dùng được. Ideation chuyển sang xKiro
+  `deepseek/deepseek-v4-pro` (DeepSeek V4 Pro, 65k output-token capacity),
+  đã smoke-test completion thật thành công trong 3.23 giây. Trần 14k token
+  cho một script vẫn giữ nguyên để giới hạn đúng output video, không phải
+  giới hạn năng lực của model.
 - Không đưa người que hoặc legacy `image_motion` vào production.
 - Publish phải tôn trọng `DRY_RUN`, privacy và publish schedule.
 - Mọi trạng thái phải resume được sau lỗi hoặc dừng graceful.
@@ -116,10 +184,11 @@ Ideation lượt sau đọc các nhãn này để sinh chủ đề và format m�
 
 Tool phải hỗ trợ cấu hình theo chiến lược kênh:
 
-- Giai đoạn thử nghiệm: 2 Shorts/ngày.
-- 1 video dài/tuần.
-- Cho phép tăng lên 3–4 Shorts/ngày sau review dữ liệu.
-- Short và long có lịch riêng.
+- Mỗi ngày: 1 video dài và đúng 2 Shorts phễu cho video dài đó.
+- Mỗi Short phải khai báo cùng `long_form_slug` và `cta_target` của Long đích; audit chặn thiếu, thừa hoặc lệch liên kết.
+- Mỗi Short phải khai báo `source_long_slug`, `source_section_index` và `source_excerpt` từ đúng một phân đoạn Long; engine chỉ chọn phân đoạn có insight + curiosity, không chọn mở đầu/retention/kết thúc. Audit chặn thiếu dấu vết nguồn.
+- Hai Short cùng Long phải lấy hai phân đoạn khác nhau, rồi thêm hook/bối cảnh/bước quan sát/CTA; không là bản cắt máy móc.
+- Không tự gán lịch chỉ vì batch đã đủ; Short và Long chỉ được schedule sau QA/asset hợp lệ và lệnh schedule rõ ràng.
 - Không ghi đè `publish_at` đã tồn tại.
 - Không schedule video chưa qua QA hoặc chưa có asset hợp lệ.
 

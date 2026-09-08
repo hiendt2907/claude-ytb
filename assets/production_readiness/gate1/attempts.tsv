@@ -1,0 +1,90 @@
+ts	stage	result	class	owner	evidence
+2026-09-02T19:49:43	ideate	FAIL	UNCLASSIFIED	unknown	✗ Không thể tạo đủ 1 script sau 1 candidate bị QA từ chối.
+2026-09-02T19:55:58	ideate	RESTART	-	-	loat moi: code 76213e5 (length budget) + brief v14 khong con rang buoc viet tay
+2026-09-02T19:59:47	ideate	NOTE	-	-	luot 1 chay code 76213e5; guard mo rong 8e99d64 chi anh huong luot 2+
+2026-09-02T20:12:22	ideate	FAIL	QA_UNRENDERABLE_INTENT	ideation/prompt	"rule": "unrenderable_visual_intent",
+2026-09-02T20:16:52	ideate	RESTART	-	-	profile 2.3.0 (2c6acd1): An co cap Uu tien/Tranh cu the
+2026-09-02T20:19:53	ideate	CORRECTION	EDITORIAL_REJECT	ideation/content	dong 20:12:22 phan loai SAI (QA_UNRENDERABLE_INTENT): loi do da duoc sua thanh cong o vong 1 va khong quay lai; nguyen nhan that la editorial_review vong 5. Classifier da sua de chi doc reason= cuoi cung.
+2026-09-02T20:22:55	ideate	PASS	-	-	
+2026-09-02T20:22:56	produce	FAIL	UNCLASSIFIED	unknown	/private/tmp/claude-501/-Users-hiendang-claude-ytb/dfe35545-42ba-48fe-b6e6-14f0fc692f16/scratchpad/drive_pipeline.sh: line 13: 1: can slug
+2026-09-02T20:24:02	ideate	CORRECTION	TRANSPORT_UFFFD	provider/xkiro	dong 20:22:55 ghi PASS la SAI: ideation chet vi U+FFFD sau khi het retry, runner chi do dau ✗ nen traceback lot qua. Da sua runner dung exit code + kiem tra file that.
+2026-09-02T20:28:59	ideate	RESTART	-	-	runner sua: dung exit code + kiem tra file that; LLM retry co log (e8363f9)
+2026-09-02T20:38:13	ideate	FAIL	UNCLASSIFIED	unknown	reason=✗ LLM tạo script không qua QA sau 8 lượt (gồm 3 lượt contract, tối đa 2 rewrite editorial và hậu kiểm có giới hạn). validation=None qa={'passed': False, 'violations': [{'rule': 'narrator_reflection', 'detail': 'Lời chốt story cần là phản chiếu trực tiếp, khiêm tốn của narrator.', 'suggestion'
+2026-09-02T20:46:12	ideate	RESTART	-	-	8539904: sua nguoc lai loi do chinh 76213e5 gay ra (ngan sach ep loi chot thanh cau le the)
+2026-09-02T20:57:43	ideate	INTERRUPTED	-	-	bi dung tu ben ngoai o vong 3 (dang rewrite bien tap); khong phai loi engine, khong tinh la FAIL
+2026-09-02T21:05:56	ideate	FAIL	QA_NARRATOR_REFLECTION	ideation/content	reason=✗ LLM tạo script không qua QA sau 8 lượt (gồm 3 lượt contract, tối đa 2 rewrite editorial và hậu kiểm có giới hạn). validation=None qa={'passed': False, 'violations': [{'rule': 'series_semantic_dedup', 'detail': "Chủ đề/title 'Câu Hỏi Vì Sao Tối Qua Không Nói Sớm' gần trùng 'Vì Sao Tối Qua Kh
+2026-09-02T21:12:00	ideate	RESTART	-	-	cf24cf6 (ten cast la danh tu rieng) + brief v15: trung tam la cuoc tro chuyen, co che khac de tranh dedup
+2026-09-02T21:35:30	ideate	FAIL	QA:unrenderable_visual_intent	ideation/prompt	Section 2 yêu cầu vật nhỏ cầm trên tay ('tay cầm'); image model không dựng nổi nên Judge sẽ hard-fail mọi candidate.
+2026-09-02T21:35:33	ideate	FAIL	QA:unrenderable_visual_intent	ideation/prompt	Section 2 yêu cầu vật nhỏ cầm trên tay ('tay cầm'); image model không dựng nổi nên Judge sẽ hard-fail mọi candidate.
+2026-09-02T21:35:35	ideate	FAIL	QA:unrenderable_visual_intent	ideation/prompt	Section 2 yêu cầu vật nhỏ cầm trên tay ('tay cầm'); image model không dựng nổi nên Judge sẽ hard-fail mọi candidate.
+2026-09-02T21:35:36	ideate	FAIL	QA:unrenderable_visual_intent	ideation/prompt	Section 2 yêu cầu vật nhỏ cầm trên tay ('tay cầm'); image model không dựng nổi nên Judge sẽ hard-fail mọi candidate.
+2026-09-02T21:40:21	ideate	RESTART	-	-	433dc85: nho candidate da loai giua cac lan chay (gateway cache request giong het)
+2026-09-02T21:47:10	ideate	FAIL	UNCLASSIFIED	unknown	compliance.passed must be true and include community/copyright/accuracy/advertiser/coppa/notes.
+2026-09-03T09:16:51	ideate	RESTART	-	-	runner: class_count chi dem trong loat nay (truoc do dem ca ledger nen dung som sau 1 luot that)
+2026-09-03T09:23:51	ideate	FAIL	UNCLASSIFIED	unknown	compliance.passed must be true and include community/copyright/accuracy/advertiser/coppa/notes.
+2026-09-03T09:23:52	ideate	FAIL	UNCLASSIFIED	unknown	compliance.passed must be true and include community/copyright/accuracy/advertiser/coppa/notes.
+2026-09-03T09:24:00	ideate	FAIL	UNCLASSIFIED	unknown	compliance.passed must be true and include community/copyright/accuracy/advertiser/coppa/notes.
+2026-09-03T09:24:02	ideate	FAIL	UNCLASSIFIED	unknown	compliance.passed must be true and include community/copyright/accuracy/advertiser/coppa/notes.
+2026-09-03T09:43:28	ideate	FAIL	QA:unrenderable_visual_intent	ideation/prompt	Section 2 yêu cầu vật nhỏ cầm trên tay ('tay cầm'); image model không dựng nổi nên Judge sẽ hard-fail mọi candidate.
+2026-09-03T09:50:05	ideate	FAIL	UNCLASSIFIED	unknown	reason=✗ LLM tạo script không qua QA sau 8 lượt (gồm 3 lượt contract, tối đa 2 rewrite editorial và hậu kiểm có giới hạn). validation='Kịch bản lam-dung-viec-kho-chua-chac-nhe-hon.json: strategy.hook phải là object.' qa=None
+2026-09-03T09:55:37	ideate	RESTART	-	-	code 2070f26: align all visual-intent hard-fail families in generation/repair prompts; strip inapplicable model-authored strategy from generated Long without mutating input. xKiro cache-bypass 247a78b already observed across two normal-duration calls with no U+FFFD.
+2026-09-03T10:19:40	ideate	FAIL	DURATION_SHORT	ideation/content	}
+2026-09-03T10:39:20	ideate	FAIL	QA:editorial_review	ideation/content	An liên tục thúc ép Minh gọi điện và đưa lời khuyên 'còn hơn ngồi đoán' ở mục 4,9,11,13, biến cô thành người xử lý hộ và vi phạm hard fail An ép Minh ra quyết định.
+2026-09-03T10:57:44	ideate	FAIL	QA:editorial_review	ideation/content	Section 7: narrator voiceover contains An's first-person experience and spoken line instead of narrator scene/time/object observation
+2026-09-03T11:09:26	ideate	FAIL	QA:unrenderable_visual_intent	ideation/prompt	Section 2 yêu cầu vật nhỏ cầm trên tay ('tay cầm'); image model không dựng nổi nên Judge sẽ hard-fail mọi candidate.
+2026-09-03T11:33:30	ideate	PASS	-	-	lam-dung-roi-van-nang
+2026-09-03T11:37:38	produce	FAIL	DURATION_LONG	ideation/content	PIPELINE_STATE=INFRASTRUCTURE_FAILED node=voiceover error=Long quá dài 420s: audio 423.7s.
+2026-09-03T11:37:40	produce	START	-	-	tiep tuc tu voiceover=running (codex het quota giua chung)
+2026-09-03T11:37:51	produce	FAIL	DURATION_LONG	ideation/content	PIPELINE_STATE=INFRASTRUCTURE_FAILED node=voiceover error=Long quá dài 420s: audio 423.7s.
+2026-09-03T11:45:48	ideate	RESTART	-	-	217c958: profile 2.4.0, tts_pace_factor 0.92->0.79 do lai tren 5 Long that
+2026-09-03T12:08:37	ideate	FAIL	QA:editorial_review	ideation/content	Minh voiceover ở đoạn 14 tường thuật hành động người thứ ba như narrator (Duy hỏi, mọi người nhìn, ghi tên, chuyển slide); vi phạm role_fidelity.
+2026-09-03T12:12:57	ideate	FAIL	UNCLASSIFIED	unknown	}
+2026-09-03T12:23:16	ideate	FAIL	QA:editorial_review	ideation/content	Hard fail: section 20 states a general rule and assigns meaning to the busy call, not a humble viewer-facing reflection.
+2026-09-03T12:25:35	ideate	RESTART	-	-	8be8ccb profile 2.5.0 (phep thu loi chot) + brief v16 (Minh khong thuat lai canh hop) + 3b89732 (retry 502)
+2026-09-03T12:49:37	ideate	FAIL	QA:editorial_review	ideation/content	Narrator turns 4, 7, 10, 13, 16, 17 repeat coffee/laptop/phone/table-6 motifs with little new causal movement, stalling the scene instead of escalating.
+2026-09-03T12:51:11	ideate	RESTART	-	-	brief v17: 8 buoc su kien co he qua trong khung hinh, 14 section (sau 20); v16 da go het su kien khoi canh
+2026-09-03T13:10:57	ideate	PASS	-	-	cuoc-goi-ban-luc-bay-gio-muoi
+2026-09-03T13:38:27	produce	FAIL	VISUAL_BLOCKED	render/visual	=== DUNG: co shot bi chan, khong accept anh hong ===
+2026-09-03T13:38:56	voiceover	PASS	-	-	cuoc-goi-ban-luc-bay-gio-muoi: 5433 ky tu -> 374.0s (cong 300-420s). Du doan truoc khi biet: 315-371s. Toc do that 871.4 cpm, cham hon san 879.4 toi gia dinh 1%.
+2026-09-03T13:39:50	produce	OPERATOR	-	render/visual	scene-000-shot-00: replace-intent, bo yeu cau phu dinh "tach ca phe chua co" va vat nho dat theo tu the
+2026-09-03T13:55:26	produce	FAIL	VISUAL_BLOCKED	render/visual	=== DUNG: co shot bi chan, khong accept anh hong ===
+2026-09-03T13:56:13	produce	OPERATOR	-	render/visual	scene-001-shot-00: replace-intent, bo "dat ... xuong" (hanh dong dang dien ra) va "dien thoai up" (vat nho doi tu the)
+2026-09-03T14:10:55	produce	FAIL	VISUAL_BLOCKED	render/visual	=== DUNG: co shot bi chan, khong accept anh hong ===
+2026-09-03T15:05:27	ideate	RESTART	-	-	e2f02de: prompt dung tu bang guard (8 ho, truoc do prompt chi neu 6). Da cancel cuoc-goi-ban-luc-bay-gio-muoi: 12/16 intent doi quan he chinh xac, sinh duoi hop dong thieu.
+2026-09-03T15:28:15	ideate	FAIL	QA:editorial_review	ideation/content	Minh's spoken lines in sections 5, 7, 10, 12 are internal monologue disguised as dialogue; they state reasoning, plans, and emotional state aloud to An without a conversational trigger.
+2026-09-03T15:53:38	ideate	FAIL	QA:editorial_review	ideation/content	Section 15 mở đầu phần kết gọi tên 'Minh' trong phản chiếu trực tiếp, vi phạm yêu cầu không gọi tên nhân vật ngoài cầu nối tập sau.
+2026-09-03T16:27:00	ideate	FAIL	TRANSPORT_HTTP	provider/xkiro	ytb_pipeline.providers.errors.ProviderUnavailableError: xKiro LLM (deepseek/deepseek-v4-pro) trả HTTP 200 với body rỗng. (đã thử 3 lượt)
+2026-09-03T17:06:59	ideate	FAIL	QA:editorial_review	ideation/content	Lời thoại của Minh ở mục 17 thành đoạn tự thuật/giải thích nội tâm thay vì lời nói tự nhiên với An.
+2026-09-03T17:08:02	ideate	RESTART	-	-	brief v18: Minh chi DAP LAI, cau ngan mot hoi tho, cam tu thuat/giai thich. Lop nay hong 2 lan (15:28, 16:27).
+2026-09-03T17:33:25	ideate	PASS	-	-	hai-lan-may-ban-mot-tin-nhan-gui-di
+2026-09-03T18:02:44	produce	FAIL	VISUAL_BLOCKED	render/visual	=== DUNG: co shot bi chan, khong accept anh hong ===
+2026-09-03T18:37:19	produce	FAIL	VISUAL_BLOCKED	render/visual	=== DUNG: co shot bi chan, khong accept anh hong ===
+2026-09-04T05:57:10	produce	RESUME	-	-	afd9669 tran mat do chi tiet + driver tu giam mat do; tiep tu shot 3
+2026-09-04T05:57:12	produce	FAIL	VISUAL_BLOCKED	render/visual	=== DUNG: co shot bi chan, khong accept anh hong ===
+2026-09-04T06:01:41	produce	FAIL	UNCLASSIFIED	unknown	PIPELINE_STATE=INFRASTRUCTURE_FAILED node=visual_assets error=VisualJudge lỗi hạ tầng và hard_fail_on_judge_error=true cho shot scene-003-shot-00: xKiro vision provider unavailable.
+2026-09-04T06:03:52	produce	FAIL	UNCLASSIFIED	unknown	PIPELINE_STATE=INFRASTRUCTURE_FAILED node=visual_assets error=VisualJudge lỗi hạ tầng và hard_fail_on_judge_error=true cho shot scene-003-shot-00: xKiro vision provider unavailable.
+2026-09-04T06:10:07	produce	RESUME	-	-	profile 2.6.0: judge model qwen(500 het) -> minimax/minimax-m3:free
+2026-09-04T06:10:14	produce	FAIL	UNCLASSIFIED	unknown	PIPELINE_STATE=INFRASTRUCTURE_FAILED node=visual_assets error=VisualJudge lỗi hạ tầng và hard_fail_on_judge_error=true cho shot scene-003-shot-00: xKiro vision provider unavailable.
+2026-09-04T06:13:13	produce	RESUME	-	-	86f3347 + VISUAL_JUDGE_MODEL=minimax: script ghim 2.5.0 nen profile 2.6.0 khong toi duoc no; override runtime moi go duoc
+2026-09-04T06:13:42	produce	FAIL	VISUAL_BLOCKED	render/visual	=== DUNG: co shot bi chan, khong accept anh hong ===
+2026-09-04T06:14:32	produce	OPERATOR	-	render/visual	scene-003: bo dien thoai (6/6 candidate ve tren tay hoac mat han, model thay bang laptop) va dong ho treo tuong (vang 6/6)
+2026-09-04T06:14:34	produce	FAIL	VISUAL_BLOCKED	render/visual	=== DUNG: co shot bi chan, khong accept anh hong ===
+2026-09-04T06:16:03	ideate	RESTART	-	-	sinh lai: kich ban cu co 5/18 intent bi guard chan; ngan sach override shot-003 da can (driver dot het). Driver da ngung regenerate.
+2026-09-04T06:43:45	ideate	FAIL	QA:editorial_review	ideation/content	Kết thúc (mục 16) nói thay ý nghĩa 'Việc đúng đã xong... cái nhẹ vẫn chưa tới' khi cảnh chỉ mới có dấu đã gửi; đây là lỗi hard fail theo rubric.
+2026-09-04T06:53:23	ideate	FAIL	QA:series_semantic_dedup	ideation/prompt	Chủ đề/title 'Hai Lần Máy Bận, Một Tin Nhắn Chưa Hồi Âm' gần trùng 'Hai Lần Máy Bận, Một Tin Nhắn Gửi Đi' (similarity=0.58).
+2026-09-04T07:10:18	ideate	FAIL	QA:narrator_reflection	ideation/content	Lời chốt story cần là phản chiếu trực tiếp, khiêm tốn của narrator.
+2026-09-04T07:12:25	ideate	RESTART	-	-	profile 2.7.0: 3 vi du Uu tien cua 2.5.0 deu truot chinh cong closing; da sua va verify tung cau
+2026-09-04T07:28:37	ideate	FAIL	QA:unrenderable_visual_intent	ideation/prompt	Section 10 nêu 5 chi tiết vật-có-trạng-thái (tối đa 2); Judge chấm từng mệnh đề nên mỗi chi tiết là một cơ hội độc lập để hard-fail cả shot.
+2026-09-04T07:49:53	ideate	FAIL	QA:editorial_review	ideation/content	Minh mở thoại lệch câu hỏi chỗ ngồi của An, không phản ứng lời trước.
+2026-09-04T07:53:01	ideate	RESTART	-	-	brief v19: 16 section, 5.400-5.900 ky tu — cua so LUON >5 phut o moi toc do do duoc (5.176-6.026)
+2026-09-04T07:59:48	ideate	FAIL	QA:unrenderable_visual_intent	ideation/prompt	Section 9 nêu 4 chi tiết vật-có-trạng-thái (tối đa 2); Judge chấm từng mệnh đề nên mỗi chi tiết là một cơ hội độc lập để hard-fail cả shot.
+2026-09-04T07:59:49	ideate	FAIL	QA:unrenderable_visual_intent	ideation/prompt	Section 9 nêu 4 chi tiết vật-có-trạng-thái (tối đa 2); Judge chấm từng mệnh đề nên mỗi chi tiết là một cơ hội độc lập để hard-fail cả shot.
+2026-09-04T07:59:50	ideate	FAIL	QA:unrenderable_visual_intent	ideation/prompt	Section 9 nêu 4 chi tiết vật-có-trạng-thái (tối đa 2); Judge chấm từng mệnh đề nên mỗi chi tiết là một cơ hội độc lập để hard-fail cả shot.
+2026-09-04T07:59:51	ideate	FAIL	QA:unrenderable_visual_intent	ideation/prompt	Section 9 nêu 4 chi tiết vật-có-trạng-thái (tối đa 2); Judge chấm từng mệnh đề nên mỗi chi tiết là một cơ hội độc lập để hard-fail cả shot.
+2026-09-04T08:01:50	ideate	RESTART	-	-	tran mat do gio toi duoc ban sua + ca hai prompt
+2026-09-04T08:13:50	ideate	FAIL	QA:unrenderable_visual_intent	ideation/prompt	Section 6 yêu cầu trao/xoay vật về phía người khác ('quay đầu nhìn về phía'); image model không dựng nổi nên Judge sẽ hard-fail mọi candidate.
+2026-09-04T08:23:31	ideate	FAIL	QA:unrenderable_visual_intent	ideation/prompt	Section 5 yêu cầu vật nhỏ cầm trên tay ('tay cầm'); image model không dựng nổi nên Judge sẽ hard-fail mọi candidate.
+2026-09-04T08:44:59	ideate	FAIL	QA:unrenderable_visual_intent	ideation/prompt	Section 2 yêu cầu vật nhỏ cầm trên tay ('tay cầm'); image model không dựng nổi nên Judge sẽ hard-fail mọi candidate.
+2026-09-04T08:52:24	ideate	FAIL	ENCODING_ASCII	ideation/model	Wording Engine encoding flag: narration thiếu dấu tiếng Việt (MISSING_VIETNAMESE_DIACRITICS)
+2026-09-04T08:52:25	ideate	FAIL	ENCODING_ASCII	ideation/model	Wording Engine encoding flag: narration thiếu dấu tiếng Việt (MISSING_VIETNAMESE_DIACRITICS)
+2026-09-04T08:52:26	ideate	FAIL	ENCODING_ASCII	ideation/model	Wording Engine encoding flag: narration thiếu dấu tiếng Việt (MISSING_VIETNAMESE_DIACRITICS)

@@ -19,8 +19,10 @@ data/ledger.backup.*.md
 scripts/*.json
 
 assets/output/
+assets/generated_visuals/
 assets/audio/*.mp3
 assets/audio/*.wav
+assets/quality_reports/
 assets/auto_update.pid
 assets/batch_cli.pid
 assets/auto_update.failed_sha
@@ -33,6 +35,10 @@ assets/benchmarks/
 assets/update_logs/
 data/*.db
 *.mp4
+assets/f5-daemons/
+assets/script_revisions/
+assets/voice_reports/
+assets/ref/narrator_clean.*
 
 # video-render (copy từ Documents/video-render, đọc CLAUDE.md của nó)
 video-render/demo_data/
@@ -46,3 +52,34 @@ video-render/.pytest_cache/
 video-render/.coverage*
 video-render/test-results/
 assets/projects/
+
+# Kho script cũ đã archive (nhất quán với `scripts/*.json` ở trên — script là
+# nội dung vận hành, không phải source). Bản gốc vẫn nằm trên đĩa.
+scripts/archive/
+# Backup của các file vận hành vốn đã gitignore (ledger, auto_state, worker state).
+data/archive/
+assets/archive/
+
+# Runtime/derived state duoi assets/ — sinh lai duoc, khong phai nguon su that.
+assets/asset_registry.json
+assets/.asset_registry.json.lock
+assets/editorial_review_cache/
+# Bang chung Gate 1 duoc theo doi (attempts.tsv), nhung audio benchmark thi khong.
+assets/production_readiness/**/audio/
+
+# Test khong duoc commit (yeu cau 2026-09-03). Van chay duoc tai cho.
+tests/test_cast_leak_word_boundary.py
+tests/test_editorial_rewrite_length_budget.py
+tests/test_rejected_candidate_memory.py
+tests/test_vision_transport_retry.py
+tests/test_visual_intent_repair.py
+tests/test_llm_transient_retry.py
+tests/test_negated_visual_object.py
+tests/test_prop_pose_and_action.py
+tests/test_cast_leak_case_regression.py
+tests/test_negation_word_order.py
+tests/test_visual_detail_density.py
+tests/test_5xx_retry_range.py
+tests/test_judge_model_override.py
+tests/test_ledger_cancelled_topics.py
+tests/test_density_reaches_repair_and_prompt.py

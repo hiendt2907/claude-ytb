@@ -1,0 +1,29 @@
+{
+  "passed": false,
+  "blocking_findings": [
+    "Người kể nói về 'anh' như đối tượng quan sát và bịa trước trải nghiệm nội tâm ('Có lần định kể công ty đang chậm lương') thay vì chia sẻ góc nhìn cá nhân có giới hạn.",
+    "Suy diễn nguyên nhân tâm lý chắc chắn từ một tin nhắn ('Nó nằm ở chỗ...') dù thiếu dữ kiện.",
+    "Đoạn payoff dùng câu quote-card về phẩm giá/cúi đầu, biến chỗ ngồi thành thước đo bản lĩnh.",
+    "Nhiều đoạn dùng công thức 'Không cần... Chỉ cần...' và câu văn vẻ không ai nói ngoài đời, làm giảm chất nói tự nhiên.",
+    "Điểm biên tập 5/10 dưới ngưỡng 9/10 của profile.",
+    "Các tiêu chí dưới ngưỡng 9/10: causal_coherence, human_truth, role_fidelity, spoken_naturalness, useful_restraint."
+  ],
+  "section_refs": [
+    1,
+    2,
+    3,
+    4,
+    6,
+    9,
+    10
+  ],
+  "repair_brief": "Viết lại toàn transcript từ ngôi thứ nhất có giới hạn: người kể kể một kỷ niệm thật của mình, thay mọi câu mô tả nội tâm 'anh' bằng giả thuyết mời ('có thể anh thấy...'). Bỏ câu payoff hô hào về phẩm giá; kết bằng một quan sát cá nhân hoặc câu hỏi mở. Giữ các bước thử nhưng nêu rõ điều kiện, giới hạn, đánh đổi và không biến hành động thành thước đo bản lĩnh.",
+  "overall_score": 5,
+  "dimension_scores": {
+    "human_truth": 6,
+    "spoken_naturalness": 6,
+    "causal_coherence": 7,
+    "role_fidelity": 4,
+    "useful_restraint": 7
+  }
+}

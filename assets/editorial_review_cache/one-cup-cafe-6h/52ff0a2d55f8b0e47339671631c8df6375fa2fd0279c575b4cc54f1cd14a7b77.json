@@ -1,0 +1,14 @@
+{
+  "passed": true,
+  "blocking_findings": [],
+  "section_refs": [],
+  "repair_brief": "",
+  "overall_score": 9,
+  "dimension_scores": {
+    "human_truth": 9,
+    "spoken_naturalness": 9,
+    "causal_coherence": 9,
+    "role_fidelity": 9,
+    "useful_restraint": 9
+  }
+}

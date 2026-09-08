@@ -7,6 +7,8 @@ import re
 import subprocess
 from pathlib import Path
 
+from ..content_contract import contract_for
+from ..content_profiles import load_content_profile
 from ..pkg.models import Voiceover
 
 _STAGE_DIRECTION_PATTERNS = (
@@ -15,6 +17,47 @@ _STAGE_DIRECTION_PATTERNS = (
     r"\bChốt cảnh\s*:",
     r"\[[^\]]+\]",
 )
+
+
+def validate_hook_timing(voiceover: Voiceover) -> None:
+    """Ensure a strategy-v1 Short gives its promised answer before swipe-off.
+
+    Legacy scripts do not have a strategy contract and remain valid.  New
+    scripts identify the answer segment explicitly, letting this check use the
+    measured TTS durations rather than a character-count guess.
+    """
+    strategy = voiceover.strategy
+    if voiceover.video_type != "short" or strategy is None or strategy.hook is None:
+        return
+
+    elapsed_before_answer = 0.0
+    answer_segment = None
+    for segment in voiceover.segments:
+        if segment.purpose == "core_answer":
+            answer_segment = segment
+            break
+        elapsed_before_answer += segment.duration_sec
+    if answer_segment is None:
+        raise ValueError("Hook strategy thiếu segment purpose='core_answer'.")
+    profile = (
+        load_content_profile(
+            voiceover.content_profile_id, version=voiceover.content_profile_version,
+        )
+        if voiceover.content_profile_version else None
+    )
+    deadline = (
+        contract_for("short", profile).answer_start_deadline_sec
+        or strategy.hook.answer_by_sec
+    )
+    if elapsed_before_answer > deadline:
+        raise ValueError(
+            "Core answer bắt đầu ở "
+            f"{elapsed_before_answer:.1f}s, vượt deadline {deadline:.1f}s."
+        )
+    answer = " ".join(strategy.hook.core_answer.lower().split())
+    narration = " ".join(answer_segment.narration.lower().split())
+    if answer not in narration:
+        raise ValueError("Narration core_answer không khớp hook strategy đã duyệt.")
 
 
 def validate_audio(
@@ -37,6 +80,8 @@ def validate_audio(
                     f"Audio QA chặn section {index}: voiceover còn stage direction ({pattern})."
                 )
 
+    validate_hook_timing(voiceover)
+
     actual_duration = _duration(Path(voiceover.audio_path))
     expected_duration = sum(segment.duration_sec for segment in voiceover.segments)
     if actual_duration <= 0:
@@ -46,6 +91,17 @@ def validate_audio(
             f"Audio tổng lệch section {abs(actual_duration - expected_duration):.2f}s "
             f"> {max_duration_drift_sec:.2f}s."
         )
+
+    profile = (
+        load_content_profile(
+            voiceover.content_profile_id, version=voiceover.content_profile_version,
+        )
+        if voiceover.content_profile_version else None
+    )
+    contract_for(voiceover.video_type, profile).validate_audio_runtime(
+        actual_duration,
+        segment_count=len(voiceover.segments) if voiceover.ruleset_id else 1,
+    )
 
     mean_volume, silence_ratio = _volume_and_silence(Path(voiceover.audio_path))
     if mean_volume is not None and mean_volume < -35.0:

@@ -1,0 +1,30 @@
+{
+  "passed": false,
+  "blocking_findings": [
+    "Gán chắc chắn nguyên nhân tâm lý từ một cảnh thiếu dữ kiện: 'vai anh phải đóng để khỏi thấy mình vô dụng' (mục 3), 'vì nó mang lại cảm giác mình có giá trị ngay lập tức' (mục 6), 'nỗi sợ bị xem là vô dụng đã quyết định thay anh' (mục 10).",
+    "Nhiều câu quote card/giảng giải không ai nói ngoài đời: 'Sự đáng tin cậy không miễn phí...' (mục 5), 'Ranh giới đó không làm anh bớt giá trị...' (mục 11), 'chữ đáng tin không còn là cái giá phải trả bằng giấc ngủ' (mục 2).",
+    "Cấu trúc hướng dẫn 'Giờ thử một bước nhỏ', 'Thêm một cách nữa', 'Cái giá phải trả là' biến giọng thành bài giảng thay vì bạn nói chuyện.",
+    "Điểm biên tập 6/10 dưới ngưỡng 9/10 của profile.",
+    "Các tiêu chí dưới ngưỡng 9/10: role_fidelity, spoken_naturalness."
+  ],
+  "section_refs": [
+    2,
+    3,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+  ],
+  "repair_brief": "Viết lại toàn transcript theo giọng kể cá nhân có giới hạn: thay mọi kết luận tâm lý chắc chắn bằng quan sát và ngôn ngữ 'có thể/ tôi thấy'; cắt câu quote card, bỏ công thức hướng dẫn, kể lại các bước thử như trải nghiệm trong tình huống thay vì ra lệnh.",
+  "overall_score": 6,
+  "dimension_scores": {
+    "human_truth": 9,
+    "spoken_naturalness": 7,
+    "causal_coherence": 9,
+    "role_fidelity": 5,
+    "useful_restraint": 9
+  }
+}

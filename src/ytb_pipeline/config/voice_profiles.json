@@ -1,0 +1,25 @@
+{
+  "profiles": {
+    "neutral": {"comma_sec": 0.2, "sentence_sec": 0.32, "segment_sec": 0.28, "edge_rate": "+100%", "edge_pitch": "+0Hz", "f5_tempo": 1.06},
+    "entertainment": {"comma_sec": 0.06, "sentence_sec": 0.14, "segment_sec": 0.08, "edge_rate": "+116%", "edge_pitch": "+8Hz", "f5_tempo": 1.18},
+    "knowledge": {"comma_sec": 0.24, "sentence_sec": 0.46, "segment_sec": 0.34, "edge_rate": "+96%", "edge_pitch": "-2Hz", "f5_tempo": 1.08},
+    "inspiring": {"comma_sec": 0.28, "sentence_sec": 0.52, "segment_sec": 0.42, "edge_rate": "+88%", "edge_pitch": "-1Hz", "f5_tempo": 1.02},
+    "serious": {"comma_sec": 0.30, "sentence_sec": 0.56, "segment_sec": 0.48, "edge_rate": "+82%", "edge_pitch": "-2Hz", "f5_tempo": 0.98, "pitch_semitones": -1.0, "gain_db": 0.5, "pause_before": 0.20, "pause_after": 0.35},
+    "hook": {"comma_sec": 0.08, "sentence_sec": 0.18, "segment_sec": 0.12, "edge_rate": "+108%", "edge_pitch": "+3Hz", "f5_tempo": 1.15, "pitch_semitones": 0.5, "gain_db": 0.5, "pause_after": 0.12},
+    "curious": {"comma_sec": 0.18, "sentence_sec": 0.36, "segment_sec": 0.24, "edge_rate": "+94%", "edge_pitch": "+2Hz", "f5_tempo": 1.10, "pitch_semitones": 0.5, "pause_after": 0.18},
+    "conclusion": {"comma_sec": 0.28, "sentence_sec": 0.50, "segment_sec": 0.40, "edge_rate": "+90%", "edge_pitch": "-1Hz", "f5_tempo": 1.04, "pitch_semitones": -0.5, "gain_db": 0.5, "pause_after": 0.30}
+  },
+  "routing": {
+    "entertainment_hints": ["giải trí", "giai tri", "người que", "nguoi que", "stickman", "hài", "hai", "meme", "viral", "kéo view", "keo view", "vui nhộn", "vui nhon"],
+    "knowledge_hints": ["kiến thức", "kien thuc", "giáo dục", "giao duc", "tâm lý", "tam ly", "phát triển bản thân", "phat trien ban than", "khoa học", "khoa hoc", "lịch sử", "lich su", "tài chính", "tai chinh", "sức khỏe", "suc khoe"],
+    "serious_hints": ["đáng sợ", "cảnh báo", "nguy hiểm", "sự thật"],
+    "curious_hints": ["tại sao", "vì sao", "thật ra"],
+    "conclusion_hints": ["tập tiếp theo", "kết lại"],
+    "rules": [
+      {"profile": "hook", "when": "hook_or_first"},
+      {"profile": "serious", "when": "danger_or_hint", "hints_key": "serious_hints"},
+      {"profile": "conclusion", "when": "last_or_hint", "hints_key": "conclusion_hints"},
+      {"profile": "curious", "when": "question_or_hint", "hints_key": "curious_hints"}
+    ]
+  }
+}

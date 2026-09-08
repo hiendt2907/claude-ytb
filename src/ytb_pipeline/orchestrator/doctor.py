@@ -150,11 +150,11 @@ def run_local_doctor_checks() -> list[tuple[str, bool, str]]:
 
         llm = get_llm_provider(cli.settings.llm_provider)
         checks.append((
-            "Ollama local LLM",
+            f"LLM provider ({llm.name})",
             llm.is_available(),
-            f"{llm.model_name()} tại {cli.settings.ollama_url}"
+            f"model={llm.model_name()}"
             if llm.is_available()
-            else f"Ollama không sẵn sàng — chạy `ollama serve` và `ollama pull {cli.settings.ollama_model}`",
+            else f"`{llm.name}` chưa sẵn sàng — kiểm tra XKIRO_API_KEY hoặc `claude`/`codex` CLI trong PATH",
         ))
 
         image = get_image_provider(cli.settings.image_provider)
@@ -186,11 +186,31 @@ def run_local_doctor_checks() -> list[tuple[str, bool, str]]:
             else (video.is_available(), f"provider={video.name}" if video.is_available() else "provider unavailable")
         )
         checks.append((
-            "Pexels footage provider",
+            "Pexels VideoProvider (chỉ dùng cho doctor/benchmark, KHÔNG nằm trong đường render thật)",
             cli.settings.broll_strategy == "pexels" and video_status[0],
             video_status[1] if cli.settings.broll_strategy == "pexels"
             else "BROLL_STRATEGY phải là pexels để render footage thật",
         ))
+
+        # Đường render THẬT (RenderProvider "ai") — local-only mặc định, không
+        # cần PEXELS_API_KEY khi BROLL_ALLOW_DOWNLOADS=false. Check này phản
+        # ánh đúng dependency của renderer, không gắn cứng API key.
+        from ..render.asset_catalog import AssetCatalog
+        from ..providers.registry import get_render_provider
+
+        ai_render = get_render_provider("ai")
+        n_assets = len(AssetCatalog().assets())
+        ai_ok = ai_render.is_available() and n_assets > 0
+        if not ai_render.is_available():
+            ai_detail = "broll_strategy phải là 'pexels' (hoặc thiếu PEXELS_API_KEY khi BROLL_ALLOW_DOWNLOADS=true)"
+        elif n_assets == 0:
+            ai_detail = (
+                "asset catalog local rỗng (assets/asset_catalog.json) — cần index/bổ sung "
+                "B-roll local trước khi render local-only"
+            )
+        else:
+            ai_detail = f"{n_assets} asset local sẵn sàng trong catalog"
+        checks.append(("AI render provider (B-roll local-only)", ai_ok, ai_detail))
     except Exception as exc:  # noqa: BLE001
         checks.append(("Provider registry", False, str(exc)))
 
@@ -207,6 +227,36 @@ def run_local_doctor_checks() -> list[tuple[str, bool, str]]:
         checks.append(("Disk space", free_gb >= 10, f"{free_gb:.1f} GB free"))
     except OSError as exc:
         checks.append(("Disk space", False, str(exc)))
+
+    try:
+        stale = [
+            worker_id
+            for worker_id, state in cli.worker_states().items()
+            if str(state.get("stage", "")).startswith(("starting-", "running-"))
+            and not cli.batch_process_is_alive()
+        ]
+        checks.append((
+            "Worker state",
+            not stale,
+            "không có worker stale" if not stale else f"worker stale: {', '.join(stale)} — kiểm tra/reset trước khi chạy",
+        ))
+    except Exception as exc:  # noqa: BLE001 -- local doctor must report failures
+        checks.append(("Worker state", False, str(exc)))
+
+    try:
+        queue = cli.load_queue()
+        unavailable = cli.done_slugs() | cli.failed_slugs()
+        pending = [item for item in queue if item.slug not in unavailable]
+        results = [cli.preflight_script(cli.ROOT / "scripts" / f"{item.slug}.json") for item in pending]
+        ready = [result for result in results if result.passed]
+        failed = [f"{result.script_path.stem}: {result.failures[0].code}" for result in results if not result.passed]
+        checks.append((
+            "Runnable preflight scripts",
+            bool(ready),
+            f"{len(ready)}/{len(results)} runnable" if ready else "không có script runnable" + (f" ({'; '.join(failed[:5])})" if failed else ""),
+        ))
+    except Exception as exc:  # noqa: BLE001 -- malformed legacy queue is a doctor failure
+        checks.append(("Runnable preflight scripts", False, str(exc)))
 
     return checks
 

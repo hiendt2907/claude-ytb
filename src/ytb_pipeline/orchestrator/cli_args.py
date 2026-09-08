@@ -23,10 +23,10 @@ Các lệnh:
   doctor   Kiểm tra môi trường trước khi chạy batch (config, token, script)
   auth     Đăng nhập lại OAuth (mở browser) cho YouTube + Drive
   benchmark-local  Benchmark local AI stack và ghi JSON report
+  review   List/show/resolve visual Shots đã chạm giới hạn tự động
 
 Quy trình thường dùng:
-  ytb batch start -n 5 --type-of-vid long   # Claude mặc định viết kịch bản
-  ytb batch start -n 5 --type-of-vid long --llm codex  # dùng Codex CLI
+  ytb batch start -n 5 --type-of-vid long   # xKiro/DeepSeek V4 Pro viết kịch bản
   ytb doctor                # kiểm tra môi trường trước (shortcut top-level)
   ytb batch status          # xem còn video nào pending
   ytb batch run             # chạy 1 video, lặp lại lệnh này cho video kế
@@ -71,9 +71,9 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
     p_start = _sub(
         sub, "start",
         help="Sinh phần SÁNG TẠO (ideation + viết N kịch bản)",
-        description="Mặc định dùng Claude khi LLM_PROVIDER=claude; có thể chọn Claude hoặc Codex "
-        "bằng --llm-provider/--llm, "
-        "hoặc local LLM provider khi cấu hình local/Ollama, để chọn chủ đề "
+        description="Chỉ dùng xKiro/DeepSeek V4 Pro để sinh kịch bản; khi lỗi lệnh dừng "
+        "minh bạch, không fallback sang Claude hoặc Codex. "
+        "để chọn chủ đề "
         "(chống trùng data/ledger.md), viết kịch bản đầy đủ cho N video vào "
         "scripts/<slug>.json, và đăng ký từng video vào assets/auto_state.json. "
         "Dùng --cloud nếu muốn gọi Claude legacy không qua local QA loop.\n\n"
@@ -94,6 +94,10 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
     )
     p_start.add_argument("--num-of-vid", "-n", type=int, default=None, help="Số video cần viết kịch bản (hỏi interactive nếu bỏ qua)")
     p_start.add_argument(
+        "--profile", dest="profile_id", default=None,
+        help="Content profile theo tên thư mục trong profiles/ (mặc định CONTENT_PROFILE_ID).",
+    )
+    p_start.add_argument(
         "--type-of-vid", choices=["long", "short"], default="long",
         help="long = video dài ngang 12-15 phút, short = dọc 1-1.5 phút (mặc định long)",
     )
@@ -104,8 +108,8 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
     )
     p_start.add_argument(
         "--llm-provider", "--llm", dest="llm_provider",
-        choices=["claude", "codex"], default=None,
-        help="LLM viết kịch bản: claude hoặc codex (mặc định theo LLM_PROVIDER).",
+        choices=["xkiro"], default=None,
+        help="LLM viết kịch bản duy nhất: xkiro/DeepSeek V4 Pro.",
     )
     p_start.add_argument(
         "--idea",
@@ -130,19 +134,28 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
     )
     p_start.add_argument(
         "--local", action="store_true", default=False,
-        help="Đã deprecated: luồng Ollama sinh kịch bản đã bị xoá; dùng --llm claude/codex",
+        help="Đã gỡ cùng Ollama/MLX-LM (amendment 2026-08-24): MacBook không "
+        "còn chạy local LLM. Dùng --llm xkiro/claude/codex.",
     )
     p_start.add_argument(
         "--cloud", action="store_true", default=False,
-        help="Opt-in dùng Claude CLI legacy cho ideation; mặc định dùng local LLM provider",
+        help="Đã gỡ: legacy cloud ideation không mang system prompt/strategy-v1 và sẽ báo lỗi.",
     )
     p_start.add_argument(
         "--batch-key", default="",
         help="Batch state riêng (bắt đầu bằng shorts_funnel_batch_) để không trộn vào queue legacy",
     )
     p_start.add_argument(
+        "--replace-slug", action="append", default=[],
+        help="Thay script của slot đã có, giữ nguyên slug/day/provenance; dùng một lần cho mỗi video.",
+    )
+    p_start.add_argument(
         "--long-form-slug", default="",
         help="Slug video dài đích cho Short (bắt buộc khi --type-of-vid short trong batch funnel)",
+    )
+    p_start.add_argument(
+        "--allow-external-long", action="store_true",
+        help="Cho Short tham chiếu Long đã done ở batch cũ; chỉ dùng khi source archive còn nguyên.",
     )
     p_start.add_argument(
         "--playlist", default="",
@@ -154,6 +167,14 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
     )
     p_start.set_defaults(func=cmd_funcs["start"])
 
+    p_reconcile = _sub(
+        sub, "reconcile",
+        help="Đồng bộ queue theo ledger + provenance script",
+        description="Đọc event mới nhất mỗi slug trong ledger, ghi lại trạng thái, YouTube ID đã verified và hash kịch bản vào auto_state.json.",
+    )
+    p_reconcile.add_argument("--batch-key", default="", help="Batch cần đồng bộ (mặc định batch mới nhất).")
+    p_reconcile.set_defaults(func=cmd_funcs.get("reconcile", lambda _args: None))
+
     _sub(
         sub, "status",
         help="Xem video nào done/pending trong queue",
@@ -162,12 +183,27 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
         epilog="Ví dụ:\n  ytb batch status\n",
     ).set_defaults(func=cmd_funcs["status"])
 
+    p_preflight = _sub(
+        sub, "preflight",
+        help="Kiểm tra effective config trước khi chạy batch",
+        description="Mặc định offline. Kiểm tra contract, provider config, story assets, audio, tool, thư mục và disk; --live-providers chỉ health-check, không sinh media.",
+    )
+    p_preflight.add_argument("slugs", nargs="*", help="Slug cần kiểm tra; bỏ trống để kiểm tra toàn bộ queue.")
+    p_preflight.add_argument(
+        "--live-providers", action="store_true",
+        help="Kiểm tra live ComfyUI inventory, xKiro Vision capability và OAuth (nếu --publish).",
+    )
+    p_preflight.add_argument(
+        "--publish", action="store_true",
+        help="Yêu cầu kiểm tra YouTube/Drive credential cho lượt publish thật.",
+    )
+    p_preflight.set_defaults(func=cmd_funcs.get("preflight", lambda _args: None))
+
     p_run = _sub(
         sub, "run",
         help="Chạy video kế tiếp (--loop để chạy hết queue)",
-        description="Chạy pipeline cho video PENDING đầu tiên trong queue: ideation -> "
-        "voiceover -> render -> publish, rồi xác minh video thật qua YouTube Data API "
-        "(không tin stdout) và ghi 1 dòng mới vào ledger.\n\n"
+        description="Mặc định chạy dry-run local-only: voiceover -> render -> publish-prep, "
+        "không upload. Chỉ --publish mới upload và xác minh YouTube API.\n\n"
         "Tự retry lỗi tạm thời (409 Conflict, mất mạng, timeout) với backoff 30/60/120s. "
         "Lỗi khác (script sai, thiếu file...) bỏ qua ngay, KHÔNG retry. Mọi thất bại cuối "
         "cùng đều bắn cảnh báo Telegram + ghi assets/batch_cli_warnings.log.\n\n"
@@ -175,18 +211,29 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
         "muốn chạy liên tục cho tới khi queue hết video pending. Dùng --schedule để tự "
         "gán publish_at cho các video pending chưa có lịch trước khi chạy.",
         epilog="Ví dụ:\n"
-        "  ytb batch run            # chạy 1 video kế tiếp rồi dừng\n"
-        "  ytb batch run --loop     # chạy hết các video pending còn lại\n"
+        "  ytb batch run            # dry-run 1 video kế tiếp rồi dừng\n"
+        "  ytb batch run --loop     # dry-run hết các video pending còn lại\n"
+        "  ytb batch run --publish  # upload 1 video (explicit)\n"
         "  ytb batch run --schedule --loop  # lên lịch rồi chạy hết queue\n"
         "  ytb batch run --schedule --schedule-slots 09:00,12:00,20:30 --loop\n",
     )
     p_run.add_argument("--loop", action="store_true", help="Chạy hết queue, không chỉ 1 video")
+    p_run.add_argument("--publish", action="store_true", help="Cho phép upload YouTube; mặc định dry-run, không upload.")
+    p_run.add_argument(
+        "--batch-key",
+        default="",
+        help="Chạy đúng batch chỉ định, không suy đoán theo tên batch mới nhất.",
+    )
+    p_run.add_argument(
+        "--through", choices=("publish", "render"), default="publish",
+        help="Chạy đến publish (mặc định) hoặc dừng sau render để test an toàn, không upload YouTube.",
+    )
     p_run.add_argument(
         "--workers",
         type=int,
         choices=[1, 2],
         default=1,
-        help="Số video chạy song song khi dùng --loop (tối đa 2, mặc định 1)",
+        help="Số lane chạy song song khi dùng --loop (tối đa 2; F5 dùng daemon TTS + consumer render/upload riêng mỗi lane)",
     )
     p_run.add_argument(
         "--schedule",
@@ -195,8 +242,8 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
     )
     p_run.add_argument(
         "--schedule-slots",
-        default="06:00,20:30",
-        help="Các giờ publish trong ngày, cách nhau bằng dấu phẩy (mặc định 06:00,20:30 giờ VN)",
+        default="06:00,12:30,20:30",
+        help="Các giờ publish trong ngày, cách nhau bằng dấu phẩy (mặc định 06:00,12:30,20:30 giờ VN)",
     )
     p_run.add_argument(
         "--schedule-start-days",
@@ -204,17 +251,30 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
         default=1,
         help="Bắt đầu schedule sau N ngày tính từ hôm nay giờ VN; 0=hôm nay, 1=ngày mai (mặc định)",
     )
+    p_run.add_argument(
+        "--schedule-start-date",
+        default="",
+        help="Ngày bắt đầu lịch Short YYYY-MM-DD; ưu tiên hơn --schedule-start-days.",
+    )
+    p_run.add_argument(
+        "--long-publish-at",
+        default="",
+        help="Các mốc RFC3339 riêng cho Long, cách nhau bằng dấu phẩy; tách khỏi slot Short.",
+    )
     p_run.set_defaults(func=cmd_funcs["run"])
 
     p_verify = _sub(
         sub, "verify",
-        help="Xác minh 1 youtube_id có thật qua API (không tin stdout)",
+        help="Xác minh YouTube ID hoặc slug đã publish qua API (không tin stdout)",
         description="Gọi YouTube Data API videos().list() để lấy trạng thái THẬT của 1 "
         "video (title, privacyStatus, publishAt). Dùng khi nghi ngờ pipeline tự báo sai ID "
         "trong stdout (đã từng gặp thật trong batch này).",
-        epilog="Ví dụ:\n  ytb batch verify b917RPp2o7o\n",
+        epilog="Ví dụ:\n  ytb batch verify b917RPp2o7o\n  ytb batch verify slug-da-publish\n",
     )
-    p_verify.add_argument("youtube_id", help="ID video trên YouTube (phần sau youtu.be/)")
+    p_verify.add_argument(
+        "youtube_id",
+        help="YouTube ID 11 ký tự, hoặc slug đã có URL done|ok trong ledger",
+    )
     p_verify.set_defaults(func=cmd_funcs["verify"])
 
     p_retry = _sub(
@@ -228,6 +288,12 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
         "  ytb batch retry thien-kien-xac-nhan-vi-sao-nao-chi-thay-dieu-ban-muon-thay\n",
     )
     p_retry.add_argument("slug", help="Slug video (khớp với auto_state.json)")
+    p_retry.add_argument(
+        "--batch-key",
+        default="",
+        help="Chỉ tìm slug trong batch chỉ định; cần khi nhiều profile/batch cùng tồn tại.",
+    )
+    p_retry.add_argument("--publish", action="store_true", help="Cho phép upload YouTube; mặc định dry-run.")
     p_retry.set_defaults(func=cmd_funcs["retry"])
 
     p_logs = _sub(
@@ -276,6 +342,34 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
         epilog="Ví dụ:\n"
         "  ytb batch queue | jq '.[] | select(.status==\"pending\")'\n",
     ).set_defaults(func=cmd_funcs["queue"])
+
+    p_analytics = _sub(
+        sub, "analytics",
+        help="Lưu baseline/Short metrics và xem quyết định format",
+        description="Nhập các chỉ số Shorts mà YouTube Studio hiển thị nhưng API không trả về, "
+        "sau ít nhất 48 giờ. Tool gom tối thiểu 4 Shorts cùng format trước khi trả "
+        "scale, revise_hook hoặc revise_value cho batch ideation kế tiếp.",
+        epilog="Ví dụ:\n"
+        "  ytb batch analytics baseline --stayed-to-watch 0.22\n"
+        "  ytb batch analytics snapshot --slug mo-laptop --format-id core_answer_first_v1 "
+        "--age-hours 72 --stayed-to-watch 0.31 --short-to-long-clicks 2 --subscribers-gained 1\n"
+        "  ytb batch analytics summary\n",
+    )
+    analytics_func = cmd_funcs.get("analytics", lambda _args: None)
+    analytics_sub = p_analytics.add_subparsers(dest="action", required=True)
+    p_baseline = analytics_sub.add_parser("baseline", help="Lưu mốc Viewed/Stayed to watch hiện tại")
+    p_baseline.add_argument("--stayed-to-watch", type=float, required=True, help="Tỷ lệ 0–1, ví dụ 0.22")
+    p_baseline.set_defaults(func=analytics_func)
+    p_snapshot = analytics_sub.add_parser("snapshot", help="Lưu một Short đã đủ 48–72 giờ")
+    p_snapshot.add_argument("--slug", required=True, help="Slug Short")
+    p_snapshot.add_argument("--format-id", required=True, help="Ví dụ core_answer_first_v1")
+    p_snapshot.add_argument("--age-hours", type=float, required=True, help="Số giờ kể từ lúc public")
+    p_snapshot.add_argument("--stayed-to-watch", type=float, required=True, help="Tỷ lệ 0–1")
+    p_snapshot.add_argument("--short-to-long-clicks", type=int, default=0, help="Lượt sang long, nếu Studio có")
+    p_snapshot.add_argument("--subscribers-gained", type=int, default=0, help="Subscriber từ Short")
+    p_snapshot.set_defaults(func=analytics_func)
+    p_summary = analytics_sub.add_parser("summary", help="Xem nhãn format cho batch tiếp")
+    p_summary.set_defaults(func=analytics_func)
 
     _sub(
         sub, "ps",
@@ -339,7 +433,8 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
     )
     p_doctor.add_argument(
         "--local", action="store_true",
-        help="Kiểm tra local-first AI stack: Ollama, ComfyUI/Flux, TTS local, Wan/LTX, ffmpeg",
+        help="Kiểm tra stack local còn lại: LLM xKiro/Gemini cấu hình, "
+        "ComfyUI/Flux, TTS provider cấu hình, Wan/LTX, ffmpeg",
     )
     p_doctor.set_defaults(func=cmd_funcs["doctor"])
 
@@ -369,5 +464,53 @@ def build_parser(*, doc: str | None, cmd_funcs: dict) -> argparse.ArgumentParser
         help="Đường dẫn JSON report benchmark (mặc định assets/benchmarks/local_benchmark.json)",
     )
     p_benchmark.set_defaults(func=cmd_funcs["benchmark-local"])
+
+    p_review = _sub(
+        sub,
+        "review",
+        help="Quản lý visual Shot cần operator disposition",
+        description=(
+            "Đọc visual_review.json và áp dụng đúng một quyết định human: "
+            "accept existing, manual regenerate, hoặc abandon. Administrative "
+            "CLI chỉ ghi state; không gọi ComfyUI hoặc VisualJudge."
+        ),
+        epilog=(
+            "Ví dụ:\n"
+            "  ytb batch review list my-project\n"
+            "  ytb batch review show my-project shot-001\n"
+            "  ytb batch review accept my-project shot-001 --asset-id ast_...\n"
+            "  ytb batch review regenerate my-project shot-001 --instruction \"Bỏ đám đông\"\n"
+            "  ytb batch review abandon my-project shot-001\n"
+        ),
+    )
+    review_func = cmd_funcs.get("review", lambda _args: None)
+    review_sub = p_review.add_subparsers(dest="review_action", required=True)
+    review_list = review_sub.add_parser("list", help="Liệt kê review hiện hành")
+    review_list.add_argument("project", help="Project slug dưới assets/projects/")
+    review_list.set_defaults(func=review_func)
+    review_show = review_sub.add_parser("show", help="Hiện request/candidate/Judge context")
+    review_show.add_argument("project")
+    review_show.add_argument("shot_id")
+    review_show.set_defaults(func=review_func)
+    review_accept = review_sub.add_parser("accept", help="Chọn một managed candidate hiện có")
+    review_accept.add_argument("project")
+    review_accept.add_argument("shot_id")
+    review_accept.add_argument("--asset-id", required=True)
+    review_accept.set_defaults(func=review_func)
+    review_regenerate = review_sub.add_parser("regenerate", help="Ghi một human-authored manual override")
+    review_regenerate.add_argument("project")
+    review_regenerate.add_argument("shot_id")
+    review_regenerate.add_argument("--instruction", required=True)
+    review_regenerate.add_argument(
+        "--replace-intent", action="store_true",
+        help="Instruction THAY hẳn visual_intent thay vì nối thêm — dùng khi "
+             "intent gốc đòi thứ image model không dựng nổi, vì nối thêm chỉ "
+             "thêm được ràng buộc chứ không rút được cái nào.",
+    )
+    review_regenerate.set_defaults(func=review_func)
+    review_abandon = review_sub.add_parser("abandon", help="Dừng Shot theo quyết định operator")
+    review_abandon.add_argument("project")
+    review_abandon.add_argument("shot_id")
+    review_abandon.set_defaults(func=review_func)
 
     return parser

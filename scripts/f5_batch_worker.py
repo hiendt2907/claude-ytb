@@ -22,13 +22,123 @@ giữa batch), job được bỏ qua (`JOB i/n skip (đã có) <out>`) — cho p
 
 from __future__ import annotations
 
+import argparse
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 import json
+import os
 import re
+import socket
 import subprocess
 import sys
 import tempfile
 import wave
 from pathlib import Path
+
+# F5/Torch may create Python helper processes after this daemon has started.
+# Set the seed in the worker environment itself (not only in Popen's env) so
+# every helper inherits a value CPython accepts during pre-initialization.
+os.environ["PYTHONHASHSEED"] = "0"
+
+# CPython only accepts values in [0, 2**32 - 1] for PYTHONHASHSEED.  F5-TTS
+# otherwise generates a random value up to sys.maxsize on every inference and
+# exports it to this process environment, which can make later Python helpers
+# abort during interpreter startup on 64-bit macOS.
+_PYTHON_HASH_SEED_MAX = (2**32) - 1
+
+
+def _inference_seed(manifest: dict) -> int:
+    """Return the validated deterministic seed used for every F5 inference."""
+    raw_seed = manifest.get("inference_seed", 0)
+    if isinstance(raw_seed, bool):
+        raise ValueError("inference_seed phải là số nguyên không âm")
+    try:
+        seed = int(raw_seed)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("inference_seed phải là số nguyên") from exc
+    if not 0 <= seed <= _PYTHON_HASH_SEED_MAX:
+        raise ValueError(f"inference_seed phải nằm trong 0..{_PYTHON_HASH_SEED_MAX}")
+    return seed
+
+
+def _inference_speed(manifest: dict) -> float:
+    """Return the bounded F5 duration-calibration speed from the manifest.
+
+    This is an acoustic-model control, not the final playback tempo.  The
+    latter remains constrained in the main pipeline to 0.95–1.18.
+    """
+    raw_speed = manifest.get("inference_speed", 0.30)
+    if isinstance(raw_speed, bool):
+        raise ValueError("inference_speed phải là số thực")
+    try:
+        speed = float(raw_speed)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("inference_speed phải là số thực") from exc
+    if not 0.30 <= speed <= 1.0:
+        raise ValueError("inference_speed phải nằm trong 0.30..1.0")
+    return speed
+
+
+def _inference_device(manifest: dict) -> str:
+    """Return the only supported local F5 inference backends.
+
+    Manifests are an external process boundary, so do not trust the provider
+    config alone here.  Missing legacy manifests retain the production MPS
+    default; all other values fail closed rather than falling back to another
+    backend.
+    """
+    raw_device = manifest.get("device", "mps")
+    if not isinstance(raw_device, str):
+        raise ValueError("device phải là 'mps' hoặc 'cpu'")
+    device = raw_device.strip().lower()
+    if device not in {"mps", "cpu"}:
+        raise ValueError("device phải là 'mps' hoặc 'cpu'")
+    return device
+
+
+def _validate_daemon_request_speed(request: dict, manifest: dict) -> None:
+    """Reject daemon jobs calibrated for a different acoustic speed.
+
+    Cached F5 pieces are keyed by inference speed, so accepting a stale daemon
+    would silently produce audio that cannot match the caller's cache key or
+    duration contract.
+    """
+    if "inference_speed" not in request:
+        raise ValueError("Daemon request thiếu inference_speed.")
+    requested = _inference_speed(request)
+    expected = _inference_speed(manifest)
+    if requested != expected:
+        raise ValueError(
+            f"Daemon inference_speed không khớp: request={requested:.2f}, daemon={expected:.2f}."
+        )
+
+
+def _validate_daemon_request_device(request: dict, manifest: dict) -> None:
+    """Reject a client whose selected backend differs from the resident daemon."""
+    if "device" not in request:
+        raise ValueError("Daemon request thiếu device.")
+    requested = _inference_device(request)
+    expected = _inference_device(manifest)
+    if requested != expected:
+        raise ValueError(
+            f"Daemon device không khớp: request={requested}, daemon={expected}."
+        )
+
+
+def _configure_f5_inference_executor(device: str, utils_infer=None) -> None:
+    """Serialize F5's own nested inference batches on the MPS backend only.
+
+    F5's ``infer_batch_process`` otherwise submits each auto-split text piece
+    to a default ``ThreadPoolExecutor`` concurrently.  Its MPS model is not
+    safe for that nested concurrency.  This does not lock independent worker
+    processes (batch lanes) and does not affect CPU inference.
+    """
+    if device != "mps":
+        return
+    if utils_infer is None:
+        from f5_tts.infer import utils_infer
+
+    utils_infer.ThreadPoolExecutor = partial(ThreadPoolExecutor, max_workers=1)
 
 
 def _is_valid_wav(path: Path) -> bool:
@@ -88,24 +198,32 @@ def _concat_wavs(parts: list[Path], out: Path) -> None:
         list_path.unlink(missing_ok=True)
 
 
-def main() -> int:
-    manifest = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-    jobs = manifest["jobs"]
-    max_chars = int(manifest.get("max_chars", 300))
-    ref_audio = manifest["ref_audio"]
-    ref_text = manifest["ref_text"]
-
-    # Nạp model MỘT LẦN cho cả tập.
+def _load_tts(manifest: dict):
+    """Load the model once; a daemon keeps this object resident across videos."""
+    device = _inference_device(manifest)
+    _configure_f5_inference_executor(device)
     from f5_tts.api import F5TTS
 
-    print(f"[f5-batch] nạp model {manifest['model']} ({manifest['device']})…", flush=True)
+    print(f"[f5-batch] nạp model {manifest['model']} ({device})…", flush=True)
     tts = F5TTS(
         model=manifest["model"],
         ckpt_file=manifest["ckpt"],
         vocab_file=manifest["vocab"],
-        device=manifest["device"],
+        device=device,
     )
-    print(f"[f5-batch] model sẵn sàng — {len(jobs)} job", flush=True)
+    print("[f5-batch] model sẵn sàng", flush=True)
+    return tts
+
+
+def _run_jobs(tts, manifest: dict, emit=print) -> int:
+    jobs = manifest["jobs"]
+    max_chars = int(manifest.get("max_chars", 300))
+    ref_audio = manifest["ref_audio"]
+    ref_text = manifest["ref_text"]
+    inference_seed = _inference_seed(manifest)
+    inference_speed = _inference_speed(manifest)
+
+    emit(f"[f5-batch] nhận {len(jobs)} job", flush=True)
 
     n = len(jobs)
     for i, job in enumerate(jobs, 1):
@@ -116,7 +234,7 @@ def main() -> int:
         # bỏ qua, không nạp lại model/render lại — đây là điểm mấu chốt để resume
         # đúng ngay job bị dừng (vd job 200/250) chứ không chạy lại từ job 1.
         if out.exists() and _is_valid_wav(out):
-            print(f"JOB {i}/{n} skip (đã có) {out}", flush=True)
+            emit(f"JOB {i}/{n} skip (đã có) {out}", flush=True)
             continue
 
         chunks = _split_text(job["text"], max_chars)
@@ -124,7 +242,8 @@ def main() -> int:
         if len(chunks) <= 1:
             tts.infer(ref_file=ref_audio, ref_text=ref_text,
                       gen_text=chunks[0] if chunks else job["text"],
-                      file_wave=str(out), remove_silence=False)
+                      file_wave=str(out), remove_silence=False,
+                      seed=inference_seed, speed=inference_speed)
         else:
             parts: list[Path] = []
             try:
@@ -132,7 +251,8 @@ def main() -> int:
                     part = out.with_name(f"{out.stem}.c{k:02d}.wav")
                     tts.infer(ref_file=ref_audio, ref_text=ref_text,
                               gen_text=chunk, file_wave=str(part),
-                              remove_silence=False)
+                              remove_silence=False, seed=inference_seed,
+                              speed=inference_speed)
                     parts.append(part)
                 _concat_wavs(parts, out)
             finally:
@@ -140,12 +260,62 @@ def main() -> int:
                     p.unlink(missing_ok=True)
 
         if not out.exists():
-            print(f"[f5-batch] LỖI job {i}/{n}: không tạo được {out}", flush=True)
+            emit(f"[f5-batch] LỖI job {i}/{n}: không tạo được {out}", flush=True)
             return 1
-        print(f"JOB {i}/{n} ok {out}", flush=True)
+        emit(f"JOB {i}/{n} ok {out}", flush=True)
 
-    print("[f5-batch] xong toàn bộ", flush=True)
+    emit("[f5-batch] xong toàn bộ", flush=True)
     return 0
+
+
+def _serve(socket_path: Path, manifest: dict) -> int:
+    """Serve one job list at a time while retaining the loaded model."""
+    socket_path.parent.mkdir(parents=True, exist_ok=True)
+    socket_path.unlink(missing_ok=True)
+    server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    server.bind(str(socket_path))
+    server.listen(4)
+    try:
+        tts = _load_tts(manifest)
+        while True:
+            conn, _ = server.accept()
+            with conn, conn.makefile("rwb") as stream:
+                request = json.loads(stream.readline())
+                if request.get("command") == "shutdown":
+                    stream.write(b'{"event":"done"}\n')
+                    stream.flush()
+                    return 0
+
+                def emit(line: str, **_ignored) -> None:
+                    stream.write(json.dumps({"event": "progress", "line": line}, ensure_ascii=False).encode("utf-8") + b"\n")
+                    stream.flush()
+
+                try:
+                    _validate_daemon_request_speed(request, manifest)
+                    _validate_daemon_request_device(request, manifest)
+                    code = _run_jobs(tts, {**manifest, "jobs": request["jobs"]}, emit=emit)
+                    if code:
+                        stream.write(json.dumps({"event": "error", "detail": f"job worker exit {code}"}).encode("utf-8") + b"\n")
+                    else:
+                        stream.write(b'{"event":"done"}\n')
+                    stream.flush()
+                except Exception as exc:  # noqa: BLE001 -- return daemon errors to the requesting lane
+                    stream.write(json.dumps({"event": "error", "detail": str(exc)}, ensure_ascii=False).encode("utf-8") + b"\n")
+                    stream.flush()
+    finally:
+        server.close()
+        socket_path.unlink(missing_ok=True)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--serve", type=Path)
+    parser.add_argument("manifest", type=Path)
+    args = parser.parse_args()
+    manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
+    if args.serve:
+        return _serve(args.serve, manifest)
+    return _run_jobs(_load_tts(manifest), manifest)
 
 
 if __name__ == "__main__":

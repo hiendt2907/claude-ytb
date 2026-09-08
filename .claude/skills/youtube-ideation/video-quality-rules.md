@@ -1,5 +1,9 @@
 # Bộ rules chất lượng video — áp cho MỌI video
 
+> **Canonical ruleset:** `docs/CONTENT_CONTRACT.md` và
+> `src/ytb_pipeline/content_contract.py`. File legacy này không được tự đặt duration,
+> hook hay QA threshold khác ruleset đó.
+
 Rút ra từ phản hồi biên tập (Gemini/YouTube) và kinh nghiệm sản xuất. Đây là
 **nguyên tắc chung, không gắn cứng một chủ đề**. Mọi kịch bản sinh ở khâu ideation
 PHẢI thoả các rule dưới đây trước khi đưa sang duyệt Telegram. Khi viết script JSON,
@@ -29,13 +33,11 @@ sang viết kịch bản. Đây là cổng chặn đặt trước tất cả rul
 Ghi kết quả verify (PASS/FAIL + ghi chú nguồn) vào metadata/ý tưởng và đính kèm khi gửi
 duyệt Telegram, để user thấy đã kiểm trước khi duyệt.
 
-## 0b. KHUNG SHORT — độ dài 0.8–1.2 phút + KHÔNG hiện số thứ tự (ÉP ở code)
+## 0b. KHUNG SHORT — độ dài 1–1.5 phút + KHÔNG hiện số thứ tự (ÉP ở code)
 
-- **Short BẮT BUỘC TRÊN 0.8 phút, DƯỚI 1.2 phút (~45–60s).** Short không khai báo
-  `target_minutes`; `generator.load_script` **fail-fast** nếu narration ước lượng
-  (~1.197 ký tự/phút) ≤ 0.8 phút (quá ngắn, sơ sài) hoặc ≥ 1.2 phút (lê thê, vượt
-  khung). Nhắm đích **~1.000–1.400 ký tự** narration để an toàn trong khung — ngắn,
-  đi thẳng vào trọng tâm, không nhồi câu đệm cho đủ phút.
+- **Short BẮT BUỘC 1–1.5 phút (~60–90s).** Short không khai báo `target_minutes`.
+  Character budget là provider-aware (F5 hiện ~2.000 ký tự/phút); audio thật và
+  crossfade renderer được kiểm theo Content Contract.
 - **TUYỆT ĐỐI KHÔNG render badge số thứ tự** kiểu "1/5", "2/5" trên khung hình. Người
   xem không cần biết đang ở phần mấy; con số này làm rối và lộ "công thức". Renderer đã
   gỡ badge — kịch bản cũng không được yêu cầu hiển thị đếm phần/tổng.

@@ -1,7 +1,7 @@
 """ClaudeProvider — bọc `claude -p` subprocess (claude_cli.py) thành LLMProvider.
 
 Giữ hành vi cũ (cloud, headless qua CLI) nhưng qua interface chung LLMProvider
-để pipeline có thể đổi sang OllamaProvider (local) bằng `settings.llm_provider`
+để pipeline có thể đổi sang XkiroLLMProvider (cloud, mặc định) bằng `settings.llm_provider`
 mà không sửa logic agent.
 """
 
@@ -39,6 +39,7 @@ class ClaudeProvider:
         max_tokens: int = 4096,
         temperature: float = 0.7,
         json_output: bool = False,
+        response_schema: dict | None = None,
     ) -> str:
         if not self.is_available():
             raise ProviderUnavailableError(

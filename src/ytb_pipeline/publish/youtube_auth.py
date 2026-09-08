@@ -25,6 +25,10 @@ class ReauthRequiredError(RuntimeError):
 YOUTUBE_SCOPES = [
     "https://www.googleapis.com/auth/youtube.upload",
     "https://www.googleapis.com/auth/youtube",
+    # Required by commentThreads.insert for the post-upload CTA.  Google does
+    # not offer a narrower comment-only write scope; this authorizes broad
+    # YouTube channel management, so it is requested only during explicit auth.
+    "https://www.googleapis.com/auth/youtube.force-ssl",
     "https://www.googleapis.com/auth/yt-analytics.readonly",
 ]
 DRIVE_SCOPES = [

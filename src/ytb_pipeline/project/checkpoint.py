@@ -11,7 +11,7 @@ from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .models import NodeStatus, Project, WorkflowNode
+from .models import NodeStatus, Project, ProjectStatus, WorkflowNode
 
 
 def _now_iso() -> str:
@@ -75,6 +75,12 @@ class CheckpointManager:
             output_data=output_data or {},
             completed_at=_now_iso(),
             error=None,
+            # Stamp the contract this work was done under, so a later resume can
+            # tell "still valid" from "made under rules that have since moved".
+            # Absent metadata leaves them empty, which
+            # `contract.invalidation.stale_node_ids` reads as "do not touch".
+            creative_fingerprint=str(project.metadata.get("creative_policy_fingerprint") or ""),
+            runtime_fingerprint=str(project.metadata.get("runtime_binding_fingerprint") or ""),
         )
         return project.with_node(node)
 
@@ -90,6 +96,28 @@ class CheckpointManager:
             retry_count=retry_count,
         )
         return project.with_node(node)
+
+    def mark_halted(
+        self,
+        project: Project,
+        node_id: str,
+        *,
+        node_status: NodeStatus,
+        project_status: ProjectStatus,
+        error: str,
+    ) -> Project:
+        """Persist an intentional domain halt separately from FAILED."""
+        if node_status not in {NodeStatus.REVIEW_REQUIRED, NodeStatus.ABANDONED}:
+            raise ValueError(f"Node halt status không hợp lệ: {node_status.value}.")
+        existing = project.nodes.get(node_id)
+        stage = existing.stage if existing else node_id
+        node = replace(
+            existing if existing else WorkflowNode(node_id=node_id, stage=stage),
+            status=node_status,
+            error=error,
+            completed_at=_now_iso(),
+        )
+        return replace(project.with_node(node), status=project_status)
 
     def is_done(self, project: Project, node_id: str) -> bool:
         """True nếu node tồn tại và status=DONE."""

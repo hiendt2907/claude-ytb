@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from .cohorts import classify_cohort
 from ..config.settings import settings
 from ..orchestrator.state_io import locked_json_update
 
@@ -25,8 +26,12 @@ class AnalyticsStore:
             return []
         with locked_json_update(self.path) as data:
             videos = data.get("videos", {})
-            return [f"{slug}: {entry.get('decision')}" for slug, entry in videos.items()
-                    if isinstance(entry, dict) and entry.get("decision")]
+            decisions = [f"{slug}: {entry.get('decision')}" for slug, entry in videos.items()
+                         if isinstance(entry, dict) and entry.get("decision")]
+            baseline = data.get("channel_baseline", {}).get("stayed_to_watch")
+        if baseline is None:
+            return decisions
+        return decisions + self.format_feedback(baseline_stayed_to_watch=float(baseline))
 
     def record(self, slug: str, metrics: dict[str, Any]) -> str:
         decision = classify(metrics)
@@ -34,6 +39,48 @@ class AnalyticsStore:
             videos = data.setdefault("videos", {})
             videos[slug] = {**metrics, "decision": decision}
         return decision
+
+    def record_snapshot(self, slug: str, metrics: dict[str, Any]) -> None:
+        """Append an immutable observation instead of replacing video history."""
+        if "stayed_to_watch" in metrics:
+            stayed_to_watch = float(metrics["stayed_to_watch"])
+            if not 0 <= stayed_to_watch <= 1:
+                raise ValueError("stayed_to_watch snapshot phải nằm trong [0, 1].")
+        for field in ("age_hours", "short_to_long_clicks", "subscribers_gained"):
+            if field in metrics and float(metrics[field]) < 0:
+                raise ValueError(f"{field} snapshot không được âm.")
+        with locked_json_update(self.path) as data:
+            videos = data.setdefault("videos", {})
+            entry = videos.setdefault(slug, {})
+            snapshots = entry.setdefault("snapshots", [])
+            snapshots.append(dict(metrics))
+
+    def record_channel_baseline(self, *, stayed_to_watch: float) -> None:
+        """Persist the current batch's manually observed Shorts baseline."""
+        if not 0 <= stayed_to_watch <= 1:
+            raise ValueError("stayed_to_watch baseline phải nằm trong [0, 1].")
+        with locked_json_update(self.path) as data:
+            data["channel_baseline"] = {"stayed_to_watch": stayed_to_watch}
+
+    def format_feedback(self, *, baseline_stayed_to_watch: float) -> list[str]:
+        """Summarize mature snapshots by tested format for the next prompt."""
+        if not self.path.exists():
+            return []
+        with locked_json_update(self.path) as data:
+            grouped: dict[str, list[dict[str, Any]]] = {}
+            for entry in data.get("videos", {}).values():
+                if not isinstance(entry, dict):
+                    continue
+                for snapshot in entry.get("snapshots", []):
+                    if not isinstance(snapshot, dict):
+                        continue
+                    format_id = str(snapshot.get("format_id", "")).strip()
+                    if format_id:
+                        grouped.setdefault(format_id, []).append(snapshot)
+        return [
+            f"format={format_id}: {classify_cohort(snapshots, baseline_stayed_to_watch=baseline_stayed_to_watch)}"
+            for format_id, snapshots in sorted(grouped.items())
+        ]
 
 
 def classify(metrics: dict[str, Any]) -> str:

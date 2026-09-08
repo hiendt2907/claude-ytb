@@ -1,6 +1,6 @@
 # Kế hoạch phát triển kênh YouTube
 
-**Trạng thái:** Đã chốt, áp dụng từ 2026-07-14
+**Trạng thái:** Đã chốt, cập nhật 2026-07-22
 **Chủ sở hữu quyết định:** User
 **Đối tượng đọc:** Codex, Claude và mọi agent vận hành kênh
 
@@ -13,6 +13,16 @@
 - Không sản xuất nội dung hàng loạt thiếu giá trị, trùng chủ đề hoặc rủi ro monetization.
 
 Batch đang chạy phải được để hoàn tất. Không thêm queue mới cho tới khi batch hiện tại được audit.
+
+**Phạm vi áp dụng (thêm 2026-08-27):** mục tiêu và mô hình phễu Short→Long
+trong tài liệu này áp dụng cho content profile giải thích cơ chế
+(`one-cup-cafe-6h`). Series kể chuyện `ban-so-6` (content_rules
+`allow_short_generation: false`) là **ngoại lệ vĩnh viễn, Long-only theo
+quyết định chủ sở hữu** — không chạy phễu Short→Long, không cần
+`--long-form-slug`/`--playlist`/`--cta-target` khi lên batch. Đừng áp mục
+tiêu "40-50 Shorts + 4 Long" hay lịch "1 Long + 2 Short/ngày" ở mục 1 và 3
+cho series này. Bối cảnh quyết định:
+`docs/handoffs/2026-08-27-content-profile-engine-refactor-plan.md`.
 
 ## 2. Định vị kênh
 
@@ -31,14 +41,15 @@ Mỗi video chỉ có **một cơ chế hoặc một vấn đề trung tâm**.
 
 ## 3. Lịch xuất bản thử nghiệm
 
-Sau batch hiện tại:
+Mỗi ngày sản xuất một cụm nội dung hoàn chỉnh:
 
-- Thứ 2–Thứ 7: 2 Shorts/ngày.
-- Chủ nhật: 1 video dài.
-- Khung giờ thử nghiệm: 06:00 và 20:30, giờ Việt Nam.
-- Chỉ tăng lên 3–4 Shorts/ngày khi dữ liệu chứng minh chất lượng không giảm.
+- 1 video dài, một cơ chế trung tâm, xuất bản lúc 20:30.
+- 2 Shorts cùng cơ chế nhưng khác góc khai thác, xuất bản lúc 06:00 và 12:30; từng Short phải dẫn về đúng video dài của ngày đó.
+- Mỗi Short phải bắt đầu từ đúng một phân đoạn đã truy được trong Long: phân đoạn đó vừa đem lại một insight cụ thể, vừa để lại một câu hỏi đáng xem tiếp. Short bổ sung hook, bối cảnh, bước quan sát an toàn và CTA; không tự thêm claim chưa có nguồn.
+- Chỉ tăng số Short khi dữ liệu chứng minh chất lượng không giảm và chủ sở hữu quyết định.
 
 Không thay đổi lịch của video đã upload hoặc đã schedule.
+Chính sách này không tự gán `publish_at`: chỉ lên lịch sau khi cả Long, hai Short, nguồn và QA đều hợp lệ.
 
 ## 4. Tiêu chuẩn một Short
 
@@ -51,6 +62,7 @@ Mỗi Short phải có đủ:
 5. Một hành động người xem áp dụng được trong ngày.
 6. Câu chốt/payoff đáng nhớ.
 7. CTA dẫn sang video liên quan hoặc video dài.
+8. Dấu vết nguồn: slug Long, chỉ mục phân đoạn và trích đoạn nguồn phải có trong metadata để audit.
 
 Không dùng lời mở đầu chung chung, danh sách mẹo không có cơ chế, hoặc kết thúc chỉ bằng “hãy like và subscribe”.
 
@@ -66,7 +78,7 @@ Video dài 12–15 phút, một cơ chế mỗi tập:
 6. Sai lầm thường gặp.
 7. Tóm tắt và cầu nối sang tập sau.
 
-Short và video dài cùng chủ đề lõi nhưng không được là bản cắt máy móc của nhau.
+Short dùng một phân đoạn của Long làm hạt nhân, rồi viết lại cho nhịp dọc; không phải bản cắt máy móc hoặc bản tóm tắt cả Long.
 
 ## 6. Quy tắc chống trùng
 

@@ -14,17 +14,14 @@ from __future__ import annotations
 
 import re
 import time
+from collections import Counter
 from typing import Any
 
 from ..ideation import series as series_mod
-from ..ideation.generator import (
-    GREETING_PREFIX,
-    LONG_MAX_MINUTES,
-    LONG_MIN_MINUTES,
-    SHORT_MAX_MINUTES,
-    SHORT_MIN_MINUTES,
-    estimate_minutes,
-)
+from ..content_contract import contract_for, effective_chars_per_min, estimate_duration_sec
+from ..content_profiles import load_content_profile
+from ..ideation.generator import GREETING_PREFIX
+from ..config.settings import settings
 from .base import AgentResult, AgentStatus
 
 _SELF_HELP_MANTRAS = (
@@ -47,19 +44,8 @@ _STAGE_DIRECTION_PATTERNS = (
     "[",
     "]",
 )
-_CONCRETE_EXAMPLE_HINTS = (
-    "ví dụ",
-    "chẳng hạn",
-    "cụ thể",
-    "trong thực tế",
-    "một người",
-    "khi bạn",
-)
-_EXAMPLE_CONTEXT_HINTS = ("khi ", "lúc ", "trong ", "ở ", "một người", "lan ")
-_EXAMPLE_ACTION_HINTS = ("mở ", "đặt ", "tắt ", "viết ", "chọn ", "làm ", "bỏ ")
-_EXAMPLE_CONSEQUENCE_HINTS = ("nên ", "vì vậy", "kết quả", "hậu quả", "khiến", "dẫn đến", "bị ")
-_EXAMPLE_APPLICATION_HINTS = ("bạn có thể", "hãy thử", "lần tới", "áp dụng", "ngay hôm nay")
 _IMMEDIATE_ACTION_HINTS = ("hãy ", "thử ngay", "ngay hôm nay", "ngay bây giờ", "làm ngay")
+_NARRATOR_REFLECTION_IMPERATIVES = ("hãy ", "đừng ", "bạn phải ", "cần phải ")
 _ABSOLUTE_CLAIM_HINTS = ("chắc chắn", "đảm bảo", "100%", "luôn luôn", "mọi người")
 _HEALTH_FINANCE_HINTS = (
     "chữa khỏi", "điều trị", "lo âu", "trầm cảm", "bệnh", "thuốc",
@@ -88,12 +74,22 @@ class QAAgent:
             violations.extend(_check_length(script))
             violations.extend(_check_intro(script))
             violations.extend(_check_self_help(script))
-            violations.extend(_check_dedup(script, context.get("done_topics")))
+            violations.extend(_check_dedup(
+                script, context.get("done_topics"), context.get("exempt_slugs", ()),
+            ))
             violations.extend(_check_absolute_health_finance_claims(script))
             if context.get("strict", False):
                 violations.extend(_check_hook_strength(script))
-                violations.extend(_check_central_mechanism(script))
+                violations.extend(_check_hook_contract(script))
+                if _get(script, "ruleset_id", ""):
+                    violations.extend(_check_release_schema(script))
                 violations.extend(_check_stage_direction_leak(script))
+                violations.extend(_check_speaker_prefix_leak(script))
+                violations.extend(_check_slug_leak(script))
+                violations.extend(_check_unrenderable_visual_intent(script))
+                violations.extend(_check_story_speaker_ownership(script))
+                violations.extend(_check_character_voiceover_is_direct(script))
+                violations.extend(_check_story_series_arc(script))
                 violations.extend(_check_knowledge_examples(script))
                 violations.extend(_check_immediate_action(script))
                 violations.extend(_check_final_payoff(script))
@@ -135,6 +131,15 @@ def _segments_of(script: Any) -> list[Any]:
     return list(_get(script, "segments", ()) or ())
 
 
+def _content_profile(script: Any):
+    if not _get(script, "content_profile_version", ""):
+        return None
+    return load_content_profile(
+        _get(script, "content_profile_id", "") or None,
+        version=_get(script, "content_profile_version", "") or None,
+    )
+
+
 def _narration_of(segment: Any) -> str:
     return _get(segment, "narration", "") or ""
 
@@ -156,33 +161,41 @@ def _check_length(script: Any) -> list[dict[str, str]]:
         return [{"rule": "length", "detail": "Script không có segment narration."}]
 
     target_minutes = _get(script, "target_minutes")
-    est = estimate_minutes(segments)
+    video_type = "long" if target_minutes is not None else "short"
+    profile = _content_profile(script)
+    contract = contract_for(video_type, profile)
+    est_sec = estimate_duration_sec(
+        sum(len(_narration_of(segment)) for segment in segments),
+        chars_per_minute=effective_chars_per_min(
+            profile.providers.tts if profile else settings.tts_provider,
+            video_type=video_type,
+            content_profile=profile,
+        ),
+    )
 
     if target_minutes is not None:
-        if not (LONG_MIN_MINUTES <= target_minutes <= LONG_MAX_MINUTES):
+        min_minutes = contract.viewer_runtime_bounds_sec[0] / 60
+        max_minutes = contract.viewer_runtime_bounds_sec[1] / 60
+        if not (min_minutes <= target_minutes <= max_minutes):
             return [{
                 "rule": "length",
                 "detail": (
                     f"target_minutes={target_minutes} ngoài khoảng "
-                    f"[{LONG_MIN_MINUTES}, {LONG_MAX_MINUTES}]."
+                    f"[{min_minutes:.0f}, {max_minutes:.0f}]."
                 ),
             }]
-        if est < target_minutes:
+        required_target_sec = float(target_minutes) * 60 + contract.transition_loss_sec(len(segments))
+        if est_sec + contract.runtime_tolerance_sec < required_target_sec:
             return [{
                 "rule": "length",
-                "detail": f"Nội dung quá mỏng: ước lượng {est:.1f}p < target {target_minutes}p.",
+                "detail": f"Nội dung quá mỏng: audio ước lượng {est_sec / 60:.1f}p < target {target_minutes}p.",
             }]
-        if est > LONG_MAX_MINUTES:
-            return [{
-                "rule": "length",
-                "detail": f"Video dài quá dài: ước lượng {est:.1f}p > {LONG_MAX_MINUTES}p.",
-            }]
-        return []
-
-    if est < SHORT_MIN_MINUTES:
-        return [{"rule": "length", "detail": f"Short quá ngắn: ước lượng {est:.2f}p."}]
-    if est > SHORT_MAX_MINUTES:
-        return [{"rule": "length", "detail": f"Short quá dài: ước lượng {est:.2f}p."}]
+    try:
+        contract.validate_audio_runtime(
+            est_sec, segment_count=len(segments) if _get(script, "ruleset_id", "") else 1
+        )
+    except ValueError as exc:
+        return [{"rule": "length", "detail": str(exc)}]
     return []
 
 
@@ -194,10 +207,19 @@ def _check_intro(script: Any) -> list[dict[str, str]]:
     is_long = _get(script, "target_minutes") is not None
     starts_with_greeting = first.startswith(GREETING_PREFIX)
 
-    if is_long and not starts_with_greeting:
+    profile = _content_profile(script)
+    opening_mode = (
+        profile.content_rules.long_opening_mode if profile is not None else "channel_greeting"
+    )
+    if is_long and opening_mode == "channel_greeting" and not starts_with_greeting and not settings.e2e_test:
         return [{
             "rule": "intro",
             "detail": f"Video dài phải mở đầu bằng \"{GREETING_PREFIX}\".",
+        }]
+    if is_long and opening_mode == "pain_first" and starts_with_greeting:
+        return [{
+            "rule": "intro",
+            "detail": "Profile pain_first phải mở thẳng bằng tình huống đau, không dùng lời chào.",
         }]
     if not is_long and starts_with_greeting:
         return [{
@@ -231,7 +253,110 @@ def _script_video_type(script: Any) -> str:
     return "long" if _get(script, "target_minutes") is not None else "short"
 
 
+# Neo phải là một khoảnh khắc CỤ THỂ, không phải một buổi chung chung: "sáu
+# giờ bảy" khác "những buổi sáng". Vì thế mốc thời gian chỉ tính khi đi kèm một
+# con số. Không dùng để "đếm từ khoá hay" — chỉ để phân biệt một cảnh có neo
+# với một câu trừu tượng.
+_STORY_MOMENT_MARKERS = (
+    "giờ", "phút", "rưỡi", "sáng", "trưa", "chiều", "tối", "đêm", "hôm",
+)
+_STORY_NUMBER_WORDS = frozenset({
+    "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín", "mười",
+    "mươi", "rưỡi", "kém",
+})
+# Dấu hiệu có thứ để mất — hai lớp NGỮ NGHĨA khác nhau, cả hai đều là "stake"
+# hợp lệ theo STORY_HOOK_CONTRACT (ideation_prompts.py): (1) nghĩa vụ/thời hạn
+# chưa xong; (2) hậu quả/rủi ro. Một câu mở thật của Qwen ("sợ hỏi An thì bị
+# chê là thiếu chủ động") có anchor rõ nhưng vẫn bị QA từ chối vì lớp (2)
+# trước đây chưa có marker nào — không phải vì thiếu marker "sợ hỏi ... bị
+# chê" cụ thể, mà vì thiếu CẢ LỚP hậu quả/rủi ro trong danh sách.
+_STORY_STAKE_OBLIGATION_MARKERS = (
+    "phải", "chưa", "vẫn", "còn", "sắp", "kịp", "hạn", "trễ", "muộn",
+    "trước khi", "nhưng", "quên", "lỡ",
+)
+# "bị" là trợ từ bị động-nghịch (adversative passive) của tiếng Việt: gần như
+# luôn đứng trước một hậu quả xấu xảy đến cho chủ thể ("bị chê", "bị la", "bị
+# phạt", "bị đuổi", "bị trừ điểm"...), khác với "được" (trung tính/tích cực).
+# Vì vậy một từ "bị" khái quát được cả lớp hậu quả mà không cần liệt kê từng
+# động từ theo sau. "sợ"/"lo"/"nếu"/"nhỡ"/"kẻo" đánh dấu một rủi ro nhân vật
+# đang lường trước, dù hậu quả có thể chưa xảy ra.
+_STORY_STAKE_RISK_MARKERS = (
+    "bị", "sợ", "lo", "nếu", "nhỡ", "kẻo",
+)
+_STORY_STAKE_MARKERS = _STORY_STAKE_OBLIGATION_MARKERS + _STORY_STAKE_RISK_MARKERS
+
+
+def _story_words(text: str) -> list[str]:
+    return re.findall(r"[^\W_]+", text.lower(), flags=re.UNICODE)
+
+
+def _mentions_cast_by_name(text: str, cast: "set[str]") -> bool:
+    """Nhân vật có được GỌI TÊN trong đoạn này không.
+
+    So token viết thường thì mọi từ tiếng Việt có âm tiết trùng tên nhân vật
+    đều thành rò rỉ. Đo thật 2026-09-02: một lời chốt hợp lệ bị loại vì
+    "cuộc gọi xác minh" — `xác minh` tách ra `minh`, trùng cast id. Tập đó nói
+    về đúng một cuộc gọi xác minh, nên cổng gần như không thể qua. `chứng
+    minh`, `thông minh`, `minh bạch`, `văn minh` đều hỏng y hệt.
+
+    Tiếng Việt viết hoa danh từ riêng và không viết hoa âm tiết trong từ ghép,
+    nên chữ hoa là thứ phân biệt được. Khớp phân biệt hoa/thường, có biên từ:
+    "Minh" là người, "minh" trong "xác minh" thì không.
+
+    Dấu thanh cũng đã tách sẵn "mình" khỏi "minh"; chữ hoa xử lý phần còn lại.
+    """
+    for name in cast:
+        if not name:
+            continue
+        pattern = re.compile(rf"(?<![^\W\d_]){re.escape(name.capitalize())}(?![^\W\d_])")
+        if pattern.search(text):
+            return True
+    return False
+
+
+def _check_story_hook(script: Any, profile: Any) -> list[dict[str, str]]:
+    """Cổng mở đầu cho profile kể chuyện.
+
+    Một cảnh mở mạnh không cần nghịch lý — nó cần hai thứ: NEO (người xem biết
+    mình đang ở đâu, lúc nào, với ai) và THỨ ĐỂ MẤT (một nghĩa vụ chưa xong,
+    một thời hạn). Luật cũ đòi từ khoá nghịch lý nên loại thẳng mọi mở đầu bằng
+    cảnh, dù đó chính là điều làm series khác với video khuyên bảo.
+    """
+    segments = _segments_of(script)
+    if not segments:
+        return []
+    first = _narration_of(segments[0]).strip()
+    words = _story_words(first)
+    narrator_id = profile.editorial_contract.narration_speaker_id
+    cast = {name for name in profile.voice_cast if name != narrator_id}
+    word_set = set(words)
+    has_clock = any(marker in word_set for marker in _STORY_MOMENT_MARKERS) and (
+        bool(_STORY_NUMBER_WORDS & word_set) or any(character.isdigit() for character in first)
+    )
+    # Neo nhân vật phải là GỌI TÊN thật, không phải một âm tiết trùng tên. Khớp
+    # theo token sẽ ghi công cho "cuộc gọi xác minh" là có neo nhân vật, và một
+    # cảnh mở không neo được ai vẫn qua cổng — lỗi lặng, ngược chiều với ca ở
+    # `_is_narrator_lesson_closing` nhưng cùng một gốc.
+    has_anchor = _mentions_cast_by_name(first, cast) or has_clock
+    lowered = first.lower()
+    has_stake = any(marker in words for marker in _STORY_STAKE_MARKERS) or any(
+        marker in lowered for marker in _STORY_STAKE_MARKERS if " " in marker
+    )
+    if len(words) >= 8 and has_anchor and has_stake:
+        return []
+    return [_repair(
+        "hook",
+        "Cảnh mở đầu chưa neo được khoảnh khắc hoặc chưa có gì để mất.",
+        "Mở bằng một mốc cụ thể (giờ, nơi chốn, tên nhân vật) rồi nêu ngay việc "
+        "đang dở hoặc thời hạn đang đến, ví dụ: 'Sáu giờ bảy, Minh mở laptop. "
+        "Tám rưỡi phải gửi bản đề xuất.'",
+    )]
+
+
 def _check_hook_strength(script: Any) -> list[dict[str, str]]:
+    profile = _content_profile(script)
+    if profile is not None and profile.narrative_mode == "character_story":
+        return _check_story_hook(script, profile)
     segments = _segments_of(script)
     if not segments:
         return []
@@ -242,7 +367,7 @@ def _check_hook_strength(script: Any) -> list[dict[str, str]]:
         first_text = first_text.replace(GREETING_PREFIX.lower(), "", 1).strip()
     strong_markers = (
         "vì sao", "thật ra", "nghịch lý", "sai lầm", "bí mật", "đừng", "không phải",
-        "nhưng", "bỗng", "ngay trước mặt", "hóa ra", "mở laptop", "cầm điện thoại",
+        "nhưng", "bỗng", "ngay trước mặt", "hóa ra",
     )
     has_question_hook = "?" in first
     if len(first_words) < 8 or not (has_question_hook or any(marker in first_text for marker in strong_markers)):
@@ -254,10 +379,100 @@ def _check_hook_strength(script: Any) -> list[dict[str, str]]:
     return []
 
 
+def _check_hook_contract(script: Any) -> list[dict[str, str]]:
+    """Validate strategy-v1 structure before the audio timing gate runs.
+
+    Legacy scripts intentionally have no strategy and remain eligible for audit;
+    newly generated strategy scripts must expose the exact beat that earns the
+    first five seconds of attention.
+    """
+    strategy = _get(script, "strategy")
+    if strategy is None or _script_video_type(script) != "short":
+        return []
+    hook = _get(strategy, "hook")
+    required = (
+        _get(strategy, "format_id", ""),
+        _get(strategy, "core_mechanism", ""),
+        _get(strategy, "audience_problem", ""),
+        _get(strategy, "angle", ""),
+        _get(strategy, "long_form_slug", ""),
+        _get(strategy, "playlist", ""),
+        _get(strategy, "cta_target", ""),
+        _get(hook, "situation", ""),
+        _get(hook, "core_answer", ""),
+        _get(hook, "open_loop", ""),
+    )
+    segments = _segments_of(script)
+    purposes = [_get(segment, "purpose", "") for segment in segments]
+    contract = contract_for("short")
+    deadline = _get(hook, "answer_by_sec", 0)
+    deadline_ok = isinstance(deadline, (int, float)) and 0 < float(deadline) <= float(contract.answer_start_deadline_sec or 0)
+    if (
+        not all(str(value).strip() for value in required)
+        or purposes[:2] != ["situation", "core_answer"]
+        or not deadline_ok
+    ):
+        return [_repair(
+            "hook_contract",
+            "Strategy Short phải có hook đầy đủ, funnel đích và segment purpose='core_answer'.",
+            "Khai báo format/cơ chế/góc, long_form_slug/playlist/cta_target, rồi đặt câu trả lời lõi vào một segment core_answer.",
+        )]
+    return []
+
+
+def _check_release_schema(script: Any) -> list[dict[str, str]]:
+    """Schema required for every newly produced, publishable script."""
+    thumbnail = _get(script, "thumbnail_brief")
+    if thumbnail is None:
+        return [_repair(
+            "thumbnail_brief",
+            "Kịch bản chưa có thumbnail_brief trước khi TTS/render.",
+            "Bổ sung visual_contradiction, subject, emotion và headline (≤4 từ).",
+        )]
+    if _script_video_type(script) != "short":
+        return []
+    strategy = _get(script, "strategy")
+    if strategy is None:
+        return []
+    source = (
+        _get(strategy, "source_long_slug", ""),
+        _get(strategy, "source_section_index", None),
+        _get(strategy, "source_excerpt", ""),
+    )
+    if not source[0] or source[1] is None or not source[2]:
+        return [_repair(
+            "short_source_trace",
+            "Short thiếu dấu vết section Long làm nguồn.",
+            "Khai báo source_long_slug, source_section_index và source_excerpt trùng Long đích.",
+        )]
+    if source[0] != _get(strategy, "long_form_slug", ""):
+        return [_repair(
+            "short_source_trace",
+            "source_long_slug không khớp long_form_slug.",
+            "Dùng đúng Long đích cho source trace và CTA.",
+        )]
+    return []
+
+
 def _check_central_mechanism(script: Any) -> list[dict[str, str]]:
     """Keep each episode focused when the script explicitly names mechanisms."""
     names = re.findall(r"cơ chế\s+([\wà-ỹ\s]{2,40}?)(?:[,.;:]|\s+(?:và|nhưng|cũng)\s)", _script_text(script).lower())
-    unique = {" ".join(name.split()) for name in names if name.strip()}
+    # A single regex match is not evidence of a competing mechanism: natural
+    # narration commonly says "cơ chế này" or uses a descriptive tail once.
+    # Count normalized mentions first; only repeatedly named mechanisms enter
+    # the gate. This keeps the rule topic-agnostic instead of hardcoding words.
+    normalized = [" ".join(name.split()) for name in names if name.strip()]
+    counts = Counter(normalized)
+    unique = {name for name, count in counts.items() if count >= 2}
+    # The regex has no semantic knowledge of Vietnamese mechanism names.  A
+    # later mention can therefore include a following verb/question and look
+    # like a second mechanism ("lời nguyền tri thức" vs "lời nguyền tri thức
+    # hỏi điểm bắt đầu").  Treat prefix extensions as the same named mechanism;
+    # genuinely different names remain independent candidates below.
+    unique = {
+        name for name in unique
+        if not any(name != other and name.startswith(other + " ") for other in unique)
+    }
     if len(unique) <= 1:
         return []
     return [_repair(
@@ -281,33 +496,637 @@ def _check_stage_direction_leak(script: Any) -> list[dict[str, str]]:
     return violations
 
 
-def _check_knowledge_examples(script: Any) -> list[dict[str, str]]:
-    text = _script_text(script).lower()
-    has_example = any(hint in text for hint in _CONCRETE_EXAMPLE_HINTS)
-    parts_present = (
-        any(hint in text for hint in _EXAMPLE_CONTEXT_HINTS),
-        any(hint in text for hint in _EXAMPLE_ACTION_HINTS),
-        any(hint in text for hint in _EXAMPLE_CONSEQUENCE_HINTS),
-        any(hint in text for hint in _EXAMPLE_APPLICATION_HINTS),
+def _check_speaker_prefix_leak(script: Any) -> list[dict[str, str]]:
+    """Tên nhân vật đứng đầu lời đọc sẽ bị TTS đọc thành tiếng.
+
+    `speaker_id` đã định tuyến giọng rồi, nên "An: Cậu đã mở..." vừa thừa vừa
+    phá nhịp. Chỉ chặn dạng tiền tố "<tên>:" — gọi tên nhân vật trong câu là
+    lời thoại bình thường.
+    """
+    profile = _content_profile(script)
+    if profile is None or profile.narrative_mode != "character_story":
+        return []
+    narrator_id = profile.editorial_contract.narration_speaker_id
+    cast = {name for name in profile.voice_cast if name != narrator_id}
+    violations: list[dict[str, str]] = []
+    for index, segment in enumerate(_segments_of(script), start=1):
+        head = _narration_of(segment).strip().split(":", 1)[0].strip().lower()
+        if head and head in cast:
+            violations.append(_repair(
+                "speaker_prefix",
+                f"Section {index} mở đầu bằng tên người nói ('{head}:'); TTS sẽ đọc cả tên.",
+                "Bỏ tiền tố tên khỏi voiceover; giọng đã được chọn qua speaker_id.",
+            ))
+    return violations
+
+
+# Đúng ba điều prompt ideation đã cấm cho `visual_intent` (xem ca6bafb): chữ/số
+# đọc được trong khung, một vật nhỏ cầm trên tay, và vị trí tay/ngón chính xác.
+# Prompt nói rõ "an image model cannot deliver those reliably and every one of
+# them becomes a hard failure" — đo trên hàng thật thì đúng vậy, không candidate
+# nào qua nổi. Mẫu bám chính xác ba điều đó, không mở rộng sang mô tả cảnh
+# thường (đứng cạnh bàn, nhìn về phía ai, phòng họp sáng đèn... đều hợp lệ).
+# Câu tiếng Anh mô tả từng họ, dùng để DỰNG prompt thay vì chép tay sang đó.
+#
+# Trước đây `ideation_prompts.VISUAL_INTENT_RENDERABILITY_CONTRACT` là một chuỗi
+# viết tay kèm comment "phải giữ đồng bộ với bảng này". Comment không phải cơ
+# chế: 2026-09-03 bảng học họ thứ 6 trong khi prompt còn nêu 3, và ngay trong
+# ngày đó bảng lên 8 còn prompt vẫn 6. Một luật ở hai nơi, đồng bộ bằng lời
+# nhắc, thì sẽ lệch — và mỗi lần lệch tốn một lượt sinh kịch bản.
+#
+# `renderability_contract_text()` dựng câu contract từ chính bảng, và raise nếu
+# một họ mới chưa có mô tả. Thêm họ mà quên prompt là không thể nữa.
+_UNRENDERABLE_INTENT_GUIDANCE: dict[str, str] = {
+    "vị trí tay/ngón chính xác":
+        "an exact hand or finger position, or a close-up of hands",
+    "vật nhỏ cầm trên tay":
+        "a specific small prop held in a hand",
+    "chữ/số đọc được trong khung":
+        "readable text or numbers on a screen, page or sign",
+    "cử chỉ có đích":
+        "a directed gesture such as 'chỉ tay' or 'trỏ về phía'",
+    "trao/xoay vật về phía người khác":
+        "handing or turning an object toward someone — 'chìa', 'trao', "
+        "'đưa ... cho', 'quay ... về phía'",
+    "chuỗi hai nhịp trong một khung hình":
+        "two temporal beats joined by 'rồi', 'sau đó' or 'trước khi'",
+    "yêu cầu một vật KHÔNG có trong khung":
+        "an object described as absent — naming it is what makes the model "
+        "draw it; say what IS on the table instead",
+    "vật ở tư thế chỉ định hoặc đang được thao tác":
+        "an object in a demanded pose ('úp', 'ngửa', 'nghiêng') or mid-handling "
+        "('đặt ... xuống', 'đang rót/nâng/lật')",
+}
+
+
+def renderability_contract_text() -> str:
+    """Câu contract cho prompt, dựng từ chính bảng hard-fail.
+
+    Raise khi một họ chưa có mô tả — thà hỏng to lúc import còn hơn để prompt
+    im lặng thiếu một luật mà cổng vẫn chặn.
+    """
+    missing = [label for label, _p in _UNRENDERABLE_VISUAL_INTENT
+               if label not in _UNRENDERABLE_INTENT_GUIDANCE]
+    if missing:
+        raise RuntimeError(
+            "Thiếu mô tả prompt cho họ unrenderable: " + ", ".join(missing)
+        )
+    items = "; ".join(
+        f"({index}) {_UNRENDERABLE_INTENT_GUIDANCE[label]}"
+        for index, (label, _p) in enumerate(_UNRENDERABLE_VISUAL_INTENT, start=1)
     )
-    if not has_example or not all(parts_present):
-        return [_repair(
-            "concrete_example",
-            "Video thiếu ví dụ hoàn chỉnh (bối cảnh, hành động, hậu quả, cách áp dụng).",
-            "Thêm ít nhất một ví dụ đời thường cụ thể: bối cảnh, hành động, hậu quả, và cách áp dụng.",
-        )]
+    return (
+        "A visual_intent describes exactly ONE still frame. Never require: "
+        f"{items}. Keep one readable-at-a-glance action. An object may be "
+        "present on a table or in the room, but it must not be read, held, "
+        "handed over, precisely pointed at, posed, or described as missing. "
+        f"Name at most {MAX_STATED_OBJECT_DETAILS} object details that carry a "
+        "STATE (lit, cold, open, empty, face-down, showing a time): the Judge "
+        "scores each one separately, so every extra detail is another "
+        "independent chance to fail the whole shot."
+    )
+
+
+# Danh từ vật thể mà một `visual_intent` hay nhắc tới. Dùng chung cho mẫu phủ
+# định ở cả hai thứ tự từ, để thêm một danh từ là cả hai hướng cùng học được.
+_VISUAL_OBJECT_NOUNS = (
+    "tách|ly|cốc|khay|bút|điện thoại|laptop|máy tính|giấy|tờ|sổ|cuốn|hộp|"
+    "chìa khoá|chìa khóa|túi|mũ|áo khoác|đồng hồ|cà phê|nước|bình|đĩa|thìa|muỗng"
+)
+
+# Trần số CHI TIẾT "vật + trạng thái" trong một visual_intent.
+#
+# Tám họ hard-fail ở trên đều cấm một LOẠI chi tiết, và vá theo loại không bao
+# giờ hết — vì nguyên nhân là SỐ LƯỢNG. Judge chấm từng mệnh đề như hợp đồng
+# bắt buộc, nên mỗi chi tiết là một cơ hội ĐỘC LẬP để image model vẽ trượt, và
+# trượt một cái là hard-fail cả shot.
+#
+# Đo trên 5 shot đầu của hai-lan-may-ban-mot-tin-nhan-gui-di, cùng kịch bản,
+# cùng model:
+#     3 chi tiết -> CHẶN      0 chi tiết -> qua
+#     4 chi tiết -> CHẶN      1 chi tiết -> qua (x2)
+# Trần 2 giữ nguyên mọi shot đã qua và bắt đúng hai shot đã chặn.
+MAX_STATED_OBJECT_DETAILS = 2
+
+_OBJECT_STATE_WORDS = (
+    "sáng|tối|ướt|khô|mở|đóng|cạn|rỗng|đầy|nguội|nóng|ấm|nằm|treo|chỉ|còn|chưa|"
+    "vơi|nghiêng|úp|ngửa|bốc khói|sạc|tắt|bật"
+)
+
+_UNRENDERABLE_VISUAL_INTENT: tuple[tuple[str, "re.Pattern[str]"], ...] = (
+    (
+        "vị trí tay/ngón chính xác",
+        re.compile(r"cận\s+(?:cảnh\s+)?(?:bàn\s+)?tay|ngón\s+(?:tay|trỏ|cái)", re.IGNORECASE),
+    ),
+    (
+        "vật nhỏ cầm trên tay",
+        re.compile(r"tay\s+(?:cầm|giữ|nắm)|cầm\s+(?:khay|ly|tách|bút|cuốn|tờ|điện thoại)", re.IGNORECASE),
+    ),
+    (
+        # Chỉ chặn khi đòi NỘI DUNG đọc được, không chặn trạng thái sáng/tối.
+        # Mẫu cũ bắt cả "màn hình sáng" — một màn hình đang bật thì image model
+        # vẽ dễ, và việc chặn nó đã làm hỏng một lượt sinh kịch bản mà biên tập
+        # đã đạt. Bằng chứng thật sự chỉ có cho ca đòi chữ/số hoặc một hoạ tiết
+        # cụ thể phải hiện trên màn hình.
+        "chữ/số đọc được trong khung",
+        re.compile(
+            r"màn hình\s+(?:hiện|hiển thị)|dòng chữ|dòng cảnh báo"
+            r"|chữ\s+(?:trên|hiện)|con số\s+(?:trên|hiện)",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        # Đo trên 4 shot liên tiếp: Judge cho character và continuity ~1.0,
+        # composition 0.5-0.9, nhưng semantic 0.0-0.2. Người và nơi chốn luôn
+        # dựng đúng; chỉ HÀNH ĐỘNG hỏng, và mọi mệnh đề hỏng đều là cử chỉ có
+        # ĐÍCH — một chi phải trỏ tới một vật xác định trong khung. Đó cùng một
+        # lý do vật lý với hai mẫu tay ở trên.
+        #
+        # Ranh giới: tư thế TĨNH luôn qua ("ngồi", "đứng cạnh bàn", "cúi nhìn
+        # màn hình"). Không chặn động từ nói chung — chặn rộng hơn sẽ giết cả
+        # cảnh dựng được, đúng cái đã xảy ra một lần với "màn hình sáng".
+        "cử chỉ có đích",
+        re.compile(r"chỉ\s+tay|chỉ\s+về\s+phía|trỏ\s+về\s+phía", re.IGNORECASE),
+    ),
+    (
+        # Cùng bộ đo: trao/xoay một vật về phía người kia đòi hai nhân vật phối
+        # hợp chính xác quanh một vật thể — hỏng y hệt cách "tay cầm" hỏng.
+        # "quay về phía cửa kính" (xoay người, không có vật) vẫn qua.
+        # Đo trên hàng thật, project minh-neu-rui-ro-trong-cuoc-hop, shot
+        # scene-001-shot-00: "mắt nhìn tách cà phê RỒI nhìn Minh" — 4/4
+        # candidate hard-fail `semantic_contradiction`, semantic 0.2 trong khi
+        # character 1.0 và composition 0.9. Một khung hình tĩnh không kể được
+        # hai nhịp thời gian, nên mọi candidate đều sai mãi mãi và production
+        # dừng chờ người sau khi đã đốt 4 lượt sinh ảnh.
+        #
+        # "rồi" là từ rất thường ("cà phê nguội rồi"), nên chỉ chặn khi ngay
+        # sau nó là một ĐỘNG TỪ HÀNH ĐỘNG — tức mệnh đề đang mô tả nhịp thứ hai.
+        # Đo trên hàng thật, project cuoc-goi-ban-luc-bay-gio-muoi, shot
+        # scene-000-shot-00: "...tách cà phê CHƯA CÓ" — 4/4 candidate qua 2
+        # vòng hard-fail với đúng một lý do: "Xuất hiện tách cà phê trên bàn
+        # trong khi yêu cầu bắt buộc là chưa có."
+        #
+        # Diffusion model không vẽ được sự vắng mặt: nhắc tên một vật là vẽ ra
+        # nó. Judge rồi tính đúng sự hiện diện đó là mâu thuẫn ngữ nghĩa, nên
+        # mọi candidate sai mãi mãi. Cách viết đúng là tả thứ CÓ trong khung
+        # ("mặt bàn gần như trống"), không tả thứ không có.
+        #
+        # Chỉ chặn khi phủ định bám vào một DANH TỪ VẬT THỂ. "quán chưa đông"
+        # hay "quán vắng" là trạng thái cảnh, model dựng được, và chặn chúng
+        # sẽ giết những mô tả cảnh hoàn toàn hợp lệ.
+        # Cùng giới hạn vật lý với "vật nhỏ cầm trên tay", hai hình dạng khác.
+        # Đo trên 8 candidate qua 2 shot của cuoc-goi-ban-luc-bay-gio-muoi:
+        #   "điện thoại úp trên mặt bàn"          -> 4/4 "Thiếu điện thoại úp"
+        #   "đặt một tách cà phê xuống mặt bàn"   -> 4/4 "Thiếu hành động đặt"
+        # character/composition/continuity ~1.0 cả 8 lần: người và nơi chốn
+        # luôn đúng, chỉ VẬT và HÀNH ĐỘNG hỏng. Một khung tĩnh không kể được
+        # "đang đặt xuống", và một vật nhỏ ở tư thế chỉ định thì model bỏ qua.
+        #
+        # Vật vẫn được phép CÓ MẶT — chỉ cấm đòi tư thế hoặc thao tác dở.
+        "vật ở tư thế chỉ định hoặc đang được thao tác",
+        re.compile(
+            r"(?:úp|ngửa|nghiêng|dựng đứng)\s+(?:trên|xuống|vào)\b"
+            r"|đặt\s+[^,.;]{0,25}?\s+xuống\b"
+            r"|đang\s+(?:đặt|rót|nâng|nhấc|mở|gấp|lật)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "yêu cầu một vật KHÔNG có trong khung",
+        # Hai thứ tự từ, cùng một lỗi. Bản đầu chỉ đo trên "tách cà phê chưa
+        # có" nên chỉ phủ được danh-từ-trước; vài giờ sau "chưa có cà phê" lọt
+        # qua và chặn shot đầu của lượt kế tiếp, dù guard báo kịch bản sạch.
+        # Một mẫu chỉ phủ một cách viết của cùng một lỗi thì chưa phải là luật.
+        re.compile(
+            r"(?:"
+            r"(?P<noun_first>" + _VISUAL_OBJECT_NOUNS + r")"
+            r"[^,.;]{0,20}?\s+(?:chưa|không)\s+(?:có|xuất hiện|còn|nằm|đặt)\b"
+            r"|"
+            r"(?:chưa|không)\s+(?:có|xuất hiện|còn)\s+"
+            r"(?:\S+\s+){0,2}?(?:" + _VISUAL_OBJECT_NOUNS + r")\b"
+            r")",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "chuỗi hai nhịp trong một khung hình",
+        re.compile(
+            r"(?:rồi|sau đó|trước khi)\s+"
+            r"(?:nhìn|quay|đưa|cầm|đặt|mở|đóng|bước|ngồi|đứng|với|kéo|đẩy|gõ|cúi|ngẩng)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "trao/xoay vật về phía người khác",
+        re.compile(
+            # Tên vật dài ngắn khác nhau ("khay", "màn hình", "tách cà phê"),
+            # nên đo bằng khoảng ký tự có chặn trên thay vì đếm token — và
+            # không cho vượt qua dấu câu, để mệnh đề sau dấu phẩy không bị kéo
+            # vào thành một match giả.
+            r"chìa\s+[^,.;]{1,30}?\s+(?:cho|về)\b"
+            r"|đưa\s+[^,.;]{1,30}?\s+cho\s+\w"
+            r"|quay\s+(?!(?:về|lại|sang|đi)\b)[^,.;]{1,30}?\s+về\s+phía",
+            re.IGNORECASE,
+        ),
+    ),
+)
+
+
+# Một "chi tiết có trạng thái" = danh từ vật thể + một từ trạng thái ngay sau,
+# cho phép tối đa hai tiếng đệm ở giữa ("màn hình vẫn sáng", "cà phê đã nguội").
+_STATED_OBJECT_DETAIL = re.compile(
+    rf"(?:{_VISUAL_OBJECT_NOUNS}|màn hình|tạp dề)"
+    rf"(?:\s+\S+){{0,2}}?\s+(?:{_OBJECT_STATE_WORDS})\b",
+    re.IGNORECASE,
+)
+
+
+def _check_unrenderable_visual_intent(script: Any) -> list[dict[str, str]]:
+    """Chặn `visual_intent` đòi thứ image model không dựng nổi.
+
+    `visual_intent` vừa là prompt sinh ảnh vừa là thước Judge chấm TỪNG mệnh đề.
+    Một mệnh đề bất khả thi nghĩa là mọi candidate đều hard-fail mãi mãi, và
+    production dừng chờ người sau khi đã đốt 4-8 lượt sinh ảnh.
+
+    Đo trên một Long thật: 3/20 section vi phạm, hai trong số đó chặn production
+    ("tay cầm khay gỗ" 8/8 hỏng; "cận bàn tay trên bàn phím, màn hình tối" 4/4
+    hỏng). Prompt đã cấm đúng những thứ này rồi mà model vẫn viết — nêu luật
+    không đủ, phải chặn được ở kịch bản.
+    """
+    violations: list[dict[str, str]] = []
+    for index, segment in enumerate(_segments_of(script), start=1):
+        intent = str(_get(segment, "visual_intent", "") or "").strip()
+        if not intent:
+            continue
+        for label, pattern in _UNRENDERABLE_VISUAL_INTENT:
+            found = pattern.search(intent)
+            if not found:
+                continue
+            violations.append(_repair(
+                "unrenderable_visual_intent",
+                f"Section {index} yêu cầu {label} ('{found.group(0)}'); "
+                "image model không dựng nổi nên Judge sẽ hard-fail mọi candidate.",
+                "Tả cảnh ở mức trung cảnh: ai ở đâu, đang làm gì, không khí thế nào. "
+                "Đừng chỉ định góc máy cận tay, nội dung hiển thị trên màn hình, "
+                "hay một vật nhỏ phải nằm trên tay ai.",
+            ))
+            break
+        else:
+            detail_count = len(_STATED_OBJECT_DETAIL.findall(intent))
+            if detail_count > MAX_STATED_OBJECT_DETAILS:
+                violations.append(_repair(
+                    "unrenderable_visual_intent",
+                    f"Section {index} nêu {detail_count} chi tiết vật-có-trạng-thái "
+                    f"(tối đa {MAX_STATED_OBJECT_DETAILS}); Judge chấm từng mệnh đề nên "
+                    "mỗi chi tiết là một cơ hội độc lập để hard-fail cả shot.",
+                    "Giữ tối đa hai chi tiết thật sự cần cho cảnh; bỏ những chi tiết "
+                    "phụ (trạng thái màn hình, độ nóng/nguội, giờ trên đồng hồ, quần "
+                    "áo ướt) — chúng không đổi ý nghĩa cảnh nhưng đều bị chấm.",
+                ))
+    return violations
+
+
+def _check_slug_leak(script: Any) -> list[dict[str, str]]:
+    """Slug là định danh máy; lọt vào lời đọc thì TTS đọc ra chuỗi vô nghĩa.
+
+    Đo trên một Short thật: "Lần tới, video dài minh-cham-hon-dong-nghiep-tre sẽ
+    đi tiếp..." được xKiro đọc thành "Video giải minh cờ hờ AMH Owner the owner
+    Sơ". Cổng audio vẫn cho qua ở 0.92 vì 200 ký tự đúng pha loãng 29 ký tự
+    slug — đúng kiểu pha loãng mà cổng per-segment đã sửa, nhưng nằm TRONG một
+    segment nên không cổng nào thấy.
+
+    Chỉ so với các slug script tự khai (chính nó và funnel target), không bắt
+    theo mẫu gạch nối chung: tiếng Việt có "cà-phê", và lớp phát âm còn tự sinh
+    "tơ-mi-nồ", nên một luật theo hình dạng sẽ bắt nhầm.
+    """
+    known = {str(_get(script, "slug", "") or "").strip()}
+    strategy = _get(script, "strategy", None)
+    for field in ("long_form_slug", "cta_target", "source_long_slug"):
+        known.add(str(_get(strategy, field, "") or "").strip())
+    slugs = {slug for slug in known if len(slug) >= 8 and "-" in slug}
+    if not slugs:
+        return []
+    violations: list[dict[str, str]] = []
+    for index, segment in enumerate(_segments_of(script), start=1):
+        narration = _narration_of(segment)
+        spoken = sorted(slug for slug in slugs if slug in narration)
+        if spoken:
+            violations.append(_repair(
+                "slug_leak",
+                f"Section {index} đọc thành tiếng một slug ('{spoken[0]}'); TTS sẽ phát ra chuỗi vô nghĩa.",
+                "Gọi tên video bằng tiêu đề hoặc mô tả nội dung, đừng đặt slug vào voiceover.",
+            ))
+    return violations
+
+
+def _check_story_speaker_ownership(script: Any) -> list[dict[str, str]]:
+    """Reject a character's direct speech hidden inside a narrator segment.
+
+    The schema-level ``turn`` card handles ownership before TTS. This second
+    guard catches the most damaging escaped form: a long first-person address
+    after narrative staging, which causes the narrator voice to read a whole
+    character monologue. It is profile-configured and Vietnamese-generic; it
+    does not know Minh, An, or any series-specific wording.
+    """
+    profile = _content_profile(script)
+    if (
+        profile is None
+        or profile.narrative_mode != "character_story"
+        or not profile.content_rules.require_conversation_turns
+    ):
+        return []
+    direct_address = re.compile(
+        r"(?:anh|chị|em|cậu|bạn)\s+ơi\s*,\s*(?:em|tôi|mình)\b",
+        flags=re.IGNORECASE,
+    )
+    narrator_id = profile.editorial_contract.narration_speaker_id
+    violations: list[dict[str, str]] = []
+    for index, segment in enumerate(_segments_of(script), start=1):
+        if str(_get(segment, "speaker_id", narrator_id) or narrator_id).strip().lower() != narrator_id:
+            continue
+        narration = _narration_of(segment).strip()
+        if len(narration) >= 220 and direct_address.search(narration):
+            violations.append(_repair(
+                "speaker_ownership",
+                f"Section {index} gán một lời xưng hô trực tiếp dài cho narrator.",
+                "Tách lời đó thành section riêng với speaker_id của nhân vật; narrator chỉ neo cảnh và hành động.",
+            ))
+    return violations
+
+
+def _check_character_voiceover_is_direct(script: Any) -> list[dict[str, str]]:
+    """A routed character voice may not narrate its own staging before speech."""
+    profile = _content_profile(script)
+    if (
+        profile is None
+        or profile.narrative_mode != "character_story"
+        or not profile.content_rules.require_conversation_turns
+    ):
+        return []
+    narrator_id = profile.editorial_contract.narration_speaker_id
+    violations: list[dict[str, str]] = []
+    for index, segment in enumerate(_segments_of(script), start=1):
+        speaker = str(_get(segment, "speaker_id", narrator_id) or narrator_id).strip().lower()
+        if speaker == narrator_id:
+            continue
+        narration = _narration_of(segment).strip()
+        colon = narration.find(":")
+        if 0 < colon < len(narration) - 8:
+            prelude = narration[:colon].casefold()
+            # A character may naturally quote the exact words they are about
+            # to say ("Tôi sẽ nói một câu: ...").  That is direct speech,
+            # not narrator staging.  The unsafe shape remains third-person
+            # action before the quote ("An đặt cốc xuống: ...").
+            if re.search(r"\b(?:tôi|mình|em|tớ|ta|chúng tôi)\b", prelude):
+                continue
+            # A colon in ordinary direct dialogue may introduce a list or an
+            # explanation ("ba chỗ: hệ thống, thời hạn, dữ liệu").  Reject
+            # only an observable third-person staging prefix, rather than
+            # treating every colon as narration.  The routed speaker's own
+            # name is the strongest signal; explicit third-person pronouns
+            # remain guarded when paired with a staging action.
+            speaker_prefix = re.match(rf"^\s*{re.escape(speaker)}\b", prelude)
+            third_person_staging = re.match(
+                r"^\s*(?:anh ấy|chị ấy|cô ấy|cậu ấy|hắn|nó)\b.*\b"
+                r"(?:đặt|cầm|nhìn|ngồi|đứng|quay|cúi|gật|lắc|nhấc|kéo|đẩy|"
+                r"mở|đóng|thở|cười|bước|xoay|chạm|nói|hỏi|đáp)\b",
+                prelude,
+            )
+            if speaker_prefix is None and third_person_staging is None:
+                continue
+            violations.append(_repair(
+                "character_voiceover_direct",
+                f"Section {index} có phần dẫn/hành động trước dấu ':' trong voiceover của {speaker}.",
+                "Chuyển hành động sang narrator hoặc visual_intent; voiceover nhân vật chỉ giữ câu họ nói trực tiếp.",
+            ))
+    return violations
+
+
+_NEXT_EPISODE_MARKERS = (
+    "tập sau", "hẹn gặp lại", "lần tới", "phần sau",
+)
+_FUNNEL_BRIDGE_MARKERS = ("video dài", "xem tiếp", "xem video", "long")
+_SPOKEN_BRIDGE_MARKERS = _NEXT_EPISODE_MARKERS + _FUNNEL_BRIDGE_MARKERS
+
+
+def _check_story_series_arc(script: Any) -> list[dict[str, str]]:
+    """Enforce an opt-in three-voice Long-series ending at the release gate.
+
+    The profile declares roles, so this contains no knowledge of a particular
+    cast or series. It proves the generated transcript kept the storyteller as
+    the frame, let both characters actually participate, and left a truthful
+    invitation into the following episode.
+    """
+    profile = _content_profile(script)
+    if (
+        profile is None
+        or profile.narrative_mode != "character_story"
+        or _script_video_type(script) != "long"
+        or not profile.content_rules.story_primary_speaker_id
+    ):
+        return []
+    segments = _segments_of(script)
+    if not segments:
+        return []
+    rules = profile.content_rules
+    narrator_id = profile.editorial_contract.narration_speaker_id
+    primary = rules.story_primary_speaker_id
+    supporting = rules.story_supporting_speaker_id
+    speakers = [
+        str(_get(segment, "speaker_id", narrator_id) or narrator_id).strip().lower()
+        for segment in segments
+    ]
+    violations: list[dict[str, str]] = []
+    unexpected = sorted(set(speakers) - {narrator_id, primary, supporting})
+    if unexpected:
+        violations.append(_repair(
+            "story_series_cast",
+            f"Story Long có speaker ngoài cast ba vai đã khai báo: {', '.join(unexpected)}.",
+            "Chỉ dùng narrator, nhân vật chính và nhân vật phụ của profile; không thêm speaker mới.",
+        ))
+    missing = [speaker for speaker in (primary, supporting) if speaker not in speakers]
+    if missing:
+        violations.append(_repair(
+            "story_series_roles",
+            f"Story Long thiếu lượt thoại của vai: {', '.join(missing)}.",
+            "Cho cả nhân vật chính lẫn nhân vật phụ một lượt thoại trực tiếp, có phản hồi nhân quả.",
+        ))
+    if speakers[0] != narrator_id or speakers[-1] != narrator_id:
+        violations.append(_repair(
+            "story_series_narrator_frame",
+            "Story Long phải để narrator mở bối cảnh và khép ý nghĩa ở section cuối.",
+            "Mở bằng narrator neo cảnh/cái giá; kết bằng narrator đúc kết cho người xem.",
+        ))
+    if rules.require_next_episode_bridge:
+        final_text = _narration_of(segments[-1]).casefold()
+        if not any(marker in final_text for marker in _NEXT_EPISODE_MARKERS):
+            violations.append(_repair(
+                "story_series_next_episode",
+                "Phần chốt Story Long chưa hẹn một câu hỏi/lựa chọn cho tập tiếp theo.",
+                "Giữ phần đúc kết của narrator và thêm một bridge tự nhiên như 'Tập sau...' hoặc 'Hẹn gặp lại...'.",
+            ))
+    return violations
+
+
+def _check_knowledge_examples(script: Any) -> list[dict[str, str]]:
+    # Example quality is semantic/editorial, not a fixed keyword or label contract.
+    # Leave that judgment to the upstream script generation/review model rather than
+    # rejecting narration based on literal Vietnamese labels.
     return []
 
 
+# Một hành động cụ thể trong truyện được nhận ra bằng phạm vi đo được: một
+# lượng thời gian, một số lần. "Làm việc kế tiếp trong hai mươi phút" là thứ
+# người xem sao chép được; "cảm thấy nhẹ nhõm hơn" thì không.
+_STORY_BOUNDED_ACTION_UNITS = ("phút", "giây", "tiếng", "trang", "dòng", "lần", "bước", "câu")
+
+
+def _has_bounded_action(text: str) -> bool:
+    words = _story_words(text)
+    if not any(unit in words for unit in _STORY_BOUNDED_ACTION_UNITS):
+        return False
+    return bool(_STORY_NUMBER_WORDS & set(words)) or any(c.isdigit() for c in text)
+
+
+# A generalised lesson needs enough substance to actually say something to
+# the viewer, not just a one-line tag stapled onto the scene.
+_NARRATOR_LESSON_MIN_WORDS = 12
+# A lesson generalises to the VIEWER, not to the character it just watched —
+# it needs a marker of direct address or of a repeatable/general situation
+# ("next time", "you", "every time"), the same way a real advice-giving
+# sentence would open in Vietnamese.
+_NARRATOR_LESSON_ADDRESS_MARKERS = (
+    "bạn", "chúng ta", "lần tới", "lần sau", "mỗi khi", "mỗi lần", "đừng",
+)
+
+
+def _is_narrator_lesson_closing(profile: Any, final_segment: Any, final_text: str) -> bool:
+    """Opt-in ending contract: the NARRATOR generalises the story into a
+    lesson spoken directly to the viewer (`content_rules.narrator_lesson_closing`),
+    instead of the legacy contract requiring a bounded action a character does.
+
+    A plain narrator sentence that just resolves the scene ("Buổi sáng trôi
+    qua và Minh cảm thấy nhẹ nhõm hơn") is NOT a lesson — it still talks
+    about a character in third person. This is rejected two ways: it must
+    not name any cast member, and it must carry a direct-address/generalising
+    marker, not just be a long narrator line.
+    """
+    if (
+        profile is None
+        or profile.narrative_mode != "character_story"
+        or not profile.content_rules.narrator_lesson_closing
+    ):
+        return False
+    narrator_id = profile.editorial_contract.narration_speaker_id
+    speaker = str(_get(final_segment, "speaker_id", narrator_id) or narrator_id).strip().lower()
+    if speaker != narrator_id:
+        return False
+    # The lesson is addressed to the viewer. A separate, explicitly marked
+    # next-episode or Long funnel bridge may naturally carry a character name
+    # in its target slug, so only evaluate the lesson portion for a cast leak.
+    normalized_final = final_text.casefold()
+    bridge_positions = [
+        normalized_final.find(marker)
+        for marker in _SPOKEN_BRIDGE_MARKERS
+        if normalized_final.find(marker) >= 0
+    ]
+    lesson_text = final_text[:min(bridge_positions)] if bridge_positions else final_text
+    words = _story_words(lesson_text)
+    if len(words) < _NARRATOR_LESSON_MIN_WORDS:
+        return False
+    cast = {name for name in profile.voice_cast if name != narrator_id}
+    if _mentions_cast_by_name(lesson_text, cast):
+        return False
+    word_set = set(words)
+    has_address = any(
+        marker in word_set for marker in _NARRATOR_LESSON_ADDRESS_MARKERS if " " not in marker
+    ) or any(
+        marker in lesson_text for marker in _NARRATOR_LESSON_ADDRESS_MARKERS if " " in marker
+    )
+    return has_address
+
+
 def _check_immediate_action(script: Any) -> list[dict[str, str]]:
-    final_text = _narration_of(_segments_of(script)[-1]).lower() if _segments_of(script) else ""
-    if any(hint in final_text for hint in _IMMEDIATE_ACTION_HINTS):
+    segments = _segments_of(script)
+    # GIỮ nguyên chữ hoa: `_is_narrator_lesson_closing` phân biệt tên riêng
+    # ("Minh") với âm tiết trong từ ghép ("xác minh") bằng chính chữ hoa. Bản
+    # trước viết thường ở đây rồi truyền xuống, nên từ cf24cf6 phép kiểm tên
+    # cast không bao giờ khớp được nữa — cổng chết âm thầm và rubric LLM phải
+    # bắt thay. Chỉ hạ chữ cho các phép so khớp thật sự không phân biệt hoa
+    # thường.
+    final_text = _narration_of(segments[-1]) if segments else ""
+    lowered_final = final_text.lower()
+    profile = _content_profile(script)
+    if (
+        profile is not None
+        and profile.narrative_mode == "character_story"
+        and profile.content_rules.narrator_lesson_closing
+    ):
+        if any(marker in lowered_final for marker in _NARRATOR_REFLECTION_IMPERATIVES):
+            return [_repair(
+                "narrator_reflection",
+                "Lời chốt của narrator phải là phản chiếu khiêm tốn, không phải mệnh lệnh.",
+                "Nói với người xem bằng một nhận xét có điều kiện, bám đúng lựa chọn/hệ quả vừa xảy ra.",
+            )]
+        if segments and _is_narrator_lesson_closing(profile, segments[-1], final_text):
+            if _requires_funnel_bridge(script, profile):
+                return _check_funnel_bridge(script, final_text)
+            return []
+        return [_repair(
+            "narrator_reflection",
+            "Lời chốt story cần là phản chiếu trực tiếp, khiêm tốn của narrator.",
+            "Dùng 2-3 câu nói với người xem, không nêu tên cast ngoài cầu nối tập sau và không biến thành lời khuyên ra lệnh.",
+        )]
+    if (
+        profile is not None
+        and _requires_funnel_bridge(script, profile)
+    ):
+        return _check_funnel_bridge(script, final_text)
+    if any(hint in lowered_final for hint in _IMMEDIATE_ACTION_HINTS):
+        return []
+    if (
+        profile is not None
+        and profile.narrative_mode == "character_story"
+        and _has_bounded_action(final_text)
+    ):
+        # Truyện kiếm được phần chốt bằng cách CHO THẤY hành động, không bằng
+        # cách ra lệnh. Bắt buộc chữ "Hãy" là quy ước của kênh giải thích.
         return []
     return [_repair(
         "immediate_action",
         "Phần chốt chưa có một hành động có thể làm ngay sau khi xem.",
         "Kết bằng một mệnh lệnh nhỏ, cụ thể và làm được ngay, ví dụ 'Hãy đặt điện thoại ngoài bàn trong 10 phút tới'.",
     )]
+
+
+def _check_funnel_bridge(script: Any, final_text: str) -> list[dict[str, str]]:
+    strategy = _get(script, "strategy", None)
+    long_slug = str(_get(strategy, "long_form_slug", "") or "").strip()
+    cta_target = str(_get(strategy, "cta_target", "") or "").strip()
+    source_long_slug = str(_get(strategy, "source_long_slug", "") or "").strip()
+    if (
+        long_slug
+        and long_slug == cta_target == source_long_slug
+        and any(marker in final_text for marker in _FUNNEL_BRIDGE_MARKERS)
+    ):
+        return []
+    return [_repair(
+        "funnel_bridge",
+        "Short phễu phải kết bằng cầu nối tự nhiên tới đúng video Long đã khai báo.",
+        "Nêu phần Long sẽ giải thích tiếp và giữ long_form_slug, cta_target, source_long_slug trùng nhau.",
+    )]
+
+
+def _requires_funnel_bridge(script: Any, profile: Any) -> bool:
+    if _script_video_type(script) != "short":
+        return False
+    if profile.content_rules.short_ending_mode == "funnel_bridge":
+        return True
+    strategy = _get(script, "strategy", None)
+    return any(
+        str(_get(strategy, field, "") or "").strip()
+        for field in ("long_form_slug", "cta_target", "source_long_slug")
+    )
 
 
 def _check_final_payoff(script: Any) -> list[dict[str, str]]:
@@ -325,9 +1144,20 @@ def _check_absolute_health_finance_claims(script: Any) -> list[dict[str, str]]:
     violations: list[dict[str, str]] = []
     for segment in _segments_of(script):
         text = _narration_of(segment).lower()
-        if any(hint in text for hint in _HEALTH_FINANCE_HINTS) and any(
-            hint in text for hint in _ABSOLUTE_CLAIM_HINTS
-        ):
+        absolute_claims = []
+        for hint in _ABSOLUTE_CLAIM_HINTS:
+            if hint not in text:
+                continue
+            if hint == "mọi người":
+                if re.search(r"mọi người\s+(?:đều|sẽ|phải|luôn|chắc chắn|không thể)", text):
+                    absolute_claims.append(hint)
+                continue
+            for match in re.finditer(re.escape(hint), text):
+                prefix = text[max(0, match.start() - 48):match.start()]
+                if not re.search(r"(không|chẳng|chưa|tránh)[^.?!]{0,40}$", prefix):
+                    absolute_claims.append(hint)
+                    break
+        if any(hint in text for hint in _HEALTH_FINANCE_HINTS) and absolute_claims:
             violations.append(_repair(
                 "health_finance_claim",
                 "Phát hiện tuyên bố y tế/tài chính tuyệt đối hoặc áp dụng cho mọi người.",
@@ -341,6 +1171,9 @@ def _segment_query(segment: Any) -> str:
 
 
 def _check_pexels_queries(script: Any) -> list[dict[str, str]]:
+    profile = _content_profile(script)
+    if profile is not None and not profile.content_rules.require_pexels_query:
+        return []
     weak = {"", "video", "stock footage", "broll", "background", "abstract"}
     violations: list[dict[str, str]] = []
     for index, segment in enumerate(_segments_of(script), start=1):
@@ -387,9 +1220,18 @@ def _script_text(script: Any) -> str:
     return " ".join(parts)
 
 
-def _check_dedup(script: Any, done_topics: Any) -> list[dict[str, str]]:
+def _check_dedup(
+    script: Any, done_topics: Any, exempt_slugs: Any = (),
+) -> list[dict[str, str]]:
+    """Chặn chủ đề trùng, trừ những slug đang được thay tại chỗ.
+
+    `--replace-slug` viết lại kịch bản cho một slot ĐÃ tồn tại, nên slug của nó
+    đương nhiên có trong ledger. Không miễn trừ thì mọi lần thay đều bị từ chối:
+    operator xin viết lại một tập, pipeline trả lời rằng tập đó đã có rồi.
+    """
     if not done_topics:
         return []
+    exempt = {series_mod.slugify(str(slug)) for slug in (exempt_slugs or ()) if str(slug).strip()}
     candidates = [
         value
         for value in (
@@ -400,15 +1242,19 @@ def _check_dedup(script: Any, done_topics: Any) -> list[dict[str, str]]:
     ]
     if not candidates:
         return []
-    done_slugs = {series_mod.slugify(t) for t in done_topics}
+    done_slugs = {series_mod.slugify(t) for t in done_topics} - exempt
     for candidate in candidates:
         slug = series_mod.slugify(candidate)
+        if slug in exempt:
+            continue
         if slug in done_slugs:
             return [{
                 "rule": "series_dedup",
                 "detail": f"Chủ đề/title '{candidate}' (slug={slug}) đã có trong done_topics.",
             }]
         for done_topic in done_topics:
+            if series_mod.slugify(str(done_topic)) in exempt:
+                continue
             similarity = _topic_similarity(candidate, str(done_topic))
             if similarity >= 0.55:
                 return [_repair(

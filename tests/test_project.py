@@ -260,6 +260,41 @@ def test_project_to_dict_from_dict_roundtrip():
     assert restored.nodes["ideation"].stage == "ideation"
 
 
+@pytest.mark.parametrize(
+    ("node_status", "project_status"),
+    [
+        (NodeStatus.REVIEW_REQUIRED, ProjectStatus.REVIEW_REQUIRED),
+        (NodeStatus.ABANDONED, ProjectStatus.ABANDONED),
+    ],
+)
+def test_workflow_persists_explicit_operator_halt_state(
+    tmp_path, node_status, project_status
+):
+    class _OperatorHalt(RuntimeError):
+        pass
+
+    _OperatorHalt.workflow_node_status = node_status.value
+    _OperatorHalt.project_status = project_status.value
+
+    async def halt(_project):
+        raise _OperatorHalt("operator boundary")
+
+    checkpoint = CheckpointManager(tmp_path)
+    project = Project(project_id="reviewable")
+    graph = WorkflowGraph(
+        [NodeDef("visual_assets", "visual_assets", halt)], checkpoint
+    )
+
+    with pytest.raises(WorkflowError) as exc_info:
+        asyncio.run(graph.execute(project))
+
+    persisted = checkpoint.load("reviewable")
+    assert isinstance(exc_info.value.__cause__, _OperatorHalt)
+    assert persisted.nodes["visual_assets"].status == node_status
+    assert persisted.status == project_status
+    assert persisted.nodes["visual_assets"].error == "operator boundary"
+
+
 def test_project_status_enum_serializes_as_string_value():
     project = Project(project_id="p1", status=ProjectStatus.PUBLISHED)
     assert project.to_dict()["status"] == "published"

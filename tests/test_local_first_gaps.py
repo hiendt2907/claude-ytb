@@ -7,8 +7,15 @@ from pathlib import Path
 
 import pytest
 
+from conftest import chars_for_minutes
+
 
 def _script_payload(video_type: str = "ai_video") -> dict:
+    unit = (
+        "Một cơ chế nhỏ có thể đổi cách ta nhìn hành vi. "
+        "Nó không phải lời khuyên chung chung mà là cách não xử lý tín hiệu. "
+    )
+    narration = (unit * (-(-len(chars_for_minutes(1.2)) // len(unit))))[:len(chars_for_minutes(1.2))]
     return {
         "topic": "T",
         "title": "Title",
@@ -17,10 +24,7 @@ def _script_payload(video_type: str = "ai_video") -> dict:
         "sections": [
             {
                 "caption": "cap",
-                "narration": (
-                    "Một cơ chế nhỏ có thể đổi cách ta nhìn hành vi. "
-                    "Nó không phải lời khuyên chung chung mà là cách não xử lý tín hiệu. "
-                ) * 11,
+                "narration": narration,
                 "broll": "abstract brain mechanism",
                 "video_type": video_type,
                 "hook": True,

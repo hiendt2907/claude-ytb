@@ -39,7 +39,8 @@ case "${1:-}" in
     echo "  ytb batch <lệnh>                     # toàn bộ batch workflow" >&2
     echo "" >&2
     echo "  ytb batch start -n N                 # Claude viết N kịch bản" >&2
-    echo "  ytb batch run [--loop]               # render + publish" >&2
+    echo "  ytb batch run [--loop]               # dry-run local-only, không upload" >&2
+    echo "  ytb batch run --publish [--loop]     # upload YouTube (explicit)" >&2
     echo "  ytb batch ps                         # slug + PID đang chạy" >&2
     echo "  ytb batch logs --current             # tail log video đang chạy" >&2
     echo "  ytb batch logs <slug> [-f]           # log 1 video cụ thể" >&2

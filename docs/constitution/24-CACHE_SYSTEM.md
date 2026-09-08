@@ -29,8 +29,8 @@ Cache keys are computed as:
 cache_key = sha256(
     canonical_json({
         "type": "llm" | "tts" | "image" | "video_clip",
-        "provider": provider_name,        # e.g. "f5", "edge", "flux", "ollama-qwen3"
-        "model": model_identifier,        # e.g. "qwen3:8b", "flux-dev-fp8"
+        "provider": provider_name,        # e.g. "xkiro", "f5", "edge", "flux"
+        "model": model_identifier,        # e.g. configured xKiro model, "flux-dev-fp8"
         "params": sorted_params_dict,     # voice id, sample rate, resolution, seed, etc.
         "prompt": prompt_text_or_hash,    # full text, or its own hash if very large
     })
@@ -51,8 +51,8 @@ varying the seed is a deliberate cache miss, not a bug).
 
 | Type | Producer | Typical params in key |
 |---|---|---|
-| LLM response cache | Ideation/research LLM calls (Ollama/Qwen3 default, Claude API fallback) | `temperature`, `max_tokens`, `system_prompt_hash` |
-| TTS audio cache | Voiceover stage (F5-TTS default, Edge-TTS/ElevenLabs fallback) | `voice_id`, `speed`, `pitch`, pause settings (`pause_comma_ms` etc. from `settings.py`) |
+| LLM response cache | Ideation/research LLM calls (xKiro default; Codex CLI → Claude CLI cascade) | `temperature`, `max_tokens`, `system_prompt_hash` |
+| TTS audio cache | Voiceover stage (xKiro default; F5/Edge-TTS/ElevenLabs explicit alternatives) | `voice_id`, `speed`, `pitch`, pause settings (`pause_comma_ms` etc. from `settings.py`) |
 | Image cache | Render stage AI image path (Flux default) | `width`, `height`, `steps`, `seed`, `style_lora` |
 | Video clip cache | Render stage AI video path / B-roll fetch | `duration_sec`, `resolution`, `motion_strength`, or stock query string for the explicit Pexels fallback |
 

@@ -9,11 +9,22 @@ import argparse
 import json
 import os
 import subprocess
+from types import SimpleNamespace
 from datetime import datetime
 
 import pytest
 
+from ytb_pipeline.content_contract import CONTRACT_VERSION
 from ytb_pipeline.orchestrator import batch_cli as cli
+
+# Fields `schedule_pending_videos.eligible()` requires before it will assign a
+# publish_at slot — merge into any fixture video dict meant to be schedulable.
+ELIGIBLE_FIELDS = {
+    "quality_status": "pass",
+    "qa_status": "pass",
+    "ruleset_id": CONTRACT_VERSION,
+    "assets_valid": True,
+}
 
 
 # ── fixtures ────────────────────────────────────────────────────────────────
@@ -67,13 +78,19 @@ def _progress_off(monkeypatch):
     monkeypatch.setattr(cli.settings, "telegram_progress", False)
 
 
+@pytest.fixture(autouse=True)
+def _bypass_preflight_for_legacy_orchestration_tests(monkeypatch):
+    """These tests isolate queue behavior; dedicated preflight tests cover admission."""
+    monkeypatch.setattr(cli, "preflight_script", lambda _path: SimpleNamespace(passed=True, failures=()))
+
+
 # ── load_queue ────────────────────────────────────────────────────────────────
 def test_load_queue_sorted_by_day(auto_state_file):
     queue = cli.load_queue(auto_state_file)
     assert [i.slug for i in queue] == ["a-video", "b-video", "c-video"]
 
 
-def test_load_queue_includes_short_videos_sorted_with_long(tmp_path):
+def test_load_queue_prioritizes_long_dependencies_before_shorts(tmp_path):
     path = tmp_path / "auto_state.json"
     path.write_text(json.dumps({
         "shorts_funnel_batch_2026-07-06": {
@@ -88,7 +105,7 @@ def test_load_queue_includes_short_videos_sorted_with_long(tmp_path):
 
     queue = cli.load_queue(path)
 
-    assert [i.slug for i in queue] == ["short-video", "long-video"]
+    assert [i.slug for i in queue] == ["long-video", "short-video"]
 
 
 # ── done_slugs ────────────────────────────────────────────────────────────────
@@ -109,6 +126,32 @@ def test_next_pending_none_when_all_done(auto_state_file):
     queue = cli.load_queue(auto_state_file)
     done = {i.slug for i in queue}
     assert cli.next_pending(queue, done) is None
+
+
+def test_process_next_does_not_run_short_when_its_long_has_not_completed(tmp_path, monkeypatch):
+    state = tmp_path / "auto_state.json"
+    state.write_text(json.dumps({
+        "shorts_funnel_batch_dependency": {
+            "long_videos": [{"day": 1, "slug": "long-a", "shorts_status": "queued"}],
+            "short_videos": [{
+                "day": 1, "slug": "short-a", "shorts_status": "queued",
+                "long_form_slug": "long-a", "cta_target": "long-a",
+            }],
+        },
+    }), encoding="utf-8")
+    ledger = tmp_path / "ledger.md"
+    ledger.write_text(
+        "| Ngày | Slug | Tiêu đề | Stage | Status | URL / ghi chú |\n"
+        "|---|---|---|---|---|---|\n"
+        "| 2026-07-28 | long-a | Long | voiceover | error | strict audio gate |\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(cli, "run_with_retry", lambda *_args, **_kwargs: pytest.fail("Short must wait for Long"))
+
+    handled = cli.process_next(queue_path=state, ledger_path=ledger)
+
+    assert handled is False
+    assert "short-a" not in ledger.read_text(encoding="utf-8")
 
 
 # ── is_transient_error ───────────────────────────────────────────────────────
@@ -157,8 +200,10 @@ def test_emit_warning_still_logs_when_telegram_fails(tmp_path, monkeypatch):
 
 
 # ── build_env ─────────────────────────────────────────────────────────────────
-def test_build_env_forces_telegram_approval_false():
+def test_build_env_defaults_to_dry_run_and_forces_local_stock(monkeypatch):
     item = cli.QueueItem(day=1, slug="x", publish_at="2026-06-23T06:00:00+0700", shorts_status="queued")
+    monkeypatch.setenv("BROLL_ALLOW_DOWNLOADS", "true")
+    monkeypatch.setenv("E2E_TEST", "true")
     env = cli.build_env(item)
     assert env["TELEGRAM_APPROVAL"] == "false"
     assert env["YOUTUBE_PUBLISH_AT"] == item.publish_at
@@ -166,10 +211,12 @@ def test_build_env_forces_telegram_approval_false():
     assert env["ALLOW_CLOUD_PROVIDERS"] == "true"
     assert env["BROLL_STRATEGY"] == "pexels"
     assert env["VIDEO_PROVIDER"] == "pexels"
-    assert env["DRY_RUN"] == "false"
+    assert env["DRY_RUN"] == "true"
+    assert env["BROLL_ALLOW_DOWNLOADS"] == "false"
+    assert env["E2E_TEST"] == "false"
 
 
-def test_build_env_preserves_queue_dry_run_contract():
+def test_build_env_only_enables_publish_when_explicitly_requested():
     item = cli.QueueItem(
         day=1,
         slug="safe-preview",
@@ -178,9 +225,9 @@ def test_build_env_preserves_queue_dry_run_contract():
         dry_run=True,
     )
 
-    env = cli.build_env(item)
+    env = cli.build_env(item, publish=True)
 
-    assert env["DRY_RUN"] == "true"
+    assert env["DRY_RUN"] == "false"
 
 
 def test_build_env_uses_queue_orientation_for_shorts():
@@ -279,6 +326,52 @@ def test_run_with_retry_warns_immediately_for_non_transient_error(_capture_teleg
     assert "KHÔNG retry" in _capture_telegram[0]
 
 
+def test_run_with_retry_writes_a_sanitized_recovery_report_for_terminal_failure(monkeypatch):
+    item = cli.QueueItem(1, "x", "2026-06-23T06:00:00+0700", "queued")
+    reports = []
+    monkeypatch.setattr(cli, "write_failure_recovery_report", lambda *_args: reports.append(True) or None)
+
+    cli.run_with_retry(
+        item,
+        backoff=[1],
+        sleep_fn=lambda _s: None,
+        run_fn=lambda _item, **_kwargs: _completed(1, stderr="FileNotFoundError: scripts/x.json"),
+    )
+
+    assert reports == [True]
+
+
+# ── escalation: cùng recovery code lặp liên tiếp ────────────────────────────
+def test_run_with_retry_escalates_after_threshold_consecutive_same_code_failures(_capture_telegram):
+    for n in range(1, cli.RECOVERY_ESCALATION_THRESHOLD + 1):
+        item = cli.QueueItem(n, f"slug-{n}", "2026-06-23T06:00:00+0700", "queued")
+        cli.run_with_retry(
+            item,
+            backoff=[1],
+            sleep_fn=lambda _s: None,
+            run_fn=lambda _item, **_kwargs: _completed(1, stderr="FileNotFoundError: scripts/x.json"),
+        )
+
+    escalations = [msg for msg in _capture_telegram if "ESCALATION" in msg]
+    assert len(escalations) == 1
+    assert f"lặp lại {cli.RECOVERY_ESCALATION_THRESHOLD} lần liên tiếp" in escalations[0]
+    assert "slug-3" in escalations[0]
+
+
+def test_run_with_retry_streak_resets_after_a_success(_capture_telegram):
+    item = cli.QueueItem(1, "x", "2026-06-23T06:00:00+0700", "queued")
+    fail_fn = lambda _item, **_kwargs: _completed(1, stderr="FileNotFoundError: scripts/x.json")  # noqa: E731
+    ok_fn = lambda _item, **_kwargs: _completed(0, stdout="ok")  # noqa: E731
+
+    for _ in range(cli.RECOVERY_ESCALATION_THRESHOLD - 1):
+        cli.run_with_retry(item, backoff=[1], sleep_fn=lambda _s: None, run_fn=fail_fn)
+    cli.run_with_retry(item, backoff=[1], sleep_fn=lambda _s: None, run_fn=ok_fn)
+    for _ in range(cli.RECOVERY_ESCALATION_THRESHOLD - 1):
+        cli.run_with_retry(item, backoff=[1], sleep_fn=lambda _s: None, run_fn=fail_fn)
+
+    assert not any("ESCALATION" in msg for msg in _capture_telegram)
+
+
 # ── extract_claimed_video_id ──────────────────────────────────────────────────
 def test_extract_claimed_video_id_found():
     output = "...\n  ✓ Đã upload: https://youtu.be/b917RPp2o7o\n[4/4] Publish   ✓  uploaded=True"
@@ -370,6 +463,27 @@ def test_verify_youtube_video_applies_short_transport_timeout(monkeypatch):
     assert youtube._http.http.timeout == cli.YOUTUBE_VERIFY_TIMEOUT_SEC
 
 
+def test_cmd_verify_resolves_a_published_slug_from_the_ledger(monkeypatch, tmp_path, capsys):
+    """Operators may pass the pipeline slug, but the API only accepts an ID."""
+    from ytb_pipeline.publish import uploader
+
+    ledger = tmp_path / "ledger.md"
+    ledger.write_text("# test\n", encoding="utf-8")
+    monkeypatch.setattr(cli, "LEDGER_PATH", ledger)
+    monkeypatch.setattr(
+        uploader,
+        "_published_url_for_slug",
+        lambda slug, ledger_path=None: "https://youtu.be/AbC_123-xYz" if slug == "known-slug" else None,
+    )
+    seen: list[str] = []
+    monkeypatch.setattr(cli, "verify_youtube_video", lambda video_id: seen.append(video_id) or {"exists": True})
+
+    cli.cmd_verify(argparse.Namespace(youtube_id="known-slug"))
+
+    assert seen == ["AbC_123-xYz"]
+    assert '"exists": true' in capsys.readouterr().out
+
+
 # ── check_schedule_drift ──────────────────────────────────────────────────────
 def test_check_schedule_drift_detects_mismatch():
     # Lệch 1 ngày — đúng tình huống thật đã gặp với video #2 batch này.
@@ -388,7 +502,7 @@ def test_check_schedule_drift_none_publish_at_is_not_drift():
 @pytest.mark.parametrize(
     "line,expected",
     [
-        ("[1/4] Ideation  ▶  ...\n", "running-ideation"),
+        ("[0/3] Input     ✓  approved script\n", None),
         ("[2/4] Voiceover ▶  đang tạo audio...\n", "running-voiceover"),
         ("[3/4] Render    ▶  đang dựng video (ai/landscape)...\n", "running-ai-render"),
         ("[3/4] Render    ▶  đang dựng video (moviepy/landscape)...\n", "running-render"),
@@ -434,7 +548,7 @@ def test_run_pipeline_once_writes_running_stages_as_it_streams(tmp_path, monkeyp
         def __init__(self):
             self.stdout = iter(
                 [
-                    "[1/4] Ideation  ✓  T (1 đoạn)\n",
+                    "[0/3] Input     ✓  T (1 đoạn; approved by batch start)\n",
                     "[2/4] Voiceover ▶  đang tạo audio...\n",
                     "[2/4] Voiceover ✓  a.mp3 (1.0s)\n",
                     "[3/4] Render    ▶  đang dựng video (ai/landscape)...\n",
@@ -451,9 +565,43 @@ def test_run_pipeline_once_writes_running_stages_as_it_streams(tmp_path, monkeyp
     cli.run_pipeline_once(item, script_path=script_path, ledger_path=ledger)
 
     content = ledger.read_text(encoding="utf-8")
-    assert "running-ideation" in content
+    assert "starting-voiceover" in content
+    assert "running-ideation" not in content
     assert "running-voiceover" in content
     assert "running-ai-render" in content
+
+
+def test_run_pipeline_once_can_target_resident_f5_voiceover_stage(tmp_path, monkeypatch):
+    item = cli.QueueItem(1, "x", "2026-06-23T06:00:00+0700", "queued")
+    script_path = tmp_path / "x.json"
+    script_path.write_text("{}", encoding="utf-8")
+    socket_path = tmp_path / "f5.sock"
+    captured = {}
+    monkeypatch.setattr(cli, "log_path_for", lambda slug: tmp_path / f"{slug}.log")
+
+    class FakeProc:
+        stdout = iter(())
+        args = ["fake"]
+        returncode = 0
+
+        def wait(self):
+            return None
+
+    def fake_popen(command, **kwargs):
+        captured["command"] = command
+        captured["env"] = kwargs["env"]
+        return FakeProc()
+
+    monkeypatch.setattr(cli.subprocess, "Popen", fake_popen)
+
+    cli.run_pipeline_once(
+        item, script_path=script_path, through="voiceover",
+        f5_daemon_socket=socket_path, ledger_path=tmp_path / "ledger.md",
+    )
+
+    assert "--through" in captured["command"]
+    assert "voiceover" in captured["command"]
+    assert captured["env"]["F5_DAEMON_SOCKET"] == str(socket_path)
 
 
 # ── update_ledger ─────────────────────────────────────────────────────────────
@@ -481,13 +629,97 @@ def test_process_next_happy_path(auto_state_file, ledger_file, monkeypatch, _cap
         },
     )
 
-    handled = cli.process_next(queue_path=auto_state_file, ledger_path=ledger_file)
+    handled = cli.process_next(queue_path=auto_state_file, ledger_path=ledger_file, publish=True)
 
     assert handled is True
     content = ledger_file.read_text(encoding="utf-8")
     assert "b-video" in content and "done | ok" in content
     assert "https://youtu.be/NEWID12345" in content
     assert _capture_telegram == []  # đúng kế hoạch, không lệch -> không cảnh báo
+
+
+def test_finalize_published_item_updates_auto_state_after_api_verification(
+    auto_state_file, ledger_file, monkeypatch
+):
+    monkeypatch.setattr(cli, "AUTO_STATE_PATH", auto_state_file)
+    monkeypatch.setattr(
+        cli,
+        "verify_youtube_video",
+        lambda _video_id: {
+            "exists": True,
+            "title": "A",
+            "privacy_status": "private",
+            "publish_at": "2026-06-23T06:00:00Z",
+        },
+    )
+    item = cli.QueueItem(5, "a-video", "2026-06-23T06:00:00+0700", "queued")
+
+    assert cli.finalize_published_item(
+        item,
+        "✓ Đã upload: https://youtu.be/AbC_123-xYz",
+        ledger_path=ledger_file,
+        batch_key="shorts_funnel_batch_2026-06-22",
+    ) is True
+
+    state = json.loads(auto_state_file.read_text(encoding="utf-8"))
+    entry = next(video for video in state["shorts_funnel_batch_2026-06-22"]["long_videos"] if video["slug"] == "a-video")
+    assert {key: entry[key] for key in ("shorts_status", "youtube_id", "youtube_url")} == {
+        "shorts_status": "published",
+        "youtube_id": "AbC_123-xYz",
+        "youtube_url": "https://youtu.be/AbC_123-xYz",
+    }
+
+
+def test_finalize_published_item_keeps_ledger_done_when_state_persist_fails(
+    ledger_file, monkeypatch
+):
+    """A verified upload must never become pending again because state telemetry fails."""
+    from ytb_pipeline.orchestrator import pipeline_runner
+
+    item = cli.QueueItem(5, "a-video", "2026-06-23T06:00:00+0700", "queued")
+    monkeypatch.setattr(
+        cli,
+        "verify_youtube_video",
+        lambda _video_id: {"exists": True, "title": "A", "privacy_status": "private", "publish_at": None},
+    )
+    monkeypatch.setattr(
+        pipeline_runner,
+        "_persist_published_auto_state",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("queue item disappeared")),
+    )
+
+    assert cli.finalize_published_item(
+        item,
+        "✓ Đã upload: https://youtu.be/AbC_123-xYz",
+        ledger_path=ledger_file,
+    ) is True
+    assert "a-video" in cli.done_slugs(ledger_file)
+
+
+def test_finalize_published_item_warns_when_state_persist_fails(
+    ledger_file, monkeypatch, _capture_telegram
+):
+    from ytb_pipeline.orchestrator import pipeline_runner
+
+    item = cli.QueueItem(5, "a-video", "2026-06-23T06:00:00+0700", "queued")
+    monkeypatch.setattr(
+        cli,
+        "verify_youtube_video",
+        lambda _video_id: {"exists": True, "title": "A", "privacy_status": "private", "publish_at": None},
+    )
+    monkeypatch.setattr(
+        pipeline_runner,
+        "_persist_published_auto_state",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("queue item disappeared")),
+    )
+
+    cli.finalize_published_item(
+        item,
+        "✓ Đã upload: https://youtu.be/AbC_123-xYz",
+        ledger_path=ledger_file,
+    )
+
+    assert any("không cập nhật được auto_state" in message for message in _capture_telegram)
 
 
 def test_process_next_returns_false_when_queue_empty(auto_state_file, ledger_file):
@@ -499,6 +731,32 @@ def test_process_next_returns_false_when_queue_empty(auto_state_file, ledger_fil
         encoding="utf-8",
     )
     assert cli.process_next(queue_path=auto_state_file, ledger_path=ledger_file) is False
+
+
+def test_render_only_loop_skips_a_slug_rendered_earlier_in_the_same_invocation(tmp_path, monkeypatch):
+    state = tmp_path / "auto_state.json"
+    ledger = tmp_path / "ledger.md"
+    state.write_text(json.dumps({
+        "shorts_funnel_batch_render": {
+            "long_videos": [
+                {"day": 1, "slug": "long-a", "publish_at": ""},
+                {"day": 2, "slug": "long-b", "publish_at": ""},
+            ],
+        }
+    }), encoding="utf-8")
+    ledger.write_text("# Ledger\n", encoding="utf-8")
+    monkeypatch.setattr(cli, "run_with_retry", lambda *_args, **_kwargs: (True, ""))
+
+    rendered = {"long-a"}
+    handled = cli.process_next(
+        queue_path=state,
+        ledger_path=ledger,
+        through="render",
+        completed_render_slugs=rendered,
+    )
+
+    assert handled is True
+    assert rendered == {"long-a", "long-b"}
 
 
 def test_failed_slug_is_skipped_by_batch_loop_but_remains_retryable(auto_state_file, ledger_file):
@@ -520,7 +778,7 @@ def test_failed_slug_is_skipped_by_batch_loop_but_remains_retryable(auto_state_f
 def test_process_next_records_error_on_run_failure(auto_state_file, ledger_file, monkeypatch, _capture_telegram):
     monkeypatch.setattr(cli, "run_with_retry", lambda item, **kw: (False, "boom"))
 
-    handled = cli.process_next(queue_path=auto_state_file, ledger_path=ledger_file)
+    handled = cli.process_next(queue_path=auto_state_file, ledger_path=ledger_file, publish=True)
 
     assert handled is True
     content = ledger_file.read_text(encoding="utf-8")
@@ -530,7 +788,7 @@ def test_process_next_records_error_on_run_failure(auto_state_file, ledger_file,
 def test_process_next_warns_when_no_video_id_in_output(auto_state_file, ledger_file, monkeypatch, _capture_telegram):
     monkeypatch.setattr(cli, "run_with_retry", lambda item, **kw: (True, "no url printed"))
 
-    handled = cli.process_next(queue_path=auto_state_file, ledger_path=ledger_file)
+    handled = cli.process_next(queue_path=auto_state_file, ledger_path=ledger_file, publish=True)
 
     assert handled is True
     assert len(_capture_telegram) == 1
@@ -645,7 +903,7 @@ def test_process_next_records_error_when_reauth_required(auto_state_file, ledger
 
     monkeypatch.setattr(cli, "verify_youtube_video", boom)
 
-    handled = cli.process_next(queue_path=auto_state_file, ledger_path=ledger_file)
+    handled = cli.process_next(queue_path=auto_state_file, ledger_path=ledger_file, publish=True)
 
     assert handled is True
     content = ledger_file.read_text(encoding="utf-8")
@@ -666,7 +924,7 @@ def test_process_next_records_verify_network_error_without_stalling_worker(
 
     monkeypatch.setattr(cli, "verify_youtube_video", boom)
 
-    handled = cli.process_next(queue_path=auto_state_file, ledger_path=ledger_file)
+    handled = cli.process_next(queue_path=auto_state_file, ledger_path=ledger_file, publish=True)
 
     assert handled is True
     content = ledger_file.read_text(encoding="utf-8")
@@ -761,6 +1019,31 @@ def test_cmd_cancel_removes_short_video(tmp_path, monkeypatch, capsys):
     assert "Đã huỷ" in capsys.readouterr().out
 
 
+def test_cmd_reset_finds_slug_in_named_batch_not_lexicographically_latest(tmp_path, monkeypatch, capsys):
+    """Operational retries must target the requested test batch, not another queue."""
+    auto_state = tmp_path / "auto_state.json"
+    auto_state.write_text(json.dumps({
+        "shorts_funnel_batch_2026-07-28-test": {
+            "long_videos": [{"day": 1, "slug": "clean-long", "publish_at": ""}],
+            "short_videos": [],
+        },
+        "shorts_funnel_batch_2026-08-production": {
+            "long_videos": [{"day": 1, "slug": "production-long", "publish_at": ""}],
+            "short_videos": [],
+        },
+    }), encoding="utf-8")
+    ledger = tmp_path / "ledger.md"
+    ledger.write_text("# Ledger\n| Ngày | Slug | Tiêu đề | Stage | Status | URL / ghi chú |\n", encoding="utf-8")
+    monkeypatch.setattr(cli, "AUTO_STATE_PATH", auto_state)
+    monkeypatch.setattr(cli, "LEDGER_PATH", ledger)
+    monkeypatch.setattr(cli.settings, "projects_dir", str(tmp_path / "projects"))
+
+    cli.cmd_reset(argparse.Namespace(slug="clean-long"))
+
+    assert "Đã reset 'clean-long'" in capsys.readouterr().out
+    assert "| clean-long |  | reset | reset |" in ledger.read_text(encoding="utf-8")
+
+
 def test_cmd_ledger_prints_tail(ledger_file, monkeypatch, capsys):
     monkeypatch.setattr(cli, "LEDGER_PATH", ledger_file)
 
@@ -783,7 +1066,7 @@ def test_process_next_warns_on_schedule_drift(auto_state_file, ledger_file, monk
         },
     )
 
-    handled = cli.process_next(queue_path=auto_state_file, ledger_path=ledger_file)
+    handled = cli.process_next(queue_path=auto_state_file, ledger_path=ledger_file, publish=True)
 
     assert handled is True
     assert any("lệch lịch publish" in m for m in _capture_telegram)
@@ -806,31 +1089,23 @@ def test_build_start_prompt_custom_rules_used_as_topic():
     assert "chủ đề về trì hoãn" in prompt
 
 
-def test_cmd_start_runs_claude_and_reports_success(monkeypatch, capsys):
-    import io
-    captured_cmd = {}
+def test_cmd_start_rejects_the_removed_legacy_cloud_generation_path(monkeypatch):
+    monkeypatch.setattr(
+        cli.subprocess,
+        "Popen",
+        lambda *_args, **_kwargs: pytest.fail("legacy cloud path must not start a process"),
+    )
 
-    class FakePopen:
-        def __init__(self, cmd, **kw):
-            captured_cmd["cmd"] = cmd
-            result_line = json.dumps({"type": "result", "result": "✓ Đã viết 2 kịch bản."})
-            self.stdout = io.StringIO(result_line + "\n")
-            self.stderr = io.StringIO("")
-            self.returncode = 0
-            self.args = cmd
-
-        def wait(self):
-            pass
-
-    monkeypatch.setattr(cli.subprocess, "Popen", FakePopen)
-    monkeypatch.setattr(cli, "build_claude_cmd", lambda prompt: ["claude", "-p", prompt])
-
-    cli.cmd_start(argparse.Namespace(num_of_vid=2, type_of_vid="short", type_of_rules="auto", resume=False, cloud=True))
-
-    out = capsys.readouterr().out
-    assert "Đã viết 2 kịch bản" in out
-    assert "ytb batch status" in out
-    assert captured_cmd["cmd"][:2] == ["claude", "-p"]
+    with pytest.raises(SystemExit, match="--cloud.*đã bị gỡ"):
+        cli.cmd_start(
+            argparse.Namespace(
+                num_of_vid=2,
+                type_of_vid="short",
+                type_of_rules="auto",
+                resume=False,
+                cloud=True,
+            )
+        )
 
 
 def test_start_parser_accepts_explicit_local_flag():
@@ -924,12 +1199,96 @@ def test_cli_parses_run_schedule_loop_flags():
         },
     )
 
-    args = parser.parse_args(["run", "--schedule", "--loop"])
+    args = parser.parse_args(["run", "--schedule", "--loop", "--batch-key", "shorts_funnel_batch_week5"])
 
     assert args.schedule is True
     assert args.loop is True
-    assert args.schedule_slots == "06:00,20:30"
+    assert args.schedule_slots == "06:00,12:30,20:30"
     assert args.schedule_start_days == 1
+    assert args.schedule_start_date == ""
+    assert args.long_publish_at == ""
+    assert args.batch_key == "shorts_funnel_batch_week5"
+
+
+def test_schedule_targets_the_requested_batch_not_lexicographically_latest(tmp_path, monkeypatch):
+    auto_state = tmp_path / "auto_state.json"
+    ledger = tmp_path / "ledger.md"
+    auto_state.write_text(json.dumps({
+        "shorts_funnel_batch_2026-08-06": {
+            "long_videos": [{"slug": "other", "publish_at": "", **ELIGIBLE_FIELDS}], "short_videos": [],
+        },
+        "shorts_funnel_batch_week5": {
+            "long_videos": [{"slug": "target", "publish_at": "", **ELIGIBLE_FIELDS}], "short_videos": [],
+        },
+    }), encoding="utf-8")
+    ledger.write_text("# Ledger\n", encoding="utf-8")
+    monkeypatch.setattr(cli, "AUTO_STATE_PATH", auto_state)
+    monkeypatch.setattr(cli, "LEDGER_PATH", ledger)
+
+    cli.schedule_pending_videos(argparse.Namespace(
+        batch_key="shorts_funnel_batch_week5", schedule_slots="20:30", schedule_start_days=1,
+        schedule_start_date="2026-07-24", long_publish_at="2026-07-24T20:30:00+07:00",
+    ))
+
+    data = json.loads(auto_state.read_text(encoding="utf-8"))
+    assert data["shorts_funnel_batch_week5"]["long_videos"][0]["publish_at"]
+    assert data["shorts_funnel_batch_2026-08-06"]["long_videos"][0]["publish_at"] == ""
+
+
+def test_schedule_daily_bundle_places_two_shorts_and_its_long_on_one_day(tmp_path, monkeypatch):
+    auto_state = tmp_path / "auto_state.json"
+    ledger = tmp_path / "ledger.md"
+    auto_state.write_text(json.dumps({"shorts_funnel_batch_daily": {
+        "daily_cadence": {"longs": 1, "shorts": 2},
+        "long_videos": [{"day": 1, "slug": "long-a", **ELIGIBLE_FIELDS}],
+        "short_videos": [
+            {"day": 1, "slug": "short-a1", "long_form_slug": "long-a", **ELIGIBLE_FIELDS},
+            {"day": 1, "slug": "short-a2", "long_form_slug": "long-a", **ELIGIBLE_FIELDS},
+        ],
+    }}), encoding="utf-8")
+    ledger.write_text("# Ledger\n", encoding="utf-8")
+    monkeypatch.setattr(cli, "AUTO_STATE_PATH", auto_state)
+    monkeypatch.setattr(cli, "LEDGER_PATH", ledger)
+
+    cli.schedule_pending_videos(argparse.Namespace(
+        batch_key="shorts_funnel_batch_daily", schedule_slots="06:00,12:30,20:30",
+        schedule_start_days=1, schedule_start_date="2026-07-24", long_publish_at="",
+    ))
+
+    batch = json.loads(auto_state.read_text(encoding="utf-8"))["shorts_funnel_batch_daily"]
+    assert [item["publish_at"] for item in batch["short_videos"]] == [
+        "2026-07-24T06:00:00+07:00", "2026-07-24T12:30:00+07:00",
+    ]
+    assert batch["long_videos"][0]["publish_at"] == "2026-07-24T20:30:00+07:00"
+
+
+def test_schedule_separates_explicit_long_dates_from_four_shorts_per_day(tmp_path, monkeypatch):
+    auto_state = tmp_path / "auto_state.json"
+    ledger = tmp_path / "ledger.md"
+    auto_state.write_text(json.dumps({"shorts_funnel_batch_2026-07-17": {
+        "long_videos": [{"slug": "long-a", **ELIGIBLE_FIELDS}, {"slug": "long-b", **ELIGIBLE_FIELDS}],
+        "short_videos": [
+            {"day": day, "slug": f"short-{day}", **ELIGIBLE_FIELDS} for day in range(1, 9)
+        ],
+    }}), encoding="utf-8")
+    ledger.write_text("# Ledger\n", encoding="utf-8")
+    monkeypatch.setattr(cli, "AUTO_STATE_PATH", auto_state)
+    monkeypatch.setattr(cli, "LEDGER_PATH", ledger)
+
+    cli.schedule_pending_videos(argparse.Namespace(
+        schedule_slots="06:00,11:30,18:00,22:00", schedule_start_days=1,
+        schedule_start_date="2026-08-02",
+        long_publish_at="2026-08-04T20:30:00+07:00,2026-08-07T20:30:00+07:00",
+    ))
+
+    batch = json.loads(auto_state.read_text(encoding="utf-8"))["shorts_funnel_batch_2026-07-17"]
+    assert [video["publish_at"] for video in batch["long_videos"]] == [
+        "2026-08-04T20:30:00+07:00", "2026-08-07T20:30:00+07:00",
+    ]
+    assert [video["publish_at"] for video in batch["short_videos"][:4]] == [
+        "2026-08-02T06:00:00+07:00", "2026-08-02T11:30:00+07:00",
+        "2026-08-02T18:00:00+07:00", "2026-08-02T22:00:00+07:00",
+    ]
 
 
 def test_cmd_start_rejects_local_and_cloud_together():
@@ -954,33 +1313,24 @@ def test_cmd_start_rejects_clear_ledger_with_resume():
                 type_of_vid="short",
                 type_of_rules="cơ chế trì hoãn",
                 resume=True,
-                local=True,
+                local=False,
                 cloud=False,
                 clear_ledger=True,
             )
         )
 
 
-def test_cmd_start_warns_and_exits_on_nonzero_return(monkeypatch, _capture_telegram):
-    import io
+def test_cmd_start_does_not_run_legacy_cloud_even_when_it_would_fail(monkeypatch, _capture_telegram):
+    monkeypatch.setattr(
+        cli.subprocess,
+        "Popen",
+        lambda *_args, **_kwargs: pytest.fail("removed cloud path must not execute"),
+    )
 
-    class FakePopen:
-        def __init__(self, cmd, **kw):
-            self.stdout = io.StringIO("")
-            self.stderr = io.StringIO("lỗi API rồi")
-            self.returncode = 1
-            self.args = cmd
-
-        def wait(self):
-            pass
-
-    monkeypatch.setattr(cli.subprocess, "Popen", FakePopen)
-
-    with pytest.raises(SystemExit) as exc_info:
+    with pytest.raises(SystemExit, match="--cloud.*đã bị gỡ"):
         cli.cmd_start(argparse.Namespace(num_of_vid=1, type_of_vid="long", type_of_rules="auto", resume=False, cloud=True))
 
-    assert exc_info.value.code == 1
-    assert any("lỗi API rồi" in m for m in _capture_telegram)
+    assert not _capture_telegram
 
 
 # ── graceful stop (ytb batch stop) ───────────────────────────────────────────
@@ -993,6 +1343,13 @@ def _reset_stop_flag():
     yield
     cli._stop_requested = False
     cli._current_proc = None
+
+
+@pytest.fixture(autouse=True)
+def _reset_recovery_streak():
+    cli._recovery_code_streak.clear()
+    yield
+    cli._recovery_code_streak.clear()
 
 
 def test_handle_stop_signal_sets_flag_and_killpgs_current_proc_group(monkeypatch):
@@ -1111,6 +1468,87 @@ def test_cmd_run_stops_loop_when_stop_requested(monkeypatch, capsys):
     assert "dừng graceful" in capsys.readouterr().out
 
 
+def test_cmd_run_does_not_use_unsafe_f5_staged_lanes_by_default(monkeypatch, tmp_path):
+    """The legacy staged uploader is disabled until it enforces P0 admission."""
+    called = []
+    monkeypatch.setattr(cli.settings, "tts_provider", "f5")
+    monkeypatch.setattr(cli, "cmd_run_f5_staged", lambda args: called.append(args))
+
+    args = argparse.Namespace(loop=True, workers=2, schedule=False)
+    cli.cmd_run(args)
+
+    assert called == []
+    assert cli.WORKER_STATE_PATH == tmp_path / "batch_workers.json"
+    assert cli.AUTO_STATE_PATH == tmp_path / "auto_state.json"
+
+
+def test_staged_f5_runner_hands_audio_to_render_consumer_and_keeps_lanes_distinct(monkeypatch, tmp_path):
+    items = [
+        cli.QueueItem(1, "one", "2026-06-23T06:00:00+0700", "queued"),
+        cli.QueueItem(2, "two", "2026-06-24T06:00:00+0700", "queued"),
+        cli.QueueItem(3, "three", "2026-06-25T06:00:00+0700", "queued"),
+    ]
+    produced = []
+    consumed = []
+
+    class FakePool:
+        def __init__(self, _root):
+            pass
+
+        def start(self, lanes):
+            assert lanes == 2
+
+        def socket_for(self, lane):
+            return tmp_path / f"lane-{lane}.sock"
+
+        def stop(self):
+            pass
+
+    def claim(*, batch_key=None):
+        assert batch_key is None
+        return items.pop(0) if items else None
+
+    def fake_voice(item, lane, socket_path):
+        produced.append((item.slug, lane, socket_path.name))
+        return item, True, "audio complete"
+
+    def fake_render(item, lane, *, publish, batch_key=None):
+        assert publish is True
+        assert batch_key is None
+        consumed.append((item.slug, lane))
+        cli._release_staged_claim(item)
+
+    monkeypatch.setattr(cli, "F5DaemonPool", FakePool)
+    monkeypatch.setattr(cli, "_claim_next_staged", claim)
+    monkeypatch.setattr(cli, "_release_staged_claim", lambda _item: None)
+    monkeypatch.setattr(cli, "_run_f5_voiceover_lane", fake_voice)
+    monkeypatch.setattr(cli, "_run_render_publish_lane", fake_render)
+
+    cli.cmd_run_f5_staged(argparse.Namespace())
+
+    assert {slug for slug, _lane, _socket in produced} == {"one", "two", "three"}
+    assert {slug for slug, _lane in consumed} == {"one", "two", "three"}
+    assert all(socket == f"lane-{lane}.sock" for _slug, lane, socket in produced)
+
+
+def test_staged_render_lane_passes_batch_key_to_publish_finalizer(monkeypatch):
+    item = cli.QueueItem(1, "one", "", "queued")
+    captured = {}
+    monkeypatch.setattr(cli, "run_with_retry", lambda *_args, **_kwargs: (True, "https://youtu.be/AbC_123-xYz"))
+    monkeypatch.setattr(cli, "_release_staged_claim", lambda _item: None)
+    monkeypatch.setattr(
+        cli,
+        "finalize_published_item",
+        lambda _item, _output, **kwargs: captured.update(kwargs),
+    )
+
+    cli._run_render_publish_lane(
+        item, 1, publish=True, batch_key="shorts_funnel_batch_phase1"
+    )
+
+    assert captured["batch_key"] == "shorts_funnel_batch_phase1"
+
+
 def test_schedule_pending_videos_assigns_publish_at_without_overwriting_done_or_existing(
     tmp_path, monkeypatch, capsys
 ):
@@ -1119,13 +1557,16 @@ def test_schedule_pending_videos_assigns_publish_at_without_overwriting_done_or_
     auto_state.write_text(json.dumps({
         "shorts_funnel_batch_2026-07-06": {
             "long_videos": [
-                {"day": 3, "slug": "already-scheduled", "publish_at": "2026-07-20T09:00:00+07:00"},
+                {
+                    "day": 3, "slug": "already-scheduled", "publish_at": "2026-07-20T09:00:00+07:00",
+                    **ELIGIBLE_FIELDS,
+                },
             ],
             "short_videos": [
-                {"day": 1, "slug": "first-short", "publish_at": "", "shorts_status": "queued"},
-                {"day": 2, "slug": "done-short", "publish_at": "", "shorts_status": "queued"},
-                {"day": 4, "slug": "second-short", "publish_at": "", "shorts_status": "queued"},
-                {"day": 5, "slug": "third-short", "publish_at": "", "shorts_status": "queued"},
+                {"day": 1, "slug": "first-short", "publish_at": "", "shorts_status": "queued", **ELIGIBLE_FIELDS},
+                {"day": 2, "slug": "done-short", "publish_at": "", "shorts_status": "queued", **ELIGIBLE_FIELDS},
+                {"day": 4, "slug": "second-short", "publish_at": "", "shorts_status": "queued", **ELIGIBLE_FIELDS},
+                {"day": 5, "slug": "third-short", "publish_at": "", "shorts_status": "queued", **ELIGIBLE_FIELDS},
             ],
         }
     }), encoding="utf-8")
@@ -1166,10 +1607,10 @@ def test_default_schedule_keeps_shorts_off_sunday_and_long_on_sunday(tmp_path, m
     ledger = tmp_path / "ledger.md"
     auto_state.write_text(json.dumps({
         "shorts_funnel_batch_2026-07-06": {
-            "long_videos": [{"day": 10, "slug": "long", "publish_at": ""}],
+            "long_videos": [{"day": 10, "slug": "long", "publish_at": "", **ELIGIBLE_FIELDS}],
             "short_videos": [
-                {"day": 1, "slug": "short-a", "publish_at": ""},
-                {"day": 2, "slug": "short-b", "publish_at": ""},
+                {"day": 1, "slug": "short-a", "publish_at": "", **ELIGIBLE_FIELDS},
+                {"day": 2, "slug": "short-b", "publish_at": "", **ELIGIBLE_FIELDS},
             ],
         }
     }), encoding="utf-8")
@@ -1195,7 +1636,7 @@ def test_cmd_run_schedules_before_processing(tmp_path, monkeypatch):
         "shorts_funnel_batch_2026-07-06": {
             "long_videos": [],
             "short_videos": [
-                {"day": 1, "slug": "short-video", "publish_at": "", "shorts_status": "queued"},
+                {"day": 1, "slug": "short-video", "publish_at": "", "shorts_status": "queued", **ELIGIBLE_FIELDS},
             ],
         }
     }), encoding="utf-8")
@@ -1261,6 +1702,47 @@ def test_cmd_retry_finds_short_video(tmp_path, monkeypatch, capsys):
     assert "Thành công" in capsys.readouterr().out
 
 
+def test_cmd_retry_scopes_lookup_to_explicit_batch(monkeypatch, capsys):
+    batch_key = "shorts_funnel_batch_story_episode"
+    captured = {}
+    item = cli.QueueItem(day=1, slug="story-episode", publish_at="", shorts_status="queued")
+
+    def fake_load_queue(*, batch_key=None):
+        captured["batch_key"] = batch_key
+        return [item]
+
+    monkeypatch.setattr(cli, "load_queue", fake_load_queue)
+    monkeypatch.setattr(cli, "preflight_script", lambda _path: type("Result", (), {"passed": True})())
+    monkeypatch.setattr(cli, "run_with_retry", lambda *_args, **_kwargs: (True, "ok"))
+
+    cli.cmd_retry(argparse.Namespace(slug="story-episode", publish=False, batch_key=batch_key))
+
+    assert captured["batch_key"] == batch_key
+    assert "Thành công" in capsys.readouterr().out
+
+
+def test_cmd_retry_publish_finalizes_verified_upload(auto_state_file, ledger_file, monkeypatch):
+    monkeypatch.setattr(cli, "AUTO_STATE_PATH", auto_state_file)
+    monkeypatch.setattr(cli, "LEDGER_PATH", ledger_file)
+    monkeypatch.setattr(
+        cli,
+        "run_with_retry",
+        lambda *_args, **_kwargs: (True, "✓ Đã upload: https://youtu.be/AbC_123-xYz"),
+    )
+    monkeypatch.setattr(
+        cli,
+        "verify_youtube_video",
+        lambda _video_id: {"exists": True, "title": "A", "privacy_status": "private", "publish_at": None},
+    )
+
+    cli.cmd_retry(argparse.Namespace(slug="a-video", publish=True))
+
+    assert "a-video" in cli.done_slugs(ledger_file)
+    state = json.loads(auto_state_file.read_text(encoding="utf-8"))
+    entry = next(video for video in state["shorts_funnel_batch_2026-06-22"]["long_videos"] if video["slug"] == "a-video")
+    assert entry["youtube_id"] == "AbC_123-xYz"
+
+
 def test_cmd_stop_no_pid_file(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(cli, "PID_PATH", tmp_path / "batch_cli.pid")
 
@@ -1281,6 +1763,23 @@ def test_cmd_stop_sends_sigterm_to_pid_in_file(tmp_path, monkeypatch, capsys):
 
     assert sent == [(999999, cli.signal.SIGTERM)]
     assert "dừng graceful" in capsys.readouterr().out
+
+
+def test_cmd_stop_terminates_staged_descendants_before_batch_parent(tmp_path, monkeypatch):
+    pid_path = tmp_path / "batch_cli.pid"
+    pid_path.write_text("100", encoding="utf-8")
+    monkeypatch.setattr(cli, "PID_PATH", pid_path)
+    monkeypatch.setattr(cli, "_descendant_pids", lambda _pid: [101, 102])
+    sent = []
+    monkeypatch.setattr(cli.os, "kill", lambda pid, sig: sent.append((pid, sig)))
+
+    cli.cmd_stop(argparse.Namespace())
+
+    assert sent == [
+        (101, cli.signal.SIGTERM),
+        (102, cli.signal.SIGTERM),
+        (100, cli.signal.SIGTERM),
+    ]
 
 
 def test_cmd_stop_cleans_up_stale_pid_file(tmp_path, monkeypatch, capsys):
@@ -1353,16 +1852,14 @@ def test_check_not_already_running_noop_without_pid_file(tmp_path, monkeypatch):
     cli.check_not_already_running()  # không raise, không tạo file
 
 
-def test_cmd_start_missing_claude_binary_exits(monkeypatch):
+def test_cmd_start_missing_claude_binary_is_irrelevant_after_cloud_path_removal(monkeypatch):
     def fake_popen(cmd, **kw):
         raise FileNotFoundError
 
     monkeypatch.setattr(cli.subprocess, "Popen", fake_popen)
 
-    with pytest.raises(SystemExit) as exc_info:
+    with pytest.raises(SystemExit, match="--cloud.*đã bị gỡ"):
         cli.cmd_start(argparse.Namespace(num_of_vid=1, type_of_vid="long", type_of_rules="auto", resume=False, cloud=True))
-
-    assert exc_info.value.code == 1
 
 
 # ── notify_progress (Telegram tiến độ từng video) ─────────────────────────────
@@ -1384,7 +1881,7 @@ def test_process_next_sends_progress_start_and_done(
     )
 
     # Act
-    handled = cli.process_next(queue_path=auto_state_file, ledger_path=ledger_file)
+    handled = cli.process_next(queue_path=auto_state_file, ledger_path=ledger_file, publish=True)
 
     # Assert — 2 tin tiến độ: bắt đầu + xong (kèm URL và vị trí trong queue)
     assert handled is True

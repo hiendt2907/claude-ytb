@@ -1,0 +1,24 @@
+{
+  "passed": false,
+  "blocking_findings": [
+    "Giọng nói chưa đạt 9: các câu chuyển mục kiểu 'Đến đây thì có một điều cần nói rõ', 'Nếu anh muốn đi thêm một bước' và một số câu phân tích khiến transcript nghe như dàn bài, không như người bạn mệt nói sau ly cà phê.",
+    "Điểm biên tập 8/10 dưới ngưỡng 9/10 của profile.",
+    "Các tiêu chí dưới ngưỡng 9/10: spoken_naturalness."
+  ],
+  "section_refs": [
+    2,
+    5,
+    6,
+    8,
+    10
+  ],
+  "repair_brief": "Đọc to toàn transcript; xoá mọi câu biển chỉ đường dàn bài, thay bằng chi tiết cảnh hoặc câu hỏi ngắn; gộp các bước 15 phút lặp lại thành một lời mời có điều kiện duy nhất, giữ lại giới hạn và đánh đổi.",
+  "overall_score": 8,
+  "dimension_scores": {
+    "human_truth": 9,
+    "spoken_naturalness": 8,
+    "causal_coherence": 9,
+    "role_fidelity": 9,
+    "useful_restraint": 9
+  }
+}

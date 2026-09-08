@@ -17,21 +17,27 @@ Codex và Claude phải đọc cả hai tài liệu trước khi tạo queue, vi
 thay đổi pipeline hoặc quyết định tăng sản lượng.
 
 `claude-ytb` đang chuyển từ **pipeline tự động hoá YouTube** thành
-**AI Native Creative Operating System** — một engine local-first chạy chủ
-yếu trên MacBook Pro M4, biến một creative intent (chủ đề, series, nhân vật
-tái sử dụng) thành nội dung hoàn chỉnh đa nền tảng (video, audio, slide,
+**AI Native Creative Operating System** — một engine được điều phối và render
+chủ yếu trên MacBook Pro M4, biến một creative intent (chủ đề, series, nhân
+vật tái sử dụng) thành nội dung hoàn chỉnh đa nền tảng (video, audio, slide,
 text) qua một DAG các bước sản xuất dùng AI provider có thể thay thế lẫn
-nhau.
+nhau. Theo amendment 2026-08-24, LLM và TTS mặc định chạy qua xKiro; local
+compute vẫn là default cho render/visual.
 
 Nguyên tắc bất biến (xem `PROJECT_VISION.md` §2 — KHÔNG đổi trừ khi có
 amendment ghi rõ ngày + lý do trong chính file đó):
 
-1. **Offline-first.** Toàn pipeline (trừ bước publish cuối) phải chạy được
-   không cần internet.
-2. **Local inference priority.** LLM (Ollama/Qwen3), TTS (F5-TTS), ảnh
-   (Flux), video (Wan2.2) là **default**. Cloud (Claude API, ElevenLabs,
-   Pexels) là **fallback tuỳ chọn**, chọn rõ qua config — không bao giờ âm
-   thầm thay default.
+1. **Offline-first (amendment 2026-08-24 cho LLM+TTS — xem
+   `PROJECT_VISION.md` Amendment Log).** Render + publish-prep phải chạy
+   được không cần internet. LLM và TTS KHÔNG còn nằm trong yêu cầu này —
+   cả hai đã là cloud-primary (xKiro) theo chủ đích, MacBook chỉ chạy
+   workflow/pipeline orchestration + render.
+2. **Cloud-primary LLM+TTS, local-first phần còn lại (amended 2026-08-26).**
+   Ideation chỉ dùng **xKiro / DeepSeek V4 Pro**. Khi xKiro lỗi, lệnh dừng
+   minh bạch; không được thay thế bằng Codex hoặc Claude. TTS vẫn dùng xKiro.
+   Ollama và MLX-LM đã bị GỠ KHỎI CODEBASE — không còn local LLM provider
+   nào. Ảnh (Flux), video (Wan2.2) KHÔNG đổi, vẫn **default local**. Mọi
+   provider chọn rõ qua config — không bao giờ âm thầm thay default.
 3. **Không stock video làm default.** Pexels không bao giờ là nguồn B-roll
    mặc định. Ảnh/video AI-generated là default path của `render.ai`.
    **CHƯA ĐẠT (2026-07-06):** `settings.video_provider`/`broll_strategy`
@@ -50,9 +56,30 @@ amendment ghi rõ ngày + lý do trong chính file đó):
 
 ## Kiến trúc (Architecture Rules)
 
+- **Một DAG, N content profile.** Mỗi chủ đề sống trong một thư mục
+  `profiles/<profile_id>/` tự chứa `profile.json`, prompt biên tập, voice cast,
+  asset và memory/continuity. Queue item mang `profile_id`; subprocess resolve
+  cấu hình profile trước khi chạy DAG chung. Content profile (nội dung được kể
+  thế nào) hoàn toàn khác PlatformProfile (đăng lên đâu). Không hardcode tên
+  chủ đề, nhân vật, giọng hay renderer trong pipeline.
+
+- **Content profile — contract mở rộng (2026-08-26/27).** `profile.json` có
+  thể khai `format_prompts` (Short/Long dùng prompt cấu trúc khác nhau thay
+  vì gộp chung 1 prompt `editorial`), `editorial_review` (cổng LLM chấm điểm
+  rubric 5 tiêu chí, **opt-in**, xem `docs/constitution/38-EDITORIAL_QUALITY_LAYERS.md`
+  cho ranh giới với QA heuristic), và các `content_rules` mới:
+  `allow_short_generation` (series có thể ngừng SINH Short mới mà vẫn đọc
+  được Short cũ), `story_primary_speaker_id`/`story_supporting_speaker_id`
+  (profile tự khai vai trò 2-cast thay vì engine giả định key cố định),
+  `long_opening_mode`/`short_ending_mode`, `require_next_episode_bridge`.
+  Mỗi lần bump `version`, giữ snapshot tại `profiles/<id>/versions/<semver>/`
+  để script cũ luôn load lại đúng contract đã sinh ra nó. Chi tiết đầy đủ:
+  `docs/constitution/03-ARCHITECTURE.md` mục "Content profile — extended
+  contract".
+
 - **Clean + Hexagonal.** Dependency luôn hướng vào trong: Interface →
   Application → Domain. Domain layer (frozen dataclasses) không phụ thuộc
-  gì bên ngoài — không Pillow, không FFmpeg, không SDK Google/Ollama trực
+  gì bên ngoài — không Pillow, không FFmpeg, không SDK Google hay SDK provider
   tiếp.
 - **Provider Pattern.** Mọi pipeline/domain code chỉ import `Protocol`
   (`VoiceProvider`, `RenderProvider`, `ImageProvider`, `PublishProvider`),
@@ -92,11 +119,23 @@ buộc:
   (`"voiceover.segment.synthesized"`), correlation ID (`project_id`)
   bind 1 lần qua contextvars. Không `print()`/`logging.info(f"...")` trong
   `src/ytb_pipeline/`.
-- **File size.** Tối đa 400 dòng/file. `batch_cli.py` đã split — ĐẠT.
-  `ideation_cmd.py` đã split 2026-07-14 (367 dòng + ideation_prompts/
-  ideation_script_fix/ideation_state) — ĐẠT. Còn VI PHẠM:
-  `render/compose_ai.py` (~577 dòng) — cần tách trước khi thêm logic mới
-  vào file này (xem Refactoring Rules bên dưới).
+- **File size.** Tối đa 400 dòng/file. `batch_cli.py` (883 dòng) đã tách
+  2026-07-23 thành package `orchestrator/batch_cli/` — ĐẠT, mọi file <
+  400 dòng: `__init__.py` (re-export + global state + `main()`,
+  ~200 dòng), `process_control.py` (PID file + signal handling, ~150
+  dòng), `scheduler.py` (`schedule_pending_videos`, ~185 dòng),
+  `workers.py` (worker state + staged F5 lanes + `cmd_run`, ~270 dòng),
+  `commands.py` (14 subcommand đơn giản còn lại, ~240 dòng),
+  `__main__.py` (entrypoint `python -m ...batch_cli`, ~10 dòng). Tên
+  module `ytb_pipeline.orchestrator.batch_cli` giữ nguyên (giờ là
+  package thay vì file phẳng) — `bin/ytb`, `listener.py`, và các module
+  dùng pattern `_cli()` lazy-import (`queue_manager.py`,
+  `pipeline_runner.py`, `doctor.py`, `ideation_cmd.py`,
+  `ideation_state.py`) không cần sửa gì. `ideation_cmd.py` đã split
+  2026-07-14 (367 dòng + ideation_prompts/ideation_script_fix/
+  ideation_state) — ĐẠT. Còn VI PHẠM: `render/compose_ai.py` (~577
+  dòng) — cần tách trước khi thêm logic mới vào file này (xem
+  Refactoring Rules bên dưới).
 - **No hardcoded path.** Mọi path qua `settings.<field>`.
 - **Naming.** `snake_case` hàm/biến, `PascalCase` class/Protocol/enum,
   `UPPER_SNAKE_CASE` constant.
@@ -136,18 +175,27 @@ buộc:
 
 ## AI Rules
 
-- **Local-first.** Default provider cho LLM/Voice/Image/Video luôn là local
-  model. Cloud chỉ dùng khi config chọn rõ ràng (không phải vì local "chưa
-  setup xong" trong code).
-- **Fallback to cloud** là một adapter hợp lệ, không phải nhánh đặc biệt —
-  implement như mọi `Provider` khác, chọn qua registry.
+- **xKiro/DeepSeek V4 Pro là LLM duy nhất cho ideation; xKiro là TTS mặc
+  định.** `llm_provider` và `tts_provider` đều mặc định là `"xkiro"`;
+  `allow_cloud_providers=true` mặc định. Ideation lỗi phải báo lỗi, không
+  fallback sang Codex/Claude. Không thêm lại Ollama, MLX-LM, `local_stack`,
+  hoặc một local ideation provider mà không có amendment mới trong
+  `PROJECT_VISION.md`.
+- **Voice cast theo content profile.** `Segment.speaker_id` chỉ là identity;
+  xKiro tra voice qua `voice_cast` của profile và đưa voice vào content-hash
+  cache. Script cũ không khai báo profile/speaker vẫn dùng narrator/default.
+- **Local-first cho visual/render.** Flux, video generation và render vẫn ưu
+  tiên local theo §2 của `PROJECT_VISION.md`. F5 và các TTS local còn là lựa
+  chọn config rõ ràng, không phải default.
+- **Fallback là một adapter hợp lệ.** Cascade/fallback phải tập trung trong
+  provider/orchestrator boundary, không rải nhánh provider trong domain code.
 - **Token/cost tracking.** Mọi lời gọi cloud LLM/TTS phải log
   `tokens_used`/`cost_estimate` (nếu provider trả về) qua structured logging
   để theo dõi chi phí — local inference không cần track cost nhưng nên log
   `duration_ms` để theo dõi hiệu năng M4.
-- **Cost awareness.** Trước khi thêm 1 cloud call mới vào default path,
-  cân nhắc: có local alternative chưa được thử chưa? Nếu có, local phải là
-  default, cloud là fallback — không phải ngược lại.
+- **Cost awareness.** Cloud LLM/TTS là default đã được phê chuẩn. Trước khi
+  thêm cloud call mới ngoài hai capability này, vẫn đánh giá local alternative
+  và ghi rõ lý do/config; không lặng lẽ mở rộng cloud-default sang visual.
 
 ## Review Rules
 
@@ -179,8 +227,9 @@ buộc:
 Chi tiết: `docs/constitution/28-TESTING.md`. Tóm tắt:
 
 - Test pyramid: unit 70% / integration 20% / e2e 10%.
-- Coverage target 90% (đang nâng dần từ 80% hiện tại, sau khi
-  `batch_cli.py` được split — xem Migration Plan Phase 0).
+- Coverage target 90% (đang nâng dần từ 80% hiện tại; `batch_cli.py` đã
+  được split 2026-07-23 — điều kiện chặn trước đó của Migration Plan
+  Phase 0 đã ĐẠT).
 - **Không gọi real TTS/LLM/YouTube API trong unit test.** Fixture audio
   ngắn cho TTS, mock `googleapiclient` cho YouTube, fake `Provider` cho
   LLM/Image/Video.
@@ -244,6 +293,14 @@ ytb cache warm
 - `secrets/` không commit; mọi path qua `settings`, không hardcode.
 - `script.json` cũ phải luôn load được qua compatibility loader sau khi
   `project.json` thành canonical.
+- Không hardcode tên profile/nhân vật cụ thể (vd `"ban-so-6"`, `"minh"`,
+  `"an"`) trong `src/ytb_pipeline/`. Vai trò 2-cast của một profile kể
+  chuyện khai qua `content_rules.story_primary_speaker_id`/
+  `story_supporting_speaker_id`, không suy ra từ `voice_cast` cố định.
+- Một luật content mới chỉ được thêm vào ĐÚNG MỘT trong hai lớp QA
+  (`qa_agent.py` heuristic tất định, hoặc `editorial_review` LLM rubric) —
+  theo quyết định cây hỏi trong `docs/constitution/38-EDITORIAL_QUALITY_LAYERS.md`,
+  không thêm trùng ở cả hai lớp cho cùng một loại lỗi.
 
 # Repository Evolution Rules
 
@@ -410,3 +467,14 @@ Mọi cải tiến đều phải đảm bảo:
 - **Code trước.** Viết code ngay, không hỏi lại trừ khi thiếu thông tin
   chặn cứng.
 - **Giải thích tối đa 100 chữ** khi thật sự cần giải thích.
+
+## Batch safety boundary (P0)
+
+- `ytb batch preflight [slug...]` là cổng offline bắt buộc: contract/ruleset,
+  duration, orientation, TTS readiness, B-roll local, thumbnail và disk phải
+  đạt trước khi một script được nhận vào queue hoặc được batch worker chạy.
+- `ytb batch run` và `ytb batch retry` mặc định là dry-run local-only:
+  `DRY_RUN=true`, `BROLL_ALLOW_DOWNLOADS=false`, không được upload hay gọi
+  YouTube verify. Upload chỉ được phép khi operator truyền `--publish` rõ ràng.
+- Test mặc định là unit suite. Dùng `make test-integration` hoặc `make test-e2e`
+  cho marker tương ứng; các test này không được lẫn vào vòng phản hồi mặc định.

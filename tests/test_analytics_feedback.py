@@ -31,6 +31,39 @@ def test_ideation_prompt_includes_mature_feedback():
     assert "drop_format" in prompt
 
 
+def test_script_system_prompt_requires_growth_cta_for_short_and_long():
+    from ytb_pipeline.orchestrator.ideation_prompts import SCRIPT_GENERATION_SYSTEM_PROMPT
+
+    prompt = SCRIPT_GENERATION_SYSTEM_PROMPT.lower()
+    assert "short" in prompt and "long" in prompt
+    assert "like" in prompt
+    assert "subscribe" in prompt
+    assert "channel" in prompt
+    assert "action" in prompt
+
+
+def test_script_system_prompt_lets_writer_place_a_value_first_retention_beat():
+    from ytb_pipeline.orchestrator.ideation_prompts import SCRIPT_GENERATION_SYSTEM_PROMPT
+
+    prompt = SCRIPT_GENERATION_SYSTEM_PROMPT.lower()
+
+    assert "retention beat" in prompt
+    assert "value-first" in prompt
+    assert "do not use a fixed sentence" in prompt
+    assert "shorts and longs" in prompt
+
+
+def test_auto_ideation_uses_the_channel_promise_as_its_topic_compass():
+    from ytb_pipeline.orchestrator.ideation_prompts import local_script_prompt
+
+    prompt = local_script_prompt(1, 1, "short", "auto", "")
+
+    assert "phát triển bản thân thật, không self-help" in prompt.lower()
+    assert "cơ chế tâm lý" in prompt.lower()
+    assert "tình huống đời thường" in prompt.lower()
+    assert "short là phễu" in prompt.lower()
+
+
 def test_collect_youtube_metrics_records_api_report_with_video_age(tmp_path):
     from ytb_pipeline.analytics.feedback import AnalyticsStore, collect_youtube_metrics
 

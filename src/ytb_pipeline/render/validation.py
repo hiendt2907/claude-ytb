@@ -8,6 +8,8 @@ import tempfile
 from pathlib import Path
 
 from ..config.settings import settings
+from ..content_contract import contract_for
+from ..content_profiles import load_content_profile
 from ..pkg.models import RenderedVideo
 
 
@@ -91,8 +93,13 @@ def validate_final_video(video: RenderedVideo) -> None:
     duration = float(data.get("format", {}).get("duration") or 0)
     if duration <= 0:
         raise ValueError("Final QA: duration không hợp lệ.")
-    if declared_type == "short" and duration > 180:
-        raise ValueError(f"Final QA: Short dài quá 180s: {duration:.1f}s.")
+    profile = (
+        load_content_profile(video.content_profile_id, version=video.content_profile_version)
+        if video.content_profile_version else None
+    )
+    contract_for(declared_type, profile).validate_viewer_runtime(duration)
+    if video.thumbnail_path is None or not Path(video.thumbnail_path).exists():
+        raise FileNotFoundError("Final QA: thiếu thumbnail hợp lệ.")
     if not video.description or len(video.tags) < 3:
         raise ValueError("Final QA: metadata thiếu description hoặc tags (<3).")
     _check_not_blank(path)

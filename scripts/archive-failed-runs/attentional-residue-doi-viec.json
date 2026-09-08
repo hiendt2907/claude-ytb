@@ -1,0 +1,293 @@
+{
+  "slug": "attentional-residue-doi-viec",
+  "topic": "Attentional residue: phần chú ý còn sót lại sau khi chuyển từ việc này sang việc khác",
+  "title": "Vì Sao Đổi Việc Liên Tục Vẫn Không Thật Sự Tập Trung?",
+  "description": "Video giải thích attentional residue — phần chú ý còn sót lại sau khi chuyển việc — qua email, tin nhắn và học tập. Bạn sẽ hiểu cơ chế này, vì sao việc còn dang dở giữ suy nghĩ lại, cách đóng việc cũ bằng ghi chú rõ ràng và cách thiết kế những lần chuyển việc ít gây hao hụt hơn. Nguồn chính: Sophie Leroy (2009), “Why Is It So Hard to Do My Work? The Challenge of Attention Residue When Switching Between Work Tasks”, Organizational Behavior and Human Decision Processes, 109(2), 168–181, DOI: https://doi.org/10.1016/j.obhdp.2009.04.002.",
+  "tags": [
+    "tâm lý học",
+    "phát triển bản thân",
+    "tập trung",
+    "attentional residue",
+    "chuyển việc",
+    "năng suất",
+    "quản lý sự chú ý"
+  ],
+  "video_type": "long",
+  "target_minutes": 11,
+  "voice_profile": "knowledge",
+  "sections": [
+    {
+      "time_goal": 0.5,
+      "voiceover": "Mến chào các bạn, bạn có từng mở một tài liệu mới nhưng đầu óc vẫn mắc ở email vừa đọc không? Video này có tiêu đề: Vì Sao Đổi Việc Liên Tục Vẫn Không Thật Sự Tập Trung? Nghịch lý là bạn có thể làm việc suốt buổi sáng, nhưng mỗi lần đổi cửa sổ lại để lại một phần chú ý ở việc cũ.",
+      "visual_intent": "Mở bằng nhịp chuyển nhanh giữa laptop, email và điện thoại; dừng đột ngột ở tài liệu trống.",
+      "pexels_query": "person rapidly switching laptop windows phone notification office close up",
+      "caption": "Bạn đã đổi việc, nhưng sự chú ý chưa chắc đã đổi theo.",
+      "hook": true,
+      "transition": false,
+      "payoff": "Đổi cửa sổ không đồng nghĩa với đổi trạng thái chú ý.",
+      "emphasis": [
+        "đổi việc",
+        "chú ý còn sót"
+      ],
+      "narration": "Mến chào các bạn, bạn có từng mở một tài liệu mới nhưng đầu óc vẫn mắc ở email vừa đọc không? Video này có tiêu đề: Vì Sao Đổi Việc Liên Tục Vẫn Không Thật Sự Tập Trung? Nghịch lý là bạn có thể làm việc suốt buổi sáng, nhưng mỗi lần đổi cửa sổ lại để lại một phần chú ý ở việc cũ.",
+      "broll": "person rapidly switching laptop windows phone notification office close up"
+    },
+    {
+      "time_goal": 0.8,
+      "voiceover": "Hãy hình dung chín giờ sáng, bạn bắt đầu viết báo cáo. Một thông báo hiện lên. Bạn mở tin nhắn, đọc một nửa và trả lời rằng sẽ xem sau. Quay lại báo cáo, bạn vẫn nghĩ người kia cần gì, có phải trả lời ngay không và mình đã bỏ sót thông tin nào chưa. Mười phút sau, bạn mở email rồi lại quay về báo cáo. Trên lịch chỉ có một khối làm việc, nhưng trong đầu đã có nhiều việc mở cùng lúc. Cảm giác này thường bị gọi là thiếu kỷ luật, trong khi vấn đề có thể nằm ở cách chuyển việc.",
+      "visual_intent": "Minh họa một buổi sáng với báo cáo, tin nhắn và email lần lượt chen vào màn hình.",
+      "pexels_query": "office worker writing report interrupted by phone message email",
+      "caption": "Một buổi làm việc có thể chứa nhiều việc đang mở trong đầu.",
+      "hook": false,
+      "transition": false,
+      "payoff": "Sự phân mảnh không chỉ nằm trên lịch; nó nằm trong dòng suy nghĩ.",
+      "emphasis": [
+        "việc đang mở",
+        "chuyển việc"
+      ],
+      "narration": "Hãy hình dung chín giờ sáng, bạn bắt đầu viết báo cáo. Một thông báo hiện lên. Bạn mở tin nhắn, đọc một nửa và trả lời rằng sẽ xem sau. Quay lại báo cáo, bạn vẫn nghĩ người kia cần gì, có phải trả lời ngay không và mình đã bỏ sót thông tin nào chưa. Mười phút sau, bạn mở email rồi lại quay về báo cáo. Trên lịch chỉ có một khối làm việc, nhưng trong đầu đã có nhiều việc mở cùng lúc. Cảm giác này thường bị gọi là thiếu kỷ luật, trong khi vấn đề có thể nằm ở cách chuyển việc.",
+      "broll": "office worker writing report interrupted by phone message email"
+    },
+    {
+      "time_goal": 1,
+      "voiceover": "Attentional residue là tên Sophie Leroy dùng để mô tả phần chú ý của nhiệm vụ trước còn ảnh hưởng đến nhiệm vụ sau. Khái niệm này không nói rằng bộ não dừng hoạt động hay con người hoàn toàn không thể đa nhiệm. Bạn vẫn đọc, gõ và trả lời được. Điểm khác nằm ở chất lượng tài nguyên tinh thần dành cho việc mới. Một phần chú ý vẫn dùng để nhớ việc cũ, đánh giá tình trạng của nó hoặc dự đoán bước tiếp theo. Vì vậy bạn có thể nhìn vào màn hình mà chưa thật sự bước vào vấn đề đang giải quyết. Đây là một mô hình để quan sát hành vi, không phải chẩn đoán y khoa hay lời giải thích cho mọi lần mất tập trung.",
+      "visual_intent": "Dùng đồ họa một thanh chú ý bị chia giữa nhiệm vụ cũ và nhiệm vụ mới, kèm tên Sophie Leroy và năm 2009.",
+      "pexels_query": "research paper desk academic study highlighted text attention diagram",
+      "caption": "Bạn vẫn hoạt động, nhưng không còn toàn bộ chú ý.",
+      "hook": false,
+      "transition": true,
+      "payoff": "Cơ chế nằm ở phần chú ý chưa rời hẳn nhiệm vụ trước.",
+      "emphasis": [
+        "attentional residue",
+        "Sophie Leroy 2009"
+      ],
+      "narration": "Attentional residue là tên Sophie Leroy dùng để mô tả phần chú ý của nhiệm vụ trước còn ảnh hưởng đến nhiệm vụ sau. Khái niệm này không nói rằng bộ não dừng hoạt động hay con người hoàn toàn không thể đa nhiệm. Bạn vẫn đọc, gõ và trả lời được. Điểm khác nằm ở chất lượng tài nguyên tinh thần dành cho việc mới. Một phần chú ý vẫn dùng để nhớ việc cũ, đánh giá tình trạng của nó hoặc dự đoán bước tiếp theo. Vì vậy bạn có thể nhìn vào màn hình mà chưa thật sự bước vào vấn đề đang giải quyết. Đây là một mô hình để quan sát hành vi, không phải chẩn đoán y khoa hay lời giải thích cho mọi lần mất tập trung.",
+      "broll": "research paper desk academic study highlighted text attention diagram"
+    },
+    {
+      "time_goal": 1,
+      "voiceover": "Nghiên cứu năm 2009 của Leroy khảo sát ảnh hưởng của việc chuyển giữa các nhiệm vụ. Ý quan trọng không phải là mọi lần chuyển việc đều tạo ra một mức thiệt hại cố định. Tình trạng của nhiệm vụ cũ và thời điểm chuyển có vai trò. Nếu việc cũ đã được hoàn tất hoặc có ranh giới rõ, nó thường dễ rời khỏi dòng chú ý hơn. Nếu việc cũ bị bỏ dở, còn câu hỏi chưa trả lời hoặc chưa biết bước tiếp theo, nó có thể tiếp tục cạnh tranh với việc mới. Có thể hình dung bộ não như đang giữ một hồ sơ chưa đóng. Khi mở hồ sơ khác, hồ sơ đầu tiên vẫn nằm trên bàn và thỉnh thoảng kéo mắt bạn quay lại. Vì thế “xong chưa?” không chỉ là câu hỏi về tiến độ; nó là tín hiệu cho biết nhiệm vụ đã có điểm kết thúc tâm lý hay chưa.",
+      "visual_intent": "Hiển thị hai hồ sơ: một hồ sơ có dấu hoàn tất và một hồ sơ dán nhãn bước tiếp theo chưa rõ.",
+      "pexels_query": "unfinished task notes open folders desk researcher organizing papers",
+      "caption": "Việc chưa rõ bước tiếp theo khó rời khỏi đầu hơn việc đã có điểm dừng.",
+      "hook": false,
+      "transition": false,
+      "payoff": "Sự mơ hồ làm nhiệm vụ cũ tiếp tục chiếm chỗ.",
+      "emphasis": [
+        "chưa hoàn tất",
+        "bước tiếp theo"
+      ],
+      "narration": "Nghiên cứu năm 2009 của Leroy khảo sát ảnh hưởng của việc chuyển giữa các nhiệm vụ. Ý quan trọng không phải là mọi lần chuyển việc đều tạo ra một mức thiệt hại cố định. Tình trạng của nhiệm vụ cũ và thời điểm chuyển có vai trò. Nếu việc cũ đã được hoàn tất hoặc có ranh giới rõ, nó thường dễ rời khỏi dòng chú ý hơn. Nếu việc cũ bị bỏ dở, còn câu hỏi chưa trả lời hoặc chưa biết bước tiếp theo, nó có thể tiếp tục cạnh tranh với việc mới. Có thể hình dung bộ não như đang giữ một hồ sơ chưa đóng. Khi mở hồ sơ khác, hồ sơ đầu tiên vẫn nằm trên bàn và thỉnh thoảng kéo mắt bạn quay lại. Vì thế “xong chưa?” không chỉ là câu hỏi về tiến độ; nó là tín hiệu cho biết nhiệm vụ đã có điểm kết thúc tâm lý hay chưa.",
+      "broll": "unfinished task notes open folders desk researcher organizing papers"
+    },
+    {
+      "time_goal": 1,
+      "voiceover": "Ví dụ cụ thể: Bối cảnh là chín giờ sáng, bạn đang viết báo cáo doanh thu và điện thoại liên tục hiện tin nhắn từ đồng nghiệp. Hành động là bạn mở tin nhắn, đọc một nửa, trả lời sẽ xem sau rồi chuyển lại sang báo cáo. Hậu quả là bạn vừa tìm lại lập luận đang viết vừa tự hỏi người kia đang chờ thông tin nào, nên tốc độ viết giảm và lỗi kiểm tra tăng lên. Cách áp dụng là trước khi chuyển việc, ghi rõ bạn đã làm đến đâu, bước tiếp theo là gì và thời điểm quay lại; chẳng hạn: “Đã so sánh tháng Một và tháng Hai; lần tới kiểm tra ba dòng chênh lệch lúc 10 giờ.” Câu ghi chú biến một việc mơ hồ thành một trạng thái có thể tiếp tục.",
+      "visual_intent": "Cận cảnh báo cáo, tin nhắn đọc dở và sổ ghi chú ba dòng; sau đó hiển thị câu ghi chú cụ thể.",
+      "pexels_query": "office worker reading phone message while writing report notebook close up",
+      "caption": "Một việc mở cần được đóng bằng trạng thái và bước tiếp theo.",
+      "hook": false,
+      "transition": false,
+      "payoff": "Ví dụ đời thường cho thấy chi phí nằm ở những câu hỏi chưa được đóng.",
+      "emphasis": [
+        "Ví dụ cụ thể:",
+        "bối cảnh",
+        "hành động",
+        "hậu quả",
+        "cách áp dụng"
+      ],
+      "narration": "Ví dụ cụ thể: Bối cảnh là chín giờ sáng, bạn đang viết báo cáo doanh thu và điện thoại liên tục hiện tin nhắn từ đồng nghiệp. Hành động là bạn mở tin nhắn, đọc một nửa, trả lời sẽ xem sau rồi chuyển lại sang báo cáo. Hậu quả là bạn vừa tìm lại lập luận đang viết vừa tự hỏi người kia đang chờ thông tin nào, nên tốc độ viết giảm và lỗi kiểm tra tăng lên. Cách áp dụng là trước khi chuyển việc, ghi rõ bạn đã làm đến đâu, bước tiếp theo là gì và thời điểm quay lại; chẳng hạn: “Đã so sánh tháng Một và tháng Hai; lần tới kiểm tra ba dòng chênh lệch lúc 10 giờ.” Câu ghi chú biến một việc mơ hồ thành một trạng thái có thể tiếp tục.",
+      "broll": "office worker reading phone message while writing report notebook close up"
+    },
+    {
+      "time_goal": 1,
+      "voiceover": "Cơ chế này còn liên quan đến việc tái lập ngữ cảnh. Khi quay lại báo cáo, bạn không chỉ mở đúng tệp. Bạn phải nhớ mục tiêu của báo cáo, người đọc là ai, đoạn nào đã có bằng chứng, đoạn nào còn thiếu và tiêu chí thế nào là đủ. Những câu hỏi đó tạo ra một khoản khởi động lại. Nếu bạn đổi việc nhiều lần, khoản nhỏ này lặp lại nhiều lần trong ngày. Một lần chuyển có thể chỉ tốn vài phút, nhưng sự hao hụt còn nằm ở việc bạn chưa đạt được độ sâu trước khi lại bị kéo đi. Đây là lý do một lịch đầy các khoảng ngắn có thể khiến bạn bận rộn nhưng vẫn thiếu một sản phẩm hoàn chỉnh. Không phải thời gian trên đồng hồ biến mất; ngữ cảnh bị tháo ra rồi lắp lại.",
+      "visual_intent": "So sánh việc mở đúng tài liệu với quá trình phải nhớ lại mục tiêu, người đọc và bước đang làm.",
+      "pexels_query": "worker reopening document trying to remember notes office desk",
+      "caption": "Chi phí chuyển việc gồm cả thời gian tái lập ngữ cảnh.",
+      "hook": false,
+      "transition": true,
+      "payoff": "Bạn không chỉ đổi nhiệm vụ; bạn phải xây lại bối cảnh của nhiệm vụ đó.",
+      "emphasis": [
+        "tái lập ngữ cảnh",
+        "độ sâu"
+      ],
+      "narration": "Cơ chế này còn liên quan đến việc tái lập ngữ cảnh. Khi quay lại báo cáo, bạn không chỉ mở đúng tệp. Bạn phải nhớ mục tiêu của báo cáo, người đọc là ai, đoạn nào đã có bằng chứng, đoạn nào còn thiếu và tiêu chí thế nào là đủ. Những câu hỏi đó tạo ra một khoản khởi động lại. Nếu bạn đổi việc nhiều lần, khoản nhỏ này lặp lại nhiều lần trong ngày. Một lần chuyển có thể chỉ tốn vài phút, nhưng sự hao hụt còn nằm ở việc bạn chưa đạt được độ sâu trước khi lại bị kéo đi. Đây là lý do một lịch đầy các khoảng ngắn có thể khiến bạn bận rộn nhưng vẫn thiếu một sản phẩm hoàn chỉnh. Không phải thời gian trên đồng hồ biến mất; ngữ cảnh bị tháo ra rồi lắp lại.",
+      "broll": "worker reopening document trying to remember notes office desk"
+    },
+    {
+      "time_goal": 1,
+      "voiceover": "Tuy nhiên, cần phân biệt chuyển việc có chủ đích với bị gián đoạn. Chuyển từ viết sang cuộc họp đã được đặt lịch có thể cần thiết. Vấn đề là các tín hiệu bất ngờ khiến bạn chuyển trước khi quyết định việc nào quan trọng hơn. Âm báo điện thoại, biểu tượng email chưa đọc và cửa sổ chat đều hoạt động như lời nhắc rằng có thứ khác đang chờ. Khi bạn phản ứng ngay, bạn trao quyền quyết định cho tín hiệu thay vì cho mục tiêu của phiên làm việc. Tắt thông báo không làm cho công việc tự hoàn thành, nhưng nó loại bớt những lần chuyển không do bạn chọn. Sau đó bạn vẫn có thể kiểm tra tin nhắn ở một khung giờ rõ ràng, khi việc đang làm đã có điểm dừng.",
+      "visual_intent": "So sánh lịch có khối làm việc chủ động với màn hình đầy tín hiệu bất ngờ.",
+      "pexels_query": "phone notification interruption focused worker turning off alerts office",
+      "caption": "Không phải mọi chuyển đổi đều xấu; chuyển đổi bị kéo đi mới là vấn đề.",
+      "hook": false,
+      "transition": false,
+      "payoff": "Mục tiêu là giành lại quyền quyết định thời điểm chuyển việc.",
+      "emphasis": [
+        "có chủ đích",
+        "tín hiệu"
+      ],
+      "narration": "Tuy nhiên, cần phân biệt chuyển việc có chủ đích với bị gián đoạn. Chuyển từ viết sang cuộc họp đã được đặt lịch có thể cần thiết. Vấn đề là các tín hiệu bất ngờ khiến bạn chuyển trước khi quyết định việc nào quan trọng hơn. Âm báo điện thoại, biểu tượng email chưa đọc và cửa sổ chat đều hoạt động như lời nhắc rằng có thứ khác đang chờ. Khi bạn phản ứng ngay, bạn trao quyền quyết định cho tín hiệu thay vì cho mục tiêu của phiên làm việc. Tắt thông báo không làm cho công việc tự hoàn thành, nhưng nó loại bớt những lần chuyển không do bạn chọn. Sau đó bạn vẫn có thể kiểm tra tin nhắn ở một khung giờ rõ ràng, khi việc đang làm đã có điểm dừng.",
+      "broll": "phone notification interruption focused worker turning off alerts office"
+    },
+    {
+      "time_goal": 1.1,
+      "voiceover": "Cách đầu tiên để giảm residue là tạo một nghi thức đóng việc kéo dài khoảng một phút. Trước khi đổi việc, viết ba dòng. Một: đã làm đến đâu. Hai: bước tiếp theo cụ thể là gì. Ba: sẽ quay lại lúc nào hoặc điều kiện nào khiến bạn quay lại. “Tiếp tục dự án” quá rộng vì nó không cho não biết hành động đầu tiên. “Mở bảng doanh thu, kiểm tra ba dòng bị thiếu và viết đoạn kết” hẹp hơn và có thể thực hiện ngay. Với email, thay vì ghi “xử lý email”, hãy ghi “trả lời email của Minh bằng hai ý về lịch họp”. Với bài học, ghi “đánh dấu phần định nghĩa, sau đó làm câu hỏi số bốn”. Ghi chú không phải để trang trí năng suất; nó lưu trạng thái bên ngoài để bạn không phải giữ toàn bộ trạng thái trong đầu.",
+      "visual_intent": "Cận cảnh tay viết ba dòng đóng việc với ví dụ báo cáo, email và học tập.",
+      "pexels_query": "writing next action note notebook calendar time blocking desk",
+      "caption": "Đóng việc bằng trạng thái, bước tiếp theo và thời điểm quay lại.",
+      "hook": false,
+      "transition": false,
+      "payoff": "Một ghi chú tốt làm giảm số câu hỏi bạn phải giữ trong đầu.",
+      "emphasis": [
+        "ba dòng",
+        "hành động đầu tiên"
+      ],
+      "narration": "Cách đầu tiên để giảm residue là tạo một nghi thức đóng việc kéo dài khoảng một phút. Trước khi đổi việc, viết ba dòng. Một: đã làm đến đâu. Hai: bước tiếp theo cụ thể là gì. Ba: sẽ quay lại lúc nào hoặc điều kiện nào khiến bạn quay lại. “Tiếp tục dự án” quá rộng vì nó không cho não biết hành động đầu tiên. “Mở bảng doanh thu, kiểm tra ba dòng bị thiếu và viết đoạn kết” hẹp hơn và có thể thực hiện ngay. Với email, thay vì ghi “xử lý email”, hãy ghi “trả lời email của Minh bằng hai ý về lịch họp”. Với bài học, ghi “đánh dấu phần định nghĩa, sau đó làm câu hỏi số bốn”. Ghi chú không phải để trang trí năng suất; nó lưu trạng thái bên ngoài để bạn không phải giữ toàn bộ trạng thái trong đầu.",
+      "broll": "writing next action note notebook calendar time blocking desk"
+    },
+    {
+      "time_goal": 1,
+      "voiceover": "Bước thứ hai là gom những việc cùng loại. Bạn có thể đặt một khối để viết, một khối để liên lạc và một khối để họp hoặc xử lý hành chính. Cách này không loại bỏ chuyển đổi, nhưng giảm số lần phải chuyển giữa các kiểu suy nghĩ rất khác nhau. Viết một đoạn phân tích cần xây lập luận. Trả lời tin nhắn cần đọc tín hiệu xã hội và chọn mức chi tiết. Họp cần theo dõi người nói và quyết định. Mỗi lần đổi kiểu nhiệm vụ, bạn phải đổi tiêu chí thành công trong đầu. Nếu có thể gom email vào hai hoặc ba thời điểm, bạn không cần kiểm tra chúng sau từng đoạn văn. Cạm bẫy là biến việc gom cụm thành lịch cứng nhắc. Nếu có sự cố thật sự khẩn cấp, hãy chuyển; sau đó ghi lại điểm dừng trước khi đi.",
+      "visual_intent": "Lịch ngày được chia thành các khối viết, liên lạc và họp; một cảnh ngoại lệ khẩn cấp có điểm dừng được ghi lại.",
+      "pexels_query": "time blocking calendar writing communication meeting schedule desk",
+      "caption": "Gom việc cùng loại để giảm số lần nạp lại bối cảnh.",
+      "hook": false,
+      "transition": false,
+      "payoff": "Ít lần đổi kiểu suy nghĩ hơn có thể tạo ra nhiều khoảng làm việc sâu hơn.",
+      "emphasis": [
+        "gom việc",
+        "kiểu suy nghĩ"
+      ],
+      "narration": "Bước thứ hai là gom những việc cùng loại. Bạn có thể đặt một khối để viết, một khối để liên lạc và một khối để họp hoặc xử lý hành chính. Cách này không loại bỏ chuyển đổi, nhưng giảm số lần phải chuyển giữa các kiểu suy nghĩ rất khác nhau. Viết một đoạn phân tích cần xây lập luận. Trả lời tin nhắn cần đọc tín hiệu xã hội và chọn mức chi tiết. Họp cần theo dõi người nói và quyết định. Mỗi lần đổi kiểu nhiệm vụ, bạn phải đổi tiêu chí thành công trong đầu. Nếu có thể gom email vào hai hoặc ba thời điểm, bạn không cần kiểm tra chúng sau từng đoạn văn. Cạm bẫy là biến việc gom cụm thành lịch cứng nhắc. Nếu có sự cố thật sự khẩn cấp, hãy chuyển; sau đó ghi lại điểm dừng trước khi đi.",
+      "broll": "time blocking calendar writing communication meeting schedule desk"
+    },
+    {
+      "time_goal": 1,
+      "voiceover": "Bước thứ ba là chọn nhiệm vụ phù hợp với độ dài khoảng trống. Bạn có năm phút trước cuộc họp và mở một tài liệu phân tích dài. Đúng lúc não vừa nhớ lại vấn đề, chuông họp vang lên và tài liệu lại bị bỏ dở. Với năm phút, hãy chọn việc có điểm kết thúc rõ như kiểm tra một con số, đặt tên cho ba tệp hoặc viết một câu hỏi cần hỏi trong cuộc họp. Với ba mươi phút, bạn có thể xử lý một đoạn nhỏ nhưng vẫn nên định nghĩa điểm kết thúc trước. Cách này giảm khả năng bắt đầu một việc sâu rồi cắt giữa chừng. Khoảng trống ngắn cũng có thể dành cho nghỉ có ranh giới. Đứng dậy uống nước hoặc nhìn ra cửa sổ khác với mở thêm một luồng thông tin trên điện thoại.",
+      "visual_intent": "Đồng hồ năm phút, một nhiệm vụ nhỏ có điểm kết thúc và cảnh nghỉ ngắn không dùng điện thoại.",
+      "pexels_query": "five minute timer worker choosing small task before meeting short walk break",
+      "caption": "Khoảng trống ngắn không phù hợp với mọi loại nhiệm vụ.",
+      "hook": false,
+      "transition": false,
+      "payoff": "Chọn nhiệm vụ theo độ sâu cần thiết, không chỉ theo thời gian còn lại.",
+      "emphasis": [
+        "điểm kết thúc",
+        "khoảng trống ngắn"
+      ],
+      "narration": "Bước thứ ba là chọn nhiệm vụ phù hợp với độ dài khoảng trống. Bạn có năm phút trước cuộc họp và mở một tài liệu phân tích dài. Đúng lúc não vừa nhớ lại vấn đề, chuông họp vang lên và tài liệu lại bị bỏ dở. Với năm phút, hãy chọn việc có điểm kết thúc rõ như kiểm tra một con số, đặt tên cho ba tệp hoặc viết một câu hỏi cần hỏi trong cuộc họp. Với ba mươi phút, bạn có thể xử lý một đoạn nhỏ nhưng vẫn nên định nghĩa điểm kết thúc trước. Cách này giảm khả năng bắt đầu một việc sâu rồi cắt giữa chừng. Khoảng trống ngắn cũng có thể dành cho nghỉ có ranh giới. Đứng dậy uống nước hoặc nhìn ra cửa sổ khác với mở thêm một luồng thông tin trên điện thoại.",
+      "broll": "five minute timer worker choosing small task before meeting short walk break"
+    },
+    {
+      "time_goal": 1,
+      "voiceover": "Một cạm bẫy khác là chuyển từ việc khó sang việc dễ rồi tưởng rằng đầu óc đã được giải phóng. Bạn đang viết đề xuất, thấy khó nên mở ứng dụng mua sắm hoặc mạng xã hội. Việc mới nhẹ hơn, nhưng nó vẫn tạo ra nội dung và câu hỏi mới để bộ não xử lý. Khi quay lại đề xuất, bạn không chỉ rời khỏi việc khó mà còn phải rời khỏi luồng thông tin vừa xem. Vì vậy “dễ làm” không đồng nghĩa với “ít chiếm chú ý”. Nếu cần nghỉ, hãy chọn hoạt động có điểm kết thúc và ít thông tin mới. Nếu cần chuyển, hãy hoàn tất một mốc nhỏ của việc cũ trước. Quy tắc thực tế là đừng dùng một nhiệm vụ gây phân tán để phục hồi sau một nhiệm vụ đòi hỏi tập trung.",
+      "visual_intent": "Đối chiếu người đang viết đề xuất với cảnh bị cuốn vào mạng xã hội, sau đó là nghỉ đi bộ ngắn.",
+      "pexels_query": "worker distracted by social media instead of writing proposal office phone",
+      "caption": "Việc dễ hơn chưa chắc là việc ít chiếm chú ý hơn.",
+      "hook": false,
+      "transition": true,
+      "payoff": "Nghỉ ngơi và tiêu thụ thêm thông tin là hai trạng thái khác nhau.",
+      "emphasis": [
+        "việc dễ",
+        "thông tin mới"
+      ],
+      "narration": "Một cạm bẫy khác là chuyển từ việc khó sang việc dễ rồi tưởng rằng đầu óc đã được giải phóng. Bạn đang viết đề xuất, thấy khó nên mở ứng dụng mua sắm hoặc mạng xã hội. Việc mới nhẹ hơn, nhưng nó vẫn tạo ra nội dung và câu hỏi mới để bộ não xử lý. Khi quay lại đề xuất, bạn không chỉ rời khỏi việc khó mà còn phải rời khỏi luồng thông tin vừa xem. Vì vậy “dễ làm” không đồng nghĩa với “ít chiếm chú ý”. Nếu cần nghỉ, hãy chọn hoạt động có điểm kết thúc và ít thông tin mới. Nếu cần chuyển, hãy hoàn tất một mốc nhỏ của việc cũ trước. Quy tắc thực tế là đừng dùng một nhiệm vụ gây phân tán để phục hồi sau một nhiệm vụ đòi hỏi tập trung.",
+      "broll": "worker distracted by social media instead of writing proposal office phone"
+    },
+    {
+      "time_goal": 1,
+      "voiceover": "Bạn có thể thử một phép quan sát trong ba ngày để biết residue xuất hiện ở đâu. Mỗi khi bị gián đoạn, ghi bốn điều: đang làm gì, tín hiệu nào kéo bạn đi, việc cũ đã có điểm dừng chưa, và mất bao lâu để biết chính xác bước tiếp theo khi quay lại. Không cần đo hoàn hảo đến từng giây. Mục tiêu là nhận ra mẫu lặp. Có thể bạn không gặp vấn đề khi chuyển từ email sang lịch, nhưng lại mất nhiều thời gian khi rời khỏi việc viết. Có thể thông báo không phải nguyên nhân chính; chính việc bạn không ghi lại bước tiếp theo mới khiến lần quay lại nặng nề. Dữ liệu nhỏ này giúp bạn sửa đúng điểm thay vì áp dụng một khẩu hiệu chung như “tập trung hơn”.",
+      "visual_intent": "Bảng theo dõi ba ngày với bốn cột: nhiệm vụ, tín hiệu, điểm dừng và thời gian quay lại.",
+      "pexels_query": "worker tracking interruptions three day journal focused work desk",
+      "caption": "Quan sát loại chuyển đổi làm bạn mất nhiều thời gian nhất.",
+      "hook": false,
+      "transition": false,
+      "payoff": "Đo thời gian tái lập ngữ cảnh để biến cảm giác mơ hồ thành dữ liệu.",
+      "emphasis": [
+        "ba ngày",
+        "bốn điều"
+      ],
+      "narration": "Bạn có thể thử một phép quan sát trong ba ngày để biết residue xuất hiện ở đâu. Mỗi khi bị gián đoạn, ghi bốn điều: đang làm gì, tín hiệu nào kéo bạn đi, việc cũ đã có điểm dừng chưa, và mất bao lâu để biết chính xác bước tiếp theo khi quay lại. Không cần đo hoàn hảo đến từng giây. Mục tiêu là nhận ra mẫu lặp. Có thể bạn không gặp vấn đề khi chuyển từ email sang lịch, nhưng lại mất nhiều thời gian khi rời khỏi việc viết. Có thể thông báo không phải nguyên nhân chính; chính việc bạn không ghi lại bước tiếp theo mới khiến lần quay lại nặng nề. Dữ liệu nhỏ này giúp bạn sửa đúng điểm thay vì áp dụng một khẩu hiệu chung như “tập trung hơn”.",
+      "broll": "worker tracking interruptions three day journal focused work desk"
+    },
+    {
+      "time_goal": 1,
+      "voiceover": "Khi buộc phải dừng giữa chừng, hãy viết một câu mở lại thay vì chỉ ghi tên dự án. “Lần tới, tôi sẽ bắt đầu bằng…” là một mẫu đủ ngắn nhưng có tác dụng định hướng. Phần sau dấu ba chấm phải là hành động nhìn thấy được, chẳng hạn “đọc lại đoạn thứ hai và thêm nguồn cho nhận định này”, không phải “làm tiếp”. Bạn cũng có thể ghi trạng thái cảm xúc hoặc câu hỏi đang treo nếu đó là thứ khiến bạn muốn quay lại kiểm tra. Nhưng đừng biến ghi chú thành một bản nhật ký dài. Nếu việc đóng phiên mất mười phút, nghi thức mới trở thành một nhiệm vụ khác. Một câu rõ ràng, đặt đúng nơi bạn sẽ nhìn thấy khi quay lại, thường có giá trị hơn danh sách nhiều dòng nhưng không có hành động đầu tiên.",
+      "visual_intent": "Cận cảnh viết câu “Lần tới, tôi sẽ bắt đầu bằng…” trên tài liệu rồi đặt ghi chú ở vị trí dễ thấy.",
+      "pexels_query": "writing next step sentence sticky note document office desk",
+      "caption": "Hãy để lại một điểm bắt đầu, không chỉ một tên việc.",
+      "hook": false,
+      "transition": false,
+      "payoff": "Lần quay lại nhẹ hơn khi hành động đầu tiên đã được quyết định từ trước.",
+      "emphasis": [
+        "lần tới",
+        "hành động đầu tiên"
+      ],
+      "narration": "Khi buộc phải dừng giữa chừng, hãy viết một câu mở lại thay vì chỉ ghi tên dự án. “Lần tới, tôi sẽ bắt đầu bằng…” là một mẫu đủ ngắn nhưng có tác dụng định hướng. Phần sau dấu ba chấm phải là hành động nhìn thấy được, chẳng hạn “đọc lại đoạn thứ hai và thêm nguồn cho nhận định này”, không phải “làm tiếp”. Bạn cũng có thể ghi trạng thái cảm xúc hoặc câu hỏi đang treo nếu đó là thứ khiến bạn muốn quay lại kiểm tra. Nhưng đừng biến ghi chú thành một bản nhật ký dài. Nếu việc đóng phiên mất mười phút, nghi thức mới trở thành một nhiệm vụ khác. Một câu rõ ràng, đặt đúng nơi bạn sẽ nhìn thấy khi quay lại, thường có giá trị hơn danh sách nhiều dòng nhưng không có hành động đầu tiên.",
+      "broll": "writing next step sentence sticky note document office desk"
+    },
+    {
+      "time_goal": 1,
+      "voiceover": "Đừng áp dụng giải pháp bằng cách cấm mọi chuyển đổi. Bạn vẫn cần chăm sóc gia đình, phản hồi việc khẩn cấp, tham gia cuộc họp và nghỉ. Câu hỏi hữu ích hơn là: chuyển đổi này có cần xảy ra ngay không, và việc cũ đang ở trạng thái nào? Nếu cần chuyển, hãy tạo một điểm dừng tối thiểu. Lưu tệp, ghi câu tiếp theo, đặt lời nhắc nếu cần, rồi mới rời đi. Nếu không cần chuyển, hãy trì hoãn tín hiệu đến khung kiểm tra đã định. Hai lựa chọn này khác nhau về cơ chế: một lựa chọn làm rõ trạng thái của việc cũ, lựa chọn kia ngăn tín hiệu mới chiếm quyền điều khiển. Cả hai đều thực tế hơn việc tự trách vì không thể tập trung tám tiếng liên tục.",
+      "visual_intent": "Người cân nhắc cuộc gọi khẩn cấp, ghi điểm dừng rồi chuyển sang cuộc họp; lịch có khung kiểm tra thông báo.",
+      "pexels_query": "worker deciding urgent phone call writing note before meeting office",
+      "caption": "Không cần loại bỏ mọi chuyển đổi; cần chuyển đổi có điểm dừng.",
+      "hook": false,
+      "transition": false,
+      "payoff": "Thiết kế ranh giới tốt hơn là đòi hỏi sự tập trung hoàn hảo.",
+      "emphasis": [
+        "điểm dừng",
+        "khung kiểm tra"
+      ],
+      "narration": "Đừng áp dụng giải pháp bằng cách cấm mọi chuyển đổi. Bạn vẫn cần chăm sóc gia đình, phản hồi việc khẩn cấp, tham gia cuộc họp và nghỉ. Câu hỏi hữu ích hơn là: chuyển đổi này có cần xảy ra ngay không, và việc cũ đang ở trạng thái nào? Nếu cần chuyển, hãy tạo một điểm dừng tối thiểu. Lưu tệp, ghi câu tiếp theo, đặt lời nhắc nếu cần, rồi mới rời đi. Nếu không cần chuyển, hãy trì hoãn tín hiệu đến khung kiểm tra đã định. Hai lựa chọn này khác nhau về cơ chế: một lựa chọn làm rõ trạng thái của việc cũ, lựa chọn kia ngăn tín hiệu mới chiếm quyền điều khiển. Cả hai đều thực tế hơn việc tự trách vì không thể tập trung tám tiếng liên tục.",
+      "broll": "worker deciding urgent phone call writing note before meeting office"
+    },
+    {
+      "time_goal": 1,
+      "voiceover": "Cũng cần giữ giới hạn của khái niệm. Attentional residue giải thích một phần khó khăn khi chuyển nhiệm vụ, nhưng không thay thế cho những nguyên nhân khác như thiếu ngủ, môi trường ồn, mục tiêu không rõ, công việc quá khó hoặc căng thẳng kéo dài. Nếu bạn đã giảm thông báo, ghi điểm dừng và sắp xếp lại phiên làm việc mà vẫn thường xuyên không thể bắt đầu, đừng vội kết luận rằng mình thiếu ý chí. Hãy kiểm tra cả yêu cầu của nhiệm vụ, thời gian nghỉ và điều kiện làm việc. Một mô hình tốt giúp đặt câu hỏi chính xác hơn; nó không biến mọi trải nghiệm thành cùng một nhãn. Cách dùng có trách nhiệm là xem nghiên cứu của Leroy như gợi ý để quan sát, rồi điều chỉnh dựa trên dữ liệu của chính bạn.",
+      "visual_intent": "Hiển thị các yếu tố môi trường, giấc ngủ, độ khó, mục tiêu và căng thẳng quanh một người làm việc.",
+      "pexels_query": "thoughtful person considering work environment sleep stress office",
+      "caption": "Attentional residue là mô hình giải thích, không phải nhãn cho mọi vấn đề.",
+      "hook": false,
+      "transition": true,
+      "payoff": "Chẩn đoán đúng cơ chế thường hữu ích hơn tự trách bản thân.",
+      "emphasis": [
+        "giới hạn diễn giải",
+        "dữ liệu cá nhân"
+      ],
+      "narration": "Cũng cần giữ giới hạn của khái niệm. Attentional residue giải thích một phần khó khăn khi chuyển nhiệm vụ, nhưng không thay thế cho những nguyên nhân khác như thiếu ngủ, môi trường ồn, mục tiêu không rõ, công việc quá khó hoặc căng thẳng kéo dài. Nếu bạn đã giảm thông báo, ghi điểm dừng và sắp xếp lại phiên làm việc mà vẫn thường xuyên không thể bắt đầu, đừng vội kết luận rằng mình thiếu ý chí. Hãy kiểm tra cả yêu cầu của nhiệm vụ, thời gian nghỉ và điều kiện làm việc. Một mô hình tốt giúp đặt câu hỏi chính xác hơn; nó không biến mọi trải nghiệm thành cùng một nhãn. Cách dùng có trách nhiệm là xem nghiên cứu của Leroy như gợi ý để quan sát, rồi điều chỉnh dựa trên dữ liệu của chính bạn.",
+      "broll": "thoughtful person considering work environment sleep stress office"
+    },
+    {
+      "time_goal": 1,
+      "voiceover": "Tóm lại, attentional residue là phần chú ý còn ảnh hưởng từ nhiệm vụ trước sau khi bạn chuyển sang nhiệm vụ mới, đặc biệt khi việc cũ còn dang dở hoặc chưa rõ bước tiếp theo. Cơ chế này giải thích vì sao đổi cửa sổ nhanh không tạo ra một bộ não hoàn toàn mới. Bạn không cần biến mình thành người chỉ làm một việc cả ngày. Hãy giảm những chuyển đổi bị tín hiệu kéo đi, đóng phiên cũ bằng trạng thái và hành động đầu tiên, gom những việc cùng loại, chọn việc phù hợp với khoảng thời gian còn lại và đo thời gian tái lập ngữ cảnh trong ba ngày. Câu hỏi để lại cho bạn là: loại chuyển việc nào khiến bạn lâu nhất mới biết mình phải làm gì? Ở video tiếp theo, ta sẽ tìm hiểu false consensus effect — vì sao ta thường tưởng người khác cũng nghĩ và chọn giống mình hơn thực tế. Nếu muốn theo dõi chuỗi cơ chế tâm lý đời thường này, bạn có thể đăng ký kênh.",
+      "visual_intent": "Tóm tắt bằng sơ đồ chú ý còn sót, ghi chú đóng việc, lịch gom cụm và bảng theo dõi ba ngày; kết bằng hình ảnh nhiều người có quan điểm khác nhau.",
+      "pexels_query": "calm focused worker closing notebook starting new task diverse people discussion",
+      "caption": "Đóng việc cũ rõ hơn để bắt đầu việc mới sâu hơn.",
+      "hook": false,
+      "transition": true,
+      "payoff": "Bạn không cần làm nhiều hơn để tập trung hơn; đôi khi cần mang ít việc mở hơn trong đầu.",
+      "emphasis": [
+        "đóng việc cũ",
+        "false consensus effect"
+      ],
+      "narration": "Tóm lại, attentional residue là phần chú ý còn ảnh hưởng từ nhiệm vụ trước sau khi bạn chuyển sang nhiệm vụ mới, đặc biệt khi việc cũ còn dang dở hoặc chưa rõ bước tiếp theo. Cơ chế này giải thích vì sao đổi cửa sổ nhanh không tạo ra một bộ não hoàn toàn mới. Bạn không cần biến mình thành người chỉ làm một việc cả ngày. Hãy giảm những chuyển đổi bị tín hiệu kéo đi, đóng phiên cũ bằng trạng thái và hành động đầu tiên, gom những việc cùng loại, chọn việc phù hợp với khoảng thời gian còn lại và đo thời gian tái lập ngữ cảnh trong ba ngày. Câu hỏi để lại cho bạn là: loại chuyển việc nào khiến bạn lâu nhất mới biết mình phải làm gì? Ở video tiếp theo, ta sẽ tìm hiểu false consensus effect — vì sao ta thường tưởng người khác cũng nghĩ và chọn giống mình hơn thực tế. Nếu muốn theo dõi chuỗi cơ chế tâm lý đời thường này, bạn có thể đăng ký kênh.",
+      "broll": "calm focused worker closing notebook starting new task diverse people discussion"
+    }
+  ],
+  "compliance": {
+    "passed": true,
+    "community": "PASS — nội dung giáo dục về tâm lý và quản lý sự chú ý; không bạo lực, thù ghét, quấy rối, nguy hiểm hoặc thông tin y tế tuyệt đối.",
+    "copyright": "PASS — narration nguyên bản; B-roll dự kiến lấy từ Pexels với giấy phép phù hợp.",
+    "accuracy": "PASS — khái niệm và diễn giải chính dựa trên Sophie Leroy (2009), DOI: https://doi.org/10.1016/j.obhdp.2009.04.002; không thêm số liệu chưa kiểm chứng.",
+    "advertiser": "PASS — advertiser-friendly, không ngôn ngữ gây sốc, tuyên bố chữa bệnh, hứa hẹn thu nhập hoặc nội dung nhạy cảm.",
+    "coppa": "made for kids = no — nội dung hướng tới người trưởng thành và người đi làm, không nhắm trẻ em.",
+    "notes": "Video chỉ tập trung một cơ chế: attentional residue. Có ví dụ đời thường đầy đủ bối cảnh, hành động, hậu quả và cách áp dụng; giải thích cơ chế, giới hạn diễn giải, bước áp dụng cụ thể, nguồn truy được và cầu nối tập sau sang false consensus effect."
+  },
+  "quality_status": "needs_review",
+  "quality_review": {
+    "validation_error": "Kịch bản attentional-residue-doi-viec.json: nội dung quá mỏng — ước lượng ~8.5 phút nhưng mục tiêu 11 phút. Viết chi tiết & sâu hơn (cần ~13,167 ký tự narration: thêm cơ chế/ví dụ cụ thể/số liệu có nguồn/bước áp dụng, KHÔNG nói chung chung).",
+    "qa": null
+  }
+}

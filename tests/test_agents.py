@@ -38,7 +38,7 @@ def _make_script(*, target_minutes=None, narration_segments=None, topic="chu de 
     compliance = ComplianceCheck(passed=compliance_passed)
     if narration_segments is None:
         if target_minutes is not None:
-            first = GREETING + " " + chars_for_minutes(target_minutes)
+            first = GREETING + " " + chars_for_minutes(target_minutes, video_type="long")
         else:
             first = chars_for_minutes(1.0)
         narration_segments = [first]
@@ -211,7 +211,7 @@ async def test_qa_agent_rejects_long_over_fifteen_minutes():
         segments=(
             Segment(
                 caption="Mở đầu",
-                narration=GREETING + " " + chars_for_minutes(15.1),
+                narration=GREETING + " " + chars_for_minutes(15.1, video_type="long"),
             ),
         ),
     )
@@ -219,10 +219,8 @@ async def test_qa_agent_rejects_long_over_fifteen_minutes():
     result = await QAAgent().run({"script": script})
 
     assert result.output["passed"] is False
-    assert result.output["violations"] == [{
-        "rule": "length",
-        "detail": "Video dài quá dài: ước lượng 15.1p > 15p.",
-    }]
+    assert result.output["violations"][0]["rule"] == "length"
+    assert result.output["violations"][0]["detail"].startswith("Long quá dài 900s: audio ")
 
 
 # ---------------------------------------------------------------------------
@@ -530,12 +528,16 @@ async def test_qa_agent_does_not_apply_legacy_stickman_gate():
 
 async def test_qa_agent_accepts_stickman_visual_gag_structure():
     agent = QAAgent()
-    unit = (
+    story = (
         "Người que mở cửa quá tự tin, nhưng tay nắm rơi xuống sàn ngay trước mặt. "
         "Nó cúi nhặt thì bỗng cái cửa tự chạy lùi lại, càng đuổi càng xa. "
         "Cả hành lang đứng hình, cuối cùng hóa ra cái cửa cũng có chân và cú chốt là nó tự khóa người que bên ngoài. "
         "Nó nhận ra càng cố giấu xấu hổ thì càng quên mất lý do mình mở cửa. "
     )
+    # This acceptance fixture must remain inside the active provider's Short
+    # duration contract instead of assuming xKiro's current CPM forever.
+    target_per_beat = len(chars_for_minutes(1.2)) // 4
+    unit = (story + "Người que hít một hơi, quan sát lại cánh cửa kỳ lạ rồi thử một cách khác. " * 8)[:target_per_beat]
     script = Script(
         topic="giải trí người que",
         title="Người Que Và Cánh Cửa Biết Chạy",
@@ -590,7 +592,7 @@ async def test_qa_agent_series_dedup_flags_done_topic():
     assert "series_dedup" in rules
 
 
-async def test_strict_qa_requires_a_complete_concrete_example():
+async def test_strict_qa_does_not_require_literal_example_labels():
     agent = QAAgent()
     script = _make_script(
         narration_segments=["Ví dụ, một người trì hoãn việc khó mỗi ngày. " + chars_for_minutes(1.0)],
@@ -599,9 +601,23 @@ async def test_strict_qa_requires_a_complete_concrete_example():
     result = await agent.run({"script": script, "strict": True})
 
     rules = [v["rule"] for v in result.output["violations"]]
-    assert "concrete_example" in rules
-    violation = next(v for v in result.output["violations"] if v["rule"] == "concrete_example")
-    assert "suggestion" in violation
+    assert "concrete_example" not in rules
+
+
+async def test_strict_qa_accepts_labeled_everyday_example_with_nonstandard_verbs():
+    agent = QAAgent()
+    script = _make_script(
+        narration_segments=[
+            "Ví dụ cụ thể: bối cảnh: bước vào văn phòng sau khi đổi kiểu tóc; "
+            "hành động: bạn thấy đồng nghiệp nhìn mình; hậu quả: bạn mất tự nhiên và né giao tiếp; "
+            "cách áp dụng: ghi ánh nhìn vào cột dữ kiện và suy nghĩ vào cột suy đoán. "
+            + chars_for_minutes(1.0),
+        ],
+    )
+
+    result = await agent.run({"script": script, "strict": True})
+
+    assert not any(v["rule"] == "concrete_example" for v in result.output["violations"])
 
 
 async def test_strict_qa_rejects_missing_immediate_action_and_final_payoff():
@@ -633,6 +649,21 @@ async def test_strict_qa_blocks_absolute_health_or_finance_claim():
     assert result.output["passed"] is False
 
 
+async def test_strict_qa_allows_a_finance_evidence_limit_that_rejects_certainty():
+    agent = QAAgent()
+    script = _make_script(
+        narration_segments=[
+            "Nguồn về tâm lý tài chính không cho phép kết luận chắc chắn động cơ của một cá nhân. "
+            + chars_for_minutes(1.0)
+        ],
+    )
+
+    result = await agent.run({"script": script, "strict": True})
+
+    rules = [violation["rule"] for violation in result.output["violations"]]
+    assert "health_finance_claim" not in rules
+
+
 async def test_qa_agent_semantic_dedup_flags_near_duplicate_topic():
     agent = QAAgent()
     script = _make_script(
@@ -649,7 +680,7 @@ async def test_qa_agent_semantic_dedup_flags_near_duplicate_topic():
     assert "series_semantic_dedup" in rules
 
 
-async def test_strict_qa_rejects_multiple_competing_mechanisms():
+async def test_strict_qa_does_not_block_mechanism_wording():
     agent = QAAgent()
     script = _make_script(
         narration_segments=[
@@ -661,7 +692,33 @@ async def test_strict_qa_rejects_multiple_competing_mechanisms():
 
     result = await agent.run({"script": script, "strict": True})
 
-    assert "central_mechanism" in [v["rule"] for v in result.output["violations"]]
+    assert "central_mechanism" not in [v["rule"] for v in result.output["violations"]]
+
+
+def test_mechanism_gate_does_not_split_one_name_from_its_following_question():
+    from ytb_pipeline.agents.qa_agent import _check_central_mechanism
+
+    script = _make_script(narration_segments=[
+        "Cơ chế lời nguyền tri thức, khiến người biết nhiều bỏ qua điểm bắt đầu của người mới. "
+        "Sau đó cơ chế lời nguyền tri thức hỏi điểm bắt đầu nào đã bị bỏ qua."
+    ])
+
+    assert _check_central_mechanism(script) == []
+
+
+def test_mechanism_gate_ignores_generic_effect_phrase():
+    from ytb_pipeline.agents.qa_agent import _check_central_mechanism
+
+    script = _make_script(
+        topic="Cơ chế né tránh bất định khiến bạn trì hoãn",
+        narration_segments=[
+        "Cơ chế né tránh bất định khiến ta trì hoãn khi điểm bắt đầu chưa rõ. "
+        "Cơ chế né tránh bất định, nhưng không phải lười biếng, mới là trục của câu chuyện. "
+        "Hãy đăng ký kênh để xem thêm các cơ chế khiến ta trì hoãn."
+        ],
+    )
+
+    assert _check_central_mechanism(script) == []
 
 
 async def test_qa_agent_handles_exception_gracefully():

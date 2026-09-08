@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from ytb_pipeline.publish import uploader
-from ytb_pipeline.pkg.models import RenderedVideo
+from ytb_pipeline.pkg.models import ContentStrategy, RenderedVideo
 
 
 def _video(**overrides) -> RenderedVideo:
@@ -201,3 +201,153 @@ def test_publish_real_assigns_configured_playlist(monkeypatch, tmp_path):
     uploader.publish(_video(video_path=path))
 
     assert calls[0]["body"]["snippet"]["playlistId"] == "PLAYLIST"
+
+
+# ── _published_url_for_slug ───────────────────────────────────────────────────
+def test_published_url_for_slug_returns_url_for_done_ok_row(tmp_path):
+    ledger = tmp_path / "ledger.md"
+    ledger.write_text(
+        "# Ledger\n"
+        "| Ngày | Slug | Tiêu đề | Stage | Status | URL / ghi chú |\n"
+        "| 2026-07-20 | long-a | Long A | done | ok | https://youtu.be/abc123 — verified. |\n",
+        encoding="utf-8",
+    )
+    assert uploader._published_url_for_slug("long-a", ledger) == "https://youtu.be/abc123"
+
+
+def test_published_url_for_slug_none_when_not_done(tmp_path):
+    ledger = tmp_path / "ledger.md"
+    ledger.write_text(
+        "# Ledger\n"
+        "| Ngày | Slug | Tiêu đề | Stage | Status | URL / ghi chú |\n"
+        "| 2026-07-20 | long-a | Long A | voiceover | running | Tự động: đang chạy |\n",
+        encoding="utf-8",
+    )
+    assert uploader._published_url_for_slug("long-a", ledger) is None
+
+
+def test_published_url_for_slug_uses_latest_row(tmp_path):
+    ledger = tmp_path / "ledger.md"
+    ledger.write_text(
+        "# Ledger\n"
+        "| Ngày | Slug | Tiêu đề | Stage | Status | URL / ghi chú |\n"
+        "| 2026-07-20 | long-a | Long A | done | ok | https://youtu.be/old111 |\n"
+        "| 2026-07-25 | long-a | Long A | done | ok | https://youtu.be/new222 |\n",
+        encoding="utf-8",
+    )
+    assert uploader._published_url_for_slug("long-a", ledger) == "https://youtu.be/new222"
+
+
+def test_published_url_for_slug_missing_ledger_returns_none(tmp_path):
+    assert uploader._published_url_for_slug("long-a", tmp_path / "missing.md") is None
+
+
+# ── _post_cta_comment ─────────────────────────────────────────────────────────
+def _strategy(**overrides) -> ContentStrategy:
+    defaults = dict(
+        format_id="core_answer_first_v1", core_mechanism="m", audience_problem="p",
+        angle="a", long_form_slug="long-a", playlist="series", cta_target="long-a",
+    )
+    defaults.update(overrides)
+    return ContentStrategy(**defaults)
+
+
+def test_post_cta_comment_noop_without_cta_target():
+    calls = []
+
+    class Youtube:
+        def commentThreads(self):
+            calls.append(1)
+            raise AssertionError("must not be called without cta_target")
+
+    uploader._post_cta_comment(Youtube(), "VIDEO", _video())
+
+    assert calls == []
+
+
+def test_post_cta_comment_skips_when_target_not_published(monkeypatch, capsys):
+    monkeypatch.setattr(uploader, "_published_url_for_slug", lambda _slug, ledger_path=None: None)
+    calls = []
+
+    class Youtube:
+        def commentThreads(self):
+            calls.append(1)
+            raise AssertionError("must not be called when target isn't published")
+
+    video = _video(strategy=_strategy())
+    uploader._post_cta_comment(Youtube(), "VIDEO", video)
+
+    assert calls == []
+    assert "chưa publish" in capsys.readouterr().out
+
+
+def test_post_cta_comment_posts_link_and_reminds_manual_pin(monkeypatch, capsys):
+    monkeypatch.setattr(
+        uploader, "_published_url_for_slug", lambda _slug, ledger_path=None: "https://youtu.be/target1"
+    )
+    captured = {}
+
+    class Request:
+        def execute(self):
+            return {}
+
+    class CommentThreads:
+        def insert(self, **kwargs):
+            captured.update(kwargs)
+            return Request()
+
+    class Youtube:
+        def commentThreads(self):
+            return CommentThreads()
+
+    video = _video(strategy=_strategy())
+    uploader._post_cta_comment(Youtube(), "VIDEO123", video)
+
+    assert captured["part"] == "snippet"
+    body = captured["body"]
+    assert body["snippet"]["videoId"] == "VIDEO123"
+    assert "https://youtu.be/target1" in body["snippet"]["topLevelComment"]["snippet"]["textOriginal"]
+    out = capsys.readouterr().out
+    assert "Đã tự động đăng comment" in out
+    assert "ghim tay" in out
+
+
+def test_post_cta_comment_failure_does_not_raise(monkeypatch, capsys):
+    monkeypatch.setattr(
+        uploader, "_published_url_for_slug", lambda _slug, ledger_path=None: "https://youtu.be/target1"
+    )
+
+    class CommentThreads:
+        def insert(self, **_kwargs):
+            raise RuntimeError("quota exceeded")
+
+    class Youtube:
+        def commentThreads(self):
+            return CommentThreads()
+
+    video = _video(strategy=_strategy())
+    uploader._post_cta_comment(Youtube(), "VIDEO123", video)  # không raise
+
+    assert "Không đăng được comment CTA" in capsys.readouterr().out
+
+
+def test_post_cta_comment_failure_emits_durable_warning(monkeypatch):
+    monkeypatch.setattr(
+        uploader, "_published_url_for_slug", lambda _slug, ledger_path=None: "https://youtu.be/target1"
+    )
+    warnings: list[str] = []
+    monkeypatch.setattr(uploader, "emit_warning", lambda message: warnings.append(message))
+
+    class CommentThreads:
+        def insert(self, **_kwargs):
+            raise RuntimeError("missing scope")
+
+    class Youtube:
+        def commentThreads(self):
+            return CommentThreads()
+
+    uploader._post_cta_comment(Youtube(), "VIDEO123", _video(strategy=_strategy()))
+
+    assert len(warnings) == 1
+    assert "VIDEO123" in warnings[0]
+    assert "CTA" in warnings[0]

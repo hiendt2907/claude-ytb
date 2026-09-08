@@ -4,13 +4,13 @@ from dataclasses import replace
 
 import pytest
 
-from ytb_pipeline.ideation.generator import load_script
+from ytb_pipeline.ideation.generator import CHARS_PER_MIN, load_script
 from ytb_pipeline.pkg.models import ComplianceCheck, VideoIdea
 
-from conftest import make_script, passing_compliance
+from conftest import chars_for_minutes, make_script, passing_compliance
 
 # narration đủ dài để qua cổng độ dài Short (1–1.5 phút)
-_SECTIONS = [{"caption": "c", "narration": "x" * 1200}]
+_SECTIONS = [{"caption": "c", "narration": "x" * int(CHARS_PER_MIN)}]
 
 
 def test_compliance_attaches_to_idea_immutably():
@@ -60,7 +60,10 @@ def test_load_script_rejects_failed_compliance(write_script):
 
 
 def test_load_script_normalizes_non_list_emphasis(write_script):
-    data = make_script([{"caption": "c1", "narration": "x" * 600}, {"caption": "c2", "narration": "y" * 600}])
+    data = make_script([
+        {"caption": "c1", "narration": "x" * (int(CHARS_PER_MIN / 2) + 5)},
+        {"caption": "c2", "narration": "y" * (int(CHARS_PER_MIN / 2) + 5)},
+    ])
     data["sections"][0]["emphasis"] = True
     data["sections"][1]["emphasis"] = "cơ chế"
     path = write_script(data)
@@ -75,8 +78,10 @@ def test_load_script_accepts_structured_claude_schema(write_script):
     data = make_script([
         {
             "caption": "Hook",
-            "voiceover": "Đừng cố kỷ luật hơn trước khi hiểu vì sao não né việc khó. "
-            * 21,
+            "voiceover": (
+                "Đừng cố kỷ luật hơn trước khi hiểu vì sao não né việc khó. "
+                + chars_for_minutes(1.2)
+            ),
             "visual_intent": "Một người trì hoãn trước laptop.",
             "pexels_query": "person procrastinating at laptop",
             "time_goal": 5,
