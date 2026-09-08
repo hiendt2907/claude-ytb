@@ -224,46 +224,16 @@ def load_or_create_project(script_source: str, checkpoint: CheckpointManager) ->
     from .ideation.generator import _resolve
 
     path = _resolve(script_source)
-    script_sha256 = _script_sha256(path)
-    script_ruleset_id = _script_ruleset_id(path)
-    script_profile = _script_profile(path)
     existing = checkpoint.load(path.stem)
     if existing is None:
         project = Project(
             project_id=path.stem,
             script_path=str(path),
-            metadata={
-                "script_sha256": script_sha256,
-                "ruleset_id": script_ruleset_id,
-                **script_profile,
-            },
+            metadata={},
         )
     else:
-        metadata = dict(existing.metadata)
-        if (
-            metadata.get("script_sha256") != script_sha256
-            or metadata.get("ruleset_id") != script_ruleset_id
-            or metadata.get("content_profile_fingerprint")
-            != script_profile.get("content_profile_fingerprint")
-            # A legacy ruleset can reference audio rendered with an obsolete
-            # F5 tempo or a superseded QA policy.  It must never resume a
-            # DONE node simply because its on-disk script/checkpoint agree.
-            # Clear nodes so the input contract gate can reject it before TTS.
-            or script_ruleset_id != CONTRACT_VERSION
-        ):
-            # No downstream artifact may survive a script or contract change.
-            # This is intentionally broader than file-existence stale checks:
-            # otherwise old narration/render could be uploaded with new metadata.
-            metadata.update({
-                "script_sha256": script_sha256,
-                "ruleset_id": script_ruleset_id,
-                **script_profile,
-            })
-            project = replace(existing, script_path=str(path), nodes={}, metadata=metadata)
-        else:
-            metadata.update(script_profile)
-            project = replace(existing, script_path=str(path), metadata=metadata)
-    project = _reset_stale_nodes(project)
+        project = existing
+    project = _normalize_project_for_script(project, path)
     checkpoint.save(project)
     return project
 
@@ -359,6 +329,40 @@ def _script_profile(path: Path) -> dict[str, str]:
     }
 
 
+def _normalize_project_for_script(project: Project, path: Path) -> Project:
+    """Bind a project to current script bytes and reset stale artifacts.
+
+    Both batch and direct callers must pass this boundary. Without it a direct
+    resume can stamp a new profile onto DONE media made under an old contract.
+    """
+    script_sha256 = _script_sha256(path)
+    script_ruleset_id = _script_ruleset_id(path)
+    script_profile = _script_profile(path)
+    metadata = dict(project.metadata)
+    changed = (
+        metadata.get("script_sha256") != script_sha256
+        or metadata.get("ruleset_id") != script_ruleset_id
+        or metadata.get("content_profile_fingerprint")
+        != script_profile.get("content_profile_fingerprint")
+        # A legacy ruleset can reference audio rendered with an obsolete F5
+        # tempo or QA policy. It must not resume a matching old checkpoint.
+        or script_ruleset_id != CONTRACT_VERSION
+    )
+    metadata.update({
+        "script_sha256": script_sha256,
+        "ruleset_id": script_ruleset_id,
+        **script_profile,
+    })
+    if changed:
+        # No downstream artifact may survive a script or contract change.
+        # This is broader than an existence check: old media must never be
+        # published merely because its file still exists.
+        project = replace(project, script_path=str(path), nodes={}, metadata=metadata)
+    else:
+        project = replace(project, script_path=str(path), metadata=metadata)
+    return _reset_stale_nodes(project)
+
+
 def write_run_manifest(project: Project, project_dir: Path) -> Path:
     """One record of what this run decided, beside its checkpoint.
 
@@ -367,6 +371,24 @@ def write_run_manifest(project: Project, project_dir: Path) -> Path:
     place a later reader — or a shadow evaluation — starts from.
     """
     metadata = project.metadata
+    profile_id = str(metadata.get("content_profile_id") or "").strip()
+    profile_version = str(metadata.get("content_profile_version") or "").strip()
+    if profile_id:
+        profile = load_content_profile(profile_id, version=profile_version or None)
+        provider_bindings = {
+            "llm": profile.providers.llm,
+            "tts": profile.providers.tts,
+            "render": profile.providers.render,
+        }
+    else:
+        # Legacy checkpoints may predate profile metadata. Preserve their
+        # observable behavior, while every profile-owned run records the
+        # provider contract that actually selected its implementations.
+        provider_bindings = {
+            "llm": settings.llm_provider,
+            "tts": settings.tts_provider,
+            "render": settings.render_provider,
+        }
     manifest = RunManifest(
         run_id=new_run_id(datetime.now(timezone.utc)),
         started_at=project.created_at or "",
@@ -374,11 +396,7 @@ def write_run_manifest(project: Project, project_dir: Path) -> Path:
         profile_version=str(metadata.get("content_profile_version") or ""),
         creative_policy_fingerprint=str(metadata.get("creative_policy_fingerprint") or ""),
         runtime_binding_fingerprint=str(metadata.get("runtime_binding_fingerprint") or ""),
-        provider_bindings={
-            "llm": settings.llm_provider,
-            "tts": settings.tts_provider,
-            "render": settings.render_provider,
-        },
+        provider_bindings=provider_bindings,
     )
     for node_id, node in sorted(project.nodes.items()):
         manifest = manifest.record_node(NodeOutcome(
@@ -421,18 +439,30 @@ def validate_editorial_release_approval(script_path: Path, input_data: dict[str,
         raise ValueError("Editorial release manifest không khớp script đã được review.")
     if review.get("passed") is not True:
         raise ValueError("Editorial release manifest cho thấy transcript chưa đạt review.")
-    if review_config.minimum_score:
-        score = review.get("overall_score")
-        dimensions = review.get("dimension_scores")
-        if isinstance(score, bool) or not isinstance(score, int) or score < review_config.minimum_score:
-            raise ValueError("Editorial release manifest thiếu overall_score đạt ngưỡng profile.")
-        if not isinstance(dimensions, dict) or set(dimensions) != EDITORIAL_REVIEW_DIMENSIONS:
-            raise ValueError("Editorial release manifest thiếu đủ dimension_scores của profile.")
-        if any(
-            isinstance(value, bool) or not isinstance(value, int) or value < review_config.minimum_score
-            for value in dimensions.values()
-        ):
+    if not (review_config.minimum_score or review_config.uses_mean_bar):
+        return
+    score = review.get("overall_score")
+    dimensions = review.get("dimension_scores")
+    if isinstance(score, bool) or not isinstance(score, int) or not 0 <= score <= 10:
+        raise ValueError("Editorial release manifest thiếu overall_score hợp lệ của profile.")
+    if not isinstance(dimensions, dict) or set(dimensions) != EDITORIAL_REVIEW_DIMENSIONS:
+        raise ValueError("Editorial release manifest thiếu đủ dimension_scores của profile.")
+    if any(
+        isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 10
+        for value in dimensions.values()
+    ):
+        raise ValueError("Editorial release manifest có dimension_scores không hợp lệ.")
+    if review_config.uses_mean_bar:
+        if any(value < review_config.minimum_dimension_score for value in dimensions.values()):
             raise ValueError("Editorial release manifest có dimension_scores dưới ngưỡng profile.")
+        mean = sum(dimensions.values()) / len(dimensions)
+        if mean < review_config.minimum_mean_score:
+            raise ValueError("Editorial release manifest có trung bình dimension_scores dưới ngưỡng profile.")
+        return
+    if score < review_config.minimum_score or any(
+        value < review_config.minimum_score for value in dimensions.values()
+    ):
+        raise ValueError("Editorial release manifest có dimension_scores dưới ngưỡng profile.")
 
 
 MAX_AUDIO_RESYNTH_ATTEMPTS = 2
@@ -682,6 +712,12 @@ async def run_project(project: Project, checkpoint: CheckpointManager, through: 
     của node ghi vào project.json chỉ là path/identifier nhẹ để resume; object
     đầy đủ được tái tạo lại nếu cần load lại từ output_ref khi resume từ giữa.
     """
+    # `run_project` is also a public direct/resume boundary. Batch callers
+    # arrive through `load_or_create_project`, but a direct caller may supply
+    # stale DONE nodes. Normalize and persist exactly as batch does before any
+    # provider is selected or a manifest can claim a newer contract than media.
+    project = _normalize_project_for_script(project, Path(_node_script_path(project)))
+    checkpoint.save(project)
     state: dict[str, object] = {}
 
     def enforce_checkpointed_audio_quality(current: Project) -> None:
@@ -855,7 +891,11 @@ async def run_project(project: Project, checkpoint: CheckpointManager, through: 
         # with the checkpoint/queue slug so artifact names remain stable when a
         # title is edited.
         script = replace(script, project_id=current.project_id)
-        voice = get_voice_provider()
+        profile = load_content_profile(
+            script.content_profile_id,
+            version=script.content_profile_version or None,
+        )
+        voice = get_voice_provider(profile.providers.tts)
         print("[2/4] Voiceover ▶  đang tạo audio...")
         voiceover = await voice.synthesise(script, Path("assets/audio"))
         validate_audio(voiceover)

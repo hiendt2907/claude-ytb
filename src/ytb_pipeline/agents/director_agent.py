@@ -30,8 +30,12 @@ class DirectorAgent:
     """One configured-provider call per scene, with one bounded repair."""
     ruleset_version = "director-v1"
 
+    def __init__(self, provider_name: str | None = None) -> None:
+        self._provider_name = provider_name
+        self.provider_identity = provider_name or "configured-provider"
+
     async def plan_scene(self, *, narration: str, visual_intent: str, characters: tuple[str, ...], max_shots: int):
-        provider = get_llm_provider()
+        provider = get_llm_provider(self._provider_name)
         if not provider.is_available():
             raise RuntimeError("Director LLM provider không khả dụng.")
         prompt = f"Return JSON {{shots:[{{visual_intent,characters,duration_weight}}]}}. Scene: {visual_intent}. Narration: {narration}. Allowed characters: {','.join(characters)}. Max shots: {max_shots}."

@@ -26,7 +26,7 @@ async def prepare_scene_plan(voiceover, profile, *, project_dir, director=None) 
     baseline = build_story_scene_plan(voiceover, profile)
     if profile.scene_planning.mode == "director" and director is None:
         from ..agents.director_agent import DirectorAgent
-        director = DirectorAgent()
+        director = DirectorAgent(profile.providers.llm)
     fingerprint, provenance = _planning_identity(baseline, profile, director)
     path = project_dir / "scene_plan.json"
     if path.is_file():
