@@ -308,9 +308,10 @@ class VisualCandidateStore:
             and existing.generation_key == generation_key
         ):
             # A changed target count or selection-policy version does NOT
-            # invalidate already-generated candidates.  A generation key does:
-            # it binds the profile release version and visual prompt inputs, so
-            # reusing its old pixels would cross a release boundary.
+            # invalidate already-generated candidates. A generation key binds
+            # the exact model-facing visual inputs (including consumed
+            # reference bytes), so reusing old pixels would cross a real image
+            # input boundary — unlike a broad editorial profile release.
             existing.request_id = request_id
             existing.generation_key = generation_key
             existing.candidate_policy_version = candidate_policy_version

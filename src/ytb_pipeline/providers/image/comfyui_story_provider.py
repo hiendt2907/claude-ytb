@@ -30,6 +30,7 @@ runs on this machine or elsewhere reachable at `settings.comfyui_url`.
 from __future__ import annotations
 
 import json
+import re
 import time
 import urllib.error
 import urllib.parse
@@ -47,6 +48,18 @@ _POLL_INTERVAL_S = 1.5
 _POLL_ATTEMPTS = 240  # ~6 minutes; an SDXL/IPAdapter step on M4 Pro is far faster
 SAMPLER = "dpmpp_2m"
 SCHEDULER = "karras"
+
+# A duo keyframe is deliberately free of work clutter so img2img does not
+# hallucinate it into every story beat.  Individual scenes still opt in to
+# those props by naming them in `visual_intent`.
+_COMPUTER_INTENT = re.compile(
+    r"\b(?:laptop|computer|desktop|pc|macbook)\b|máy\s+tính", re.IGNORECASE
+)
+_PAPERWORK_INTENT = re.compile(
+    r"\b(?:document|documents|paper|papers|worksheet|printout|notebook)\b|"
+    r"tài\s+liệu|giấy|bản\s+nháp|sổ\s+tay",
+    re.IGNORECASE,
+)
 
 
 class ComfyUIStoryProvider:
@@ -132,7 +145,9 @@ class ComfyUIStoryProvider:
         return {
             "ckpt": self._checkpoint_node(),
             "pos": self._text_node(f"{prompt}, {vg.style_prompt}", ["ckpt", 1]),
-            "neg": self._text_node(self._scene_negative_prompt(vg, character_count=0), ["ckpt", 1]),
+            "neg": self._text_node(
+                self._scene_negative_prompt(vg, character_count=0, prompt=prompt), ["ckpt", 1]
+            ),
             "latent": {"class_type": "EmptyLatentImage", "inputs": {"width": width, "height": height, "batch_size": 1}},
             "sampler": self._sampler_node(vg, seed, ["ckpt", 0], ["latent", 0], denoise=1.0),
             "vaedecode": self._decode_node(["ckpt", 2]),
@@ -153,7 +168,9 @@ class ComfyUIStoryProvider:
                 model=["ckpt", 0], image=["refimg", 0], weight=vg.solo_weight,
             ),
             "pos": self._text_node(f"{prompt}, {vg.style_prompt}", ["ckpt", 1]),
-            "neg": self._text_node(self._scene_negative_prompt(vg, character_count=1), ["ckpt", 1]),
+            "neg": self._text_node(
+                self._scene_negative_prompt(vg, character_count=1, prompt=prompt), ["ckpt", 1]
+            ),
             "latent": {"class_type": "EmptyLatentImage", "inputs": {"width": width, "height": height, "batch_size": 1}},
             "sampler": self._sampler_node(vg, seed, ["ipadapter", 0], ["latent", 0], denoise=1.0),
             "vaedecode": self._decode_node(["ckpt", 2]),
@@ -188,7 +205,9 @@ class ComfyUIStoryProvider:
             ),
             "vaeencode": {"class_type": "VAEEncode", "inputs": {"pixels": ["baseresize", 0], "vae": ["ckpt", 2]}},
             "pos": self._text_node(f"{prompt}, {vg.style_prompt}", ["ckpt", 1]),
-            "neg": self._text_node(self._scene_negative_prompt(vg, character_count=2), ["ckpt", 1]),
+            "neg": self._text_node(
+                self._scene_negative_prompt(vg, character_count=2, prompt=prompt), ["ckpt", 1]
+            ),
             "sampler": self._sampler_node(
                 vg, seed, ["ipa_second", 0], ["vaeencode", 0], denoise=vg.duo_denoise,
             ),
@@ -198,14 +217,21 @@ class ComfyUIStoryProvider:
         return workflow
 
     @staticmethod
-    def _scene_negative_prompt(vg: VisualGenerationProfile, *, character_count: int) -> str:
+    def _scene_negative_prompt(
+        vg: VisualGenerationProfile, *, character_count: int, prompt: str
+    ) -> str:
         if character_count == 1:
             exclusion = "multiple people, two people, duplicate person, extra person"
         elif character_count == 2:
             exclusion = "third person, extra person, duplicate person"
         else:
             exclusion = "people, person, character"
-        return f"{vg.negative_prompt}, {exclusion}"
+        prop_exclusions: list[str] = []
+        if not _COMPUTER_INTENT.search(prompt):
+            prop_exclusions.extend(("laptop", "computer"))
+        if not _PAPERWORK_INTENT.search(prompt):
+            prop_exclusions.extend(("documents", "papers", "notebook"))
+        return ", ".join((vg.negative_prompt, exclusion, *prop_exclusions))
 
     def _checkpoint_node(self) -> dict:
         return {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": settings.comfyui_sdxl_checkpoint}}

@@ -26,8 +26,12 @@ from .visual_candidates import (
     resolve_selection_policy,
     validate_candidate_image,
 )
-from .visual_disposition import AutoDispositionPolicy, choose_auto_accept
 from .visual_evaluation_store import ShotEvaluationSet, VisualEvaluationStore
+from .visual_generation_identity import generation_key as _generation_key
+from .visual_integrity import (
+    VisualAssetIntegrityError,
+    assert_registered_cache_is_intact,
+)
 from .visual_judge import (
     CONTRACT_VERSION as _JUDGE_CONTRACT_VERSION,
     JudgeCandidate,
@@ -49,152 +53,16 @@ from .visual_review import (
     manual_candidate_cache_path,
     manual_generation_key,
 )
+from .visual_review_auto import (
+    resolve_auto_disposition,
+    resolve_judge_target,
+    try_auto_accept,
+)
 
 if TYPE_CHECKING:
     from ..content_profiles import ContentProfile
     from ..pkg.models import Segment, Voiceover
     from .scene_plan import ScenePlan, Shot
-
-
-
-def resolve_judge_target(judge_cfg: Any) -> tuple[str, str]:
-    """Provider/model nào thật sự chấm ảnh cho shot này.
-
-    Model Judge được khai trong profile, và script ghim `profile_version`, nên
-    snapshot đóng băng cả LỰA CHỌN HẠ TẦNG lẫn hợp đồng nội dung. Snapshot tồn
-    tại để luật kể chuyện không đổi dưới chân một script đã viết; đóng băng
-    luôn tên nhà cung cấp chỉ là tác dụng phụ của việc để chung một file.
-
-    Đo 2026-09-04: `qwen/qwen3.8-max:free` trả HTTP 500 cho mọi request, kể cả
-    text-only, và cả họ qwen cùng hỏng trên gateway. Mọi script ghim version có
-    model đó trở thành KHÔNG BAO GIỜ sản xuất được — kể cả sau khi profile mới
-    đã đổi sang model chạy được.
-
-    `settings.visual_judge_provider/model` đã tồn tại nhưng chỉ được một smoke
-    tool dùng. Ở đây chúng là cửa thoát TƯỜNG MINH cho operator: đặt env thì nó
-    thắng, bỏ trống thì profile thắng đúng như trước. Không có mặc định ẩn nào
-    thay đổi.
-    """
-    provider = (settings.visual_judge_provider or "").strip() or judge_cfg.provider
-    model = (settings.visual_judge_model or "").strip() or judge_cfg.model
-    if model != judge_cfg.model or provider != judge_cfg.provider:
-        _judge_logger.warning(
-            "visual_judge.operator_override profile=%s/%s -> %s/%s",
-            judge_cfg.provider, judge_cfg.model, provider, model,
-        )
-    return provider, model
-
-
-def resolve_auto_disposition(judge_cfg: Any) -> "AutoDispositionPolicy":
-    """The disposition policy in force, profile first, operator override last.
-
-    Same shape and same reason as `resolve_judge_target` above. Four ban-so-6
-    Longs are pinned to profile snapshots 2.2.0 and 2.5.0, so a policy added to
-    the live `profile.json` can never reach them — the snapshot exists exactly
-    so story rules do not shift under a written script, and it freezes this
-    with them. The env override is the explicit way out for an operator, and
-    when it is unset the profile wins, unchanged.
-    """
-    from .visual_disposition import AutoDispositionPolicy, DispositionError
-
-    # `judge_cfg` is duck-typed across this module. Anything that never
-    # declared a disposition has not opted in, and halting is what not opting
-    # in means — so read it defensively rather than requiring the full profile.
-    reader = getattr(judge_cfg, "auto_disposition_policy", None)
-    declared = reader() if callable(reader) else AutoDispositionPolicy()
-    mode = (settings.visual_auto_disposition or "").strip()
-    if not mode:
-        return declared
-    raw_codes = (settings.visual_auto_accept_waived_failures or "").strip()
-    codes = frozenset(part.strip() for part in raw_codes.split(",") if part.strip())
-    try:
-        override = AutoDispositionPolicy(
-            mode=mode,
-            minimum_score=settings.visual_auto_accept_minimum_score,
-            ignorable_hard_failures=codes,
-        )
-    except DispositionError as exc:
-        raise DispositionError(f"Operator override không hợp lệ: {exc}") from exc
-    _judge_logger.warning(
-        "visual_judge.disposition_override profile=%s -> %s waived=%s min=%.2f",
-        declared.mode, override.mode, ",".join(sorted(codes)) or "-",
-        override.minimum_score,
-    )
-    return override
-
-
-def try_auto_accept(
-    entry: Any,
-    request: "VisualRequest",
-    *,
-    judge_cfg: Any,
-    review_store: Any,
-    evaluation_store: Any,
-    registry: AssetRegistry,
-) -> str | None:
-    """Settle one pending review by policy, or return None to keep waiting.
-
-    Called from two places on purpose. A review entry outlives the run that
-    created it, so a policy enabled afterwards would never reach the shots
-    already halted if this only ran where the halt is first raised — which is
-    exactly the state four ban-so-6 Longs were in.
-    """
-    if judge_cfg is None or review_store is None or evaluation_store is None:
-        return None
-    policy = resolve_auto_disposition(judge_cfg)
-    if not policy.accepts_automatically:
-        return None
-    evaluated = evaluation_store.get(request.shot_id)
-    if evaluated is None or evaluated.fallback_used:
-        return None
-    candidate_identity: dict[str, str] = {}
-    for asset_id in entry.candidate_asset_ids:
-        record = registry.find_by_asset_id(asset_id)
-        if record is None:
-            return None
-        path = Path(str(record.get("local_path") or ""))
-        if not path.is_file() or observed_content_sha256(path) != record.get("content_sha256"):
-            return None
-        candidate_identity[asset_id] = str(record["content_sha256"])
-    judge_provider, judge_model = resolve_judge_target(judge_cfg)
-    if (
-        not evaluated.matches_context(
-            request_fingerprint=request.request_fingerprint,
-            judge_provider=judge_provider,
-            judge_model=judge_model,
-            judge_policy_version=judge_cfg.policy_version,
-            judge_contract_version=_JUDGE_CONTRACT_VERSION,
-        )
-        or not evaluated.matches_candidate_identity(candidate_identity)
-        or set(evaluated.evaluations) != set(candidate_identity)
-    ):
-        return None
-    evaluations = tuple(evaluated.evaluations[asset_id] for asset_id in entry.candidate_asset_ids)
-    index = {
-        asset_id: position
-        for position, asset_id in enumerate(entry.candidate_asset_ids)
-    }
-    chosen = choose_auto_accept(evaluations, policy=policy, candidate_index_by_asset=index)
-    if chosen is None:
-        return None
-    review_store.resolve_accept_existing(
-        entry.review_id,
-        request_fingerprint=request.request_fingerprint,
-        asset_id=chosen,
-        selection_mode="auto_accept_best",
-    )
-    waived = sorted(
-        code
-        for evaluation in evaluations
-        if evaluation.asset_id == chosen
-        for code in evaluation.hard_failures
-    )
-    _candidate_logger.warning(
-        "visual_review.auto_accepted shot_id=%s review_id=%s asset_id=%s waived=%s",
-        request.shot_id, entry.review_id, chosen, ",".join(waived) or "-",
-    )
-    return chosen
-
 
 @dataclass(frozen=True)
 class VisualRequest:
@@ -232,7 +100,11 @@ def build_visual_requests(scene_plan: "ScenePlan", profile: "ContentProfile", *,
         for shot in scene.shots:
             kind = "profile_local" if shot.visual_asset else "generated_image"
             fingerprint = _fingerprint(
-                profile.profile_id, profile.version, policy, kind, scene.scene_id,
+                # Profile releases cover many independent editorial concerns.
+                # A request is only its semantic plan + dimensions + local-vs-
+                # generated policy, otherwise a corrective release needlessly
+                # stales every unaffected shot.
+                profile.profile_id, policy, kind, scene.scene_id,
                 shot.shot_id, shot.visual_intent.strip(), ",".join(shot.scene_characters),
                 f"{dimensions[0]}x{dimensions[1]}",
             )
@@ -315,12 +187,6 @@ def validate_prepared_manifest(manifest: VisualManifest, requests: tuple[VisualR
 
 
 _SDXL_GENERATION_DIMS = {(1920, 1080): (1344, 768), (1080, 1920): (832, 1216)}
-
-
-def _generation_key(segment: "Segment", profile: "ContentProfile", dimensions: tuple[int, int]) -> str:
-    visual = profile.visual_generation
-    payload = "\x1f".join((profile.profile_id, profile.version, f"{dimensions[0]}x{dimensions[1]}", ",".join(sorted(segment.scene_characters)), segment.visual_intent.strip(), visual.style_prompt, visual.negative_prompt, str(visual.steps), str(visual.cfg), str(visual.solo_weight), str(visual.duo_weight), str(visual.duo_denoise)))
-    return hashlib.sha256(payload.encode()).hexdigest()
 
 
 def _generation_mode(characters: tuple[str, ...]) -> str:
@@ -435,6 +301,9 @@ class VisualAssetResolver:
             # seed formula, same call shape as before Phase 9 existed.
             asset_path = Path(cache_dir) / f"{key}.png"
             seed = int(key[:16], 16) % (2**32)
+            assert_registered_cache_is_intact(
+                self.registry, generation_key=key, path=asset_path
+            )
             fresh = not asset_path.is_file()
             if fresh:
                 provider = self.provider
@@ -479,6 +348,16 @@ class VisualAssetResolver:
             slot = candidate_set.slot(index, generation_round=generation_round)
             if candidate_is_valid(slot, self.registry):
                 continue
+            if slot.status == "done":
+                # A completed checkpoint whose registered bytes disappeared or
+                # changed is an integrity incident.  It is not the bounded
+                # semantic-recovery path and must never silently spend another
+                # generation call to conceal that history.
+                raise VisualAssetIntegrityError(
+                    "Visual asset integrity failure: completed candidate "
+                    f"checkpoint is missing or stale (shot={request.shot_id}, "
+                    f"slot={slot.candidate_slot_id})."
+                )
             slot.attempt_count += 1
             asset_path = candidate_cache_path(
                 cache_dir,
@@ -487,6 +366,9 @@ class VisualAssetResolver:
                 generation_round=generation_round,
             )
             seed = slot.seed
+            assert_registered_cache_is_intact(
+                self.registry, generation_key=generation_key, path=asset_path
+            )
             fresh = not asset_path.is_file()
             try:
                 if fresh:
@@ -702,6 +584,12 @@ class VisualAssetResolver:
             candidate_slot = self._manual_candidate_slot(persisted_slot)
             if candidate_is_valid(candidate_slot, self.registry):
                 continue
+            asset_path = manual_candidate_cache_path(
+                cache_dir, generation_key, persisted_slot.candidate_index
+            )
+            assert_registered_cache_is_intact(
+                self.registry, generation_key=generation_key, path=asset_path
+            )
             entry = self.review_store.update_manual_slot(
                 entry.review_id,
                 request_fingerprint=request.request_fingerprint,
@@ -717,9 +605,6 @@ class VisualAssetResolver:
                 item
                 for item in override.candidates
                 if item.candidate_index == persisted_slot.candidate_index
-            )
-            asset_path = manual_candidate_cache_path(
-                cache_dir, generation_key, slot.candidate_index
             )
             fresh = not asset_path.is_file()
             try:
@@ -1286,6 +1171,29 @@ def _resolved_review_record(
     return record
 
 
+def _resolved_review_generation_key(
+    request: VisualRequest,
+    segment: "Segment",
+    profile: "ContentProfile",
+    entry: VisualReviewEntry,
+) -> str | None:
+    """Expected generation identity for a reviewed selection on this rerun.
+
+    A review resolves a concrete old candidate, not a standing approval for
+    every future image generated for the same semantic request. Manual
+    candidates additionally bind their operator override into the identity.
+    """
+    if request.resolution_kind != "generated_image":
+        return None
+    automated_key = _generation_key(segment, profile, request.dimensions)
+    if (
+        entry.disposition == ReviewDisposition.MANUAL_REGENERATE
+        and entry.manual_override is not None
+    ):
+        return manual_generation_key(automated_key, entry.manual_override)
+    return automated_key
+
+
 def prepare_visual_assets(voiceover: "Voiceover", profile: "ContentProfile", *, project_dir: Path, dimensions: tuple[int, int], scene_plan: "ScenePlan | None" = None, registry: AssetRegistry | None = None, cache_dir: Path | None = None, provider: Any = None, lineage=None, judge: Any = None) -> tuple["ScenePlan", VisualManifest, dict[str, Path]]:
     """Checkpoint each resolved shot; failures preserve earlier completed shots.
 
@@ -1349,6 +1257,26 @@ def prepare_visual_assets(voiceover: "Voiceover", profile: "ContentProfile", *, 
                         error="Accepted/manual selected asset missing, stale, or invalid.",
                     )
                     raise ReviewRequiredError(review)
+                scene, _shot = shots[request.shot_id]
+                expected_generation_key = _resolved_review_generation_key(
+                    request,
+                    voiceover.segments[scene.source_segment_index],
+                    profile,
+                    review,
+                )
+                if (
+                    expected_generation_key is not None
+                    and record.get("generation_key") != expected_generation_key
+                ):
+                    review = review_store.reopen_invalid_selection(
+                        review.review_id,
+                        request_fingerprint=request.request_fingerprint,
+                        error=(
+                            "Accepted/manual selected asset no longer matches "
+                            "the current visual generation input."
+                        ),
+                    )
+                    raise ReviewRequiredError(review)
                 candidate_set = candidate_store.get(request.shot_id)
                 if candidate_set is not None:
                     candidate_set.selected_asset_id = record["asset_id"]
@@ -1364,15 +1292,43 @@ def prepare_visual_assets(voiceover: "Voiceover", profile: "ContentProfile", *, 
                 manifest.write_json(manifest_path)
                 prepared[request.shot_id] = Path(record["local_path"])
                 continue
-            if (
-                review.status == ReviewStatus.PENDING
-                and review.disposition != ReviewDisposition.MANUAL_REGENERATE
-                and not resolve_auto_disposition(judge_cfg).accepts_automatically
-            ):
+            manual_attempt_active = bool(
+                review.disposition == ReviewDisposition.MANUAL_REGENERATE
+                and review.manual_override is not None
+                and review.manual_override.status in {"pending", "running"}
+            )
+            if review.status == ReviewStatus.PENDING and not manual_attempt_active:
+                # A policy that *could* waive a failure is not itself a
+                # disposition. A completed/rejected manual override is also
+                # not a standing permission to generate again. The durable
+                # review must receive a new operator action first.
                 raise ReviewRequiredError(review)
         existing = manifest.shots.get(request.shot_id)
         if existing and existing.asset_id:
             record = registry.find_by_asset_id(existing.asset_id)
+            same_completed_request = (
+                existing.status == "done"
+                and existing.request_fingerprint == request.request_fingerprint
+            )
+            if same_completed_request and (
+                record is None
+                or not manifest.is_reusable(
+                    request.shot_id,
+                    request_fingerprint=request.request_fingerprint,
+                    asset_path=Path(record["local_path"]) if record else Path(),
+                    content_sha256=record.get("content_sha256", "") if record else "",
+                )
+            ):
+                raise VisualAssetIntegrityError(
+                    "Visual asset integrity failure: completed manifest asset is "
+                    f"missing or stale (shot={request.shot_id})."
+                )
+            expected_generation_key = None
+            if request.resolution_kind == "generated_image" and not existing.reuse_source:
+                scene, _shot = shots[request.shot_id]
+                expected_generation_key = _generation_key(
+                    voiceover.segments[scene.source_segment_index], profile, request.dimensions
+                )
             if (
                 record
                 and manifest.is_reusable(
@@ -1387,6 +1343,10 @@ def prepare_visual_assets(voiceover: "Voiceover", profile: "ContentProfile", *, 
                     candidate_store,
                     has_reuse_source=existing.reuse_source is not None,
                 )
+                and (
+                    expected_generation_key is None
+                    or record.get("generation_key") == expected_generation_key
+                )
             ):
                 prepared[request.shot_id] = Path(record["local_path"])
                 continue
@@ -1398,6 +1358,8 @@ def prepare_visual_assets(voiceover: "Voiceover", profile: "ContentProfile", *, 
                 review is not None
                 and review.status == ReviewStatus.PENDING
                 and review.disposition == ReviewDisposition.MANUAL_REGENERATE
+                and review.manual_override is not None
+                and review.manual_override.status in {"pending", "running"}
             ):
                 record = resolver.resolve_manual_review(
                     request,
