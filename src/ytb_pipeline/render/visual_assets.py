@@ -13,7 +13,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from ..config.settings import settings
-from ..providers.image.comfyui_story_provider import SAMPLER, SCHEDULER
+from ..providers.image.comfyui_story_provider import (
+    SAMPLER,
+    SCHEDULER,
+    STORY_PROMPT_POLICY_VERSION,
+)
 from .asset_registry import AssetRegistry, content_sha256 as observed_content_sha256
 from .visual_candidates import (
     CandidateSlot,
@@ -107,6 +111,10 @@ def build_visual_requests(scene_plan: "ScenePlan", profile: "ContentProfile", *,
                 profile.profile_id, policy, kind, scene.scene_id,
                 shot.shot_id, shot.visual_intent.strip(), ",".join(shot.scene_characters),
                 f"{dimensions[0]}x{dimensions[1]}",
+                # A change to the prompt compiler changes the semantic
+                # request, not just the cache bytes. Reopen prior reviews so
+                # a rejected manual disposition cannot survive a new rule.
+                STORY_PROMPT_POLICY_VERSION if kind == "generated_image" else "",
             )
             requests.append(VisualRequest(
                 request_id=f"vr_{fingerprint[:24]}", request_fingerprint=fingerprint,
