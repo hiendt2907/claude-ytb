@@ -14,7 +14,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from ..config.settings import settings
-from ..providers.image.comfyui_story_provider import SAMPLER, SCHEDULER
+from ..providers.image.comfyui_story_provider import (
+    SAMPLER,
+    SCHEDULER,
+    STORY_PROMPT_POLICY_VERSION,
+)
 
 if TYPE_CHECKING:
     from ..content_profiles import ContentProfile
@@ -109,6 +113,7 @@ def visual_input_fingerprint(
         "ipadapter_model": settings.comfyui_ipadapter_model,
         "sampler": SAMPLER,
         "scheduler": SCHEDULER,
+        "story_prompt_policy_version": STORY_PROMPT_POLICY_VERSION,
     }
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()

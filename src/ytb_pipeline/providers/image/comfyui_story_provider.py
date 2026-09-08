@@ -48,6 +48,7 @@ _POLL_INTERVAL_S = 1.5
 _POLL_ATTEMPTS = 240  # ~6 minutes; an SDXL/IPAdapter step on M4 Pro is far faster
 SAMPLER = "dpmpp_2m"
 SCHEDULER = "karras"
+STORY_PROMPT_POLICY_VERSION = "story-props-v2"
 
 # A duo keyframe is deliberately free of work clutter so img2img does not
 # hallucinate it into every story beat.  Individual scenes still opt in to
@@ -58,6 +59,11 @@ _COMPUTER_INTENT = re.compile(
 _PAPERWORK_INTENT = re.compile(
     r"\b(?:document|documents|paper|papers|worksheet|printout|notebook)\b|"
     r"tài\s+liệu|giấy|bản\s+nháp|sổ\s+tay",
+    re.IGNORECASE,
+)
+_EXPLICIT_NO_COFFEE_SERVICE = re.compile(
+    r"\b(?:no|without)\s+(?:(?:an?|any)\s+)?(?:(?:coffee\s+)?(?:cups?|saucers?)|coffee)\b"
+    r"|không\s+(?:có\s+)?(?:cốc|ly|tách|đĩa\s+lót|cà\s+phê)",
     re.IGNORECASE,
 )
 
@@ -231,6 +237,8 @@ class ComfyUIStoryProvider:
             prop_exclusions.extend(("laptop", "computer"))
         if not _PAPERWORK_INTENT.search(prompt):
             prop_exclusions.extend(("documents", "papers", "notebook"))
+        if _EXPLICIT_NO_COFFEE_SERVICE.search(prompt):
+            prop_exclusions.extend(("coffee cup", "cup", "saucer", "coffee"))
         return ", ".join((vg.negative_prompt, exclusion, *prop_exclusions))
 
     def _checkpoint_node(self) -> dict:
